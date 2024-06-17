@@ -23,12 +23,14 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -39,9 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-
-	core "k8s.io/client-go/testing"
-	"time"
+	"k8s.io/utils/pointer"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -1650,7 +1650,7 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 				MatchLabels:      nil,
 				MatchExpressions: testMatchExpressions,
 			},
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
@@ -1679,7 +1679,7 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "datadir"},
 					Spec: v1.PersistentVolumeClaimSpec{
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{
 								v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 							},

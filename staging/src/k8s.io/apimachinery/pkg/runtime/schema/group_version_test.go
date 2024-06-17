@@ -178,3 +178,63 @@ func TestParseGroupKind(t *testing.T) {
 		})
 	}
 }
+
+func TestToAPIVersionAndKind(t *testing.T) {
+	tests := []struct {
+		desc         string
+		input        GroupVersionKind
+		GroupVersion string
+		Kind         string
+	}{
+		{
+			desc:         "gvk object is not empty",
+			input:        GroupVersionKind{Version: "V1", Kind: "pod"},
+			GroupVersion: "V1",
+			Kind:         "pod",
+		},
+		{
+			desc:         "gvk object is empty",
+			input:        GroupVersionKind{},
+			GroupVersion: "",
+			Kind:         "",
+		},
+	}
+	for i, test := range tests {
+		version, kind := test.input.ToAPIVersionAndKind()
+		if version != test.GroupVersion {
+			t.Errorf("%d: expected version: %#v, got: %#v", i, test.GroupVersion, version)
+		}
+		if kind != test.Kind {
+			t.Errorf("%d: expected kind: %#v, got: %#v", i, test.Kind, kind)
+		}
+	}
+}
+
+func TestBestMatch(t *testing.T) {
+	tests := []struct {
+		desc    string
+		kinds   []GroupVersionKind
+		targets []GroupVersionKind
+		output  GroupVersionKind
+	}{
+		{
+			desc:    "targets and kinds have match items",
+			kinds:   []GroupVersionKind{{Version: "V1", Kind: "pod"}, {Version: "V2", Kind: "pod"}},
+			targets: []GroupVersionKind{{Version: "V1", Kind: "pod"}},
+			output:  GroupVersionKind{Version: "V1", Kind: "pod"},
+		},
+		{
+			desc:    "targets and kinds do not have match items",
+			kinds:   []GroupVersionKind{{Version: "V1", Kind: "pod"}, {Version: "V2", Kind: "pod"}},
+			targets: []GroupVersionKind{{Version: "V3", Kind: "pod"}, {Version: "V4", Kind: "pod"}},
+			output:  GroupVersionKind{Version: "V3", Kind: "pod"},
+		},
+	}
+
+	for i, test := range tests {
+		out := bestMatch(test.kinds, test.targets)
+		if out != test.output {
+			t.Errorf("%d: expected out: %#v, got: %#v", i, test.output, out)
+		}
+	}
+}

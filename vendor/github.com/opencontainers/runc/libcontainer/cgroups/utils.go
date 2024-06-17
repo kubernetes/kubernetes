@@ -1,5 +1,3 @@
-// +build linux
-
 package cgroups
 
 import (
@@ -7,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,37 +12,59 @@ import (
 	"sync"
 	"time"
 
-	units "github.com/docker/go-units"
+	"github.com/opencontainers/runc/libcontainer/userns"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
 const (
 	CgroupProcesses   = "cgroup.procs"
 	unifiedMountpoint = "/sys/fs/cgroup"
+	hybridMountpoint  = "/sys/fs/cgroup/unified"
 )
 
 var (
 	isUnifiedOnce sync.Once
 	isUnified     bool
+	isHybridOnce  sync.Once
+	isHybrid      bool
 )
-
-// HugePageSizeUnitList is a list of the units used by the linux kernel when
-// naming the HugePage control files.
-// https://www.kernel.org/doc/Documentation/cgroup-v1/hugetlb.txt
-// TODO Since the kernel only use KB, MB and GB; TB and PB should be removed,
-// depends on https://github.com/docker/go-units/commit/a09cd47f892041a4fac473133d181f5aea6fa393
-var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
 func IsCgroup2UnifiedMode() bool {
 	isUnifiedOnce.Do(func() {
 		var st unix.Statfs_t
-		if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
-			panic("cannot statfs cgroup root")
+		err := unix.Statfs(unifiedMountpoint, &st)
+		if err != nil {
+			if os.IsNotExist(err) && userns.RunningInUserNS() {
+				// ignore the "not found" error if running in userns
+				logrus.WithError(err).Debugf("%s missing, assuming cgroup v1", unifiedMountpoint)
+				isUnified = false
+				return
+			}
+			panic(fmt.Sprintf("cannot statfs cgroup root: %s", err))
 		}
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
 	return isUnified
+}
+
+// IsCgroup2HybridMode returns whether we are running in cgroup v2 hybrid mode.
+func IsCgroup2HybridMode() bool {
+	isHybridOnce.Do(func() {
+		var st unix.Statfs_t
+		err := unix.Statfs(hybridMountpoint, &st)
+		if err != nil {
+			isHybrid = false
+			if !os.IsNotExist(err) {
+				// Report unexpected errors.
+				logrus.WithError(err).Debugf("statfs(%q) failed", hybridMountpoint)
+			}
+			return
+		}
+		isHybrid = st.Type == unix.CGROUP2_SUPER_MAGIC
+	})
+	return isHybrid
 }
 
 type Mount struct {
@@ -86,11 +105,11 @@ func GetAllSubsystems() ([]string, error) {
 		// - freezer: implemented in kernel 5.2
 		// We assume these are always available, as it is hard to detect availability.
 		pseudo := []string{"devices", "freezer"}
-		data, err := ioutil.ReadFile("/sys/fs/cgroup/cgroup.controllers")
+		data, err := ReadFile("/sys/fs/cgroup", "cgroup.controllers")
 		if err != nil {
 			return nil, err
 		}
-		subsystems := append(pseudo, strings.Fields(string(data))...)
+		subsystems := append(pseudo, strings.Fields(data)...)
 		return subsystems, nil
 	}
 	f, err := os.Open("/proc/cgroups")
@@ -117,8 +136,8 @@ func GetAllSubsystems() ([]string, error) {
 	return subsystems, nil
 }
 
-func readProcsFile(file string) ([]int, error) {
-	f, err := os.Open(file)
+func readProcsFile(dir string) ([]int, error) {
+	f, err := OpenFile(dir, CgroupProcesses, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -143,8 +162,10 @@ func readProcsFile(file string) ([]int, error) {
 
 // ParseCgroupFile parses the given cgroup file, typically /proc/self/cgroup
 // or /proc/<pid>/cgroup, into a map of subsystems to cgroup paths, e.g.
-//   "cpu": "/user.slice/user-1000.slice"
-//   "pids": "/user.slice/user-1000.slice"
+//
+//	"cpu": "/user.slice/user-1000.slice"
+//	"pids": "/user.slice/user-1000.slice"
+//
 // etc.
 //
 // Note that for cgroup v2 unified hierarchy, there are no per-controller
@@ -207,20 +228,65 @@ func EnterPid(cgroupPaths map[string]string, pid int) error {
 	return nil
 }
 
+func rmdir(path string) error {
+	err := unix.Rmdir(path)
+	if err == nil || err == unix.ENOENT { //nolint:errorlint // unix errors are bare
+		return nil
+	}
+	return &os.PathError{Op: "rmdir", Path: path, Err: err}
+}
+
+// RemovePath aims to remove cgroup path. It does so recursively,
+// by removing any subdirectories (sub-cgroups) first.
+func RemovePath(path string) error {
+	// try the fast path first
+	if err := rmdir(path); err == nil {
+		return nil
+	}
+
+	infos, err := os.ReadDir(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+		}
+		return err
+	}
+	for _, info := range infos {
+		if info.IsDir() {
+			// We should remove subcgroups dir first
+			if err = RemovePath(filepath.Join(path, info.Name())); err != nil {
+				break
+			}
+		}
+	}
+	if err == nil {
+		err = rmdir(path)
+	}
+	return err
+}
+
 // RemovePaths iterates over the provided paths removing them.
 // We trying to remove all paths five times with increasing delay between tries.
 // If after all there are not removed cgroups - appropriate error will be
 // returned.
 func RemovePaths(paths map[string]string) (err error) {
+	const retries = 5
 	delay := 10 * time.Millisecond
-	for i := 0; i < 5; i++ {
+	for i := 0; i < retries; i++ {
 		if i != 0 {
 			time.Sleep(delay)
 			delay *= 2
 		}
 		for s, p := range paths {
-			os.RemoveAll(p)
-			// TODO: here probably should be logging
+			if err := RemovePath(p); err != nil {
+				// do not log intermediate iterations
+				switch i {
+				case 0:
+					logrus.WithError(err).Warnf("Failed to remove cgroup (will retry)")
+				case retries - 1:
+					logrus.WithError(err).Error("Failed to remove cgroup")
+				}
+			}
 			_, err := os.Stat(p)
 			// We need this strange way of checking cgroups existence because
 			// RemoveAll almost always returns error, even on already removed
@@ -230,64 +296,88 @@ func RemovePaths(paths map[string]string) (err error) {
 			}
 		}
 		if len(paths) == 0 {
+			//nolint:ineffassign,staticcheck // done to help garbage collecting: opencontainers/runc#2506
+			paths = make(map[string]string)
 			return nil
 		}
 	}
 	return fmt.Errorf("Failed to remove paths: %v", paths)
 }
 
-func GetHugePageSize() ([]string, error) {
-	files, err := ioutil.ReadDir("/sys/kernel/mm/hugepages")
-	if err != nil {
-		return []string{}, err
-	}
-	var fileNames []string
-	for _, st := range files {
-		fileNames = append(fileNames, st.Name())
-	}
-	return getHugePageSizeFromFilenames(fileNames)
+var (
+	hugePageSizes []string
+	initHPSOnce   sync.Once
+)
+
+func HugePageSizes() []string {
+	initHPSOnce.Do(func() {
+		dir, err := os.OpenFile("/sys/kernel/mm/hugepages", unix.O_DIRECTORY|unix.O_RDONLY, 0)
+		if err != nil {
+			return
+		}
+		files, err := dir.Readdirnames(0)
+		dir.Close()
+		if err != nil {
+			return
+		}
+
+		hugePageSizes, err = getHugePageSizeFromFilenames(files)
+		if err != nil {
+			logrus.Warn("HugePageSizes: ", err)
+		}
+	})
+
+	return hugePageSizes
 }
 
 func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
-	var pageSizes []string
-	for _, fileName := range fileNames {
-		nameArray := strings.Split(fileName, "-")
-		pageSize, err := units.RAMInBytes(nameArray[1])
-		if err != nil {
-			return []string{}, err
+	pageSizes := make([]string, 0, len(fileNames))
+	var warn error
+
+	for _, file := range fileNames {
+		// example: hugepages-1048576kB
+		val := strings.TrimPrefix(file, "hugepages-")
+		if len(val) == len(file) {
+			// Unexpected file name: no prefix found, ignore it.
+			continue
 		}
-		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, HugePageSizeUnitList)
-		pageSizes = append(pageSizes, sizeString)
+		// The suffix is always "kB" (as of Linux 5.13). If we find
+		// something else, produce an error but keep going.
+		eLen := len(val) - 2
+		val = strings.TrimSuffix(val, "kB")
+		if len(val) != eLen {
+			// Highly unlikely.
+			if warn == nil {
+				warn = errors.New(file + `: invalid suffix (expected "kB")`)
+			}
+			continue
+		}
+		size, err := strconv.Atoi(val)
+		if err != nil {
+			// Highly unlikely.
+			if warn == nil {
+				warn = fmt.Errorf("%s: %w", file, err)
+			}
+			continue
+		}
+		// Model after https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/hugetlb_cgroup.c?id=eff48ddeab782e35e58ccc8853f7386bbae9dec4#n574
+		// but in our case the size is in KB already.
+		if size >= (1 << 20) {
+			val = strconv.Itoa(size>>20) + "GB"
+		} else if size >= (1 << 10) {
+			val = strconv.Itoa(size>>10) + "MB"
+		} else {
+			val += "KB"
+		}
+		pageSizes = append(pageSizes, val)
 	}
 
-	return pageSizes, nil
+	return pageSizes, warn
 }
 
 // GetPids returns all pids, that were added to cgroup at path.
 func GetPids(dir string) ([]int, error) {
-	return readProcsFile(filepath.Join(dir, CgroupProcesses))
-}
-
-// GetAllPids returns all pids, that were added to cgroup at path and to all its
-// subcgroups.
-func GetAllPids(path string) ([]int, error) {
-	var pids []int
-	// collect pids from all sub-cgroups
-	err := filepath.Walk(path, func(p string, info os.FileInfo, iErr error) error {
-		if iErr != nil {
-			return iErr
-		}
-		if info.IsDir() || info.Name() != CgroupProcesses {
-			return nil
-		}
-		cPids, err := readProcsFile(p)
-		if err != nil {
-			return err
-		}
-		pids = append(pids, cPids...)
-		return nil
-	})
-	return pids, err
+	return readProcsFile(dir)
 }
 
 // WriteCgroupProc writes the specified pid into the cgroup's cgroup.procs file
@@ -303,14 +393,14 @@ func WriteCgroupProc(dir string, pid int) error {
 		return nil
 	}
 
-	cgroupProcessesFile, err := os.OpenFile(filepath.Join(dir, CgroupProcesses), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	file, err := OpenFile(dir, CgroupProcesses, os.O_WRONLY)
 	if err != nil {
-		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+		return fmt.Errorf("failed to write %v: %w", pid, err)
 	}
-	defer cgroupProcessesFile.Close()
+	defer file.Close()
 
 	for i := 0; i < 5; i++ {
-		_, err = cgroupProcessesFile.WriteString(strconv.Itoa(pid))
+		_, err = file.WriteString(strconv.Itoa(pid))
 		if err == nil {
 			return nil
 		}
@@ -322,20 +412,9 @@ func WriteCgroupProc(dir string, pid int) error {
 			continue
 		}
 
-		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+		return fmt.Errorf("failed to write %v: %w", pid, err)
 	}
 	return err
-}
-
-// Since the OCI spec is designed for cgroup v1, in some cases
-// there is need to convert from the cgroup v1 configuration to cgroup v2
-// the formula for BlkIOWeight is y = (1 + (x - 10) * 9999 / 990)
-// convert linearly from [10-1000] to [1-10000]
-func ConvertBlkIOToCgroupV2Value(blkIoWeight uint16) uint64 {
-	if blkIoWeight == 0 {
-		return 0
-	}
-	return uint64(1 + (uint64(blkIoWeight)-10)*9999/990)
 }
 
 // Since the OCI spec is designed for cgroup v1, in some cases
@@ -376,4 +455,15 @@ func ConvertMemorySwapToCgroupV2Value(memorySwap, memory int64) (int64, error) {
 	}
 
 	return memorySwap - memory, nil
+}
+
+// Since the OCI spec is designed for cgroup v1, in some cases
+// there is need to convert from the cgroup v1 configuration to cgroup v2
+// the formula for BlkIOWeight to IOWeight is y = (1 + (x - 10) * 9999 / 990)
+// convert linearly from [10-1000] to [1-10000]
+func ConvertBlkIOToIOWeightValue(blkIoWeight uint16) uint64 {
+	if blkIoWeight == 0 {
+		return 0
+	}
+	return 1 + (uint64(blkIoWeight)-10)*9999/990
 }

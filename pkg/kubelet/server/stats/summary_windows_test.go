@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,21 +20,24 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	gomock "go.uber.org/mock/gomock"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 )
 
 func TestSummaryProvider(t *testing.T) {
 	var (
+		ctx            = context.Background()
 		podStats       = []statsapi.PodStats{*getPodStats()}
 		imageFsStats   = getFsStats()
 		rootFsStats    = getFsStats()
@@ -51,29 +55,33 @@ func TestSummaryProvider(t *testing.T) {
 
 	assert := assert.New(t)
 
-	mockStatsProvider := new(statstest.StatsProvider)
-	mockStatsProvider.
-		On("GetNode").Return(node, nil).
-		On("GetNodeConfig").Return(nodeConfig).
-		On("GetPodCgroupRoot").Return(cgroupRoot).
-		On("ListPodStats").Return(podStats, nil).
-		On("ListPodStatsAndUpdateCPUNanoCoreUsage").Return(podStats, nil).
-		On("ImageFsStats").Return(imageFsStats, nil).
-		On("RootFsStats").Return(rootFsStats, nil).
-		On("RlimitStats").Return(nil, nil).
-		On("GetCgroupStats", "/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 
-	provider := NewSummaryProvider(mockStatsProvider)
-	summary, err := provider.Get(true)
+	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
+	mockStatsProvider.EXPECT().GetNode().Return(node, nil).AnyTimes()
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).AnyTimes()
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).AnyTimes()
+	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
+	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
+
+	kubeletCreationTime := metav1.Now()
+	systemBootTime := metav1.Now()
+	provider := summaryProviderImpl{kubeletCreationTime: kubeletCreationTime, systemBootTime: systemBootTime, provider: mockStatsProvider}
+	summary, err := provider.Get(ctx, true)
 	assert.NoError(err)
 
 	assert.Equal(summary.Node.NodeName, "test-node")
-	assert.Equal(summary.Node.StartTime, cgroupStatsMap["/"].cs.StartTime)
+	assert.Equal(summary.Node.StartTime, systemBootTime)
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
-	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ImageFs: imageFsStats})
+	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
 	assert.Equal(len(summary.Node.SystemContainers), 1)
 	assert.Equal(summary.Node.SystemContainers[0].Name, "pods")

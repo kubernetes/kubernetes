@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: test-dra
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
+    resources:
+      claims:
+      - name: resource
+  resourceClaims:
+  - name: resource
+    source:
+      resourceClaimTemplateName: test-claim-template

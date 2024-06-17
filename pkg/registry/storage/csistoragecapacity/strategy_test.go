@@ -19,15 +19,12 @@ package csistoragecapacity
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // getValidCSIStorageCapacity returns a fully-populated CSIStorageCapacity.
@@ -83,7 +80,7 @@ func TestCSIStorageCapacityStrategy(t *testing.T) {
 
 	// Create with status should have kept status and all other fields.
 	if !apiequality.Semantic.DeepEqual(capacity, original) {
-		t.Errorf("unexpected objects difference after creation: %v", diff.ObjectDiff(original, capacity))
+		t.Errorf("unexpected objects difference after creation: %v", cmp.Diff(original, capacity))
 	}
 
 	// Update of immutable fields is disallowed
@@ -159,8 +156,6 @@ func TestCSIStorageCapacityValidation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
-
 			oldCapacity := test.old.DeepCopy()
 			Strategy.PrepareForCreate(ctx, oldCapacity)
 			errs := Strategy.Validate(ctx, oldCapacity)

@@ -17,7 +17,6 @@ limitations under the License.
 package net
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -33,11 +32,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/net/http2"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 // JoinPreservingTrailingSlash does a path.Join of the specified elements,
@@ -62,8 +63,11 @@ func JoinPreservingTrailingSlash(elem ...string) string {
 
 // IsTimeout returns true if the given error is a network timeout error
 func IsTimeout(err error) bool {
-	neterr, ok := err.(net.Error)
-	return ok && neterr != nil && neterr.Timeout()
+	var neterr net.Error
+	if errors.As(err, &neterr) {
+		return neterr != nil && neterr.Timeout()
+	}
+	return false
 }
 
 // IsProbableEOF returns true if the given error resembles a connection termination
@@ -76,7 +80,8 @@ func IsProbableEOF(err error) bool {
 	if err == nil {
 		return false
 	}
-	if uerr, ok := err.(*url.Error); ok {
+	var uerr *url.Error
+	if errors.As(err, &uerr) {
 		err = uerr.Err
 	}
 	msg := err.Error()
@@ -108,6 +113,7 @@ func SetOldTransportDefaults(t *http.Transport) *http.Transport {
 		t.Proxy = NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 	// If no custom dialer is set, use the default context dialer
+	//lint:file-ignore SA1019 Keep supporting deprecated Dial method of custom transports
 	if t.DialContext == nil && t.Dial == nil {
 		t.DialContext = defaultTransport.DialContext
 	}
@@ -126,13 +132,61 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Infof("HTTP2 has been explicitly disabled")
+		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
-		if err := http2.ConfigureTransport(t); err != nil {
+		if err := configureHTTP2Transport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
 		}
 	}
 	return t
+}
+
+func readIdleTimeoutSeconds() int {
+	ret := 30
+	// User can set the readIdleTimeout to 0 to disable the HTTP/2
+	// connection health check.
+	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
+func pingTimeoutSeconds() int {
+	ret := 15
+	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
+		i, err := strconv.Atoi(s)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v."+
+				" Default value %d is used", s, err, ret)
+			return ret
+		}
+		ret = i
+	}
+	return ret
+}
+
+func configureHTTP2Transport(t *http.Transport) error {
+	t2, err := http2.ConfigureTransports(t)
+	if err != nil {
+		return err
+	}
+	// The following enables the HTTP/2 connection health check added in
+	// https://github.com/golang/net/pull/55. The health check detects and
+	// closes broken transport layer connections. Without the health check,
+	// a broken connection can linger too long, e.g., a broken TCP
+	// connection will be closed by the Linux kernel after 13 to 30 minutes
+	// by default, which caused
+	// https://github.com/kubernetes/client-go/issues/374 and
+	// https://github.com/kubernetes/kubernetes/issues/87615.
+	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
+	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	return nil
 }
 
 func allowsHTTP2(t *http.Transport) bool {
@@ -180,6 +234,29 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
 		return nil, fmt.Errorf("unknown transport type: %T", transport)
+	}
+}
+
+// CloseIdleConnectionsFor close idles connections for the Transport.
+// If the Transport is wrapped it iterates over the wrapped round trippers
+// until it finds one that implements the CloseIdleConnections method.
+// If the Transport does not have a CloseIdleConnections method
+// then this function does nothing.
+func CloseIdleConnectionsFor(transport http.RoundTripper) {
+	if transport == nil {
+		return
+	}
+	type closeIdler interface {
+		CloseIdleConnections()
+	}
+
+	switch transport := transport.(type) {
+	case closeIdler:
+		transport.CloseIdleConnections()
+	case RoundTripperWrapper:
+		CloseIdleConnectionsFor(transport.WrappedRoundTripper())
+	default:
+		klog.Warningf("unknown transport type: %T", transport)
 	}
 }
 
@@ -235,7 +312,7 @@ func SourceIPs(req *http.Request) []net.IP {
 		// Use the first valid one.
 		parts := strings.Split(hdrForwardedFor, ",")
 		for _, part := range parts {
-			ip := net.ParseIP(strings.TrimSpace(part))
+			ip := netutils.ParseIPSloppy(strings.TrimSpace(part))
 			if ip != nil {
 				srcIPs = append(srcIPs, ip)
 			}
@@ -245,7 +322,7 @@ func SourceIPs(req *http.Request) []net.IP {
 	// Try the X-Real-Ip header.
 	hdrRealIp := hdr.Get("X-Real-Ip")
 	if hdrRealIp != "" {
-		ip := net.ParseIP(hdrRealIp)
+		ip := netutils.ParseIPSloppy(hdrRealIp)
 		// Only append the X-Real-Ip if it's not already contained in the X-Forwarded-For chain.
 		if ip != nil && !containsIP(srcIPs, ip) {
 			srcIPs = append(srcIPs, ip)
@@ -257,11 +334,11 @@ func SourceIPs(req *http.Request) []net.IP {
 	// Remote Address in Go's HTTP server is in the form host:port so we need to split that first.
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err == nil {
-		remoteIP = net.ParseIP(host)
+		remoteIP = netutils.ParseIPSloppy(host)
 	}
 	// Fallback if Remote Address was just IP.
 	if remoteIP == nil {
-		remoteIP = net.ParseIP(req.RemoteAddr)
+		remoteIP = netutils.ParseIPSloppy(req.RemoteAddr)
 	}
 
 	// Don't duplicate remote IP if it's already the last address in the chain.
@@ -328,7 +405,7 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 
 	cidrs := []*net.IPNet{}
 	for _, noProxyRule := range noProxyRules {
-		_, cidr, _ := net.ParseCIDR(noProxyRule)
+		_, cidr, _ := netutils.ParseCIDRSloppy(noProxyRule)
 		if cidr != nil {
 			cidrs = append(cidrs, cidr)
 		}
@@ -339,7 +416,7 @@ func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error
 	}
 
 	return func(req *http.Request) (*url.URL, error) {
-		ip := net.ParseIP(req.URL.Hostname())
+		ip := netutils.ParseIPSloppy(req.URL.Hostname())
 		if ip == nil {
 			return delegate(req)
 		}
@@ -366,104 +443,6 @@ type Dialer interface {
 	// Dial connects to the host specified by req's URL, writes the request to the connection, and
 	// returns the opened net.Conn.
 	Dial(req *http.Request) (net.Conn, error)
-}
-
-// ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
-// originalLocation). It returns the opened net.Conn and the raw response bytes.
-// If requireSameHostRedirects is true, only redirects to the same host are permitted.
-func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, error) {
-	const (
-		maxRedirects    = 9     // Fail on the 10th redirect
-		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
-	)
-
-	var (
-		location         = originalLocation
-		method           = originalMethod
-		intermediateConn net.Conn
-		rawResponse      = bytes.NewBuffer(make([]byte, 0, 256))
-		body             = originalBody
-	)
-
-	defer func() {
-		if intermediateConn != nil {
-			intermediateConn.Close()
-		}
-	}()
-
-redirectLoop:
-	for redirects := 0; ; redirects++ {
-		if redirects > maxRedirects {
-			return nil, nil, fmt.Errorf("too many redirects (%d)", redirects)
-		}
-
-		req, err := http.NewRequest(method, location.String(), body)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		req.Header = header
-
-		intermediateConn, err = dialer.Dial(req)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Peek at the backend response.
-		rawResponse.Reset()
-		respReader := bufio.NewReader(io.TeeReader(
-			io.LimitReader(intermediateConn, maxResponseSize), // Don't read more than maxResponseSize bytes.
-			rawResponse)) // Save the raw response.
-		resp, err := http.ReadResponse(respReader, nil)
-		if err != nil {
-			// Unable to read the backend response; let the client handle it.
-			klog.Warningf("Error reading backend response: %v", err)
-			break redirectLoop
-		}
-
-		switch resp.StatusCode {
-		case http.StatusFound:
-			// Redirect, continue.
-		default:
-			// Don't redirect.
-			break redirectLoop
-		}
-
-		// Redirected requests switch to "GET" according to the HTTP spec:
-		// https://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3
-		method = "GET"
-		// don't send a body when following redirects
-		body = nil
-
-		resp.Body.Close() // not used
-
-		// Prepare to follow the redirect.
-		redirectStr := resp.Header.Get("Location")
-		if redirectStr == "" {
-			return nil, nil, fmt.Errorf("%d response missing Location header", resp.StatusCode)
-		}
-		// We have to parse relative to the current location, NOT originalLocation. For example,
-		// if we request http://foo.com/a and get back "http://bar.com/b", the result should be
-		// http://bar.com/b. If we then make that request and get back a redirect to "/c", the result
-		// should be http://bar.com/c, not http://foo.com/c.
-		location, err = location.Parse(redirectStr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
-		}
-
-		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
-		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			return nil, nil, fmt.Errorf("hostname mismatch: expected %s, found %s", originalLocation.Hostname(), location.Hostname())
-		}
-
-		// Reset the connection.
-		intermediateConn.Close()
-		intermediateConn = nil
-	}
-
-	connToReturn := intermediateConn
-	intermediateConn = nil // Don't close the connection when we return it.
-	return connToReturn, rawResponse.Bytes(), nil
 }
 
 // CloneRequest creates a shallow copy of the request along with a deep copy of the Headers.
@@ -640,7 +619,7 @@ func parseQuotedString(quotedString string) (string, string, error) {
 	var remainder string
 	escaping := false
 	closedQuote := false
-	result := &bytes.Buffer{}
+	result := &strings.Builder{}
 loop:
 	for i := 0; i < len(quotedString); i++ {
 		b := quotedString[i]

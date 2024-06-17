@@ -17,6 +17,7 @@ limitations under the License.
 package cleaner
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -194,6 +195,18 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			},
 			[]string{"delete"},
 		},
+		{
+			"delete approved passed deadline unparseable",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			[]byte(`garbage`),
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+				},
+			},
+			[]string{"delete"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -213,8 +226,8 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			s := &CSRCleanerController{
 				csrClient: client.CertificatesV1().CertificateSigningRequests(),
 			}
-
-			err := s.handle(csr)
+			ctx := context.TODO()
+			err := s.handle(ctx, csr)
 			if err != nil {
 				t.Fatalf("failed to clean CSR: %v", err)
 			}

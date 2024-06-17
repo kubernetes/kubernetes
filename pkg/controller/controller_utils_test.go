@@ -35,9 +35,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -45,17 +46,24 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/pointer"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *testingclock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := clock.NewFakeClock(fakeTime)
+	fakeClock := testingclock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -72,7 +80,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 			ResourceVersion: "18",
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -124,17 +132,17 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 	}
 }
 
-func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
+func newReplicaSet(name string, replicas int, rsUuid types.UID) *apps.ReplicaSet {
 	return &apps.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
-			UID:             uuid.NewUUID(),
+			UID:             rsUuid,
 			Name:            name,
 			Namespace:       metav1.NamespaceDefault,
 			ResourceVersion: "18",
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -164,6 +172,7 @@ func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
 }
 
 func TestControllerExpectations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ttl := 30 * time.Second
 	e, fakeClock := NewFakeControllerExpectationsLookup(ttl)
 	// In practice we can't really have add and delete expectations since we only either create or
@@ -176,144 +185,213 @@ func TestControllerExpectations(t *testing.T) {
 	rcKey, err := KeyFunc(rc)
 	assert.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
 
-	e.SetExpectations(rcKey, adds, dels)
+	e.SetExpectations(logger, rcKey, adds, dels)
 	var wg sync.WaitGroup
 	for i := 0; i < adds+1; i++ {
 		wg.Add(1)
 		go func() {
 			// In prod this can happen either because of a failed create by the rc
 			// or after having observed a create via informer
-			e.CreationObserved(rcKey)
+			e.CreationObserved(logger, rcKey)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 
 	// There are still delete expectations
-	assert.False(t, e.SatisfiedExpectations(rcKey), "Rc will sync before expectations are met")
+	assert.False(t, e.SatisfiedExpectations(logger, rcKey), "Rc will sync before expectations are met")
 
 	for i := 0; i < dels+1; i++ {
 		wg.Add(1)
 		go func() {
-			e.DeletionObserved(rcKey)
+			e.DeletionObserved(logger, rcKey)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 
-	// Expectations have been surpassed
-	podExp, exists, err := e.GetExpectations(rcKey)
-	assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
-	assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
+	tests := []struct {
+		name                      string
+		expectationsToSet         []int
+		expireExpectations        bool
+		wantPodExpectations       []int64
+		wantExpectationsSatisfied bool
+	}{
+		{
+			name:                      "Expectations have been surpassed",
+			expireExpectations:        false,
+			wantPodExpectations:       []int64{int64(-1), int64(-1)},
+			wantExpectationsSatisfied: true,
+		},
+		{
+			name:                      "Old expectations are cleared because of ttl",
+			expectationsToSet:         []int{1, 2},
+			expireExpectations:        true,
+			wantPodExpectations:       []int64{int64(1), int64(2)},
+			wantExpectationsSatisfied: false,
+		},
+	}
 
-	add, del := podExp.GetExpectations()
-	assert.Equal(t, int64(-1), add, "Unexpected pod expectations %#v", podExp)
-	assert.Equal(t, int64(-1), del, "Unexpected pod expectations %#v", podExp)
-	assert.True(t, e.SatisfiedExpectations(rcKey), "Expectations are met but the rc will not sync")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if len(test.expectationsToSet) > 0 {
+				e.SetExpectations(logger, rcKey, test.expectationsToSet[0], test.expectationsToSet[1])
+			}
+			podExp, exists, err := e.GetExpectations(rcKey)
+			assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
+			assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
 
-	// Next round of rc sync, old expectations are cleared
-	e.SetExpectations(rcKey, 1, 2)
-	podExp, exists, err = e.GetExpectations(rcKey)
-	assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
-	assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
-	add, del = podExp.GetExpectations()
+			add, del := podExp.GetExpectations()
+			assert.Equal(t, test.wantPodExpectations[0], add, "Unexpected pod expectations %#v", podExp)
+			assert.Equal(t, test.wantPodExpectations[1], del, "Unexpected pod expectations %#v", podExp)
+			assert.Equal(t, test.wantExpectationsSatisfied, e.SatisfiedExpectations(logger, rcKey), "Expectations are met but the rc will not sync")
 
-	assert.Equal(t, int64(1), add, "Unexpected pod expectations %#v", podExp)
-	assert.Equal(t, int64(2), del, "Unexpected pod expectations %#v", podExp)
-
-	// Expectations have expired because of ttl
-	fakeClock.Step(ttl + 1)
-	assert.True(t, e.SatisfiedExpectations(rcKey),
-		"Expectations should have expired but didn't")
+			if test.expireExpectations {
+				fakeClock.Step(ttl + 1)
+				assert.True(t, e.SatisfiedExpectations(logger, rcKey), "Expectations should have expired but didn't")
+			}
+		})
+	}
 }
 
 func TestUIDExpectations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	uidExp := NewUIDTrackingControllerExpectations(NewControllerExpectations())
-	rcList := []*v1.ReplicationController{
-		newReplicationController(2),
-		newReplicationController(1),
-		newReplicationController(0),
-		newReplicationController(5),
+	type test struct {
+		name        string
+		numReplicas int
 	}
-	rcToPods := map[string][]string{}
-	rcKeys := []string{}
-	for i := range rcList {
-		rc := rcList[i]
-		rcName := fmt.Sprintf("rc-%v", i)
+
+	shuffleTests := func(tests []test) {
+		for i := range tests {
+			j := rand.Intn(i + 1)
+			tests[i], tests[j] = tests[j], tests[i]
+		}
+	}
+
+	getRcDataFrom := func(test test) (string, []string) {
+		rc := newReplicationController(test.numReplicas)
+
+		rcName := fmt.Sprintf("rc-%v", test.numReplicas)
 		rc.Name = rcName
 		rc.Spec.Selector[rcName] = rcName
+
 		podList := newPodList(nil, 5, v1.PodRunning, rc)
 		rcKey, err := KeyFunc(rc)
 		if err != nil {
 			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
 		}
-		rcKeys = append(rcKeys, rcKey)
+
 		rcPodNames := []string{}
 		for i := range podList.Items {
 			p := &podList.Items[i]
 			p.Name = fmt.Sprintf("%v-%v", p.Name, rc.Name)
 			rcPodNames = append(rcPodNames, PodKey(p))
 		}
-		rcToPods[rcKey] = rcPodNames
-		uidExp.ExpectDeletions(rcKey, rcPodNames)
+		uidExp.ExpectDeletions(logger, rcKey, rcPodNames)
+
+		return rcKey, rcPodNames
 	}
-	for i := range rcKeys {
-		j := rand.Intn(i + 1)
-		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
+
+	tests := []test{
+		{name: "Replication controller with 2 replicas", numReplicas: 2},
+		{name: "Replication controller with 1 replica", numReplicas: 1},
+		{name: "Replication controller with no replicas", numReplicas: 0},
+		{name: "Replication controller with 5 replicas", numReplicas: 5},
 	}
-	for _, rcKey := range rcKeys {
-		assert.False(t, uidExp.SatisfiedExpectations(rcKey),
-			"Controller %v satisfied expectations before deletion", rcKey)
 
-		for _, p := range rcToPods[rcKey] {
-			uidExp.DeletionObserved(rcKey, p)
-		}
+	shuffleTests(tests)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 
-		assert.True(t, uidExp.SatisfiedExpectations(rcKey),
-			"Controller %v didn't satisfy expectations after deletion", rcKey)
+			rcKey, rcPodNames := getRcDataFrom(test)
+			assert.False(t, uidExp.SatisfiedExpectations(logger, rcKey),
+				"Controller %v satisfied expectations before deletion", rcKey)
 
-		uidExp.DeleteExpectations(rcKey)
+			for _, p := range rcPodNames {
+				uidExp.DeletionObserved(logger, rcKey, p)
+			}
 
-		assert.Nil(t, uidExp.GetUIDs(rcKey),
-			"Failed to delete uid expectations for %v", rcKey)
+			assert.True(t, uidExp.SatisfiedExpectations(logger, rcKey),
+				"Controller %v didn't satisfy expectations after deletion", rcKey)
+
+			uidExp.DeleteExpectations(logger, rcKey)
+
+			assert.Nil(t, uidExp.GetUIDs(rcKey),
+				"Failed to delete uid expectations for %v", rcKey)
+		})
 	}
 }
 
-func TestCreatePods(t *testing.T) {
+func TestCreatePodsWithGenerateName(t *testing.T) {
 	ns := metav1.NamespaceDefault
-	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(body),
-	}
-	testServer := httptest.NewServer(&fakeHandler)
-	defer testServer.Close()
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	podControl := RealPodControl{
-		KubeClient: clientset,
-		Recorder:   &record.FakeRecorder{},
-	}
-
+	generateName := "hello-"
 	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
-	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
-	assert.NoError(t, err, "unexpected error: %v", err)
-
-	expectedPod := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:       controllerSpec.Spec.Template.Labels,
-			GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
-		},
-		Spec: controllerSpec.Spec.Template.Spec,
+	type test struct {
+		name            string
+		podCreationFunc func(podControl RealPodControl) error
+		wantPod         *v1.Pod
 	}
-	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
-	var actualPod = &v1.Pod{}
-	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
-	assert.NoError(t, err, "unexpected error: %v", err)
-	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
-		"Body: %s", fakeHandler.RequestBody)
+	var tests = []test{
+		{
+			name: "Create pod",
+			podCreationFunc: func(podControl RealPodControl) error {
+				return podControl.CreatePods(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
+			},
+			wantPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:       controllerSpec.Spec.Template.Labels,
+					GenerateName: fmt.Sprintf("%s-", controllerSpec.Name),
+				},
+				Spec: controllerSpec.Spec.Template.Spec,
+			},
+		},
+		{
+			name: "Create pod with generate name",
+			podCreationFunc: func(podControl RealPodControl) error {
+				// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
+				return podControl.CreatePodsWithGenerateName(context.TODO(), ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
+			},
+			wantPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:          controllerSpec.Spec.Template.Labels,
+					GenerateName:    generateName,
+					OwnerReferences: []metav1.OwnerReference{*controllerRef},
+				},
+				Spec: controllerSpec.Spec.Template.Spec,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
+			fakeHandler := utiltesting.FakeHandler{
+				StatusCode:   200,
+				ResponseBody: string(body),
+			}
+			testServer := httptest.NewServer(&fakeHandler)
+			defer testServer.Close()
+			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+			podControl := RealPodControl{
+				KubeClient: clientset,
+				Recorder:   &record.FakeRecorder{},
+			}
+
+			err := test.podCreationFunc(podControl)
+			assert.NoError(t, err, "unexpected error: %v", err)
+
+			fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
+			var actualPod = &v1.Pod{}
+			err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
+			assert.NoError(t, err, "unexpected error: %v", err)
+			assert.True(t, apiequality.Semantic.DeepDerivative(test.wantPod, actualPod),
+				"Body: %s", fakeHandler.RequestBody)
+		})
+	}
 }
 
 func TestDeletePodsAllowsMissing(t *testing.T) {
@@ -325,117 +403,214 @@ func TestDeletePodsAllowsMissing(t *testing.T) {
 
 	controllerSpec := newReplicationController(1)
 
-	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	err := podControl.DeletePod(context.TODO(), "namespace-name", "podName", controllerSpec)
 	assert.True(t, apierrors.IsNotFound(err))
 }
 
-func TestActivePodFiltering(t *testing.T) {
+func TestCountTerminatingPods(t *testing.T) {
+	now := metav1.Now()
+
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)
-	podList := newPodList(nil, 5, v1.PodRunning, rc)
+	podList := newPodList(nil, 7, v1.PodRunning, rc)
 	podList.Items[0].Status.Phase = v1.PodSucceeded
 	podList.Items[1].Status.Phase = v1.PodFailed
-	expectedNames := sets.NewString()
-	for _, pod := range podList.Items[2:] {
-		expectedNames.Insert(pod.Name)
-	}
-
+	podList.Items[2].Status.Phase = v1.PodPending
+	podList.Items[2].SetDeletionTimestamp(&now)
+	podList.Items[3].Status.Phase = v1.PodRunning
+	podList.Items[3].SetDeletionTimestamp(&now)
 	var podPointers []*v1.Pod
 	for i := range podList.Items {
 		podPointers = append(podPointers, &podList.Items[i])
 	}
-	got := FilterActivePods(podPointers)
-	gotNames := sets.NewString()
-	for _, pod := range got {
-		gotNames.Insert(pod.Name)
+
+	terminatingPods := CountTerminatingPods(podPointers)
+
+	assert.Equal(t, terminatingPods, int32(2))
+
+	terminatingList := FilterTerminatingPods(podPointers)
+	assert.Equal(t, len(terminatingList), int(2))
+}
+
+func TestActivePodFiltering(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	type podData struct {
+		podName  string
+		podPhase v1.PodPhase
 	}
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	type test struct {
+		name         string
+		pods         []podData
+		wantPodNames []string
+	}
+
+	tests := []test{
+		{
+			name: "Filters active pods",
+			pods: []podData{
+				{podName: "pod-1", podPhase: v1.PodSucceeded},
+				{podName: "pod-2", podPhase: v1.PodFailed},
+				{podName: "pod-3"},
+				{podName: "pod-4"},
+				{podName: "pod-5"},
+			},
+			wantPodNames: []string{"pod-3", "pod-4", "pod-5"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
+			rc := newReplicationController(0)
+			podList := newPodList(nil, 5, v1.PodRunning, rc)
+			for idx, testPod := range test.pods {
+				podList.Items[idx].Name = testPod.podName
+				podList.Items[idx].Status.Phase = testPod.podPhase
+			}
+
+			var podPointers []*v1.Pod
+			for i := range podList.Items {
+				podPointers = append(podPointers, &podList.Items[i])
+			}
+			got := FilterActivePods(logger, podPointers)
+			gotNames := sets.NewString()
+			for _, pod := range got {
+				gotNames.Insert(pod.Name)
+			}
+
+			if diff := cmp.Diff(test.wantPodNames, gotNames.List()); diff != "" {
+				t.Errorf("Active pod names (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestSortingActivePods(t *testing.T) {
-	numPods := 9
-	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
-	rc := newReplicationController(0)
-	podList := newPodList(nil, numPods, v1.PodRunning, rc)
-
-	pods := make([]*v1.Pod, len(podList.Items))
-	for i := range podList.Items {
-		pods[i] = &podList.Items[i]
-	}
-	// pods[0] is not scheduled yet.
-	pods[0].Spec.NodeName = ""
-	pods[0].Status.Phase = v1.PodPending
-	// pods[1] is scheduled but pending.
-	pods[1].Spec.NodeName = "bar"
-	pods[1].Status.Phase = v1.PodPending
-	// pods[2] is unknown.
-	pods[2].Spec.NodeName = "foo"
-	pods[2].Status.Phase = v1.PodUnknown
-	// pods[3] is running but not ready.
-	pods[3].Spec.NodeName = "foo"
-	pods[3].Status.Phase = v1.PodRunning
-	// pods[4] is running and ready but without LastTransitionTime.
 	now := metav1.Now()
-	pods[4].Spec.NodeName = "foo"
-	pods[4].Status.Phase = v1.PodRunning
-	pods[4].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
-	pods[4].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[5] is running and ready and with LastTransitionTime.
-	pods[5].Spec.NodeName = "foo"
-	pods[5].Status.Phase = v1.PodRunning
-	pods[5].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}}
-	pods[5].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[6] is running ready for a longer time than pods[5].
 	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
-	pods[6].Spec.NodeName = "foo"
-	pods[6].Status.Phase = v1.PodRunning
-	pods[6].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
-	pods[6].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}}
-	// pods[7] has lower container restart count than pods[6].
-	pods[7].Spec.NodeName = "foo"
-	pods[7].Status.Phase = v1.PodRunning
-	pods[7].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
-	pods[7].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
-	pods[7].CreationTimestamp = now
-	// pods[8] is older than pods[7].
-	pods[8].Spec.NodeName = "foo"
-	pods[8].Status.Phase = v1.PodRunning
-	pods[8].Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}}
-	pods[8].Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}}
-	pods[8].CreationTimestamp = then
 
-	getOrder := func(pods []*v1.Pod) []string {
-		names := make([]string, len(pods))
-		for i := range pods {
-			names[i] = pods[i].Name
-		}
-		return names
+	tests := []struct {
+		name      string
+		pods      []v1.Pod
+		wantOrder []string
+	}{
+		{
+			name: "Sorts by active pod",
+			pods: []v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "unscheduled"},
+					Spec:       v1.PodSpec{NodeName: ""},
+					Status:     v1.PodStatus{Phase: v1.PodPending},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "scheduledButPending"},
+					Spec:       v1.PodSpec{NodeName: "bar"},
+					Status:     v1.PodStatus{Phase: v1.PodPending},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "unknownPhase"},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status:     v1.PodStatus{Phase: v1.PodUnknown},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "runningButNotReady"},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status:     v1.PodStatus{Phase: v1.PodRunning},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "runningNoLastTransitionTime"},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status: v1.PodStatus{
+						Phase:             v1.PodRunning,
+						Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
+						ContainerStatuses: []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "runningWithLastTransitionTime"},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status: v1.PodStatus{
+						Phase:             v1.PodRunning,
+						Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: now}},
+						ContainerStatuses: []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "runningLongerTime"},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status: v1.PodStatus{
+						Phase:             v1.PodRunning,
+						Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}},
+						ContainerStatuses: []v1.ContainerStatus{{RestartCount: 3}, {RestartCount: 0}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "lowerContainerRestartCount", CreationTimestamp: now},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status: v1.PodStatus{
+						Phase:             v1.PodRunning,
+						Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}},
+						ContainerStatuses: []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "oldest", CreationTimestamp: then},
+					Spec:       v1.PodSpec{NodeName: "foo"},
+					Status: v1.PodStatus{
+						Phase:             v1.PodRunning,
+						Conditions:        []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: then}},
+						ContainerStatuses: []v1.ContainerStatus{{RestartCount: 2}, {RestartCount: 1}},
+					},
+				},
+			},
+			wantOrder: []string{
+				"unscheduled",
+				"scheduledButPending",
+				"unknownPhase",
+				"runningButNotReady",
+				"runningNoLastTransitionTime",
+				"runningWithLastTransitionTime",
+				"runningLongerTime",
+				"lowerContainerRestartCount",
+				"oldest",
+			},
+		},
 	}
 
-	expected := getOrder(pods)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			numPods := len(test.pods)
 
-	for i := 0; i < 20; i++ {
-		idx := rand.Perm(numPods)
-		randomizedPods := make([]*v1.Pod, numPods)
-		for j := 0; j < numPods; j++ {
-			randomizedPods[j] = pods[idx[j]]
-		}
-		sort.Sort(ActivePods(randomizedPods))
-		actual := getOrder(randomizedPods)
+			for i := 0; i < 20; i++ {
+				idx := rand.Perm(numPods)
+				randomizedPods := make([]*v1.Pod, numPods)
+				for j := 0; j < numPods; j++ {
+					randomizedPods[j] = &test.pods[idx[j]]
+				}
 
-		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)
+				sort.Sort(ActivePods(randomizedPods))
+				gotOrder := make([]string, len(randomizedPods))
+				for i := range randomizedPods {
+					gotOrder[i] = randomizedPods[i].Name
+				}
+
+				if diff := cmp.Diff(test.wantOrder, gotOrder); diff != "" {
+					t.Errorf("Sorted active pod names (-want,+got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 
 func TestSortingActivePodsWithRanks(t *testing.T) {
 	now := metav1.Now()
-	then := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then1Month := metav1.Time{Time: now.AddDate(0, -1, 0)}
+	then2Hours := metav1.Time{Time: now.Add(-2 * time.Hour)}
+	then5Hours := metav1.Time{Time: now.Add(-5 * time.Hour)}
+	then8Hours := metav1.Time{Time: now.Add(-8 * time.Hour)}
 	zeroTime := metav1.Time{}
-	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time) *v1.Pod {
+	pod := func(podName, nodeName string, phase v1.PodPhase, ready bool, restarts int32, readySince metav1.Time, created metav1.Time, annotations map[string]string) *v1.Pod {
 		var conditions []v1.PodCondition
 		var containerStatuses []v1.ContainerStatus
 		if ready {
@@ -446,6 +621,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				CreationTimestamp: created,
 				Name:              podName,
+				Annotations:       annotations,
 			},
 			Spec: v1.PodSpec{NodeName: nodeName},
 			Status: v1.PodStatus{
@@ -456,92 +632,136 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		}
 	}
 	var (
-		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime)
-		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime)
-		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime)
-		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime)
-		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime)
-		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now)
-		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then, then)
-		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now)
-		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then)
+		unscheduledPod                      = pod("unscheduled", "", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		scheduledPendingPod                 = pod("pending", "node", v1.PodPending, false, 0, zeroTime, zeroTime, nil)
+		unknownPhasePod                     = pod("unknown-phase", "node", v1.PodUnknown, false, 0, zeroTime, zeroTime, nil)
+		runningNotReadyPod                  = pod("not-ready", "node", v1.PodRunning, false, 0, zeroTime, zeroTime, nil)
+		runningReadyNoLastTransitionTimePod = pod("ready-no-last-transition-time", "node", v1.PodRunning, true, 0, zeroTime, zeroTime, nil)
+		runningReadyNow                     = pod("ready-now", "node", v1.PodRunning, true, 0, now, now, nil)
+		runningReadyThen                    = pod("ready-then", "node", v1.PodRunning, true, 0, then1Month, then1Month, nil)
+		runningReadyNowHighRestarts         = pod("ready-high-restarts", "node", v1.PodRunning, true, 9001, now, now, nil)
+		runningReadyNowCreatedThen          = pod("ready-now-created-then", "node", v1.PodRunning, true, 0, now, then1Month, nil)
+		lowPodDeletionCost                  = pod("low-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "10"})
+		highPodDeletionCost                 = pod("high-deletion-cost", "node", v1.PodRunning, true, 0, now, then1Month, map[string]string{core.PodDeletionCost: "100"})
+		unscheduled5Hours                   = pod("unscheduled-5-hours", "", v1.PodPending, false, 0, then5Hours, then5Hours, nil)
+		unscheduled8Hours                   = pod("unscheduled-10-hours", "", v1.PodPending, false, 0, then8Hours, then8Hours, nil)
+		ready2Hours                         = pod("ready-2-hours", "", v1.PodRunning, true, 0, then2Hours, then1Month, nil)
+		ready5Hours                         = pod("ready-5-hours", "", v1.PodRunning, true, 0, then5Hours, then1Month, nil)
+		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, then8Hours, then1Month, nil)
 	)
-	equalityTests := []*v1.Pod{
-		unscheduledPod,
-		scheduledPendingPod,
-		unknownPhasePod,
-		runningNotReadyPod,
-		runningReadyNowCreatedThen,
-		runningReadyNow,
-		runningReadyThen,
-		runningReadyNowHighRestarts,
-		runningReadyNowCreatedThen,
+	equalityTests := []struct {
+		p1                          *v1.Pod
+		p2                          *v1.Pod
+		disableLogarithmicScaleDown bool
+	}{
+		{p1: unscheduledPod},
+		{p1: scheduledPendingPod},
+		{p1: unknownPhasePod},
+		{p1: runningNotReadyPod},
+		{p1: runningReadyNowCreatedThen},
+		{p1: runningReadyNow},
+		{p1: runningReadyThen},
+		{p1: runningReadyNowHighRestarts},
+		{p1: runningReadyNowCreatedThen},
+		{p1: unscheduled5Hours, p2: unscheduled8Hours},
+		{p1: ready5Hours, p2: ready10Hours},
 	}
-	for _, pod := range equalityTests {
-		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{pod, pod},
-			Rank: []int{1, 1},
-		}
-		if podsWithRanks.Less(0, 1) || podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q not to be less than than itself", pod.Name)
-		}
+	for i, test := range equalityTests {
+		t.Run(fmt.Sprintf("Equality tests %d", i), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
+			if test.p2 == nil {
+				test.p2 = test.p1
+			}
+			podsWithRanks := ActivePodsWithRanks{
+				Pods: []*v1.Pod{test.p1, test.p2},
+				Rank: []int{1, 1},
+				Now:  now,
+			}
+			if podsWithRanks.Less(0, 1) || podsWithRanks.Less(1, 0) {
+				t.Errorf("expected pod %q to be equivalent to %q", test.p1.Name, test.p2.Name)
+			}
+		})
 	}
+
 	type podWithRank struct {
 		pod  *v1.Pod
 		rank int
 	}
 	inequalityTests := []struct {
-		lesser, greater podWithRank
+		lesser, greater             podWithRank
+		disablePodDeletioncost      bool
+		disableLogarithmicScaleDown bool
 	}{
-		{podWithRank{unscheduledPod, 1}, podWithRank{scheduledPendingPod, 2}},
-		{podWithRank{unscheduledPod, 2}, podWithRank{scheduledPendingPod, 1}},
-		{podWithRank{scheduledPendingPod, 1}, podWithRank{unknownPhasePod, 2}},
-		{podWithRank{unknownPhasePod, 1}, podWithRank{runningNotReadyPod, 2}},
-		{podWithRank{runningNotReadyPod, 1}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNoLastTransitionTimePod, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNoLastTransitionTimePod, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyThen, 1}},
-		{podWithRank{runningReadyNowHighRestarts, 1}, podWithRank{runningReadyNow, 1}},
-		{podWithRank{runningReadyNow, 2}, podWithRank{runningReadyNowHighRestarts, 1}},
-		{podWithRank{runningReadyNow, 1}, podWithRank{runningReadyNowCreatedThen, 1}},
-		{podWithRank{runningReadyNowCreatedThen, 2}, podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{unscheduledPod, 1}, greater: podWithRank{scheduledPendingPod, 2}},
+		{lesser: podWithRank{unscheduledPod, 2}, greater: podWithRank{scheduledPendingPod, 1}},
+		{lesser: podWithRank{scheduledPendingPod, 1}, greater: podWithRank{unknownPhasePod, 2}},
+		{lesser: podWithRank{unknownPhasePod, 1}, greater: podWithRank{runningNotReadyPod, 2}},
+		{lesser: podWithRank{runningNotReadyPod, 1}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNoLastTransitionTimePod, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNoLastTransitionTimePod, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyThen, 1}},
+		{lesser: podWithRank{runningReadyNowHighRestarts, 1}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{runningReadyNow, 2}, greater: podWithRank{runningReadyNowHighRestarts, 1}},
+		{lesser: podWithRank{runningReadyNow, 1}, greater: podWithRank{runningReadyNowCreatedThen, 1}},
+		{lesser: podWithRank{runningReadyNowCreatedThen, 2}, greater: podWithRank{runningReadyNow, 1}},
+		{lesser: podWithRank{lowPodDeletionCost, 2}, greater: podWithRank{highPodDeletionCost, 1}},
+		{lesser: podWithRank{highPodDeletionCost, 2}, greater: podWithRank{lowPodDeletionCost, 1}, disablePodDeletioncost: true},
+		{lesser: podWithRank{ready2Hours, 1}, greater: podWithRank{ready5Hours, 1}},
 	}
-	for _, test := range inequalityTests {
-		podsWithRanks := ActivePodsWithRanks{
-			Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
-			Rank: []int{test.lesser.rank, test.greater.rank},
-		}
-		if !podsWithRanks.Less(0, 1) {
-			t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
-		}
-		if podsWithRanks.Less(1, 0) {
-			t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
-		}
+
+	for i, test := range inequalityTests {
+		t.Run(fmt.Sprintf("Inequality tests %d", i), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, !test.disablePodDeletioncost)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
+
+			podsWithRanks := ActivePodsWithRanks{
+				Pods: []*v1.Pod{test.lesser.pod, test.greater.pod},
+				Rank: []int{test.lesser.rank, test.greater.rank},
+				Now:  now,
+			}
+			if !podsWithRanks.Less(0, 1) {
+				t.Errorf("expected pod %q with rank %v to be less than %q with rank %v", podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0], podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1])
+			}
+			if podsWithRanks.Less(1, 0) {
+				t.Errorf("expected pod %q with rank %v not to be less than %v with rank %v", podsWithRanks.Pods[1].Name, podsWithRanks.Rank[1], podsWithRanks.Pods[0].Name, podsWithRanks.Rank[0])
+			}
+		})
 	}
 }
 
 func TestActiveReplicaSetsFiltering(t *testing.T) {
-	var replicaSets []*apps.ReplicaSet
-	replicaSets = append(replicaSets, newReplicaSet("zero", 0))
-	replicaSets = append(replicaSets, nil)
-	replicaSets = append(replicaSets, newReplicaSet("foo", 1))
-	replicaSets = append(replicaSets, newReplicaSet("bar", 2))
-	expectedNames := sets.NewString()
-	for _, rs := range replicaSets[2:] {
-		expectedNames.Insert(rs.Name)
+
+	rsUuid := uuid.NewUUID()
+	tests := []struct {
+		name            string
+		replicaSets     []*apps.ReplicaSet
+		wantReplicaSets []*apps.ReplicaSet
+	}{
+		{
+			name: "Filters active replica sets",
+			replicaSets: []*apps.ReplicaSet{
+				newReplicaSet("zero", 0, rsUuid),
+				nil,
+				newReplicaSet("foo", 1, rsUuid),
+				newReplicaSet("bar", 2, rsUuid),
+			},
+			wantReplicaSets: []*apps.ReplicaSet{
+				newReplicaSet("foo", 1, rsUuid),
+				newReplicaSet("bar", 2, rsUuid),
+			},
+		},
 	}
 
-	got := FilterActiveReplicaSets(replicaSets)
-	gotNames := sets.NewString()
-	for _, rs := range got {
-		gotNames.Insert(rs.Name)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gotReplicaSets := FilterActiveReplicaSets(test.replicaSets)
 
-	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
-	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
-		"expected %v, got %v", expectedNames.List(), gotNames.List())
+			if diff := cmp.Diff(test.wantReplicaSets, gotReplicaSets); diff != "" {
+				t.Errorf("Active replica set names (-want,+got):\n%s", diff)
+			}
+		})
+	}
 }
 
 func TestComputeHash(t *testing.T) {
@@ -736,7 +956,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
-		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
+		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
 		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
@@ -758,6 +978,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		taintsToAdd    []*v1.Taint
 		expectedTaints []v1.Taint
 		requestCount   int
+		expectedErr    error
 	}{
 		{
 			name: "add one taint on node",
@@ -909,9 +1130,72 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			},
 			requestCount: 1,
 		},
+		{
+			name: "add taint to changed node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+				AsyncCalls: []func(*testutil.FakeNodeHandler){func(m *testutil.FakeNodeHandler) {
+					if len(m.UpdatedNodes) == 0 {
+						m.UpdatedNodes = append(m.UpdatedNodes, &v1.Node{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            "node1",
+								ResourceVersion: "2",
+							},
+							Spec: v1.NodeSpec{
+								Taints: []v1.Taint{},
+							}})
+					}
+				}},
+			},
+			nodeName:    "node1",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedTaints: []v1.Taint{
+				{Key: "key2", Value: "value2", Effect: "NoExecute"},
+			},
+			requestCount: 5,
+		},
+		{
+			name: "add taint to non-exist node",
+			nodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "node1",
+							ResourceVersion: "1",
+						},
+						Spec: v1.NodeSpec{
+							Taints: []v1.Taint{
+								{Key: "key1", Value: "value1", Effect: "NoSchedule"},
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeName:    "node2",
+			taintsToAdd: []*v1.Taint{{Key: "key2", Value: "value2", Effect: "NoExecute"}},
+			expectedErr: apierrors.NewNotFound(schema.GroupResource{Resource: "nodes"}, "node2"),
+		},
 	}
 	for _, test := range tests {
-		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		err := AddOrUpdateTaintOnNode(context.TODO(), test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		if test.expectedErr != nil {
+			assert.Equal(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
+			continue
+		}
 		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})

@@ -41,13 +41,7 @@ func TestPatch(t *testing.T) {
 	}
 	simpleStorage := SimpleRESTStorage{item: *item}
 	storage["simple"] = &simpleStorage
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
-		name:        ID,
-		namespace:   metav1.NamespaceDefault,
-	}
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -67,9 +61,6 @@ func TestPatch(t *testing.T) {
 	if simpleStorage.updated == nil || simpleStorage.updated.Labels["foo"] != "bar" {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
-	}
 }
 
 func TestForbiddenForceOnNonApply(t *testing.T) {
@@ -85,13 +76,7 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 	}
 	simpleStorage := SimpleRESTStorage{item: *item}
 	storage["simple"] = &simpleStorage
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID,
-		name:        ID,
-		namespace:   metav1.NamespaceDefault,
-	}
-	handler := handleLinker(storage, selfLinker)
+	handler := handle(storage)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 

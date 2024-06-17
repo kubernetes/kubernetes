@@ -29,15 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -54,7 +55,7 @@ const (
 	rebootPodReadyAgainTimeout = 5 * time.Minute
 )
 
-var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
+var _ = SIGDescribe("Reboot", framework.WithDisruptive(), feature.Reboot, func() {
 	var f *framework.Framework
 
 	ginkgo.BeforeEach(func() {
@@ -65,13 +66,13 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 	})
 
-	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+	ginkgo.AfterEach(func(ctx context.Context) {
+		if ginkgo.CurrentSpecReport().Failed() {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
-			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(context.TODO(), metav1.ListOptions{})
+			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
@@ -92,26 +93,27 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	})
 
 	f = framework.NewDefaultFramework("reboot")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering clean reboot and ensure they function upon restart", func(ctx context.Context) {
 		// clean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is rebooted.
-		testReboot(f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
+		testReboot(ctx, f.ClientSet, "nohup sh -c 'sleep 10 && sudo reboot' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by ordering unclean reboot and ensure they function upon restart", func() {
+	ginkgo.It("each node by ordering unclean reboot and ensure they function upon restart", func(ctx context.Context) {
 		// unclean shutdown and restart
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before the node is shutdown.
-		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(ctx, f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo b | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by triggering kernel panic and ensure they function upon restart", func() {
+	ginkgo.It("each node by triggering kernel panic and ensure they function upon restart", func(ctx context.Context) {
 		// kernel panic
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before kernel panic is triggered.
-		testReboot(f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
+		testReboot(ctx, f.ClientSet, "nohup sh -c 'echo 1 | sudo tee /proc/sys/kernel/sysrq && sleep 10 && echo c | sudo tee /proc/sysrq-trigger' >/dev/null 2>&1 &", nil)
 	})
 
-	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func() {
+	ginkgo.It("each node by switching off the network interface and ensure they function upon switch on", func(ctx context.Context) {
 		// switch the network interface off for a while to simulate a network outage
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before network is down.
 		cmd := "nohup sh -c '" +
@@ -129,29 +131,29 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			"echo Starting systemd-networkd | sudo tee /dev/kmsg; " +
 			"sudo systemctl restart systemd-networkd | sudo tee /dev/kmsg" +
 			"' >/dev/null 2>&1 &"
-		testReboot(f.ClientSet, cmd, nil)
+		testReboot(ctx, f.ClientSet, cmd, nil)
 	})
 
-	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all inbound packets for a while and ensure they function afterwards", func(ctx context.Context) {
 		// tell the firewall to drop all inbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping inbound packets.
 		// We still accept packages send from localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-inbound.log"
-		testReboot(f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(ctx, f.ClientSet, dropPacketsScript("INPUT", tmpLogPath), catLogHook(ctx, tmpLogPath))
 	})
 
-	ginkgo.It("each node by dropping all outbound packets for a while and ensure they function afterwards", func() {
+	ginkgo.It("each node by dropping all outbound packets for a while and ensure they function afterwards", func(ctx context.Context) {
 		// tell the firewall to drop all outbound packets for a while
 		// We sleep 10 seconds to give some time for ssh command to cleanly finish before starting dropping outbound packets.
 		// We still accept packages send to localhost to prevent monit from restarting kubelet.
 		tmpLogPath := "/tmp/drop-outbound.log"
-		testReboot(f.ClientSet, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(tmpLogPath))
+		testReboot(ctx, f.ClientSet, dropPacketsScript("OUTPUT", tmpLogPath), catLogHook(ctx, tmpLogPath))
 	})
 })
 
-func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
+func testReboot(ctx context.Context, c clientset.Interface, rebootCmd string, hook terminationHook) {
 	// Get all nodes, and kick off the test on each.
-	nodelist, err := e2enode.GetReadySchedulableNodes(c)
+	nodelist, err := e2enode.GetReadySchedulableNodes(ctx, c)
 	framework.ExpectNoError(err, "failed to list nodes")
 	if hook != nil {
 		defer func() {
@@ -169,7 +171,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 			n := nodelist.Items[ix]
-			result[ix] = rebootNode(c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
+			result[ix] = rebootNode(ctx, c, framework.TestContext.Provider, n.ObjectMeta.Name, rebootCmd)
 			if !result[ix] {
 				failed = true
 			}
@@ -190,7 +192,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	}
 }
 
-func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podNames []string, pods []*v1.Pod) {
+func printStatusAndLogsForNotReadyPods(ctx context.Context, c clientset.Interface, ns string, podNames []string, pods []*v1.Pod) {
 	printFn := func(id, log string, err error, previous bool) {
 		prefix := "Retrieving log for container"
 		if previous {
@@ -217,7 +219,7 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
 			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
-			log, err := e2epod.GetPodLogs(c, p.Namespace, p.Name, container.Name)
+			log, err := e2epod.GetPodLogs(ctx, c, p.Namespace, p.Name, container.Name)
 			printFn(cIdentifer, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
@@ -228,19 +230,19 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 }
 
 // rebootNode takes node name on provider through the following steps using c:
-//  - ensures the node is ready
-//  - ensures all pods on the node are running and ready
-//  - reboots the node (by executing rebootCmd over ssh)
-//  - ensures the node reaches some non-ready state
-//  - ensures the node becomes ready again
-//  - ensures all pods on the node become running and ready again
+//   - ensures the node is ready
+//   - ensures all pods on the node are running and ready
+//   - reboots the node (by executing rebootCmd over ssh)
+//   - ensures the node reaches some non-ready state
+//   - ensures the node becomes ready again
+//   - ensures all pods on the node become running and ready again
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.
-func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
+func rebootNode(ctx context.Context, c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := metav1.NamespaceSystem
-	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
+	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector("spec.nodeName", name))
 	if err != nil {
 		framework.Logf("Couldn't initialize pod store: %v", err)
 		return false
@@ -249,14 +251,14 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// Get the node initially.
 	framework.Logf("Getting %s", name)
-	node, err := c.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		framework.Logf("Couldn't get node %s", name)
 		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !e2enode.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
+	if !e2enode.WaitForNodeToBeReady(ctx, c, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -280,32 +282,32 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// or succeeded now, as that's what we'll be checking later.
-	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
-		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, podNames, framework.PodReadyBeforeTimeout) {
+		printStatusAndLogsForNotReadyPods(ctx, c, ns, podNames, pods)
 		return false
 	}
 
 	// Reboot the node.
-	if err = e2essh.IssueSSHCommand(rebootCmd, provider, node); err != nil {
+	if err = e2essh.IssueSSHCommand(ctx, rebootCmd, provider, node); err != nil {
 		framework.Logf("Error while issuing ssh command: %v", err)
 		return false
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !e2enode.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !e2enode.WaitForNodeToBeNotReady(ctx, c, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !e2enode.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !e2enode.WaitForNodeToBeReady(ctx, c, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy, or succeeded.
-	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(ctx, c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
-		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
+		printStatusAndLogsForNotReadyPods(ctx, c, ns, podNames, newPods)
 		return false
 	}
 
@@ -315,11 +317,11 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 
 type terminationHook func(provider string, nodes *v1.NodeList)
 
-func catLogHook(logPath string) terminationHook {
+func catLogHook(ctx context.Context, logPath string) terminationHook {
 	return func(provider string, nodes *v1.NodeList) {
 		for _, n := range nodes.Items {
 			cmd := fmt.Sprintf("cat %v && rm %v", logPath, logPath)
-			if _, err := e2essh.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
+			if _, err := e2essh.IssueSSHCommandWithResult(ctx, cmd, provider, &n); err != nil {
 				framework.Logf("Error while issuing ssh command: %v", err)
 			}
 		}

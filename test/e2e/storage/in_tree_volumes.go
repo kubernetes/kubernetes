@@ -17,27 +17,26 @@ limitations under the License.
 package storage
 
 import (
-	"github.com/onsi/ginkgo"
+	"os"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() testsuites.TestDriver{
+var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitNFSDriver,
-	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
-	drivers.InitRbdDriver,
-	drivers.InitCephFSDriver,
 	drivers.InitHostPathDriver,
 	drivers.InitHostPathSymlinkDriver,
 	drivers.InitEmptydirDriver,
 	drivers.InitCinderDriver,
-	drivers.InitGcePdDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
-	drivers.InitAwsDriver,
+	drivers.InitAzureFileDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
@@ -50,11 +49,38 @@ var testDrivers = []func() testsuites.TestDriver{
 
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
+	gceEnabled := false
+	for _, driver := range framework.TestContext.EnabledVolumeDrivers {
+		switch driver {
+		case "gcepd":
+			testDrivers = append(testDrivers, drivers.InitGcePdDriver)
+			testDrivers = append(testDrivers, drivers.InitWindowsGcePdDriver)
+			gceEnabled = true
+		case "aws":
+			testDrivers = append(testDrivers, drivers.InitAwsDriver)
+			framework.Logf("Enabled aws in-tree volume drivers")
+		default:
+			framework.Failf("Invalid volume type %s in %v", driver, framework.TestContext.EnabledVolumeDrivers)
+		}
+	}
+
+	// Support the legacy env var for gcepd.
+	if enableGcePD := os.Getenv("ENABLE_STORAGE_GCE_PD_DRIVER"); enableGcePD == "yes" && !gceEnabled {
+		framework.Logf("Warning: deprecated ENABLE_STORAGE_GCE_PD_DRIVER used. This will be removed in a future release. Use --enabled-volume-drivers=gcepd instead")
+		testDrivers = append(testDrivers, drivers.InitGcePdDriver)
+		testDrivers = append(testDrivers, drivers.InitWindowsGcePdDriver)
+		gceEnabled = true
+	}
+
+	if gceEnabled {
+		framework.Logf("Enabled gcepd and windows-gcepd in-tree volume drivers")
+	}
+
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
-		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, testsuites.BaseSuites)
-		})
+		framework.Context(append(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
+			storageframework.DefineTestSuites(curDriver, testsuites.BaseSuites)
+		})...)
 	}
 })

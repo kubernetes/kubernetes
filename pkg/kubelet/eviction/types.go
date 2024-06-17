@@ -14,15 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=types.go -destination=mock_threshold_notifier_test.go -package=eviction NotifierFactory,ThresholdNotifier
 package eviction
 
 import (
+	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -36,6 +38,8 @@ const (
 	fsStatsLogs fsStatsType = "logs"
 	// fsStatsRoot identifies stats for pod container writable layers.
 	fsStatsRoot fsStatsType = "root"
+	// fsStatsContainer identifies stats for pod container read-only layers
+	fsStatsImages fsStatsType = "images"
 )
 
 // Config holds information about how eviction is configured.
@@ -70,19 +74,21 @@ type Manager interface {
 // DiskInfoProvider is responsible for informing the manager how disk is configured.
 type DiskInfoProvider interface {
 	// HasDedicatedImageFs returns true if the imagefs is on a separate device from the rootfs.
-	HasDedicatedImageFs() (bool, error)
+	HasDedicatedImageFs(ctx context.Context) (bool, error)
 }
 
 // ImageGC is responsible for performing garbage collection of unused images.
 type ImageGC interface {
 	// DeleteUnusedImages deletes unused images.
-	DeleteUnusedImages() error
+	DeleteUnusedImages(ctx context.Context) error
 }
 
 // ContainerGC is responsible for performing garbage collection of unused containers.
 type ContainerGC interface {
 	// DeleteAllUnusedContainers deletes all unused containers, even those that belong to pods that are terminated, but not deleted.
-	DeleteAllUnusedContainers() error
+	DeleteAllUnusedContainers(ctx context.Context) error
+	// IsContainerFsSeparateFromImageFs checks if container filesystem is split from image filesystem.
+	IsContainerFsSeparateFromImageFs(ctx context.Context) bool
 }
 
 // KillPodFunc kills a pod.
@@ -92,7 +98,7 @@ type ContainerGC interface {
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
+type KillPodFunc func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error
 
 // MirrorPodFunc returns the mirror pod for the given static pod and
 // whether it was known to the pod manager.
@@ -130,7 +136,7 @@ type thresholdsObservedAt map[evictionapi.Threshold]time.Time
 type nodeConditionsObservedAt map[v1.NodeConditionType]time.Time
 
 // nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
-type nodeReclaimFunc func() error
+type nodeReclaimFunc func(ctx context.Context) error
 
 // nodeReclaimFuncs is an ordered list of nodeReclaimFunc
 type nodeReclaimFuncs []nodeReclaimFunc

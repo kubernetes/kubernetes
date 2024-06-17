@@ -1,3 +1,6 @@
+// Package wclayer provides bindings to HCS's legacy layer management API and
+// provides a higher level interface around these calls for container layer
+// management.
 package wclayer
 
 import "github.com/Microsoft/go-winio/pkg/guid"

@@ -4,9 +4,6 @@
 "metadata": {
   "name":"kube-controller-manager",
   "namespace": "kube-system",
-  "annotations": {
-    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
-  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-controller-manager"
@@ -14,8 +11,12 @@
 },
 "spec":{
 "securityContext": {
-  "runAsUser": {{runAsUser}},
-  "runAsGroup": {{runAsGroup}}
+  {{runAsUser}}
+  {{runAsGroup}}
+  {{supplementalGroups}}
+  "seccompProfile": {
+      "type": "RuntimeDefault"
+  }
 },
 "priorityClassName": "system-node-critical",
 "priority": 2000001000,
@@ -46,7 +47,8 @@
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
-        "port": 10252,
+        "port": 10257,
+        "scheme": "HTTPS",
         "path": "/healthz"
       },
       "initialDelaySeconds": 15,

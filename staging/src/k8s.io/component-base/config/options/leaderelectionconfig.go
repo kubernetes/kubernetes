@@ -35,15 +35,15 @@ func BindLeaderElectionFlags(l *config.LeaderElectionConfiguration, fs *pflag.Fl
 		"election is enabled.")
 	fs.DurationVar(&l.RenewDeadline.Duration, "leader-elect-renew-deadline", l.RenewDeadline.Duration, ""+
 		"The interval between attempts by the acting master to renew a leadership slot "+
-		"before it stops leading. This must be less than or equal to the lease duration. "+
+		"before it stops leading. This must be less than the lease duration. "+
 		"This is only applicable if leader election is enabled.")
 	fs.DurationVar(&l.RetryPeriod.Duration, "leader-elect-retry-period", l.RetryPeriod.Duration, ""+
 		"The duration the clients should wait between attempting acquisition and renewal "+
 		"of a leadership. This is only applicable if leader election is enabled.")
 	fs.StringVar(&l.ResourceLock, "leader-elect-resource-lock", l.ResourceLock, ""+
 		"The type of resource object that is used for locking during "+
-		"leader election. Supported options are 'endpoints', 'configmaps', "+
-		"'leases', 'endpointsleases' and 'configmapsleases'.")
+		"leader election. Supported options are 'leases', 'endpointsleases' "+
+		"and 'configmapsleases'.")
 	fs.StringVar(&l.ResourceName, "leader-elect-resource-name", l.ResourceName, ""+
 		"The name of resource object that is used for locking during "+
 		"leader election.")

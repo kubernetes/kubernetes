@@ -17,15 +17,15 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"net"
-
+	"github.com/pkg/errors"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
+	netutils "k8s.io/utils/net"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 const (
@@ -51,7 +51,14 @@ var kubeProxyHandler = handler{
 }
 
 func kubeProxyConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
-	return h.fromConfigMap(clientset, kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey, false)
+	configMapName := kubeadmconstants.KubeProxyConfigMap
+	klog.V(1).Infof("attempting to download the KubeProxyConfiguration from ConfigMap %q", configMapName)
+	cm, err := h.fromConfigMap(clientset, configMapName, kubeadmconstants.KubeProxyConfigMapKey, false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not download the kube-proxy configuration from ConfigMap %q",
+			configMapName)
+	}
+	return cm, nil
 }
 
 // kubeProxyConfig implements the kubeadmapi.ComponentConfig interface for kube-proxy
@@ -76,11 +83,19 @@ func (kp *kubeProxyConfig) Unmarshal(docmap kubeadmapi.DocumentMap) error {
 }
 
 func kubeProxyDefaultBindAddress(localAdvertiseAddress string) string {
-	ip := net.ParseIP(localAdvertiseAddress)
+	ip := netutils.ParseIPSloppy(localAdvertiseAddress)
 	if ip.To4() != nil {
-		return kubeadmapiv1beta2.DefaultProxyBindAddressv4
+		return kubeadmapiv1.DefaultProxyBindAddressv4
 	}
-	return kubeadmapiv1beta2.DefaultProxyBindAddressv6
+	return kubeadmapiv1.DefaultProxyBindAddressv6
+}
+
+func (kp *kubeProxyConfig) Get() interface{} {
+	return &kp.config
+}
+
+func (kp *kubeProxyConfig) Set(cfg interface{}) {
+	kp.config = *cfg.(*kubeproxyconfig.KubeProxyConfiguration)
 }
 
 func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint, _ *kubeadmapi.NodeRegistrationOptions) {
@@ -88,7 +103,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 
 	// The below code is necessary because while KubeProxy may be defined, the user may not
 	// have defined any feature-gates, thus FeatureGates will be nil and the later insertion
-	// of any feature-gates (e.g. IPv6DualStack) will cause a panic.
+	// of any feature-gates will cause a panic.
 	if kp.config.FeatureGates == nil {
 		kp.config.FeatureGates = map[string]bool{}
 	}
@@ -97,7 +112,7 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	if kp.config.BindAddress == "" {
 		kp.config.BindAddress = defaultBindAddress
 	} else if kp.config.BindAddress != defaultBindAddress {
-		warnDefaultComponentConfigValue(kind, "bindAddress", kp.config.BindAddress, defaultBindAddress)
+		warnDefaultComponentConfigValue(kind, "bindAddress", defaultBindAddress, kp.config.BindAddress)
 	}
 
 	if kp.config.ClusterCIDR == "" && cfg.Networking.PodSubnet != "" {
@@ -111,10 +126,9 @@ func (kp *kubeProxyConfig) Default(cfg *kubeadmapi.ClusterConfiguration, localAP
 	} else if kp.config.ClientConnection.Kubeconfig != kubeproxyKubeConfigFileName {
 		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, kp.config.ClientConnection.Kubeconfig)
 	}
+}
 
-	// TODO: The following code should be removed after dual-stack is GA.
-	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
-		kp.config.FeatureGates[features.IPv6DualStack] = enabled
-	}
+// Mutate is NOP for the kube-proxy config
+func (kp *kubeProxyConfig) Mutate() error {
+	return nil
 }

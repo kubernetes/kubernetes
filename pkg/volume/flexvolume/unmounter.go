@@ -21,8 +21,8 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -66,7 +66,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		return nil
 	}

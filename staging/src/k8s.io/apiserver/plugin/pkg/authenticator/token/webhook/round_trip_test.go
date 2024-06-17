@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRoundTrip(t *testing.T) {
 			Status: v1beta1StatusToV1Status(&converted.Status),
 		}
 		if !reflect.DeepEqual(original, roundtripped) {
-			t.Errorf("diff %s", diff.ObjectReflectDiff(original, roundtripped))
+			t.Errorf("diff %s", cmp.Diff(original, roundtripped))
 		}
 	}
 }

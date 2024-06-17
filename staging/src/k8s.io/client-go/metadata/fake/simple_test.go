@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 const (
@@ -38,13 +38,6 @@ const (
 	testKind       = "TestKind"
 	testAPIVersion = "testgroup/testversion"
 )
-
-var scheme *runtime.Scheme
-
-func init() {
-	scheme = runtime.NewScheme()
-	metav1.AddMetaToScheme(scheme)
-}
 
 func newPartialObjectMetadata(apiVersion, kind, namespace, name string) *metav1.PartialObjectMetadata {
 	return &metav1.PartialObjectMetadata{
@@ -66,6 +59,8 @@ func newPartialObjectMetadataWithAnnotations(annotations map[string]string) *met
 }
 
 func TestList(t *testing.T) {
+	scheme := NewTestScheme()
+	metav1.AddMetaToScheme(scheme)
 	client := NewSimpleMetadataClient(scheme,
 		newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-foo"),
 		newPartialObjectMetadata("group2/version", "TheKind", "ns-foo", "name2-foo"),
@@ -84,7 +79,7 @@ func TestList(t *testing.T) {
 		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-foo"),
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
-		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
+		t.Fatal(cmp.Diff(expected, listFirst.Items))
 	}
 }
 
@@ -98,6 +93,8 @@ type patchTestCase struct {
 }
 
 func (tc *patchTestCase) runner(t *testing.T) {
+	scheme := NewTestScheme()
+	metav1.AddMetaToScheme(scheme)
 	client := NewSimpleMetadataClient(scheme, tc.object)
 	resourceInterface := client.Resource(schema.GroupVersionResource{Group: testGroup, Version: testVersion, Resource: testResource}).Namespace(testNamespace)
 
@@ -137,7 +134,7 @@ func (tc *patchTestCase) verifyResult(result *metav1.PartialObjectMetadata) erro
 		return nil
 	}
 	if !equality.Semantic.DeepEqual(result, tc.expectedPatchedObject) {
-		return fmt.Errorf("unexpected diff in received object: %s", diff.ObjectGoPrintDiff(tc.expectedPatchedObject, result))
+		return fmt.Errorf("unexpected diff in received object: %s", cmp.Diff(tc.expectedPatchedObject, result))
 	}
 	return nil
 }

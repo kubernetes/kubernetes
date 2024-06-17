@@ -18,7 +18,7 @@ package genericclioptions
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 
@@ -46,6 +46,7 @@ type JSONPathPrintFlags struct {
 	TemplateArgument *string
 }
 
+// AllowedFormats returns slice of string of allowed JSONPath printing format
 func (f *JSONPathPrintFlags) AllowedFormats() []string {
 	formats := make([]string, 0, len(jsonFormats))
 	for format := range jsonFormats {
@@ -87,9 +88,9 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 	}
 
 	if templateFormat == "jsonpath-file" {
-		data, err := ioutil.ReadFile(templateValue)
+		data, err := os.ReadFile(templateValue)
 		if err != nil {
-			return nil, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading --template %s, %v", templateValue, err)
 		}
 
 		templateValue = string(data)
@@ -97,7 +98,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 
 	p, err := printers.NewJSONPathPrinter(templateValue)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing jsonpath %s, %v\n", templateValue, err)
+		return nil, fmt.Errorf("error parsing jsonpath %s, %v", templateValue, err)
 	}
 
 	allowMissingKeys := true

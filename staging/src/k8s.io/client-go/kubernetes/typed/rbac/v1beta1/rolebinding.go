@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // RoleBindingsGetter has a method to return a RoleBindingInterface.
@@ -46,6 +52,7 @@ type RoleBindingInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.RoleBindingList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.RoleBinding, err error)
+	Apply(ctx context.Context, roleBinding *rbacv1beta1.RoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.RoleBinding, err error)
 	RoleBindingExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *roleBindings) Get(ctx context.Context, name string, options v1.GetOptio
 }
 
 // List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
+func (c *roleBindings) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.RoleBindingList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for rolebindings, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for rolebindings", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for rolebindings ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for rolebindings", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of RoleBindings that match those selectors.
+func (c *roleBindings) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *roleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of RoleBindings
+func (c *roleBindings) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.RoleBindingList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied roleBinding.
+func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1beta1.RoleBindingApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.RoleBinding, err error) {
+	if roleBinding == nil {
+		return nil, fmt.Errorf("roleBinding provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(roleBinding)
+	if err != nil {
+		return nil, err
+	}
+	name := roleBinding.Name
+	if name == nil {
+		return nil, fmt.Errorf("roleBinding.Name must be provided to Apply")
+	}
+	result = &v1beta1.RoleBinding{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("rolebindings").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -17,6 +17,7 @@ limitations under the License.
 package events
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -29,9 +30,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type testEventSeriesSink struct {
@@ -41,7 +44,7 @@ type testEventSeriesSink struct {
 }
 
 // Create records the event for testing.
-func (t *testEventSeriesSink) Create(e *eventsv1.Event) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Create(ctx context.Context, e *eventsv1.Event) (*eventsv1.Event, error) {
 	if t.OnCreate != nil {
 		return t.OnCreate(e)
 	}
@@ -49,7 +52,7 @@ func (t *testEventSeriesSink) Create(e *eventsv1.Event) (*eventsv1.Event, error)
 }
 
 // Update records the event for testing.
-func (t *testEventSeriesSink) Update(e *eventsv1.Event) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Update(ctx context.Context, e *eventsv1.Event) (*eventsv1.Event, error) {
 	if t.OnUpdate != nil {
 		return t.OnUpdate(e)
 	}
@@ -57,7 +60,7 @@ func (t *testEventSeriesSink) Update(e *eventsv1.Event) (*eventsv1.Event, error)
 }
 
 // Patch records the event for testing.
-func (t *testEventSeriesSink) Patch(e *eventsv1.Event, p []byte) (*eventsv1.Event, error) {
+func (t *testEventSeriesSink) Patch(ctx context.Context, e *eventsv1.Event, p []byte) (*eventsv1.Event, error) {
 	if t.OnPatch != nil {
 		return t.OnPatch(e, p)
 	}
@@ -69,7 +72,6 @@ func TestEventSeriesf(t *testing.T) {
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -91,7 +93,7 @@ func TestEventSeriesf(t *testing.T) {
 			Name:      "foo",
 			Namespace: "baz",
 		},
-		EventTime:           metav1.MicroTime{time.Now()},
+		EventTime:           metav1.MicroTime{Time: time.Now()},
 		ReportingController: "eventTest",
 		ReportingInstance:   "eventTest-" + hostname,
 		Action:              "started",
@@ -107,7 +109,7 @@ func TestEventSeriesf(t *testing.T) {
 	nonIsomorphicEvent := expectedEvent.DeepCopy()
 	nonIsomorphicEvent.Action = "stopped"
 
-	expectedEvent.Series = &eventsv1.EventSeries{Count: 1}
+	expectedEvent.Series = &eventsv1.EventSeries{Count: 2}
 	table := []struct {
 		regarding    k8sruntime.Object
 		related      k8sruntime.Object
@@ -134,7 +136,9 @@ func TestEventSeriesf(t *testing.T) {
 		},
 	}
 
-	stopCh := make(chan struct{})
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	createEvent := make(chan *eventsv1.Event)
 	updateEvent := make(chan *eventsv1.Event)
@@ -158,7 +162,14 @@ func TestEventSeriesf(t *testing.T) {
 	}
 	eventBroadcaster := newBroadcaster(&testEvents, 0, map[eventKey]*eventsv1.Event{})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "eventTest")
-	eventBroadcaster.StartRecordingToSink(stopCh)
+	broadcaster := eventBroadcaster.(*eventBroadcasterImpl)
+	// Don't call StartRecordingToSink, as we don't need neither refreshing event
+	// series nor finishing them in this tests and additional events updated would
+	// race with our expected ones.
+	err = broadcaster.startRecordingEvents(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
 	recorder.Eventf(regarding, related, isomorphicEvent.Type, isomorphicEvent.Reason, isomorphicEvent.Action, isomorphicEvent.Note, []interface{}{1})
 	// read from the chan as this was needed only to populate the cache
 	<-createEvent
@@ -176,7 +187,44 @@ func TestEventSeriesf(t *testing.T) {
 			validateEvent(strconv.Itoa(index), false, actualEvent, item.expect, t)
 		}
 	}
-	close(stopCh)
+}
+
+// TestEventSeriesWithEventSinkImplRace verifies that when Events are emitted to
+// an EventSink consecutively there is no data race.  This test is meant to be
+// run with the `-race` option.
+func TestEventSeriesWithEventSinkImplRace(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+
+	eventSink := &EventSinkImpl{Interface: kubeClient.EventsV1()}
+	eventBroadcaster := NewBroadcaster(eventSink)
+
+	stopCh := make(chan struct{})
+	eventBroadcaster.StartRecordingToSink(stopCh)
+
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "test")
+
+	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
+	recorder.Eventf(&v1.ObjectReference{}, nil, v1.EventTypeNormal, "reason", "action", "", "")
+
+	err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+		events, err := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		if len(events.Items) != 1 {
+			return false, nil
+		}
+
+		if events.Items[0].Series == nil {
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal("expected that 2 identical Eventf calls would result in the creation of an Event with a Serie")
+	}
 }
 
 func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *eventsv1.Event, expectedEvent *eventsv1.Event, t *testing.T) {
@@ -210,10 +258,10 @@ func validateEvent(messagePrefix string, expectedUpdate bool, actualEvent *event
 }
 
 func TestFinishSeries(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	hostname, _ := os.Hostname()
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -250,8 +298,8 @@ func TestFinishSeries(t *testing.T) {
 	}
 	cache := map[eventKey]*eventsv1.Event{}
 	eventBroadcaster := newBroadcaster(&testEvents, 0, cache).(*eventBroadcasterImpl)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImpl)
-	cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImplLogger)
+	cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
 	nonFinishedEvent := cachedEvent.DeepCopy()
 	nonFinishedEvent.ReportingController = "nonFinished-controller"
 	cachedEvent.Series = &eventsv1.EventSeries{
@@ -260,7 +308,7 @@ func TestFinishSeries(t *testing.T) {
 	}
 	cache[getKey(cachedEvent)] = cachedEvent
 	cache[getKey(nonFinishedEvent)] = nonFinishedEvent
-	eventBroadcaster.finishSeries()
+	eventBroadcaster.finishSeries(ctx)
 	select {
 	case actualEvent := <-patchEvent:
 		t.Logf("validating event affected by patch request")
@@ -282,10 +330,10 @@ func TestFinishSeries(t *testing.T) {
 }
 
 func TestRefreshExistingEventSeries(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	hostname, _ := os.Hostname()
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -337,8 +385,8 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		}
 		cache := map[eventKey]*eventsv1.Event{}
 		eventBroadcaster := newBroadcaster(&testEvents, 0, cache).(*eventBroadcasterImpl)
-		recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImpl)
-		cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
+		recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImplLogger)
+		cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
 		cachedEvent.Series = &eventsv1.EventSeries{
 			Count:            10,
 			LastObservedTime: LastObservedTime,
@@ -346,7 +394,7 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		cacheKey := getKey(cachedEvent)
 		cache[cacheKey] = cachedEvent
 
-		eventBroadcaster.refreshExistingEventSeries()
+		eventBroadcaster.refreshExistingEventSeries(ctx)
 		select {
 		case <-patchEvent:
 			t.Logf("validating event affected by patch request")

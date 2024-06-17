@@ -28,11 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/client-go/util/retry"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -40,7 +38,7 @@ import (
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
 // store into it's kind.  We've used this downstream for mappings before.
-var kindWhiteList = sets.NewString()
+var kindAllowList = sets.NewString()
 
 // namespace used for all tests, do not change this
 const testNamespace = "dryrunnamespace"
@@ -150,17 +148,18 @@ func DryRunScaleUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name str
 func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	var err error
 	var obj *unstructured.Unstructured
-	for i := 0; i < 3; i++ {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		obj, err = rsc.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to retrieve object: %v", err)
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
 		obj, err = rsc.Update(context.TODO(), obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err == nil || !apierrors.IsConflict(err) {
-			break
+		if apierrors.IsConflict(err) {
+			t.Logf("conflict error: %v", err)
 		}
-	}
+		return err
+	})
 	if err != nil {
 		t.Fatalf("failed to dry-run update resource: %v", err)
 	}
@@ -209,7 +208,6 @@ func DryRunDeleteTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 
 // TestDryRun tests dry-run on all types.
 func TestDryRun(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, true)()
 
 	// start API server
 	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
@@ -262,8 +260,8 @@ func TestDryRun(t *testing.T) {
 			gvResource := resourceToTest.Mapping.Resource
 			kind := gvk.Kind
 
-			if kindWhiteList.Has(kind) {
-				t.Skip("whitelisted")
+			if kindAllowList.Has(kind) {
+				t.Skip("allowlisted")
 			}
 
 			testData, hasTest := dryrunData[gvResource]

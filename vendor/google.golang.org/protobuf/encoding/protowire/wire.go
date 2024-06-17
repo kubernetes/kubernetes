@@ -3,10 +3,10 @@
 // license that can be found in the LICENSE file.
 
 // Package protowire parses and formats the raw wire encoding.
-// See https://developers.google.com/protocol-buffers/docs/encoding.
+// See https://protobuf.dev/programming-guides/encoding.
 //
 // For marshaling and unmarshaling entire protobuf messages,
-// use the "google.golang.org/protobuf/proto" package instead.
+// use the [google.golang.org/protobuf/proto] package instead.
 package protowire
 
 import (
@@ -21,19 +21,16 @@ import (
 type Number int32
 
 const (
-	MinValidNumber      Number = 1
-	FirstReservedNumber Number = 19000
-	LastReservedNumber  Number = 19999
-	MaxValidNumber      Number = 1<<29 - 1
+	MinValidNumber        Number = 1
+	FirstReservedNumber   Number = 19000
+	LastReservedNumber    Number = 19999
+	MaxValidNumber        Number = 1<<29 - 1
+	DefaultRecursionLimit        = 10000
 )
 
 // IsValid reports whether the field number is semantically valid.
-//
-// Note that while numbers within the reserved range are semantically invalid,
-// they are syntactically valid in the wire format.
-// Implementations may treat records with reserved field numbers as unknown.
 func (n Number) IsValid() bool {
-	return MinValidNumber <= n && n < FirstReservedNumber || LastReservedNumber < n && n <= MaxValidNumber
+	return MinValidNumber <= n && n <= MaxValidNumber
 }
 
 // Type represents the wire type.
@@ -55,6 +52,7 @@ const (
 	errCodeOverflow
 	errCodeReserved
 	errCodeEndGroup
+	errCodeRecursionDepth
 )
 
 var (
@@ -89,7 +87,7 @@ func ParseError(n int) error {
 
 // ConsumeField parses an entire field record (both tag and value) and returns
 // the field number, the wire type, and the total length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 //
 // The total length includes the tag header and the end group marker (if the
 // field is a group).
@@ -106,12 +104,16 @@ func ConsumeField(b []byte) (Number, Type, int) {
 }
 
 // ConsumeFieldValue parses a field value and returns its length.
-// This assumes that the field Number and wire Type have already been parsed.
-// This returns a negative length upon an error (see ParseError).
+// This assumes that the field [Number] and wire [Type] have already been parsed.
+// This returns a negative length upon an error (see [ParseError]).
 //
 // When parsing a group, the length includes the end group marker and
 // the end group is verified to match the starting field number.
 func ConsumeFieldValue(num Number, typ Type, b []byte) (n int) {
+	return consumeFieldValueD(num, typ, b, DefaultRecursionLimit)
+}
+
+func consumeFieldValueD(num Number, typ Type, b []byte, depth int) (n int) {
 	switch typ {
 	case VarintType:
 		_, n = ConsumeVarint(b)
@@ -126,6 +128,9 @@ func ConsumeFieldValue(num Number, typ Type, b []byte) (n int) {
 		_, n = ConsumeBytes(b)
 		return n
 	case StartGroupType:
+		if depth < 0 {
+			return errCodeRecursionDepth
+		}
 		n0 := len(b)
 		for {
 			num2, typ2, n := ConsumeTag(b)
@@ -140,7 +145,7 @@ func ConsumeFieldValue(num Number, typ Type, b []byte) (n int) {
 				return n0 - len(b)
 			}
 
-			n = ConsumeFieldValue(num2, typ2, b)
+			n = consumeFieldValueD(num2, typ2, b, depth-1)
 			if n < 0 {
 				return n // forward error code
 			}
@@ -159,7 +164,7 @@ func AppendTag(b []byte, num Number, typ Type) []byte {
 }
 
 // ConsumeTag parses b as a varint-encoded tag, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeTag(b []byte) (Number, Type, int) {
 	v, n := ConsumeVarint(b)
 	if n < 0 {
@@ -258,7 +263,7 @@ func AppendVarint(b []byte, v uint64) []byte {
 }
 
 // ConsumeVarint parses b as a varint-encoded uint64, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeVarint(b []byte) (v uint64, n int) {
 	var y uint64
 	if len(b) <= 0 {
@@ -379,7 +384,7 @@ func AppendFixed32(b []byte, v uint32) []byte {
 }
 
 // ConsumeFixed32 parses b as a little-endian uint32, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeFixed32(b []byte) (v uint32, n int) {
 	if len(b) < 4 {
 		return 0, errCodeTruncated
@@ -407,7 +412,7 @@ func AppendFixed64(b []byte, v uint64) []byte {
 }
 
 // ConsumeFixed64 parses b as a little-endian uint64, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeFixed64(b []byte) (v uint64, n int) {
 	if len(b) < 8 {
 		return 0, errCodeTruncated
@@ -427,7 +432,7 @@ func AppendBytes(b []byte, v []byte) []byte {
 }
 
 // ConsumeBytes parses b as a length-prefixed bytes value, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeBytes(b []byte) (v []byte, n int) {
 	m, n := ConsumeVarint(b)
 	if n < 0 {
@@ -451,7 +456,7 @@ func AppendString(b []byte, v string) []byte {
 }
 
 // ConsumeString parses b as a length-prefixed bytes value, reporting its length.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeString(b []byte) (v string, n int) {
 	bb, n := ConsumeBytes(b)
 	return string(bb), n
@@ -466,7 +471,7 @@ func AppendGroup(b []byte, num Number, v []byte) []byte {
 // ConsumeGroup parses b as a group value until the trailing end group marker,
 // and verifies that the end marker matches the provided num. The value v
 // does not contain the end marker, while the length does contain the end marker.
-// This returns a negative length upon an error (see ParseError).
+// This returns a negative length upon an error (see [ParseError]).
 func ConsumeGroup(num Number, b []byte) (v []byte, n int) {
 	n = ConsumeFieldValue(num, StartGroupType, b)
 	if n < 0 {
@@ -490,8 +495,8 @@ func SizeGroup(num Number, n int) int {
 	return n + SizeTag(num)
 }
 
-// DecodeTag decodes the field Number and wire Type from its unified form.
-// The Number is -1 if the decoded field number overflows int32.
+// DecodeTag decodes the field [Number] and wire [Type] from its unified form.
+// The [Number] is -1 if the decoded field number overflows int32.
 // Other than overflow, this does not check for field number validity.
 func DecodeTag(x uint64) (Number, Type) {
 	// NOTE: MessageSet allows for larger field numbers than normal.
@@ -501,12 +506,13 @@ func DecodeTag(x uint64) (Number, Type) {
 	return Number(x >> 3), Type(x & 7)
 }
 
-// EncodeTag encodes the field Number and wire Type into its unified form.
+// EncodeTag encodes the field [Number] and wire [Type] into its unified form.
 func EncodeTag(num Number, typ Type) uint64 {
 	return uint64(num)<<3 | uint64(typ&7)
 }
 
 // DecodeZigZag decodes a zig-zag-encoded uint64 as an int64.
+//
 //	Input:  {…,  5,  3,  1,  0,  2,  4,  6, …}
 //	Output: {…, -3, -2, -1,  0, +1, +2, +3, …}
 func DecodeZigZag(x uint64) int64 {
@@ -514,6 +520,7 @@ func DecodeZigZag(x uint64) int64 {
 }
 
 // EncodeZigZag encodes an int64 as a zig-zag-encoded uint64.
+//
 //	Input:  {…, -3, -2, -1,  0, +1, +2, +3, …}
 //	Output: {…,  5,  3,  1,  0,  2,  4,  6, …}
 func EncodeZigZag(x int64) uint64 {
@@ -521,6 +528,7 @@ func EncodeZigZag(x int64) uint64 {
 }
 
 // DecodeBool decodes a uint64 as a bool.
+//
 //	Input:  {    0,    1,    2, …}
 //	Output: {false, true, true, …}
 func DecodeBool(x uint64) bool {
@@ -528,6 +536,7 @@ func DecodeBool(x uint64) bool {
 }
 
 // EncodeBool encodes a bool as a uint64.
+//
 //	Input:  {false, true}
 //	Output: {    0,    1}
 func EncodeBool(x bool) uint64 {

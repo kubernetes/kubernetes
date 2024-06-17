@@ -1,3 +1,0 @@
-linux/amd64=fedora:28
-linux/arm64=arm64v8/fedora:28
-linux/ppc64le=ppc64le/fedora:28

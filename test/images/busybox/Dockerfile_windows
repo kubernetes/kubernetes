@@ -1,4 +1,4 @@
-# Copyright 2020 The Kubernetes Authors.
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,22 +13,83 @@
 # limitations under the License.
 
 ARG BASEIMAGE
-from $BASEIMAGE as prep
+ARG REGISTRY
+ARG OS_VERSION
 
-ENV CURL_VERSION 7.57.0
-WORKDIR /curl
-ADD https://skanthak.homepage.t-online.de/download/curl-$CURL_VERSION.cab curl.cab
-RUN expand /R curl.cab /F:* .
+# We're using a Linux image to unpack the archive, then we're copying it over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
 
+ENV CURL_VERSION=7.57.0
+
+# Available busybox functions retrieved by running busybox.exe --list
+ENV BUSYBOX_EXES="[ [[ ar arch ash awk base64 basename bash bunzip2 bzcat bzip2 cal cat chmod cksum clear cmp comm cp cpio cut date dc dd df diff dirname dos2unix dpkg-deb du echo ed egrep env expand expr factor false fgrep find fold fsync ftpget ftpput getopt grep groups gunzip gzip hd head hexdump id ipcalc kill killall less link ln logname ls lzcat lzma lzop lzopcat man md5sum mkdir mktemp mv nl od paste patch pgrep pidof pipe_progress pkill printenv printf ps pwd rev rm rmdir rpm rpm2cpio sed seq sh sha1sum sha256sum sha3sum sha512sum shred shuf sleep sort split ssl_client stat strings sum tac tail tar tee test timeout touch tr true truncate ttysize uname uncompress unexpand uniq unix2dos unlink unlzma unlzop unxz unzip usleep uudecode uuencode vi watch wc wget which whoami whois xargs xxd xz xzcat yes zcat"
+
+ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /busybox-dir/busybox.exe
+ADD https://skanthak.homepage.t-online.de/download/curl-$CURL_VERSION.cab /curl.cab
+ADD https://eternallybored.org/misc/netcat/netcat-win32-1.12.zip /netcat.zip
+ADD https://downloads.isc.org/isc/bind9/9.14.10/BIND9.14.10.x64.zip /bind.zip
+
+# We need vcruntime140.dll in order to run dig.exe, or httpd.exe
+ADD https://wikidll.com/download/24194/vcruntime140.zip /vcruntime140.zip
+
+RUN apk --update add cabextract
+
+# NOTE(claudiub): We're creating symlinks for each of the busybox binaries and after that we're copying
+# them over to Windows. Unfortunately, docker buildx has some issues copying over Windows symlinks.
+# "Files/" is always prepended to the symlink target. The symlinks themselves are relative paths,
+# so, in order to make use of them, we can simply add a busybox binary to Files\busybox.exe.
+RUN cd /busybox-dir/ && \
+    for busybox_binary in $BUSYBOX_EXES; do ln -s busybox.exe $busybox_binary.exe; done && \
+    mkdir Files && \
+    cp busybox.exe Files/busybox.exe
+
+RUN mkdir /curl-full /curl-dir && \
+    cabextract -d /curl-full/ /curl.cab && \
+    cp -r /curl-full/AMD64 /curl-full/CURL.LIC /curl-dir/ && \
+    mkdir /netcat-dir && \
+    unzip /netcat.zip -d /netcat-dir/ && \
+    mkdir /bind-dir /dig-dir &&\
+    unzip /bind.zip -d /bind-dir/ && \
+    cp /bind-dir/dig.exe /bind-dir/nslookup.exe /bind-dir/*.dll /dig-dir/ && \
+    unzip /vcruntime140.zip -d / && \
+    mkdir /tmp-dir
+
+
+# Windows Stage
+FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
+FROM --platform=linux/amd64 e2eteam/powershell-helper:6.2.7-linux-cache as ps-helper
 FROM $BASEIMAGE
 
-COPY --from=prep /curl/AMD64 /curl
-COPY --from=prep /curl/CURL.LIC /curl
-ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /bin/busybox.exe
-ADD https://github.com/diegocr/netcat/raw/master/nc.exe /bin/nc.exe
+COPY --from=prep /tmp-dir /tmp
+COPY --from=prep /busybox-dir /bin
+COPY --from=prep /curl-dir /curl
+COPY --from=prep /netcat-dir/nc64.exe /bin/nc.exe
+COPY --from=prep /dig-dir /dig
+COPY --from=prep /vcruntime140.dll /Windows/System32/
+
+# include nltest
+COPY --from=servercore-helper /Windows/System32/nltest.exe /Windows/System32/nltest.exe
+COPY --from=servercore-helper /Windows/System32/en-US/nltest.exe.mui /Windows/System32/en-US/nltest.exe.mui
+COPY --from=servercore-helper /Windows/System32/ntdsapi.dll /Windows/System32/ntdsapi.dll
+
+# include powershell and its Module analysis cache.
+COPY --from=ps-helper ["/PowerShell", "/Program Files/PowerShell"]
+
+# NOTE(claudiub): For the same reason mentioned above, we have to copy pwsh.exe to Files/pwsh.exe
+COPY --from=ps-helper ["/PowerShell/pwsh.exe", "/Program Files/PowerShell/Files/"]
+COPY --from=ps-helper /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache
+
 ADD hostname /bin/hostname.exe
+
 USER ContainerAdministrator
-RUN FOR /f "tokens=*" %i IN ('C:\bin\busybox --list') DO mklink C:\bin\%i.exe C:\bin\busybox.exe
-RUN setx /M PATH "C:\bin;C:\curl\;%PATH%" &\
-    mkdir C:\tmp
+
+# NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
+ENV PATH="C:\dig\;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\PowerShell;" \
+    ProgramFiles="C:\Program Files" \
+    # set a fixed location for the Module analysis cache
+    LOCALAPPDATA="C:\Users\ContainerAdministrator\AppData\Local" \
+    PSModuleAnalysisCachePath="C:\Users\ContainerAdministrator\AppData\Local\Microsoft\Windows\PowerShell\docker\ModuleAnalysisCache" \
+    # Persist %PSCORE% ENV variable for user convenience
+    PSCORE="C:\Program Files\PowerShell\pwsh.exe"
+
 ENTRYPOINT ["cmd.exe", "/s", "/c"]

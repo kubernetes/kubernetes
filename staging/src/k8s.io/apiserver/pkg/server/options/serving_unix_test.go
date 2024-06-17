@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -19,31 +20,37 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
 	"net"
 	"testing"
 )
 
 func TestCreateListenerSharePort(t *testing.T) {
-	addr := "127.0.0.1:12345"
 	c := net.ListenConfig{Control: permitPortReuse}
 
-	if _, _, err := CreateListener("tcp", addr, c); err != nil {
+	l, port, err := CreateListener("tcp", "127.0.0.1:0", c)
+	if err != nil {
 		t.Fatalf("failed to create listener: %v", err)
 	}
+	defer l.Close()
 
-	if _, _, err := CreateListener("tcp", addr, c); err != nil {
+	l2, _, err := CreateListener("tcp", fmt.Sprintf("127.0.0.1:%d", port), c)
+	if err != nil {
 		t.Fatalf("failed to create 2nd listener: %v", err)
 	}
+	defer l2.Close()
 }
 
 func TestCreateListenerPreventUpgrades(t *testing.T) {
-	addr := "127.0.0.1:12346"
-
-	if _, _, err := CreateListener("tcp", addr, net.ListenConfig{}); err != nil {
+	l, port, err := CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
+	if err != nil {
 		t.Fatalf("failed to create listener: %v", err)
 	}
+	defer l.Close()
 
-	if _, _, err := CreateListener("tcp", addr, net.ListenConfig{Control: permitPortReuse}); err == nil {
+	l2, _, err := CreateListener("tcp", fmt.Sprintf("127.0.0.1:%d", port), net.ListenConfig{Control: permitPortReuse})
+	if err == nil {
+		l2.Close()
 		t.Fatalf("creating second listener without port sharing should fail")
 	}
 }

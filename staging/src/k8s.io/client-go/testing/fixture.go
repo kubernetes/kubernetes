@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -101,10 +102,20 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			if action.GetSubresource() == "" {
 				err = tracker.Create(gvr, action.GetObject(), ns)
 			} else {
-				// TODO: Currently we're handling subresource creation as an update
-				// on the enclosing resource. This works for some subresources but
-				// might not be generic enough.
-				err = tracker.Update(gvr, action.GetObject(), ns)
+				oldObj, getOldObjErr := tracker.Get(gvr, ns, objMeta.GetName())
+				if getOldObjErr != nil {
+					return true, nil, getOldObjErr
+				}
+				// Check whether the existing historical object type is the same as the current operation object type that needs to be updated, and if it is the same, perform the update operation.
+				if reflect.TypeOf(oldObj) == reflect.TypeOf(action.GetObject()) {
+					// TODO: Currently we're handling subresource creation as an update
+					// on the enclosing resource. This works for some subresources but
+					// might not be generic enough.
+					err = tracker.Update(gvr, action.GetObject(), ns)
+				} else {
+					// If the historical object type is different from the current object type, need to make sure we return the object submitted,don't persist the submitted object in the tracker.
+					return true, action.GetObject(), nil
+				}
 			}
 			if err != nil {
 				return true, nil, err
@@ -170,7 +181,7 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 				if err := json.Unmarshal(modified, obj); err != nil {
 					return true, nil, err
 				}
-			case types.StrategicMergePatchType:
+			case types.StrategicMergePatchType, types.ApplyPatchType:
 				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
 				if err != nil {
 					return true, nil, err
@@ -399,7 +410,8 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
 			for _, w := range t.getWatches(gvr, ns) {
-				w.Modify(obj)
+				// To avoid the object from being accidentally modified by watcher
+				w.Modify(obj.DeepCopyObject())
 			}
 			t.objects[gvr][namespacedName] = obj
 			return nil
@@ -415,7 +427,8 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	t.objects[gvr][namespacedName] = obj
 
 	for _, w := range t.getWatches(gvr, ns) {
-		w.Add(obj)
+		// To avoid the object from being accidentally modified by watcher
+		w.Add(obj.DeepCopyObject())
 	}
 
 	return nil
@@ -455,7 +468,7 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string) error
 
 	delete(objs, namespacedName)
 	for _, w := range t.getWatches(gvr, ns) {
-		w.Delete(obj)
+		w.Delete(obj.DeepCopyObject())
 	}
 	return nil
 }
@@ -509,12 +522,8 @@ func (r *SimpleReactor) Handles(action Action) bool {
 	if !verbCovers {
 		return false
 	}
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
-	if !resourceCovers {
-		return false
-	}
 
-	return true
+	return resourceCovers(r.Resource, action)
 }
 
 func (r *SimpleReactor) React(action Action) (bool, runtime.Object, error) {
@@ -530,12 +539,7 @@ type SimpleWatchReactor struct {
 }
 
 func (r *SimpleWatchReactor) Handles(action Action) bool {
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
-	if !resourceCovers {
-		return false
-	}
-
-	return true
+	return resourceCovers(r.Resource, action)
 }
 
 func (r *SimpleWatchReactor) React(action Action) (bool, watch.Interface, error) {
@@ -551,14 +555,27 @@ type SimpleProxyReactor struct {
 }
 
 func (r *SimpleProxyReactor) Handles(action Action) bool {
-	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource().Resource
-	if !resourceCovers {
-		return false
-	}
-
-	return true
+	return resourceCovers(r.Resource, action)
 }
 
 func (r *SimpleProxyReactor) React(action Action) (bool, restclient.ResponseWrapper, error) {
 	return r.Reaction(action)
+}
+
+func resourceCovers(resource string, action Action) bool {
+	if resource == "*" {
+		return true
+	}
+
+	if resource == action.GetResource().Resource {
+		return true
+	}
+
+	if index := strings.Index(resource, "/"); index != -1 &&
+		resource[:index] == action.GetResource().Resource &&
+		resource[index+1:] == action.GetSubresource() {
+		return true
+	}
+
+	return false
 }

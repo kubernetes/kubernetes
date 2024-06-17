@@ -24,12 +24,15 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-scheduler/config/v1beta1"
+	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/utils/pointer"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
+// TestCodecsDecodePluginConfig tests that embedded plugin args get decoded
+// into their appropriate internal types and defaults are applied.
 func TestCodecsDecodePluginConfig(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -37,72 +40,81 @@ func TestCodecsDecodePluginConfig(t *testing.T) {
 		wantErr      string
 		wantProfiles []config.KubeSchedulerProfile
 	}{
+		// v1 tests
 		{
-			name: "v1beta1 all plugin args in default profile",
+			name: "v1 all plugin args in default profile",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
+      minCandidateNodesPercentage: 50
+      minCandidateNodesAbsolute: 500
   - name: InterPodAffinity
     args:
       hardPodAffinityWeight: 5
-  - name: NodeLabel
-    args:
-      presentLabels: ["foo"]
   - name: NodeResourcesFit
     args:
       ignoredResources: ["foo"]
-  - name: RequestedToCapacityRatio
-    args:
-      shape:
-      - utilization: 1
   - name: PodTopologySpread
     args:
       defaultConstraints:
       - maxSkew: 1
         topologyKey: zone
         whenUnsatisfiable: ScheduleAnyway
-  - name: ServiceAffinity
-    args:
-      affinityLabels: ["bar"]
-  - name: NodeResourcesLeastAllocated
-    args:
-      resources:
-      - name: cpu
-        weight: 2
-      - name: unknown
-        weight: 1
-  - name: NodeResourcesMostAllocated
-    args:
-      resources:
-      - name: memory
-        weight: 1
   - name: VolumeBinding
     args:
       bindTimeoutSeconds: 300
+  - name: NodeAffinity
+    args:
+      addedAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: foo
+              operator: In
+              values: ["bar"]
+  - name: NodeResourcesBalancedAllocation
+    args:
+      resources:
+        - name: cpu       # default weight(1) will be set.
+        - name: memory    # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar0
+          weight: 1
+        - name: scalar1   # default weight(1) will be set for scalar1
+        - name: scalar2   # weight 0 will be replaced by 1.
+          weight: 0
+        - name: scalar3
+          weight: 2
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
-					SchedulerName: "default-scheduler",
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1,
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 500},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{HardPodAffinityWeight: 5},
 						},
 						{
-							Name: "NodeLabel",
-							Args: &config.NodeLabelArgs{PresentLabels: []string{"foo"}},
-						},
-						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{IgnoredResources: []string{"foo"}},
-						},
-						{
-							Name: "RequestedToCapacityRatio",
-							Args: &config.RequestedToCapacityRatioArgs{
-								Shape:     []config.UtilizationShapePoint{{Utilization: 1}},
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							Args: &config.NodeResourcesFitArgs{
+								IgnoredResources: []string{"foo"},
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
 							},
 						},
 						{
@@ -111,24 +123,7 @@ profiles:
 								DefaultConstraints: []corev1.TopologySpreadConstraint{
 									{MaxSkew: 1, TopologyKey: "zone", WhenUnsatisfiable: corev1.ScheduleAnyway},
 								},
-							},
-						},
-						{
-							Name: "ServiceAffinity",
-							Args: &config.ServiceAffinityArgs{
-								AffinityLabels: []string{"bar"},
-							},
-						},
-						{
-							Name: "NodeResourcesLeastAllocated",
-							Args: &config.NodeResourcesLeastAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 2}, {Name: "unknown", Weight: 1}},
-							},
-						},
-						{
-							Name: "NodeResourcesMostAllocated",
-							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "memory", Weight: 1}},
+								DefaultingType: config.SystemDefaulting,
 							},
 						},
 						{
@@ -137,30 +132,137 @@ profiles:
 								BindTimeoutSeconds: 300,
 							},
 						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{
+								AddedAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "foo",
+														Operator: corev1.NodeSelectorOpIn,
+														Values:   []string{"bar"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{
+									{Name: "cpu", Weight: 1},
+									{Name: "memory", Weight: 1},
+									{Name: "scalar0", Weight: 1},
+									{Name: "scalar1", Weight: 1},
+									{Name: "scalar2", Weight: 1},
+									{Name: "scalar3", Weight: 2}},
+							},
+						},
 					},
 				},
 			},
 		},
 		{
-			name: "v1beta1 plugins can include version and kind",
+			name: "v1 with non-default global percentageOfNodesToScore",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: nil,
+					Plugins:                  defaults.PluginsV1,
+					PluginConfig:             defaults.PluginConfigsV1,
+				},
+			},
+		},
+		{
+			name: "v1 with non-default global and profile percentageOfNodesToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfNodesToScore: 10
+profiles:
+- percentageOfNodesToScore: 20
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:            "default-scheduler",
+					PercentageOfNodesToScore: ptr.To[int32](20),
+					Plugins:                  defaults.PluginsV1,
+					PluginConfig:             defaults.PluginConfigsV1,
+				},
+			},
+		},
+		{
+			name: "v1 plugins can include version and kind",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: NodeLabel
+  - name: DefaultPreemption
     args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
-      kind: NodeLabelArgs
-      presentLabels: ["bars"]
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: DefaultPreemptionArgs
+      minCandidateNodesPercentage: 50
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1,
 					PluginConfig: []config.PluginConfig{
 						{
-							Name: "NodeLabel",
-							Args: &config.NodeLabelArgs{PresentLabels: []string{"bars"}},
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 50, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "InterPodAffinity",
+							Args: &config.InterPodAffinityArgs{
+								HardPodAffinityWeight: 1,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+						{
+							Name: "NodeResourcesFit",
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
+						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultingType: config.SystemDefaulting,
+							},
+						},
+						{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 600,
+							},
 						},
 					},
 				},
@@ -169,54 +271,54 @@ profiles:
 		{
 			name: "plugin group and kind should match the type",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: NodeLabel
+  - name: DefaultPreemption
     args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      apiVersion: kubescheduler.config.k8s.io/v1
       kind: InterPodAffinityArgs
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: args for plugin NodeLabel were not of type NodeLabelArgs.kubescheduler.config.k8s.io, got InterPodAffinityArgs.kubescheduler.config.k8s.io`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: args for plugin DefaultPreemption were not of type DefaultPreemptionArgs.kubescheduler.config.k8s.io, got InterPodAffinityArgs.kubescheduler.config.k8s.io`,
 		},
 		{
-			name: "v1beta1 RequestedToCapacityRatioArgs shape encoding is strict",
+			name: "v1 NodResourcesFitArgs shape encoding is strict",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: RequestedToCapacityRatio
+  - name: NodeResourcesFit
     args:
-      shape:
-      - Utilization: 1
-        Score: 2
+      scoringStrategy:
+        requestedToCapacityRatio:
+          shape:
+          - Score: 2
+            Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"shape":[{"Score":2,"Utilization":1}]}: v1beta1.RequestedToCapacityRatioArgs.Shape: []v1beta1.UtilizationShapePoint: v1beta1.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|{"shape":[{"Score":2,"Utilization":1}]}|...`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Score", unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Utilization"`,
 		},
 		{
-			name: "v1beta1 RequestedToCapacityRatioArgs resources encoding is strict",
+			name: "v1 NodeResourcesFitArgs resources encoding is strict",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
-  - name: RequestedToCapacityRatio
+  - name: NodeResourcesFit
     args:
-      shape:
-      - utilization: 1
-        score: 2
-      resources:
-      - Name: 1
-        Weight: 2
+      scoringStrategy:
+        resources:
+        - Name: cpu
+          Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin RequestedToCapacityRatio: strict decoder error for {"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":1}]}: v1beta1.RequestedToCapacityRatioArgs.Shape: []v1beta1.UtilizationShapePoint: Resources: []v1beta1.ResourceSpec: v1beta1.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":1,"Weight|..., bigger context ...|{"resources":[{"Name":1,"Weight":2}],"shape":[{"score":2,"utilization":|...`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.resources[0].Name", unknown field "scoringStrategy.resources[0].Weight"`,
 		},
 		{
 			name: "out-of-tree plugin args",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
@@ -227,7 +329,8 @@ profiles:
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
-					PluginConfig: []config.PluginConfig{
+					Plugins:       defaults.PluginsV1,
+					PluginConfig: append([]config.PluginConfig{
 						{
 							Name: "OutOfTreePlugin",
 							Args: &runtime.Unknown{
@@ -235,33 +338,39 @@ profiles:
 								Raw:         []byte(`{"foo":"bar"}`),
 							},
 						},
-					},
+					}, defaults.PluginConfigsV1...),
 				},
 			},
 		},
 		{
 			name: "empty and no plugin args",
 			data: []byte(`
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 profiles:
 - pluginConfig:
+  - name: DefaultPreemption
+    args:
   - name: InterPodAffinity
     args:
   - name: NodeResourcesFit
   - name: OutOfTreePlugin
     args:
-  - name: NodeResourcesLeastAllocated
-    args:
-  - name: NodeResourcesMostAllocated
-    args:
   - name: VolumeBinding
     args:
+  - name: PodTopologySpread
+  - name: NodeAffinity
+  - name: NodeResourcesBalancedAllocation
 `),
 			wantProfiles: []config.KubeSchedulerProfile{
 				{
 					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1,
 					PluginConfig: []config.PluginConfig{
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
 						{
 							Name: "InterPodAffinity",
 							Args: &config.InterPodAffinityArgs{
@@ -270,19 +379,96 @@ profiles:
 						},
 						{
 							Name: "NodeResourcesFit",
-							Args: &config.NodeResourcesFitArgs{},
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
 						},
 						{Name: "OutOfTreePlugin"},
 						{
-							Name: "NodeResourcesLeastAllocated",
-							Args: &config.NodeResourcesLeastAllocatedArgs{
+							Name: "VolumeBinding",
+							Args: &config.VolumeBindingArgs{
+								BindTimeoutSeconds: 600,
+							},
+						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultingType: config.SystemDefaulting,
+							},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
+								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ignorePreferredTermsOfExistingPods is enabled",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+profiles:
+- pluginConfig:
+  - name: InterPodAffinity
+    args:
+      ignorePreferredTermsOfExistingPods: true
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName: "default-scheduler",
+					Plugins:       defaults.PluginsV1,
+					PluginConfig: []config.PluginConfig{
+						{
+							Name: "InterPodAffinity",
+							Args: &config.InterPodAffinityArgs{
+								HardPodAffinityWeight:              1,
+								IgnorePreferredTermsOfExistingPods: true,
+							},
+						},
+						{
+							Name: "DefaultPreemption",
+							Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+						},
+						{
+							Name: "NodeAffinity",
+							Args: &config.NodeAffinityArgs{},
+						},
+						{
+							Name: "NodeResourcesBalancedAllocation",
+							Args: &config.NodeResourcesBalancedAllocationArgs{
 								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 							},
 						},
 						{
-							Name: "NodeResourcesMostAllocated",
-							Args: &config.NodeResourcesMostAllocatedArgs{
-								Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+							Name: "NodeResourcesFit",
+							Args: &config.NodeResourcesFitArgs{
+								ScoringStrategy: &config.ScoringStrategy{
+									Type: config.LeastAllocated,
+									Resources: []config.ResourceSpec{
+										{Name: "cpu", Weight: 1},
+										{Name: "memory", Weight: 1},
+									},
+								},
+							},
+						},
+						{
+							Name: "PodTopologySpread",
+							Args: &config.PodTopologySpreadArgs{
+								DefaultingType: config.SystemDefaulting,
 							},
 						},
 						{
@@ -327,49 +513,61 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 		version schema.GroupVersion
 		want    string
 	}{
+		//v1 tests
 		{
-			name:    "v1beta1 in-tree and out-of-tree plugins",
-			version: v1beta1.SchemeGroupVersion,
-			obj: &v1beta1.KubeSchedulerConfiguration{
-				Profiles: []v1beta1.KubeSchedulerProfile{
+			name:    "v1 in-tree and out-of-tree plugins",
+			version: v1.SchemeGroupVersion,
+			obj: &v1.KubeSchedulerConfiguration{
+				Profiles: []v1.KubeSchedulerProfile{
 					{
-						PluginConfig: []v1beta1.PluginConfig{
+						PluginConfig: []v1.PluginConfig{
 							{
 								Name: "InterPodAffinity",
 								Args: runtime.RawExtension{
-									Object: &v1beta1.InterPodAffinityArgs{
-										HardPodAffinityWeight: pointer.Int32Ptr(5),
+									Object: &v1.InterPodAffinityArgs{
+										HardPodAffinityWeight: ptr.To[int32](5),
 									},
 								},
 							},
 							{
 								Name: "VolumeBinding",
 								Args: runtime.RawExtension{
-									Object: &v1beta1.VolumeBindingArgs{
-										BindTimeoutSeconds: pointer.Int64Ptr(300),
-									},
-								},
-							},
-							{
-								Name: "RequestedToCapacityRatio",
-								Args: runtime.RawExtension{
-									Object: &v1beta1.RequestedToCapacityRatioArgs{
-										Shape: []v1beta1.UtilizationShapePoint{
-											{Utilization: 1, Score: 2},
-										},
-										Resources: []v1beta1.ResourceSpec{
-											{Name: "cpu", Weight: 2},
+									Object: &v1.VolumeBindingArgs{
+										BindTimeoutSeconds: ptr.To[int64](300),
+										Shape: []v1.UtilizationShapePoint{
+											{
+												Utilization: 0,
+												Score:       0,
+											},
+											{
+												Utilization: 100,
+												Score:       10,
+											},
 										},
 									},
 								},
 							},
 							{
-								Name: "NodeResourcesLeastAllocated",
+								Name: "NodeResourcesFit",
 								Args: runtime.RawExtension{
-									Object: &v1beta1.NodeResourcesLeastAllocatedArgs{
-										Resources: []v1beta1.ResourceSpec{
-											{Name: "mem", Weight: 2},
+									Object: &v1.NodeResourcesFitArgs{
+										ScoringStrategy: &v1.ScoringStrategy{
+											Type:      v1.RequestedToCapacityRatio,
+											Resources: []v1.ResourceSpec{{Name: "cpu", Weight: 1}},
+											RequestedToCapacityRatio: &v1.RequestedToCapacityRatioParam{
+												Shape: []v1.UtilizationShapePoint{
+													{Utilization: 1, Score: 2},
+												},
+											},
 										},
+									},
+								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: runtime.RawExtension{
+									Object: &v1.PodTopologySpreadArgs{
+										DefaultConstraints: []corev1.TopologySpreadConstraint{},
 									},
 								},
 							},
@@ -383,7 +581,7 @@ func TestCodecsEncodePluginConfig(t *testing.T) {
 					},
 				},
 			},
-			want: `apiVersion: kubescheduler.config.k8s.io/v1beta1
+			want: `apiVersion: kubescheduler.config.k8s.io/v1
 clientConnection:
   acceptContentTypes: ""
   burst: 0
@@ -402,41 +600,49 @@ leaderElection:
 profiles:
 - pluginConfig:
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      apiVersion: kubescheduler.config.k8s.io/v1
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      apiVersion: kubescheduler.config.k8s.io/v1
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
+      shape:
+      - score: 0
+        utilization: 0
+      - score: 10
+        utilization: 100
     name: VolumeBinding
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
-      kind: RequestedToCapacityRatioArgs
-      resources:
-      - name: cpu
-        weight: 2
-      shape:
-      - score: 2
-        utilization: 1
-    name: RequestedToCapacityRatio
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        requestedToCapacityRatio:
+          shape:
+          - score: 2
+            utilization: 1
+        resources:
+        - name: cpu
+          weight: 1
+        type: RequestedToCapacityRatio
+    name: NodeResourcesFit
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
-      kind: NodeResourcesLeastAllocatedArgs
-      resources:
-      - name: mem
-        weight: 2
-    name: NodeResourcesLeastAllocated
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
   - args:
       foo: bar
     name: OutOfTreePlugin
 `,
 		},
 		{
-			name:    "v1beta1 in-tree and out-of-tree plugins from internal",
-			version: v1beta1.SchemeGroupVersion,
+			name:    "v1 in-tree and out-of-tree plugins from internal",
+			version: v1.SchemeGroupVersion,
 			obj: &config.KubeSchedulerConfiguration{
+				Parallelism:           8,
+				DelayCacheUntilActive: true,
 				Profiles: []config.KubeSchedulerProfile{
 					{
 						PluginConfig: []config.PluginConfig{
@@ -447,9 +653,12 @@ profiles:
 								},
 							},
 							{
-								Name: "NodeResourcesMostAllocated",
-								Args: &config.NodeResourcesMostAllocatedArgs{
-									Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
+								Name: "NodeResourcesFit",
+								Args: &config.NodeResourcesFitArgs{
+									ScoringStrategy: &config.ScoringStrategy{
+										Type:      config.LeastAllocated,
+										Resources: []config.ResourceSpec{{Name: "cpu", Weight: 1}},
+									},
 								},
 							},
 							{
@@ -457,6 +666,10 @@ profiles:
 								Args: &config.VolumeBindingArgs{
 									BindTimeoutSeconds: 300,
 								},
+							},
+							{
+								Name: "PodTopologySpread",
+								Args: &config.PodTopologySpreadArgs{},
 							},
 							{
 								Name: "OutOfTreePlugin",
@@ -468,16 +681,16 @@ profiles:
 					},
 				},
 			},
-			want: `apiVersion: kubescheduler.config.k8s.io/v1beta1
+			want: `apiVersion: kubescheduler.config.k8s.io/v1
 clientConnection:
   acceptContentTypes: ""
   burst: 0
   contentType: ""
   kubeconfig: ""
   qps: 0
+delayCacheUntilActive: true
 enableContentionProfiling: false
 enableProfiling: false
-healthzBindAddress: ""
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
@@ -487,32 +700,91 @@ leaderElection:
   resourceName: ""
   resourceNamespace: ""
   retryPeriod: 0s
-metricsBindAddress: ""
-percentageOfNodesToScore: 0
+parallelism: 8
 podInitialBackoffSeconds: 0
 podMaxBackoffSeconds: 0
 profiles:
 - pluginConfig:
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      apiVersion: kubescheduler.config.k8s.io/v1
       hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: false
       kind: InterPodAffinityArgs
     name: InterPodAffinity
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
-      kind: NodeResourcesMostAllocatedArgs
-      resources:
-      - name: cpu
-        weight: 1
-    name: NodeResourcesMostAllocated
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourcesFit
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta1
+      apiVersion: kubescheduler.config.k8s.io/v1
       bindTimeoutSeconds: 300
       kind: VolumeBindingArgs
     name: VolumeBinding
   - args:
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
+  - args:
       foo: bar
     name: OutOfTreePlugin
+  schedulerName: ""
+`,
+		},
+		{
+			name:    "v1 ignorePreferredTermsOfExistingPods is enabled",
+			version: v1.SchemeGroupVersion,
+			obj: &config.KubeSchedulerConfiguration{
+				Parallelism:           8,
+				DelayCacheUntilActive: true,
+				Profiles: []config.KubeSchedulerProfile{
+					{
+						PluginConfig: []config.PluginConfig{
+							{
+								Name: "InterPodAffinity",
+								Args: &config.InterPodAffinityArgs{
+									HardPodAffinityWeight:              5,
+									IgnorePreferredTermsOfExistingPods: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: `apiVersion: kubescheduler.config.k8s.io/v1
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+delayCacheUntilActive: true
+enableContentionProfiling: false
+enableProfiling: false
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 0s
+  renewDeadline: 0s
+  resourceLock: ""
+  resourceName: ""
+  resourceNamespace: ""
+  retryPeriod: 0s
+parallelism: 8
+podInitialBackoffSeconds: 0
+podMaxBackoffSeconds: 0
+profiles:
+- pluginConfig:
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1
+      hardPodAffinityWeight: 5
+      ignorePreferredTermsOfExistingPods: true
+      kind: InterPodAffinityArgs
+    name: InterPodAffinity
   schedulerName: ""
 `,
 		},

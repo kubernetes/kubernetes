@@ -19,39 +19,39 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	openapiclient "k8s.io/client-go/openapi"
+	"k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/util/openapi"
-	openapivalidation "k8s.io/kubectl/pkg/util/openapi/validation"
 	"k8s.io/kubectl/pkg/validation"
 )
 
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
 
-	// openAPIGetter loads and caches openapi specs
-	openAPIGetter openAPIGetter
-}
-
-type openAPIGetter struct {
-	once   sync.Once
-	getter openapi.Getter
+	// Caches OpenAPI document and parsed resources
+	openAPIParser *openapi.CachedOpenAPIParser
+	oapi          *openapi.CachedOpenAPIGetter
+	parser        sync.Once
+	getter        sync.Once
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
 	if clientGetter == nil {
 		panic("attempt to instantiate client_access_factory with nil clientGetter")
 	}
-
 	f := &factoryImpl{
 		clientGetter: clientGetter,
 	}
@@ -143,35 +143,76 @@ func (f *factoryImpl) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 	return restclient.RESTClientFor(cfg)
 }
 
-func (f *factoryImpl) Validator(validate bool) (validation.Schema, error) {
-	if !validate {
+func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, error) {
+	// client-side schema validation is only performed
+	// when the validationDirective is strict.
+	// If the directive is warn, we rely on the ParamVerifyingSchema
+	// to ignore the client-side validation and provide a warning
+	// to the user that attempting warn validation when SS validation
+	// is unsupported is inert.
+	if validationDirective == metav1.FieldValidationIgnore {
 		return validation.NullSchema{}, nil
 	}
 
-	resources, err := f.OpenAPISchema()
+	schema := validation.ConjunctiveSchema{
+		validation.NewSchemaValidation(f),
+		validation.NoDoubleKeySchema{},
+	}
+
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return nil, err
 	}
-
-	return validation.ConjunctiveSchema{
-		openapivalidation.NewSchemaValidation(resources),
-		validation.NoDoubleKeySchema{},
-	}, nil
+	// Create the FieldValidationVerifier for use in the ParamVerifyingSchema.
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return nil, err
+	}
+	// Memory-cache the OpenAPI V3 responses. The disk cache behavior is determined by
+	// the discovery client.
+	oapiV3Client := cached.NewClient(discoveryClient.OpenAPIV3())
+	queryParam := resource.QueryParamFieldValidation
+	primary := resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam)
+	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
+	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
+	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
 }
 
-// OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
+// OpenAPISchema returns metadata and structural information about
+// Kubernetes object definitions.
 func (f *factoryImpl) OpenAPISchema() (openapi.Resources, error) {
+	openAPIGetter := f.openAPIGetter()
+	if openAPIGetter == nil {
+		return nil, errors.New("no openapi getter")
+	}
+
+	// Lazily initialize the OpenAPIParser once
+	f.parser.Do(func() {
+		// Create the caching OpenAPIParser
+		f.openAPIParser = openapi.NewOpenAPIParser(f.openAPIGetter())
+	})
+
+	// Delegate to the OpenAPIPArser
+	return f.openAPIParser.Parse()
+}
+
+func (f *factoryImpl) openAPIGetter() discovery.OpenAPISchemaInterface {
+	discovery, err := f.clientGetter.ToDiscoveryClient()
+	if err != nil {
+		return nil
+	}
+	f.getter.Do(func() {
+		f.oapi = openapi.NewOpenAPIGetter(discovery)
+	})
+
+	return f.oapi
+}
+
+func (f *factoryImpl) OpenAPIV3Client() (openapiclient.Client, error) {
 	discovery, err := f.clientGetter.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
 
-	// Lazily initialize the OpenAPIGetter once
-	f.openAPIGetter.once.Do(func() {
-		// Create the caching OpenAPIGetter
-		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
-	})
-
-	// Delegate to the OpenAPIGetter
-	return f.openAPIGetter.getter.Get()
+	return cached.NewClient(discovery.OpenAPIV3()), nil
 }

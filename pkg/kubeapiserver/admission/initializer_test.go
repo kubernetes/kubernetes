@@ -42,7 +42,7 @@ func (p *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) {
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(cloudConfig)
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 

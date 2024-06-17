@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // waitingPodsMap a thread-safe map used to maintain pods waiting in the permit phase.
@@ -32,8 +32,8 @@ type waitingPodsMap struct {
 	mu   sync.RWMutex
 }
 
-// newWaitingPodsMap returns a new waitingPodsMap.
-func newWaitingPodsMap() *waitingPodsMap {
+// NewWaitingPodsMap returns a new waitingPodsMap.
+func NewWaitingPodsMap() *waitingPodsMap {
 	return &waitingPodsMap{
 		pods: make(map[types.UID]*waitingPod),
 	}
@@ -61,7 +61,7 @@ func (m *waitingPodsMap) get(uid types.UID) *waitingPod {
 }
 
 // iterate acquires a read lock and iterates over the WaitingPods map.
-func (m *waitingPodsMap) iterate(callback func(v1alpha1.WaitingPod)) {
+func (m *waitingPodsMap) iterate(callback func(framework.WaitingPod)) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for _, v := range m.pods {
@@ -73,11 +73,11 @@ func (m *waitingPodsMap) iterate(callback func(v1alpha1.WaitingPod)) {
 type waitingPod struct {
 	pod            *v1.Pod
 	pendingPlugins map[string]*time.Timer
-	s              chan *v1alpha1.Status
+	s              chan *framework.Status
 	mu             sync.RWMutex
 }
 
-var _ v1alpha1.WaitingPod = &waitingPod{}
+var _ framework.WaitingPod = &waitingPod{}
 
 // newWaitingPod returns a new waitingPod instance.
 func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *waitingPod {
@@ -87,7 +87,7 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 		// by using non-blocking send to this channel. This channel has a buffer of size 1
 		// to ensure that non-blocking send will not be ignored - possible situation when
 		// receiving from this channel happens after non-blocking send.
-		s: make(chan *v1alpha1.Status, 1),
+		s: make(chan *framework.Status, 1),
 	}
 
 	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
@@ -100,7 +100,7 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 		wp.pendingPlugins[plugin] = time.AfterFunc(waitTime, func() {
 			msg := fmt.Sprintf("rejected due to timeout after waiting %v at plugin %v",
 				waitTime, plugin)
-			wp.Reject(msg)
+			wp.Reject(plugin, msg)
 		})
 	}
 
@@ -143,13 +143,13 @@ func (w *waitingPod) Allow(pluginName string) {
 	// The select clause works as a non-blocking send.
 	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- v1alpha1.NewStatus(v1alpha1.Success, ""):
+	case w.s <- framework.NewStatus(framework.Success, ""):
 	default:
 	}
 }
 
 // Reject declares the waiting pod unschedulable.
-func (w *waitingPod) Reject(msg string) {
+func (w *waitingPod) Reject(pluginName, msg string) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	for _, timer := range w.pendingPlugins {
@@ -159,7 +159,7 @@ func (w *waitingPod) Reject(msg string) {
 	// The select clause works as a non-blocking send.
 	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- v1alpha1.NewStatus(v1alpha1.Unschedulable, msg):
+	case w.s <- framework.NewStatus(framework.Unschedulable, msg).WithPlugin(pluginName):
 	default:
 	}
 }

@@ -1,0 +1,55 @@
+# Copyright The OpenTelemetry Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+module-sets:
+  stable-v1:
+    version: v1.20.0
+    modules:
+      - go.opentelemetry.io/otel
+      - go.opentelemetry.io/otel/bridge/opentracing
+      - go.opentelemetry.io/otel/bridge/opentracing/test
+      - go.opentelemetry.io/otel/example/dice
+      - go.opentelemetry.io/otel/example/fib
+      - go.opentelemetry.io/otel/example/namedtracer
+      - go.opentelemetry.io/otel/example/otel-collector
+      - go.opentelemetry.io/otel/example/passthrough
+      - go.opentelemetry.io/otel/example/zipkin
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
+      - go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
+      - go.opentelemetry.io/otel/exporters/stdout/stdouttrace
+      - go.opentelemetry.io/otel/exporters/zipkin
+      - go.opentelemetry.io/otel/metric
+      - go.opentelemetry.io/otel/sdk
+      - go.opentelemetry.io/otel/sdk/metric
+      - go.opentelemetry.io/otel/trace
+  experimental-metrics:
+    version: v0.43.0
+    modules:
+      - go.opentelemetry.io/otel/bridge/opencensus
+      - go.opentelemetry.io/otel/bridge/opencensus/test
+      - go.opentelemetry.io/otel/example/opencensus
+      - go.opentelemetry.io/otel/example/prometheus
+      - go.opentelemetry.io/otel/example/view
+      - go.opentelemetry.io/otel/exporters/otlp/otlpmetric
+      - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc
+      - go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
+      - go.opentelemetry.io/otel/exporters/prometheus
+      - go.opentelemetry.io/otel/exporters/stdout/stdoutmetric
+  experimental-schema:
+    version: v0.0.7
+    modules:
+      - go.opentelemetry.io/otel/schema
+excluded-modules:
+  - go.opentelemetry.io/otel/internal/tools

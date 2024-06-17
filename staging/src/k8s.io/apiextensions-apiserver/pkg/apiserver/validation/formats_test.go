@@ -19,7 +19,7 @@ package validation
 import (
 	"testing"
 
-	"github.com/go-openapi/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 func TestRegistryFormats(t *testing.T) {

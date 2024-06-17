@@ -20,14 +20,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"sort"
 
 	"k8s.io/kube-openapi/pkg/generators/rules"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
 
@@ -64,7 +63,7 @@ func (a apiViolationFile) VerifyFile(f *generator.File, path string) error {
 	path = a.unmangledPath
 
 	formatted := f.Body.Bytes()
-	existing, err := ioutil.ReadFile(path)
+	existing, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", path, err)
 	}
@@ -95,7 +94,7 @@ func newAPIViolationGen() *apiViolationGen {
 }
 
 type apiViolationGen struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	linter *apiLinter
 }

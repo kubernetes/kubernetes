@@ -21,7 +21,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os/exec"
 	"regexp"
@@ -29,11 +28,9 @@ import (
 
 	"errors"
 	"os"
-
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
-const success = "\033[0;32mSUCESS\033[0m"
+const success = "\033[0;32mSUCCESS\033[0m"
 const failed = "\033[0;31mFAILED\033[0m"
 const notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
 const skipped = "\033[0;34mSKIPPED\033[0m"
@@ -66,12 +63,9 @@ func check(options ...string) []error {
 		switch c {
 		case "all":
 			errs = appendNotNil(errs, kernel())
-			errs = appendNotNil(errs, containerRuntime())
 			errs = appendNotNil(errs, daemons())
 			errs = appendNotNil(errs, firewall())
 			errs = appendNotNil(errs, dns())
-		case "containerruntime":
-			errs = appendNotNil(errs, containerRuntime())
 		case "daemons":
 			errs = appendNotNil(errs, daemons())
 		case "dns":
@@ -86,37 +80,6 @@ func check(options ...string) []error {
 		}
 	}
 	return errs
-}
-
-const dockerVersionRegex = `1\.[7-9]\.[0-9]+`
-
-// containerRuntime checks that a suitable container runtime is installed and recognized by cadvisor: docker 1.7-1.9
-func containerRuntime() error {
-	dockerRegex, err := regexp.Compile(dockerVersionRegex)
-	if err != nil {
-		// This should never happen and can only be fixed by changing the code
-		panic(err)
-	}
-
-	// Setup cadvisor to check the container environment
-	c, err := cadvisor.New(cadvisor.NewImageFsInfoProvider("docker", ""), "/var/lib/kubelet", []string{"/"}, false)
-	if err != nil {
-		return printError("Container Runtime Check: %s Could not start cadvisor %v", failed, err)
-	}
-
-	vi, err := c.VersionInfo()
-	if err != nil {
-		return printError("Container Runtime Check: %s Could not get VersionInfo %v", failed, err)
-	}
-
-	d := vi.DockerVersion
-	if !dockerRegex.Match([]byte(d)) {
-		return printError(
-			"Container Runtime Check: %s Docker version %s does not matching %s.  You may need to run as root or the "+
-				"user the kubelet will run under.", failed, d, dockerVersionRegex)
-	}
-
-	return printSuccess("Container Runtime Check: %s", success)
 }
 
 const kubeletClusterDNSRegexStr = `\/kubelet.*--cluster-dns=(\S+) `
@@ -182,7 +145,7 @@ const cmdlineCGroupMemory = `cgroup_enable=memory`
 
 // kernel checks that the kernel has been configured correctly to support the required cgroup features
 func kernel() error {
-	cmdline, err := ioutil.ReadFile("/proc/cmdline")
+	cmdline, err := os.ReadFile("/proc/cmdline")
 	if err != nil {
 		return printError("Kernel Command Line Check %s: Could not check /proc/cmdline", failed)
 	}
@@ -227,7 +190,7 @@ func firewall() error {
 	return printSuccess("Firewall IPTables Check %s", success)
 }
 
-// daemons checks that the required node programs are running: kubelet, kube-proxy, and docker
+// daemons checks that the required node programs are running: kubelet and kube-proxy
 func daemons() error {
 	if exec.Command("pgrep", "-f", "kubelet").Run() != nil {
 		return printError("Daemon Check %s: kubelet process not found", failed)

@@ -1,3 +1,7 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-attacher/raw/v4.5.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path release-1.13
+# by ./update-hostpath.sh
+#
 # This YAML file contains all RBAC objects that are necessary to run external
 # CSI attacher.
 #
@@ -16,7 +20,7 @@ metadata:
   namespace: default
 
 ---
-# Attacher must be able to work with PVs, nodes and VolumeAttachments
+# Attacher must be able to work with PVs, CSINodes and VolumeAttachments
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -24,16 +28,13 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["nodes"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["csinodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    verbs: ["get", "list", "watch", "patch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]

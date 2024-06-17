@@ -17,22 +17,26 @@ limitations under the License.
 package e2enode
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -55,17 +59,21 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 		priority = 1
 	}
 	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			if quotasRequested && !supportsQuotas("/var/lib/kubelet") {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
-				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationQuotaMonitoring on filesystem without project quota enabled")
+				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationFSQuotaMonitoring on filesystem without project quota enabled")
 			}
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
+
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
 			initialConfig.FeatureGates[string(LSCIQuotaFeature)] = quotasRequested
 		})
 		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
@@ -85,13 +93,14 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 	})
 }
 
-// LocalStorageCapacityIsolationQuotaMonitoring tests that quotas are
+// LocalStorageCapacityIsolationFSQuotaMonitoring tests that quotas are
 // used for monitoring rather than du.  The mechanism is to create a
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
 // file; if du is used to monitor, it will not detect this.
-var _ = framework.KubeDescribe("LocalStorageCapacityIsolationQuotaMonitoring [Slow] [Serial] [Disruptive] [Feature:LocalStorageCapacityIsolationQuota][NodeFeature:LSCIQuotaMonitoring]", func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, nodefeature.LSCIQuotaMonitoring, func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true)
 	runOneQuotaTest(f, false)
 })

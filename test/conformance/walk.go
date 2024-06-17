@@ -23,20 +23,34 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"gopkg.in/yaml.v2"
 	"io"
 	"log"
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/onsi/ginkgo/types"
+	"gopkg.in/yaml.v2"
 
-	"k8s.io/kubernetes/test/conformance/behaviors"
+	"github.com/onsi/ginkgo/v2/types"
 )
+
+// ConformanceData describes the structure of the conformance.yaml file
+type ConformanceData struct {
+	// A URL to the line of code in the kube src repo for the test. Omitted from the YAML to avoid exposing line number.
+	URL string `yaml:"-"`
+	// Extracted from the "Testname:" comment before the test
+	TestName string
+	// CodeName is taken from the actual ginkgo descriptions, e.g. `[sig-apps] Foo should bar [Conformance]`
+	CodeName string
+	// Extracted from the "Description:" comment before the test
+	Description string
+	// Version when this test is added or modified ex: v1.12, v1.13
+	Release string
+	// File is the filename where the test is defined. We intentionally don't save the line here to avoid meaningless changes.
+	File string
+}
 
 var (
 	baseURL = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
@@ -44,7 +58,7 @@ var (
 	confDoc = flag.Bool("docs", false, "write a conformance document")
 	version = flag.String("version", "v1.9", "version of this conformance document")
 
-	// If a test name contains any of these tags, it is ineligble for promotion to conformance
+	// If a test name contains any of these tags, it is ineligible for promotion to conformance
 	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Feature:[^\]]+|Flaky)\]`)
 
 	// Conformance comments should be within this number of lines to the call itself.
@@ -55,8 +69,6 @@ var (
 )
 
 type frame struct {
-	Function string
-
 	// File and Line are the file name and line number of the
 	// location in this frame. For non-leaf frames, this will be
 	// the location of a call. These may be the empty string and
@@ -80,9 +92,9 @@ func main() {
 
 	seenLines = map[string]struct{}{}
 	dec := json.NewDecoder(f)
-	testInfos := []*behaviors.ConformanceData{}
+	testInfos := []*ConformanceData{}
 	for {
-		var spec *types.SpecSummary
+		var spec *types.SpecReport
 		if err := dec.Decode(&spec); err == io.EOF {
 			break
 		} else if err != nil {
@@ -93,10 +105,9 @@ func main() {
 			testInfo := getTestInfo(spec)
 			if testInfo != nil {
 				testInfos = append(testInfos, testInfo)
-			}
-
-			if err := validateTestName(testInfo.CodeName); err != nil {
-				log.Fatal(err)
+				if err := validateTestName(testInfo.CodeName); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
@@ -105,42 +116,38 @@ func main() {
 	saveAllTestInfo(testInfos)
 }
 
-func isConformance(spec *types.SpecSummary) bool {
+func isConformance(spec *types.SpecReport) bool {
 	return strings.Contains(getTestName(spec), "[Conformance]")
 }
 
-func getTestInfo(spec *types.SpecSummary) *behaviors.ConformanceData {
-	var c *behaviors.ConformanceData
+func getTestInfo(spec *types.SpecReport) *ConformanceData {
+	var c *ConformanceData
 	var err error
 	// The key to this working is that we don't need to parse every file or walk
-	// every componentCodeLocation. The last componentCodeLocation is going to typically start
-	// with the ConformanceIt(...) call and the next call in that callstack will be the
-	// ast.Node which is attached to the comment that we want.
-	for i := len(spec.ComponentCodeLocations) - 1; i > 0; i-- {
-		fullstacktrace := spec.ComponentCodeLocations[i].FullStackTrace
-		c, err = getConformanceDataFromStackTrace(fullstacktrace)
-		if err != nil {
-			log.Printf("Error looking for conformance data: %v", err)
-		}
-		if c != nil {
-			break
-		}
+	// every types.CodeLocation. The LeafNodeLocation is going to be file:line which
+	// attached to the comment that we want.
+	leafNodeLocation := spec.LeafNodeLocation
+	frame := frame{
+		File: leafNodeLocation.FileName,
+		Line: leafNodeLocation.LineNumber,
 	}
-
+	c, err = getConformanceData(frame)
+	if err != nil {
+		log.Printf("Error looking for conformance data: %v", err)
+	}
 	if c == nil {
 		log.Printf("Did not find test info for spec: %#v\n", getTestName(spec))
 		return nil
 	}
-
 	c.CodeName = getTestName(spec)
 	return c
 }
 
-func getTestName(spec *types.SpecSummary) string {
-	return strings.Join(spec.ComponentTexts[1:], " ")
+func getTestName(spec *types.SpecReport) string {
+	return strings.Join(spec.ContainerHierarchyTexts[0:], " ") + " " + spec.LeafNodeText
 }
 
-func saveAllTestInfo(dataSet []*behaviors.ConformanceData) {
+func saveAllTestInfo(dataSet []*ConformanceData) {
 	if *confDoc {
 		// Note: this assumes that you're running from the root of the kube src repo
 		templ, err := template.ParseFiles("./test/conformance/cf_header.md")
@@ -171,53 +178,27 @@ func saveAllTestInfo(dataSet []*behaviors.ConformanceData) {
 	fmt.Println(string(b))
 }
 
-func getConformanceDataFromStackTrace(fullstackstrace string) (*behaviors.ConformanceData, error) {
-	// The full stacktrace to parse from ginkgo is of the form:
-	// k8s.io/kubernetes/test/e2e/storage/utils.SIGDescribe(0x51f4c4f, 0xf, 0x53a0dd8, 0xc000ab6e01)\n\ttest/e2e/storage/utils/framework.go:23 +0x75\n ... ...
-	// So we need to split it into lines, remove whitespace, and then grab the files/lines.
-	stack := strings.Replace(fullstackstrace, "\t", "", -1)
-	calls := strings.Split(stack, "\n")
-	frames := []frame{}
-	i := 0
-	for i < len(calls) {
-		fileLine := strings.Split(calls[i+1], " ")
-		lineinfo := strings.Split(fileLine[0], ":")
-		line, err := strconv.Atoi(lineinfo[1])
-		if err != nil {
-			panic(err)
-		}
-		frames = append(frames, frame{
-			Function: calls[i],
-			File:     lineinfo[0],
-			Line:     line,
-		})
-		i += 2
+func getConformanceData(targetFrame frame) (*ConformanceData, error) {
+	root := *k8sPath
+	if !strings.HasSuffix(root, string(os.PathSeparator)) {
+		root += string(os.PathSeparator)
 	}
 
-	// filenames have `/go/src/k8s.io` prefix which dont exist locally
-	for i, v := range frames {
-		frames[i].File = strings.Replace(v.File,
-			"/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes",
-			*k8sPath, 1)
+	trimmedFile := strings.TrimPrefix(targetFrame.File, root)
+	targetFrame.File = trimmedFile
+
+	freader, err := os.Open(targetFrame.File)
+	if err != nil {
+		return nil, err
 	}
+	defer freader.Close()
 
-	for _, curFrame := range frames {
-		if _, seen := seenLines[fmt.Sprintf("%v:%v", curFrame.File, curFrame.Line)]; seen {
-			continue
-		}
-
-		freader, err := os.Open(curFrame.File)
-		if err != nil {
-			return nil, err
-		}
-		defer freader.Close()
-		cd, err := scanFileForFrame(curFrame.File, freader, curFrame)
-		if err != nil {
-			return nil, err
-		}
-		if cd != nil {
-			return cd, nil
-		}
+	cd, err := scanFileForFrame(targetFrame.File, freader, targetFrame)
+	if err != nil {
+		return nil, err
+	}
+	if cd != nil {
+		return cd, nil
 	}
 
 	return nil, nil
@@ -225,7 +206,7 @@ func getConformanceDataFromStackTrace(fullstackstrace string) (*behaviors.Confor
 
 // scanFileForFrame will scan the target and look for a conformance comment attached to the function
 // described by the target frame. If the comment can't be found then nil, nil is returned.
-func scanFileForFrame(filename string, src interface{}, targetFrame frame) (*behaviors.ConformanceData, error) {
+func scanFileForFrame(filename string, src interface{}, targetFrame frame) (*ConformanceData, error) {
 	fset := token.NewFileSet() // positions are relative to fset
 	f, err := parser.ParseFile(fset, filename, src, parser.ParseComments)
 	if err != nil {
@@ -251,7 +232,7 @@ func validateTestName(s string) error {
 	return nil
 }
 
-func tryCommentGroupAndFrame(fset *token.FileSet, cg *ast.CommentGroup, f frame) *behaviors.ConformanceData {
+func tryCommentGroupAndFrame(fset *token.FileSet, cg *ast.CommentGroup, f frame) *ConformanceData {
 	if !shouldProcessCommentGroup(fset, cg, f) {
 		return nil
 	}
@@ -275,10 +256,10 @@ func shouldProcessCommentGroup(fset *token.FileSet, cg *ast.CommentGroup, f fram
 	return lineDiff > 0 && lineDiff <= conformanceCommentsLineWindow
 }
 
-func commentToConformanceData(comment string) *behaviors.ConformanceData {
+func commentToConformanceData(comment string) *ConformanceData {
 	lines := strings.Split(comment, "\n")
 	descLines := []string{}
-	cd := &behaviors.ConformanceData{}
+	cd := &ConformanceData{}
 	var curLine string
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -300,17 +281,9 @@ func commentToConformanceData(comment string) *behaviors.ConformanceData {
 			descLines = append(descLines, sline[1])
 			continue
 		}
-		if sline := regexp.MustCompile("^Behaviors\\s*:\\s*").Split(line, -1); len(sline) == 2 {
-			curLine = "Behaviors"
-			continue
-		}
 
 		// Line has no header
-		if curLine == "Behaviors" {
-			if sline := regexp.MustCompile("^-\\s").Split(line, -1); len(sline) == 2 {
-				cd.Behaviors = append(cd.Behaviors, sline[1])
-			}
-		} else if curLine == "Description" {
+		if curLine == "Description" {
 			descLines = append(descLines, line)
 		}
 	}

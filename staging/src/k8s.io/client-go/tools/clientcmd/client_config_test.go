@@ -17,16 +17,18 @@ limitations under the License.
 package clientcmd
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
-	restclient "k8s.io/client-go/rest"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/imdario/mergo"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	restclient "k8s.io/client-go/rest"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -62,7 +64,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataStruct {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
@@ -91,7 +93,7 @@ func TestMergoSemantics(t *testing.T) {
 		},
 	}
 	for _, data := range testDataMap {
-		err := mergo.MergeWithOverwrite(&data.dst, &data.src)
+		err := mergo.Merge(&data.dst, &data.src, mergo.WithOverride)
 		if err != nil {
 			t.Errorf("error while merging: %s", err)
 		}
@@ -138,6 +140,22 @@ func createCAValidTestConfig() *clientcmdapi.Config {
 	return config
 }
 
+func TestDisableCompression(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			DisableCompression: true,
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchBoolArg(true, actualCfg.DisableCompression, t)
+}
+
 func TestInsecureOverridesCA(t *testing.T) {
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -157,11 +175,11 @@ func TestInsecureOverridesCA(t *testing.T) {
 }
 
 func TestCAOverridesCAData(t *testing.T) {
-	file, err := ioutil.TempFile("", "my.ca")
+	file, err := os.CreateTemp("", "my.ca")
 	if err != nil {
 		t.Fatalf("could not create tempfile: %v", err)
 	}
-	defer os.Remove(file.Name())
+	defer utiltesting.CloseAndRemove(t, file)
 
 	config := createCAValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
@@ -216,6 +234,43 @@ func TestTLSServerNameClearsWhenServerNameSet(t *testing.T) {
 	matchStringArg("", actualCfg.ServerName, t)
 }
 
+func TestFullImpersonateConfig(t *testing.T) {
+	config := createValidTestConfig()
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "https://localhost:8443",
+	}
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
+		Impersonate:          "alice",
+		ImpersonateUID:       "abc123",
+		ImpersonateGroups:    []string{"group-1"},
+		ImpersonateUserExtra: map[string][]string{"some-key": {"some-value"}},
+	}
+	config.Contexts["clean"] = &clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: "http://something",
+		},
+	}, nil)
+
+	actualCfg, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	matchStringArg("alice", actualCfg.Impersonate.UserName, t)
+	matchStringArg("abc123", actualCfg.Impersonate.UID, t)
+	matchIntArg(1, len(actualCfg.Impersonate.Groups), t)
+	matchStringArg("group-1", actualCfg.Impersonate.Groups[0], t)
+	matchIntArg(1, len(actualCfg.Impersonate.Extra), t)
+	matchIntArg(1, len(actualCfg.Impersonate.Extra["some-key"]), t)
+	matchStringArg("some-value", actualCfg.Impersonate.Extra["some-key"][0], t)
+}
+
 func TestMergeContext(t *testing.T) {
 	const namespace = "overridden-namespace"
 
@@ -255,12 +310,11 @@ func TestModifyContext(t *testing.T) {
 		"clean":   true,
 	}
 
-	tempPath, err := ioutil.TempFile("", "testclientcmd-")
+	tempPath, err := os.CreateTemp("", "testclientcmd-")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(tempPath.Name())
-
+	defer utiltesting.CloseAndRemove(t, tempPath)
 	pathOptions := NewDefaultPathOptions()
 	config := createValidTestConfig()
 
@@ -287,7 +341,7 @@ func TestModifyContext(t *testing.T) {
 
 	// there should now be two contexts
 	if len(startingConfig.Contexts) != len(expectedCtx) {
-		t.Fatalf("unexpected nuber of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
+		t.Fatalf("unexpected number of contexts, expecting %v, but found %v", len(expectedCtx), len(startingConfig.Contexts))
 	}
 
 	for key := range startingConfig.Contexts {
@@ -440,13 +494,13 @@ func TestBasicAuthData(t *testing.T) {
 
 func TestBasicTokenFile(t *testing.T) {
 	token := "exampletoken"
-	f, err := ioutil.TempFile("", "tokenfile")
+	f, err := os.CreateTemp("", "tokenfile")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
@@ -476,13 +530,13 @@ func TestBasicTokenFile(t *testing.T) {
 
 func TestPrecedenceTokenFile(t *testing.T) {
 	token := "exampletoken"
-	f, err := ioutil.TempFile("", "tokenfile")
+	f, err := os.CreateTemp("", "tokenfile")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if err := os.WriteFile(f.Name(), []byte(token), 0644); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
@@ -629,9 +683,10 @@ func TestCreateAuthConfigExecInstallHintCleanup(t *testing.T) {
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		AuthInfo: clientcmdapi.AuthInfo{
 			Exec: &clientcmdapi.ExecConfig{
-				APIVersion:  "client.authentication.k8s.io/v1alpha1",
-				Command:     "some-command",
-				InstallHint: "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				Command:         "some-command",
+				InstallHint:     "some install hint with \x1b[1mcontrol chars\x1b[0m\nand a newline",
+				InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 			},
 		},
 	}, nil)
@@ -806,6 +861,12 @@ func matchByteArg(expected, got []byte, t *testing.T) {
 	}
 }
 
+func matchIntArg(expected, got int, t *testing.T) {
+	if expected != got {
+		t.Errorf("Expected %d, got %d", expected, got)
+	}
+}
+
 func TestNamespaceOverride(t *testing.T) {
 	config := &DirectClientConfig{
 		overrides: &ConfigOverrides{
@@ -834,6 +895,11 @@ apiVersion: v1
 clusters:
 - cluster:
     server: https://localhost:8080
+    extensions:
+    - name: client.authentication.k8s.io/exec
+      extension:
+        audience: foo
+        other: bar
   name: foo-cluster
 contexts:
 - context:
@@ -852,13 +918,14 @@ users:
       - arg-1
       - arg-2
       command: foo-command
+      provideClusterInfo: true
 `
-	tmpfile, err := ioutil.TempFile("", "kubeconfig")
+	tmpfile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Error(err)
 	}
-	defer os.Remove(tmpfile.Name())
-	if err := ioutil.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
+	defer utiltesting.CloseAndRemove(t, tmpfile)
+	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}
 	config, err := BuildConfigFromFlags("", tmpfile.Name())
@@ -868,7 +935,16 @@ users:
 	if !reflect.DeepEqual(config.ExecProvider.Args, []string{"arg-1", "arg-2"}) {
 		t.Errorf("Got args %v when they should be %v\n", config.ExecProvider.Args, []string{"arg-1", "arg-2"})
 	}
-
+	if !config.ExecProvider.ProvideClusterInfo {
+		t.Error("Wanted provider cluster info to be true")
+	}
+	want := &runtime.Unknown{
+		Raw:         []byte(`{"audience":"foo","other":"bar"}`),
+		ContentType: "application/json",
+	}
+	if !reflect.DeepEqual(config.ExecProvider.Config, want) {
+		t.Errorf("Got config %v when it should be %v\n", config.ExecProvider.Config, want)
+	}
 }
 
 func TestCleanANSIEscapeCodes(t *testing.T) {
@@ -935,5 +1011,70 @@ func TestCleanANSIEscapeCodes(t *testing.T) {
 				t.Errorf("expected %q, actual %q", test.out, actualOut)
 			}
 		})
+	}
+}
+
+func TestMergeRawConfigDoOverride(t *testing.T) {
+	const (
+		server         = "https://anything.com:8080"
+		token          = "the-token"
+		modifiedServer = "http://localhost:8081"
+		modifiedToken  = "modified-token"
+	)
+	config := createValidTestConfig()
+
+	// add another context which to modify with overrides
+	config.Clusters["modify"] = &clientcmdapi.Cluster{
+		Server: server,
+	}
+	config.AuthInfos["modify"] = &clientcmdapi.AuthInfo{
+		Token: token,
+	}
+	config.Contexts["modify"] = &clientcmdapi.Context{
+		Cluster:   "modify",
+		AuthInfo:  "modify",
+		Namespace: "modify",
+	}
+
+	// create overrides for the modify context
+	overrides := &ConfigOverrides{
+		ClusterInfo: clientcmdapi.Cluster{
+			Server: modifiedServer,
+		},
+		Context: clientcmdapi.Context{
+			Namespace: "foobar",
+			Cluster:   "modify",
+			AuthInfo:  "modify",
+		},
+		AuthInfo: clientcmdapi.AuthInfo{
+			Token: modifiedToken,
+		},
+		CurrentContext: "modify",
+	}
+
+	cut := NewDefaultClientConfig(*config, overrides)
+	act, err := cut.MergedRawConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// ensure overrides were applied to "modify"
+	actContext := act.CurrentContext
+	if actContext != "modify" {
+		t.Errorf("Expected context %v, got %v", "modify", actContext)
+	}
+	if act.Clusters[actContext].Server != "http://localhost:8081" {
+		t.Errorf("Expected server %v, got %v", "http://localhost:8081", act.Clusters[actContext].Server)
+	}
+	if act.Contexts[actContext].Namespace != "foobar" {
+		t.Errorf("Expected namespace %v, got %v", "foobar", act.Contexts[actContext].Namespace)
+	}
+
+	// ensure context "clean" was not touched
+	if act.Clusters["clean"].Server != config.Clusters["clean"].Server {
+		t.Errorf("Expected server %v, got %v", config.Clusters["clean"].Server, act.Clusters["clean"].Server)
+	}
+	if act.Contexts["clean"].Namespace != config.Contexts["clean"].Namespace {
+		t.Errorf("Expected namespace %v, got %v", config.Contexts["clean"].Namespace, act.Contexts["clean"].Namespace)
 	}
 }

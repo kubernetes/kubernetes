@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -24,4 +25,10 @@ import (
 
 func (f *KubeletFlags) addOSFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&f.WindowsService, "windows-service", f.WindowsService, "Enable Windows Service Control Manager API integration")
+	// The default priority class associated with any process in Windows is NORMAL_PRIORITY_CLASS. Keeping it as is
+	// to maintain backwards compatibility.
+	// Source: https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities
+	fs.StringVar(&f.WindowsPriorityClass, "windows-priorityclass", "NORMAL_PRIORITY_CLASS",
+		"Set the PriorityClass associated with kubelet process, the default ones are available at "+
+			"https://docs.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities")
 }

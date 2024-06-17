@@ -17,30 +17,30 @@ limitations under the License.
 package csi
 
 import (
-	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
-	"k8s.io/klog/v2"
-
+	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 )
 
-//TODO (vladimirvivien) move this in a central loc later
+// TODO (vladimirvivien) move this in a central loc later
 var (
 	volDataKey = struct {
 		specVolID,
@@ -48,7 +48,8 @@ var (
 		driverName,
 		nodeName,
 		attachmentID,
-		volumeLifecycleMode string
+		volumeLifecycleMode,
+		seLinuxMountContext string
 	}{
 		"specVolID",
 		"volumeHandle",
@@ -56,6 +57,7 @@ var (
 		"nodeName",
 		"attachmentID",
 		"volumeLifecycleMode",
+		"seLinuxMountContext",
 	}
 )
 
@@ -65,11 +67,10 @@ type csiMountMgr struct {
 	plugin              *csiPlugin
 	driverName          csiDriverName
 	volumeLifecycleMode storage.VolumeLifecycleMode
-	fsGroupPolicy       storage.FSGroupPolicy
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
-	supportsSELinux     bool
+	needSELinuxRelabel  bool
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
@@ -95,10 +96,6 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) CanMount() error {
-	return nil
-}
-
 func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 	return c.SetUpAt(c.GetPath(), mounterArgs)
 }
@@ -106,33 +103,30 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof(log("Mounter.SetUpAt(%s)", dir))
 
-	corruptedDir := false
-	mounted, err := isDirMounted(c.plugin, dir)
-	if err != nil {
-		if isCorruptedDir(dir) {
-			corruptedDir = true // leave to CSI driver to handle corrupted mount
-			klog.Warning(log("mounter.SetUpAt detected corrupted mount for dir [%s]", dir))
-		} else {
-			return errors.New(log("mounter.SetUpAt failed while checking mount status for dir [%s]: %v", dir, err))
-		}
-	}
-
-	if mounted && !corruptedDir {
-		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
-		return nil
-	}
-
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get CSI client: %v", err))
-
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+
+	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
 		return errors.New(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
+	}
+
+	// Check CSIDriver.Spec.Mode to ensure that the CSI driver
+	// supports the current volumeLifecycleMode.
+	if err := c.supportsVolumeLifecycleMode(); err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check volume lifecycle mode: %s", err))
+	}
+
+	fsGroupPolicy, err := c.getFSGroupPolicy()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetupAt failed to check fsGroup policy: %s", err))
 	}
 
 	driverName := c.driverName
@@ -152,9 +146,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	switch {
 	case volSrc != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-			return fmt.Errorf("CSIInlineVolume feature required")
-		}
 		if c.volumeLifecycleMode != storage.VolumeLifecycleEphemeral {
 			return fmt.Errorf("unexpected volume mode: %s", c.volumeLifecycleMode)
 		}
@@ -218,10 +209,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// create target_dir before call to NodePublish
-	if err := os.MkdirAll(dir, 0750); err != nil && !corruptedDir {
-		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", dir, err))
+	parentDir := filepath.Dir(dir)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		return errors.New(log("mounter.SetUpAt failed to create dir %#v:  %v", parentDir, err))
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Info(log("created target path successfully [%s]", parentDir))
 
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {
@@ -234,18 +226,76 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// Inject pod information into volume_attributes
-	podAttrs, err := c.podAttributes()
+	podInfoEnabled, err := c.plugin.podInfoEnabled(string(c.driverName))
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
-	if podAttrs != nil {
-		if volAttribs == nil {
-			volAttribs = podAttrs
-		} else {
-			for k, v := range podAttrs {
-				volAttribs[k] = v
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, c.volumeLifecycleMode))
+	}
+
+	// Inject pod service account token into volume attributes
+	serviceAccountTokenAttrs, err := c.podServiceAccountTokenAttrs()
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to get service accoount token attributes: %v", err))
+	}
+	volAttribs = mergeMap(volAttribs, serviceAccountTokenAttrs)
+
+	driverSupportsCSIVolumeMountGroup := false
+	var nodePublishFSGroupArg *int64
+	driverSupportsCSIVolumeMountGroup, err = csi.NodeSupportsVolumeMountGroup(ctx)
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to determine if the node service has VOLUME_MOUNT_GROUP capability: %v", err))
+	}
+
+	if driverSupportsCSIVolumeMountGroup {
+		klog.V(3).Infof("Driver %s supports applying FSGroup (has VOLUME_MOUNT_GROUP node capability). Delegating FSGroup application to the driver through NodePublishVolume.", c.driverName)
+		nodePublishFSGroupArg = mounterArgs.FsGroup
+	}
+
+	var selinuxLabelMount bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		support, err := c.plugin.SupportsSELinuxContextMount(c.spec)
+		if err != nil {
+			return errors.New(log("failed to query for SELinuxMount support: %s", err))
+		}
+		if support && mounterArgs.SELinuxLabel != "" {
+			mountOptions = util.AddSELinuxMountOption(mountOptions, mounterArgs.SELinuxLabel)
+			selinuxLabelMount = true
+		}
+	}
+
+	// Save volume info in pod dir
+	// persist volume info data for teardown
+	nodeName := string(c.plugin.host.GetNodeName())
+	volData := map[string]string{
+		volDataKey.specVolID:           c.spec.Name(),
+		volDataKey.volHandle:           volumeHandle,
+		volDataKey.driverName:          string(c.driverName),
+		volDataKey.nodeName:            nodeName,
+		volDataKey.volumeLifecycleMode: string(c.volumeLifecycleMode),
+		volDataKey.attachmentID:        getAttachmentName(volumeHandle, string(c.driverName), nodeName),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) && selinuxLabelMount {
+		volData[volDataKey.seLinuxMountContext] = mounterArgs.SELinuxLabel
+	}
+
+	err = saveVolumeData(parentDir, volDataFileName, volData)
+	defer func() {
+		// Only if there was an error and volume operation was considered
+		// finished, we should remove the directory.
+		if err != nil && volumetypes.IsOperationFinishedError(err) {
+			// attempt to cleanup volume mount dir
+			if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
+				klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
 			}
 		}
+	}()
+	if err != nil {
+		errorMsg := log("mounter.SetUpAt failed to save volume info data: %v", err)
+		klog.Error(errorMsg)
+		return volumetypes.NewTransientOperationFailure(errorMsg)
 	}
 
 	err = csi.NodePublishVolume(
@@ -260,6 +310,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		nodePublishSecrets,
 		fsType,
 		mountOptions,
+		nodePublishFSGroupArg,
 	)
 
 	if err != nil {
@@ -272,13 +323,19 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return err
 	}
 
-	c.supportsSELinux, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
-	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
+	if !selinuxLabelMount {
+		c.needSELinuxRelabel, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
+		if err != nil {
+			// The volume is mounted. Return UncertainProgressError, so kubelet will unmount it when user deletes the pod.
+			return volumetypes.NewUncertainProgressError(fmt.Sprintf("error checking for SELinux support: %s", err))
+		}
 	}
 
-	if c.supportsFSGroup(fsType, mounterArgs.FsGroup, c.fsGroupPolicy) {
-		err := volume.SetVolumeOwnership(c, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, fsGroupPolicy) {
+		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
+
+		// fullPluginName helps to distinguish different driver from csi plugin
+		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
@@ -293,50 +350,62 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	return nil
 }
 
-func (c *csiMountMgr) podAttributes() (map[string]string, error) {
-	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
-	if ok {
-		kletHost.WaitForCacheSync()
-	}
-
-	if c.plugin.csiDriverLister == nil {
-		return nil, fmt.Errorf("CSIDriverLister not found")
+func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
+	if c.plugin.serviceAccountTokenGetter == nil {
+		return nil, errors.New("ServiceAccountTokenGetter is nil")
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
+			klog.V(5).Infof(log("CSIDriver %q not found, not adding service account token information", c.driverName))
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	// if PodInfoOnMount is not set or false we do not set pod attributes
-	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
-		klog.V(4).Infof(log("CSIDriver %q does not require pod information", c.driverName))
+	if len(csiDriver.Spec.TokenRequests) == 0 {
 		return nil, nil
 	}
 
-	attrs := map[string]string{
-		"csi.storage.k8s.io/pod.name":            c.pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       c.pod.Namespace,
-		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
-		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
+	outputs := map[string]authenticationv1.TokenRequestStatus{}
+	for _, tokenRequest := range csiDriver.Spec.TokenRequests {
+		audience := tokenRequest.Audience
+		audiences := []string{audience}
+		if audience == "" {
+			audiences = []string{}
+		}
+		tr, err := c.plugin.serviceAccountTokenGetter(c.pod.Namespace, c.pod.Spec.ServiceAccountName, &authenticationv1.TokenRequest{
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences:         audiences,
+				ExpirationSeconds: tokenRequest.ExpirationSeconds,
+				BoundObjectRef: &authenticationv1.BoundObjectReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       c.pod.Name,
+					UID:        c.pod.UID,
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		outputs[audience] = tr.Status
 	}
 
-	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
-	return attrs, nil
+	klog.V(4).Infof(log("Fetched service account token attrs for CSIDriver %q", c.driverName))
+	tokens, _ := json.Marshal(outputs)
+	return map[string]string{
+		"csi.storage.k8s.io/serviceAccount.tokens": string(tokens),
+	}, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        c.readOnly,
-		Managed:         !c.readOnly,
-		SupportsSELinux: c.supportsSELinux,
+		ReadOnly:       c.readOnly,
+		Managed:        !c.readOnly,
+		SELinuxRelabel: c.needSELinuxRelabel,
 	}
 }
 
@@ -347,26 +416,38 @@ func (c *csiMountMgr) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 func (c *csiMountMgr) TearDownAt(dir string) error {
-	klog.V(4).Infof(log("Unmounter.TearDown(%s)", dir))
+	klog.V(4).Infof(log("Unmounter.TearDownAt(%s)", dir))
 
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
+		// Treat the absence of the CSI driver as a transient error
+		// See https://github.com/kubernetes/kubernetes/issues/120268
+		return volumetypes.NewTransientOperationFailure(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	// Could not get spec info on whether this is a migrated operation because c.spec is nil
+	ctx, cancel := createCSIOperationContext(c.spec, csiTimeout)
 	defer cancel()
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed: %v", err))
+		return errors.New(log("Unmounter.TearDownAt failed: %v", err))
 	}
 
-	// clean mount point dir
+	// Removal of target_path provided in the NodePublish RPC call
+	// (in this case location `dir`) MUST be done by the CSI plugin according
+	// to the spec.
+	//
+	// Kubelet should only be responsible for removal of json data files it
+	// creates and parent directories.
+	//
+	// However, some CSI plugins maybe buggy and don't adhere to the standard,
+	// so we still need to remove the target_path here if it's unmounted and
+	// empty.
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
+		return errors.New(log("Unmounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}
-	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
+	klog.V(4).Infof(log("Unmounter.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
 }
@@ -385,16 +466,96 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 		return false
 	}
 
-	accessModes := c.spec.PersistentVolume.Spec.AccessModes
-	if c.spec.PersistentVolume.Spec.AccessModes == nil {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-		return false
+	if c.spec.PersistentVolume != nil {
+		if c.spec.PersistentVolume.Spec.AccessModes == nil {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+			return false
+		}
+		if !hasReadWriteOnce(c.spec.PersistentVolume.Spec.AccessModes) {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+			return false
+		}
+		return true
+	} else if c.spec.Volume != nil && c.spec.Volume.CSI != nil {
+		// Inline CSI volumes are always mounted with RWO AccessMode by SetUpAt
+		return true
 	}
-	if !hasReadWriteOnce(accessModes) {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-		return false
+
+	klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, unsupported volume type"))
+	return false
+}
+
+// getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
+// An error indicates that it isn't supported and explains why.
+func (c *csiMountMgr) getFSGroupPolicy() (storage.FSGroupPolicy, error) {
+	// Retrieve CSIDriver. It's not an error if that isn't
+	// possible (we don't have the lister if CSIDriverRegistry is
+	// disabled) or the driver isn't found (CSIDriver is
+	// optional)
+	var csiDriver *storage.CSIDriver
+	driver := string(c.driverName)
+	if c.plugin.csiDriverLister != nil {
+		c, err := c.plugin.getCSIDriver(driver)
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Some internal error.
+			return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, err
+		}
+		csiDriver = c
 	}
-	return true
+
+	// If the csiDriver isn't defined, return the default behavior
+	if csiDriver == nil {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
+	}
+	// If the csiDriver exists but the fsGroupPolicy isn't defined, return an error
+	if csiDriver.Spec.FSGroupPolicy == nil || *csiDriver.Spec.FSGroupPolicy == "" {
+		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, errors.New(log("expected valid fsGroupPolicy, received nil value or empty string"))
+	}
+	return *csiDriver.Spec.FSGroupPolicy, nil
+}
+
+// supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
+// An error indicates that it isn't supported and explains why.
+func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
+	// Retrieve CSIDriver. It's not an error if that isn't
+	// possible (we don't have the lister if CSIDriverRegistry is
+	// disabled) or the driver isn't found (CSIDriver is
+	// optional), but then only persistent volumes are supported.
+	var csiDriver *storage.CSIDriver
+	driver := string(c.driverName)
+	if c.plugin.csiDriverLister != nil {
+		c, err := c.plugin.getCSIDriver(driver)
+		if err != nil && !apierrors.IsNotFound(err) {
+			// Some internal error.
+			return err
+		}
+		csiDriver = c
+	}
+
+	// The right response depends on whether we have information
+	// about the driver and the volume mode.
+	switch {
+	case csiDriver == nil && c.volumeLifecycleMode == storage.VolumeLifecyclePersistent:
+		// No information, but that's okay for persistent volumes (and only those).
+		return nil
+	case csiDriver == nil:
+		return fmt.Errorf("volume mode %q not supported by driver %s (no CSIDriver object)", c.volumeLifecycleMode, driver)
+	case containsVolumeMode(csiDriver.Spec.VolumeLifecycleModes, c.volumeLifecycleMode):
+		// Explicitly listed.
+		return nil
+	default:
+		return fmt.Errorf("volume mode %q not supported by driver %s (only supports %q)", c.volumeLifecycleMode, driver, csiDriver.Spec.VolumeLifecycleModes)
+	}
+}
+
+// containsVolumeMode checks whether the given volume mode is listed.
+func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
@@ -446,4 +607,14 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 func makeVolumeHandle(podUID, volSourceSpecName string) string {
 	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s", podUID, volSourceSpecName)))
 	return fmt.Sprintf("csi-%x", result)
+}
+
+func mergeMap(first, second map[string]string) map[string]string {
+	if first == nil {
+		return second
+	}
+	for k, v := range second {
+		first[k] = v
+	}
+	return first
 }

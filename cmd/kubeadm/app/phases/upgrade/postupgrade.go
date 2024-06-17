@@ -18,16 +18,21 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -37,14 +42,14 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	errs := []error{}
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+	var errs []error
 
 	// Upload currently used configuration to the cluster
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
@@ -59,7 +64,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
+	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -100,12 +105,32 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	// If the coredns / kube-dns ConfigMaps are missing, show a warning and assume that the
+	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errorsutil.NewAggregate(errs)
+}
+
+// PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
+func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
+	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
+	}
+	if len(unupgradedControlPlanes) > 0 {
+		fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
+		return nil
+	}
+
+	var errs []error
+
+	// If the coredns ConfigMap is missing, show a warning and assume that the
 	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
 	//
 	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
 	//   https://github.com/kubernetes/kubeadm/issues/1318
-	var missingCoreDNSConfigMap, missingKubeDNSConfigMap bool
+	var missingCoreDNSConfigMap bool
 	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
 		context.TODO(),
 		kubeadmconstants.CoreDNSConfigMap,
@@ -113,28 +138,16 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	); err != nil && apierrors.IsNotFound(err) {
 		missingCoreDNSConfigMap = true
 	}
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.KubeDNSConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		missingKubeDNSConfigMap = true
-	}
-	if missingCoreDNSConfigMap && missingKubeDNSConfigMap {
-		klog.Warningf("the ConfigMaps %q/%q in the namespace %q were not found. "+
+	if missingCoreDNSConfigMap {
+		klog.Warningf("the ConfigMaps %q in the namespace %q were not found. "+
 			"Assuming that a DNS server was not deployed for this cluster. "+
 			"Note that once 'kubeadm upgrade apply' supports phases you "+
 			"will have to skip the DNS upgrade manually",
 			kubeadmconstants.CoreDNSConfigMap,
-			kubeadmconstants.KubeDNSConfigMap,
 			metav1.NamespaceSystem)
 	} else {
-		// Upgrade CoreDNS/kube-dns
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
-			errs = append(errs, err)
-		}
-		// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
+		// Upgrade CoreDNS
+		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -157,7 +170,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 			metav1.NamespaceSystem)
 	} else {
 		// Upgrade kube-proxy
-		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
+		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -165,58 +178,98 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
-	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
-		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
+// unupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+//
+// NB. This function can only be called after the current control plane instance has been upgraded already.
+// Because it determines whether the other control plane instances have been upgraded by checking whether
+// the kube-apiserver image of other control plane instance is the same as that of this instance.
+func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		"component": kubeadmconstants.KubeAPIServer,
+	}))
+	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list kube-apiserver Pod from cluster")
+	}
+	if len(pods.Items) == 0 {
+		return nil, errors.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
+	}
 
-		if cfg.DNS.Type == kubeadmapi.CoreDNS {
-			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
-			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
-		}
+	nodeImageMap := map[string]string{}
 
-		nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		})
-		if err != nil {
-			return err
-		}
-
-		// If we're dry-running or there are no scheduable nodes available, we don't need to wait for the new DNS addon to become ready
-		if !dryRun && len(nodes.Items) != 0 {
-			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
-			if err != nil {
-				return err
+	for _, pod := range pods.Items {
+		found := false
+		for _, c := range pod.Spec.Containers {
+			if c.Name == kubeadmconstants.KubeAPIServer {
+				nodeImageMap[pod.Spec.NodeName] = c.Image
+				found = true
+				break
 			}
-			if dnsDeployment.Status.ReadyReplicas == 0 {
-				return errors.New("the DNS deployment isn't ready yet")
-			}
 		}
+		if !found {
+			return nil, errors.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
+		}
+	}
 
-		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
-		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
-		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+	upgradedImage, ok := nodeImageMap[nodeName]
+	if !ok {
+		return nil, errors.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
+	}
+
+	unupgradedNodes := sets.New[string]()
+	for node, image := range nodeImageMap {
+		if image != upgradedImage {
+			unupgradedNodes.Insert(node)
 		}
-		return nil
-	}, 10)
+	}
+
+	if len(unupgradedNodes) > 0 {
+		return sets.List(unupgradedNodes), nil
+	}
+
+	return nil, nil
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+// WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
+	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
+
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
+	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	if err != nil {
+		return err
+	}
+	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
+	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
+
+	if !dryRun {
+		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
+		err := kubeadmutil.CopyFile(src, dest)
+		if err != nil {
+			return errors.Wrap(err, "error backing up the kubelet config file")
+		}
+	} else {
+		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
+	}
+
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 
 	if dryRun { // Print what contents would be written
-		dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+		}
 	}
 	return errorsutil.NewAggregate(errs)
 }
@@ -227,27 +280,4 @@ func GetKubeletDir(dryRun bool) (string, error) {
 		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
-}
-
-// moveFiles moves files from one directory to another.
-func moveFiles(files map[string]string) error {
-	filesToRecover := map[string]string{}
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			return rollbackFiles(filesToRecover, err)
-		}
-		filesToRecover[to] = from
-	}
-	return nil
-}
-
-// rollbackFiles moves the files back to the original directory.
-func rollbackFiles(files map[string]string, originalErr error) error {
-	errs := []error{originalErr}
-	for from, to := range files {
-		if err := os.Rename(from, to); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }

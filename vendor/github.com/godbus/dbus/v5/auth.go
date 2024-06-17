@@ -37,7 +37,7 @@ const (
 
 // Auth defines the behaviour of an authentication mechanism.
 type Auth interface {
-	// Return the name of the mechnism, the argument to the first AUTH command
+	// Return the name of the mechanism, the argument to the first AUTH command
 	// and the next status.
 	FirstData() (name, resp []byte, status AuthStatus)
 
@@ -53,7 +53,7 @@ type Auth interface {
 // bus. Auth must not be called on shared connections.
 func (conn *Conn) Auth(methods []Auth) error {
 	if methods == nil {
-		uid := strconv.Itoa(os.Getuid())
+		uid := strconv.Itoa(os.Geteuid())
 		methods = []Auth{AuthExternal(uid), AuthCookieSha1(uid, getHomeDir())}
 	}
 	in := bufio.NewReader(conn.transport)
@@ -75,9 +75,9 @@ func (conn *Conn) Auth(methods []Auth) error {
 	s = s[1:]
 	for _, v := range s {
 		for _, m := range methods {
-			if name, data, status := m.FirstData(); bytes.Equal(v, name) {
+			if name, _, status := m.FirstData(); bytes.Equal(v, name) {
 				var ok bool
-				err = authWriteLine(conn.transport, []byte("AUTH"), v, data)
+				err = authWriteLine(conn.transport, []byte("AUTH"), v)
 				if err != nil {
 					return err
 				}
@@ -176,9 +176,10 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, boo
 					return err, false
 				}
 				state = waitingForReject
+			} else {
+				conn.uuid = string(s[1])
+				return nil, true
 			}
-			conn.uuid = string(s[1])
-			return nil, true
 		case state == waitingForData:
 			err = authWriteLine(conn.transport, []byte("ERROR"))
 			if err != nil {
@@ -191,14 +192,18 @@ func (conn *Conn) tryAuth(m Auth, state authState, in *bufio.Reader) (error, boo
 					return err, false
 				}
 				state = waitingForReject
+			} else {
+				conn.uuid = string(s[1])
+				return nil, true
 			}
-			conn.uuid = string(s[1])
-			return nil, true
+		case state == waitingForOk && string(s[0]) == "DATA":
+			err = authWriteLine(conn.transport, []byte("DATA"))
+			if err != nil {
+				return err, false
+			}
 		case state == waitingForOk && string(s[0]) == "REJECTED":
 			return nil, false
-		case state == waitingForOk && (string(s[0]) == "DATA" ||
-			string(s[0]) == "ERROR"):
-
+		case state == waitingForOk && string(s[0]) == "ERROR":
 			err = authWriteLine(conn.transport, []byte("CANCEL"))
 			if err != nil {
 				return err, false

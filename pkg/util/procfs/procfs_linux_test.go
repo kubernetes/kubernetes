@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,7 +20,6 @@ limitations under the License.
 package procfs
 
 import (
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -55,7 +55,7 @@ func TestContainerNameFromProcCgroup(t *testing.T) {
 	procCgroupEmpty := ""
 	verifyContainerName(procCgroupEmpty, "", true, t)
 
-	content, err := ioutil.ReadFile("example_proc_cgroup")
+	content, err := os.ReadFile("example_proc_cgroup")
 	if err != nil {
 		t.Errorf("Could not read example /proc cgroup file")
 	}

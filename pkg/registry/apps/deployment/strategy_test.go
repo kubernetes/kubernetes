@@ -20,12 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -167,8 +167,8 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 			Strategy: apps.DeploymentStrategy{
 				Type: apps.RollingUpdateDeploymentStrategyType,
 				RollingUpdate: &apps.RollingUpdateDeployment{
-					MaxSurge:       intstr.FromInt(1),
-					MaxUnavailable: intstr.FromInt(1),
+					MaxSurge:       intstr.FromInt32(1),
+					MaxUnavailable: intstr.FromInt32(1),
 				},
 			},
 			Template: api.PodTemplateSpec{
@@ -185,65 +185,113 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 	}
 }
 
-func TestDeploymentDefaultGarbageCollectionPolicy(t *testing.T) {
-	// Make sure we correctly implement the interface.
-	// Otherwise a typo could silently change the default.
-	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
+func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *apps.Deployment {
+	return &apps.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            deploymentName,
+			Namespace:       namespace,
+			ResourceVersion: "1",
+		},
+		Spec: apps.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{"foo": "bar"},
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+			Strategy: apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       intstr.FromInt32(1),
+					MaxUnavailable: intstr.FromInt32(1),
+				},
+			},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{{
+						Name:                     fakeImageName,
+						Image:                    fakeImage,
+						ImagePullPolicy:          api.PullNever,
+						TerminationMessagePolicy: api.TerminationMessageReadFile,
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+								api.ResourceName(resourceName):    value,
+							},
+							Limits: api.ResourceList{
+								api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+								api.ResourceName(resourceName):    value,
+							},
+						}},
+					}},
+			},
+		},
+	}
+}
+
+func TestDeploymentStrategyValidate(t *testing.T) {
 	tests := []struct {
-		requestInfo      genericapirequest.RequestInfo
-		expectedGCPolicy rest.GarbageCollectionPolicy
-		isNilRequestInfo bool
+		name       string
+		deployment *apps.Deployment
 	}{
 		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta1",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta2",
-				Resource:   "deployments",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1",
-				Resource:   "deployments",
-			},
-			rest.DeleteDependents,
-			false,
-		},
-		{
-			expectedGCPolicy: rest.DeleteDependents,
-			isNilRequestInfo: true,
+			name:       "validation on a new deployment with indivisible hugepages values",
+			deployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
 		},
 	}
 
-	for _, test := range tests {
-		context := genericapirequest.NewContext()
-		if !test.isNilRequestInfo {
-			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
-		}
-		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
-			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
-				test.requestInfo.APIVersion, got, want)
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.deployment); len(errs) == 0 {
+				t.Error("expected failure")
+			}
+		})
+	}
+}
+
+func TestDeploymentStrategyValidateUpdate(t *testing.T) {
+	tests := []struct {
+		name          string
+		newDeployment *apps.Deployment
+		oldDeployment *apps.Deployment
+	}{
+		{
+			name:          "validation on an existing deployment with indivisible hugepages values to a new deployment with indivisible hugepages values",
+			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			oldDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("1.1Gi")),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newDeployment, tc.oldDeployment); len(errs) != 0 {
+				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+
+	errTests := []struct {
+		name          string
+		newDeployment *apps.Deployment
+		oldDeployment *apps.Deployment
+	}{
+		{
+			name:          "validation on an existing deployment with divisible hugepages values to a new deployment with indivisible hugepages values",
+			newDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			oldDeployment: newDeploymentWithHugePageValue(api.ResourceHugePagesPrefix+"1Gi", resource.MustParse("2Gi")),
+		},
+	}
+
+	for _, tc := range errTests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newDeployment, tc.oldDeployment); len(errs) == 0 {
+				t.Error("expected failure")
+			}
+		})
 	}
 }

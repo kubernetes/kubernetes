@@ -26,14 +26,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/utils/integer"
-
-	"vbom.ml/util/sortorder"
 )
 
 // SortingPrinter sorts list types before delegating to another printer.
@@ -95,6 +93,8 @@ func (s *SortingPrinter) sortObj(obj runtime.Object) error {
 	return meta.SetList(obj, objs)
 }
 
+// SortObjects sorts the runtime.Object based on fieldInput and returns RuntimeSort that implements
+// the golang sort interface
 func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
 	for ix := range objs {
 		item := objs[ix]
@@ -151,6 +151,7 @@ type RuntimeSort struct {
 	origPosition []int
 }
 
+// NewRuntimeSort creates a new RuntimeSort struct that implements golang sort interface
 func NewRuntimeSort(field string, objs []runtime.Object) *RuntimeSort {
 	sorter := &RuntimeSort{field: field, objs: objs, origPosition: make([]int, len(objs))}
 	for ix := range objs {
@@ -177,8 +178,8 @@ func isLess(i, j reflect.Value) (bool, error) {
 	case reflect.Float32, reflect.Float64:
 		return i.Float() < j.Float(), nil
 	case reflect.String:
-		return sortorder.NaturalLess(i.String(), j.String()), nil
-	case reflect.Ptr:
+		return i.String() < j.String(), nil
+	case reflect.Pointer:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
 		// sort metav1.Time
@@ -186,6 +187,11 @@ func isLess(i, j reflect.Value) (bool, error) {
 		if t, ok := in.(metav1.Time); ok {
 			time := j.Interface().(metav1.Time)
 			return t.Before(&time), nil
+		}
+		// sort resource.Quantity
+		if iQuantity, ok := in.(resource.Quantity); ok {
+			jQuantity := j.Interface().(resource.Quantity)
+			return iQuantity.Cmp(jQuantity) < 0, nil
 		}
 		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {
@@ -197,15 +203,21 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return true, nil
 	case reflect.Array, reflect.Slice:
 		// note: the length of i and j may be different
-		for idx := 0; idx < integer.IntMin(i.Len(), j.Len()); idx++ {
+		for idx := 0; idx < min(i.Len(), j.Len()); idx++ {
 			less, err := isLess(i.Index(idx), j.Index(idx))
 			if err != nil || !less {
 				return less, err
 			}
 		}
 		return true, nil
-
 	case reflect.Interface:
+		if i.IsNil() && j.IsNil() {
+			return false, nil
+		} else if i.IsNil() {
+			return true, nil
+		} else if j.IsNil() {
+			return false, nil
+		}
 		switch itype := i.Interface().(type) {
 		case uint8:
 			if jtype, ok := j.Interface().(uint8); ok {
@@ -257,7 +269,17 @@ func isLess(i, j reflect.Value) (bool, error) {
 			}
 		case string:
 			if jtype, ok := j.Interface().(string); ok {
-				return sortorder.NaturalLess(itype, jtype), nil
+				// check if it's a Quantity
+				itypeQuantity, err := resource.ParseQuantity(itype)
+				if err != nil {
+					return itype < jtype, nil
+				}
+				jtypeQuantity, err := resource.ParseQuantity(jtype)
+				if err != nil {
+					return itype < jtype, nil
+				}
+				// Both strings are quantity
+				return itypeQuantity.Cmp(jtypeQuantity) < 0, nil
 			}
 		default:
 			return false, fmt.Errorf("unsortable type: %T", itype)
@@ -304,14 +326,14 @@ func (r *RuntimeSort) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
+		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
 	}
 	return less
 }
 
 // OriginalPosition returns the starting (original) position of a particular index.
 // e.g. If OriginalPosition(0) returns 5 than the
-// the item currently at position 0 was at position 5 in the original unsorted array.
+// item currently at position 0 was at position 5 in the original unsorted array.
 func (r *RuntimeSort) OriginalPosition(ix int) int {
 	if ix < 0 || ix > len(r.origPosition) {
 		return -1
@@ -350,7 +372,7 @@ func (t *TableSorter) Less(i, j int) bool {
 
 	less, err := isLess(iField, jField)
 	if err != nil {
-		klog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
+		klog.Exitf("Field %s in %T is an unsortable type: %s, err: %v", t.field, t.parsedRows, iField.Kind().String(), err)
 	}
 	return less
 }

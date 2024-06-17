@@ -20,21 +20,18 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/apis/audit/validation"
 	"k8s.io/apiserver/pkg/audit"
-
 	"k8s.io/klog/v2"
 )
 
 var (
 	apiGroupVersions = []schema.GroupVersion{
-		auditv1beta1.SchemeGroupVersion,
-		auditv1alpha1.SchemeGroupVersion,
 		auditv1.SchemeGroupVersion,
 	}
 	apiGroupVersionSet = map[schema.GroupVersion]bool{}
@@ -65,15 +62,28 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 
 func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	policy := &auditinternal.Policy{}
-	decoder := audit.Codecs.UniversalDecoder(apiGroupVersions...)
+	strictDecoder := serializer.NewCodecFactory(audit.Scheme, serializer.EnableStrict).UniversalDecoder()
 
-	_, gvk, err := decoder.Decode(policyDef, nil, policy)
+	// Try strict decoding first.
+	_, gvk, err := strictDecoder.Decode(policyDef, nil, policy)
 	if err != nil {
-		return nil, fmt.Errorf("failed decoding: %v", err)
+		if !runtime.IsStrictDecodingError(err) {
+			return nil, fmt.Errorf("failed decoding: %w", err)
+		}
+		var (
+			lenientDecoder = audit.Codecs.UniversalDecoder(apiGroupVersions...)
+			lenientErr     error
+		)
+		_, gvk, lenientErr = lenientDecoder.Decode(policyDef, nil, policy)
+		if lenientErr != nil {
+			return nil, fmt.Errorf("failed lenient decoding: %w", lenientErr)
+		}
+		klog.Warningf("Audit policy contains errors, falling back to lenient decoding: %v", err)
 	}
 
 	// Ensure the policy file contained an apiVersion and kind.
-	if !apiGroupVersionSet[schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}] {
+	gv := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+	if !apiGroupVersionSet[gv] {
 		return nil, fmt.Errorf("unknown group version field %v in policy", gvk)
 	}
 
@@ -85,6 +95,7 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	if policyCnt == 0 {
 		return nil, fmt.Errorf("loaded illegal policy with 0 rules")
 	}
-	klog.V(4).Infof("Loaded %d audit policy rules", policyCnt)
+
+	klog.V(4).InfoS("Load audit policy rules success", "policyCnt", policyCnt)
 	return policy, nil
 }

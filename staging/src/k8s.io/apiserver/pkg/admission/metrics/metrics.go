@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -45,8 +44,6 @@ const (
 )
 
 var (
-	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
-	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 2.5}
 	latencySummaryMaxAge = 5 * time.Hour
 
 	// Metrics provides access to all admission metrics.
@@ -54,9 +51,11 @@ var (
 )
 
 // ObserverFunc is a func that emits metrics.
-type ObserverFunc func(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string)
+type ObserverFunc func(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string)
 
 const (
+	kindWebhook  = "webhook"
+	kindPolicy   = "policy"
 	stepValidate = "validate"
 	stepAdmit    = "admit"
 )
@@ -96,7 +95,7 @@ func (p pluginHandlerWithMetrics) Admit(ctx context.Context, a admission.Attribu
 
 	start := time.Now()
 	err := mutatingHandler.Admit(ctx, a, o)
-	p.observer(time.Since(start), err != nil, a, stepAdmit, p.extraLabels...)
+	p.observer(ctx, time.Since(start), err != nil, a, stepAdmit, p.extraLabels...)
 	return err
 }
 
@@ -109,35 +108,89 @@ func (p pluginHandlerWithMetrics) Validate(ctx context.Context, a admission.Attr
 
 	start := time.Now()
 	err := validatingHandler.Validate(ctx, a, o)
-	p.observer(time.Since(start), err != nil, a, stepValidate, p.extraLabels...)
+	p.observer(ctx, time.Since(start), err != nil, a, stepValidate, p.extraLabels...)
 	return err
 }
 
 // AdmissionMetrics instruments admission with prometheus metrics.
 type AdmissionMetrics struct {
-	step             *metricSet
-	controller       *metricSet
-	webhook          *metricSet
-	webhookRejection *metrics.CounterVec
+	step                            *metricSet
+	controller                      *metricSet
+	webhook                         *metricSet
+	webhookRejection                *metrics.CounterVec
+	webhookFailOpen                 *metrics.CounterVec
+	webhookRequest                  *metrics.CounterVec
+	matchConditionEvalErrors        *metrics.CounterVec
+	matchConditionExclusions        *metrics.CounterVec
+	matchConditionEvaluationSeconds *metricSet
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
 func newAdmissionMetrics() *AdmissionMetrics {
 	// Admission metrics for a step of the admission flow. The entire admission flow is broken down into a series of steps
 	// Each step is identified by a distinct type label value.
-	step := newMetricSet("step",
-		[]string{"type", "operation", "rejected"},
-		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
+	// Use buckets ranging from 5 ms to 2.5 seconds.
+	step := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "step_admission_duration_seconds",
+				Help:           "Admission sub-step latency histogram in seconds, broken out for each operation and API resource and step type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"type", "operation", "rejected"},
+		),
+
+		latenciesSummary: metrics.NewSummaryVec(
+			&metrics.SummaryOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "step_admission_duration_seconds_summary",
+				Help:           "Admission sub-step latency summary in seconds, broken out for each operation and API resource and step type (validate or admit).",
+				MaxAge:         latencySummaryMaxAge,
+				StabilityLevel: metrics.ALPHA,
+			},
+			[]string{"type", "operation", "rejected"},
+		),
+	}
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
-	controller := newMetricSet("controller",
-		[]string{"name", "type", "operation", "rejected"},
-		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
+	// Use buckets ranging from 5 ms to 2.5 seconds.
+	controller := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "controller_admission_duration_seconds",
+				Help:           "Admission controller latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"name", "type", "operation", "rejected"},
+		),
+
+		latenciesSummary: nil,
+	}
 
 	// Admission webhook metrics. Each webhook is identified by name.
-	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "rejected"},
-		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
+	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
+	webhook := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "webhook_admission_duration_seconds",
+				Help:           "Admission webhook latency histogram in seconds, identified by name and broken out for each operation and API resource and type (validate or admit).",
+				Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1.0, 2.5, 10, 25},
+				StabilityLevel: metrics.STABLE,
+			},
+			[]string{"name", "type", "operation", "rejected"},
+		),
+
+		latenciesSummary: nil,
+	}
 
 	webhookRejection := metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -149,11 +202,71 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		},
 		[]string{"name", "type", "operation", "error_type", "rejection_code"})
 
+	webhookFailOpen := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_fail_open_count",
+			Help:           "Admission webhook fail open count, identified by name and broken out for each admission type (validating or mutating).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "type"})
+
+	webhookRequest := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_request_total",
+			Help:           "Admission webhook request total, identified by name and broken out for each admission type (validating or mutating) and operation. Additional labels specify whether the request was rejected or not and an HTTP status code. Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "type", "operation", "code", "rejected"})
+
+	matchConditionEvalError := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "match_condition_evaluation_errors_total",
+			Help:           "Admission match condition evaluation errors count, identified by name of resource containing the match condition and broken out for each kind containing matchConditions (webhook or policy), operation and admission type (validate or admit).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "kind", "type", "operation"})
+
+	matchConditionExclusions := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "match_condition_exclusions_total",
+			Help:           "Admission match condition evaluation exclusions count, identified by name of resource containing the match condition and broken out for each kind containing matchConditions (webhook or policy), operation and admission type (validate or admit).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "kind", "type", "operation"})
+
+	matchConditionEvaluationSeconds := &metricSet{
+		latencies: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Namespace:      namespace,
+				Subsystem:      subsystem,
+				Name:           "match_condition_evaluation_seconds",
+				Help:           "Admission match condition evaluation time in seconds, identified by name and broken out for each kind containing matchConditions (webhook or policy), operation and type (validate or admit).",
+				Buckets:        []float64{0.001, 0.005, 0.01, 0.025, 0.1, 0.2, 0.25},
+				StabilityLevel: metrics.ALPHA,
+			},
+			[]string{"name", "kind", "type", "operation"},
+		),
+		latenciesSummary: nil,
+	}
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
+	matchConditionEvaluationSeconds.mustRegister()
 	legacyregistry.MustRegister(webhookRejection)
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection}
+	legacyregistry.MustRegister(webhookFailOpen)
+	legacyregistry.MustRegister(webhookRequest)
+	legacyregistry.MustRegister(matchConditionEvalError)
+	legacyregistry.MustRegister(matchConditionExclusions)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection, webhookFailOpen: webhookFailOpen, webhookRequest: webhookRequest, matchConditionEvalErrors: matchConditionEvalError, matchConditionExclusions: matchConditionExclusions, matchConditionEvaluationSeconds: matchConditionEvaluationSeconds}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -163,66 +276,58 @@ func (m *AdmissionMetrics) reset() {
 }
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
-func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+func (m *AdmissionMetrics) ObserveAdmissionStep(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
+	m.step.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
-func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+func (m *AdmissionMetrics) ObserveAdmissionController(ctx context.Context, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
+	m.controller.observe(ctx, elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
-func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+func (m *AdmissionMetrics) ObserveWebhook(ctx context.Context, name string, elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, code int) {
+	// We truncate codes greater than 600 to keep the cardinality bounded.
+	if code > 600 {
+		code = 600
+	}
+	m.webhookRequest.WithContext(ctx).WithLabelValues(name, stepType, string(attr.GetOperation()), strconv.Itoa(code), strconv.FormatBool(rejected)).Inc()
+	m.webhook.observe(ctx, elapsed, name, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))
 }
 
 // ObserveWebhookRejection records admission related metrics for an admission webhook rejection.
-func (m *AdmissionMetrics) ObserveWebhookRejection(name, stepType, operation string, errorType WebhookRejectionErrorType, rejectionCode int) {
+func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, stepType, operation string, errorType WebhookRejectionErrorType, rejectionCode int) {
 	// We truncate codes greater than 600 to keep the cardinality bounded.
 	// This should be rarely done by a malfunctioning webhook server.
 	if rejectionCode > 600 {
 		rejectionCode = 600
 	}
-	m.webhookRejection.WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
+	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
+}
+
+// ObserveWebhookFailOpen records validating or mutating webhook that fail open.
+func (m *AdmissionMetrics) ObserveWebhookFailOpen(ctx context.Context, name, stepType string) {
+	m.webhookFailOpen.WithContext(ctx).WithLabelValues(name, stepType).Inc()
+}
+
+// ObserveMatchConditionEvalError records validating or mutating webhook that are not called due to match conditions
+func (m *AdmissionMetrics) ObserveMatchConditionEvalError(ctx context.Context, name, kind, stepType, operation string) {
+	m.matchConditionEvalErrors.WithContext(ctx).WithLabelValues(name, kind, stepType, operation).Inc()
+}
+
+// ObserveMatchConditionExclusion records validating or mutating webhook that are not called due to match conditions
+func (m *AdmissionMetrics) ObserveMatchConditionExclusion(ctx context.Context, name, kind, stepType, operation string) {
+	m.matchConditionExclusions.WithContext(ctx).WithLabelValues(name, kind, stepType, operation).Inc()
+}
+
+// ObserveMatchConditionEvaluationTime records duration of match condition evaluation process.
+func (m *AdmissionMetrics) ObserveMatchConditionEvaluationTime(ctx context.Context, elapsed time.Duration, name, kind, stepType, operation string) {
+	m.matchConditionEvaluationSeconds.observe(ctx, elapsed, name, kind, stepType, operation)
 }
 
 type metricSet struct {
 	latencies        *metrics.HistogramVec
 	latenciesSummary *metrics.SummaryVec
-}
-
-func newMetricSet(name string, labels []string, helpTemplate string, hasSummary bool) *metricSet {
-	var summary *metrics.SummaryVec
-	if hasSummary {
-		summary = metrics.NewSummaryVec(
-			&metrics.SummaryOpts{
-				Namespace:      namespace,
-				Subsystem:      subsystem,
-				Name:           fmt.Sprintf("%s_admission_duration_seconds_summary", name),
-				Help:           fmt.Sprintf(helpTemplate, "latency summary in seconds"),
-				MaxAge:         latencySummaryMaxAge,
-				StabilityLevel: metrics.ALPHA,
-			},
-			labels,
-		)
-	}
-
-	return &metricSet{
-		latencies: metrics.NewHistogramVec(
-			&metrics.HistogramOpts{
-				Namespace:      namespace,
-				Subsystem:      subsystem,
-				Name:           fmt.Sprintf("%s_admission_duration_seconds", name),
-				Help:           fmt.Sprintf(helpTemplate, "latency histogram in seconds"),
-				Buckets:        latencyBuckets,
-				StabilityLevel: metrics.ALPHA,
-			},
-			labels,
-		),
-
-		latenciesSummary: summary,
-	}
 }
 
 // MustRegister registers all the prometheus metrics in the metricSet.
@@ -242,10 +347,10 @@ func (m *metricSet) reset() {
 }
 
 // Observe records an observed admission event to all metrics in the metricSet.
-func (m *metricSet) observe(elapsed time.Duration, labels ...string) {
+func (m *metricSet) observe(ctx context.Context, elapsed time.Duration, labels ...string) {
 	elapsedSeconds := elapsed.Seconds()
-	m.latencies.WithLabelValues(labels...).Observe(elapsedSeconds)
+	m.latencies.WithContext(ctx).WithLabelValues(labels...).Observe(elapsedSeconds)
 	if m.latenciesSummary != nil {
-		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedSeconds)
+		m.latenciesSummary.WithContext(ctx).WithLabelValues(labels...).Observe(elapsedSeconds)
 	}
 }

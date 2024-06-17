@@ -18,6 +18,7 @@ package allocator
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -60,27 +61,26 @@ type bitAllocator interface {
 
 // NewAllocationMap creates an allocation bitmap using the random scan strategy.
 func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
+	return NewAllocationMapWithOffset(max, rangeSpec, 0)
+}
+
+// NewAllocationMapWithOffset creates an allocation bitmap using a random scan strategy that
+// allows to pass an offset that divides the allocation bitmap in two blocks.
+// The first block of values will not be used for random value assigned by the AllocateNext()
+// method until the second block of values has been exhausted.
+// The offset value must be always smaller than the bitmap size.
+func NewAllocationMapWithOffset(max int, rangeSpec string, offset int) *AllocationBitmap {
 	a := AllocationBitmap{
-		strategy: randomScanStrategy{
-			rand: rand.New(rand.NewSource(time.Now().UnixNano())),
+		strategy: randomScanStrategyWithOffset{
+			rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
+			offset: offset,
 		},
 		allocated: big.NewInt(0),
 		count:     0,
 		max:       max,
 		rangeSpec: rangeSpec,
 	}
-	return &a
-}
 
-// NewContiguousAllocationMap creates an allocation bitmap using the contiguous scan strategy.
-func NewContiguousAllocationMap(max int, rangeSpec string) *AllocationBitmap {
-	a := AllocationBitmap{
-		strategy:  contiguousScanStrategy{},
-		allocated: big.NewInt(0),
-		count:     0,
-		max:       max,
-		rangeSpec: rangeSpec,
-	}
 	return &a
 }
 
@@ -90,6 +90,10 @@ func (r *AllocationBitmap) Allocate(offset int) (bool, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
+	// max is the maximum size of the usable items in the range
+	if offset < 0 || offset >= r.max {
+		return false, fmt.Errorf("offset %d out of range [0,%d]", offset, r.max)
+	}
 	if r.allocated.Bit(offset) == 1 {
 		return false, nil
 	}
@@ -195,6 +199,10 @@ func (r *AllocationBitmap) Restore(rangeSpec string, data []byte) error {
 	return nil
 }
 
+// Destroy cleans up everything on shutdown.
+func (r *AllocationBitmap) Destroy() {
+}
+
 // randomScanStrategy chooses a random address from the provided big.Int, and then
 // scans forward looking for the next available address (it will wrap the range if
 // necessary).
@@ -218,19 +226,39 @@ func (rss randomScanStrategy) AllocateBit(allocated *big.Int, max, count int) (i
 
 var _ bitAllocator = randomScanStrategy{}
 
-// contiguousScanStrategy tries to allocate starting at 0 and filling in any gaps
-type contiguousScanStrategy struct{}
+// randomScanStrategyWithOffset choose a random address from the provided big.Int and then scans
+// forward looking for the next available address. The big.Int range is subdivided so it will try
+// to allocate first from the reserved upper range of addresses (it will wrap the upper subrange if necessary).
+// If there is no free address it will try to allocate one from the lower range too.
+type randomScanStrategyWithOffset struct {
+	rand   *rand.Rand
+	offset int
+}
 
-func (contiguousScanStrategy) AllocateBit(allocated *big.Int, max, count int) (int, bool) {
+func (rss randomScanStrategyWithOffset) AllocateBit(allocated *big.Int, max, count int) (int, bool) {
 	if count >= max {
 		return 0, false
 	}
-	for i := 0; i < max; i++ {
-		if allocated.Bit(i) == 0 {
-			return i, true
+	// size of the upper subrange, prioritized for random allocation
+	subrangeMax := max - rss.offset
+	// try to get a value from the upper range [rss.reserved, max]
+	start := rss.rand.Intn(subrangeMax)
+	for i := 0; i < subrangeMax; i++ {
+		at := rss.offset + ((start + i) % subrangeMax)
+		if allocated.Bit(at) == 0 {
+			return at, true
+		}
+	}
+
+	start = rss.rand.Intn(rss.offset)
+	// subrange full, try to get the value from the first block before giving up.
+	for i := 0; i < rss.offset; i++ {
+		at := (start + i) % rss.offset
+		if allocated.Bit(at) == 0 {
+			return at, true
 		}
 	}
 	return 0, false
 }
 
-var _ bitAllocator = contiguousScanStrategy{}
+var _ bitAllocator = randomScanStrategyWithOffset{}

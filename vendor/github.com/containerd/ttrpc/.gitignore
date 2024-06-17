@@ -1,4 +1,5 @@
 # Binaries for programs and plugins
+/bin/
 *.exe
 *.dll
 *.so
@@ -9,6 +10,4 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
-
-# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
-.glide/
+coverage.txt

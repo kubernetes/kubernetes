@@ -23,13 +23,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 )
 
 type fcAttacher struct {
@@ -94,7 +94,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.fcDisk), nil
 }
 
-func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(fcPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -117,6 +117,9 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 	if readOnly {
 		options = append(options, "ro")
 	}
+	if mountArgs.SELinuxLabel != "" {
+		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
+	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
@@ -132,6 +135,7 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 type fcDetacher struct {
 	mounter mount.Interface
 	manager diskManager
+	host    volume.VolumeHost
 }
 
 var _ volume.Detacher = &fcDetacher{}
@@ -142,6 +146,7 @@ func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
 		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
 		manager: &fcUtil{},
+		host:    plugin.host,
 	}, nil
 }
 
@@ -165,12 +170,33 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
 	}
-	unMounter := volumeSpecToUnmounter(detacher.mounter)
-	err = detacher.manager.DetachDisk(*unMounter, devName)
-	if err != nil {
-		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", devName, err)
+	// GetDeviceNameFromMount from above returns an empty string if deviceMountPath is not a mount point
+	// There is no need to DetachDisk if this is the case (and DetachDisk will throw an error if we attempt)
+	if devName == "" {
+		return nil
 	}
-	klog.V(4).Infof("fc: successfully detached disk: %s", devName)
+
+	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
+	// The device is unmounted now. If UnmountDevice was retried, GetDeviceNameFromMount
+	// won't find any mount and won't return DetachDisk below.
+	// Therefore implement our own retry mechanism here.
+	// E.g. DetachDisk sometimes fails to flush a multipath device with "device is busy" when it was
+	// just unmounted.
+	// 2 minutes should be enough within 6 minute force detach timeout.
+	var detachError error
+	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
+		detachError = detacher.manager.DetachDisk(*unMounter, devName)
+		if detachError != nil {
+			klog.V(4).Infof("fc: failed to detach disk %s (%s): %v", devName, deviceMountPath, detachError)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("fc: failed to detach disk: %s: %v", devName, detachError)
+	}
+
+	klog.V(2).Infof("fc: successfully detached disk: %s", devName)
 	return nil
 }
 
@@ -225,12 +251,13 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 	}, nil
 }
 
-func volumeSpecToUnmounter(mounter mount.Interface) *fcDiskUnmounter {
+func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *fcDiskUnmounter {
 	return &fcDiskUnmounter{
 		fcDisk: &fcDisk{
 			io: &osIOHandler{},
 		},
 		mounter:    mounter,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
+		exec:       host.GetExec(fcPluginName),
 	}
 }

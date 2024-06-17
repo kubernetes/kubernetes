@@ -20,8 +20,10 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"testing"
+	"time"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 )
 
@@ -56,7 +58,7 @@ func AssertKubeConfigCurrentCluster(t *testing.T, config *clientcmdapi.Config, e
 
 // AssertKubeConfigCurrentAuthInfoWithClientCert is a utility function for kubeadm testing that asserts if the CurrentAuthInfo in
 // the given KubeConfig object contains a clientCert that refers to a specific client name, is signed by the expected CA, includes the expected organizations
-func AssertKubeConfigCurrentAuthInfoWithClientCert(t *testing.T, config *clientcmdapi.Config, signinCa *x509.Certificate, expectedClientName string, expectedOrganizations ...string) {
+func AssertKubeConfigCurrentAuthInfoWithClientCert(t *testing.T, config *clientcmdapi.Config, signinCa *x509.Certificate, expectedNotAfter time.Time, expectedClientName string, expectedOrganizations ...string) {
 	currentContext := config.Contexts[config.CurrentContext]
 	currentAuthInfo := config.AuthInfos[currentContext.AuthInfo]
 
@@ -75,6 +77,9 @@ func AssertKubeConfigCurrentAuthInfoWithClientCert(t *testing.T, config *clientc
 
 	// Asserts the clientCert is signed by the signinCa
 	certstestutil.AssertCertificateIsSignedByCa(t, currentClientCert, signinCa)
+
+	// Assert the clientCert has expected NotAfter
+	certstestutil.AssertCertificateHasNotAfter(t, currentClientCert, expectedNotAfter)
 
 	// Asserts the clientCert has ClientAuth ExtKeyUsage
 	certstestutil.AssertCertificateHasClientAuthUsage(t, currentClientCert)
@@ -95,6 +100,18 @@ func AssertKubeConfigCurrentAuthInfoWithToken(t *testing.T, config *clientcmdapi
 	// assert token
 	if currentAuthInfo.Token != expectedToken {
 		t.Errorf("kubeconfig.currentAuthInfo.Token [%s], expected [%s]", currentAuthInfo.Token, expectedToken)
+		return
+	}
+}
+
+// AssertKubeConfigCurrentContextWithClusterName is a utility function for kubeadm testing that asserts if the Current Cluster config in
+// the given KubeConfig object refers to expected cluster name
+func AssertKubeConfigCurrentContextWithClusterName(t *testing.T, config *clientcmdapi.Config, expectedClusterName string) {
+	currentContext := config.Contexts[config.CurrentContext]
+
+	// assert cluster name
+	if currentContext.Cluster != expectedClusterName {
+		t.Errorf("kubeconfig.currentContext.clusterName [%s], expected [%s]", currentContext.Cluster, expectedClusterName)
 		return
 	}
 }

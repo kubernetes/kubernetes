@@ -19,10 +19,11 @@ package bootstrap
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	flowcontrol "k8s.io/api/flowcontrol/v1alpha1"
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/utils/ptr"
 )
 
 // The objects that define an apiserver's initial behavior.  The
@@ -32,8 +33,8 @@ import (
 // because that would require importing k8s.io/kubernetes).
 var (
 	MandatoryPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
-		MandatoryPriorityLevelConfigurationExempt,
 		MandatoryPriorityLevelConfigurationCatchAll,
+		MandatoryPriorityLevelConfigurationExempt,
 	}
 	MandatoryFlowSchemas = []*flowcontrol.FlowSchema{
 		MandatoryFlowSchemaExempt,
@@ -48,6 +49,11 @@ var (
 		// cluster and the availability of those running pods in the cluster, including kubelet and
 		// kube-proxy.
 		SuggestedPriorityLevelConfigurationSystem,
+		// "node-high" priority-level is for the node health reporting. It is separated from "system"
+		// to make sure that nodes are able to report their health even if kube-apiserver is not capable of
+		// handling load caused by pod startup (fetching secrets, events etc).
+		// NOTE: In large clusters 50% - 90% of all API calls use this priority-level.
+		SuggestedPriorityLevelConfigurationNodeHigh,
 		// "leader-election" is dedicated for controllers' leader-election, which majorly affects the
 		// availability of any controller runs in the cluster.
 		SuggestedPriorityLevelConfigurationLeaderElection,
@@ -64,8 +70,11 @@ var (
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
+		SuggestedFlowSchemaSystemNodeHigh,            // references "node-high" priority-level
+		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
 		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
+		SuggestedFlowSchemaEndpointsController,       // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
 		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
@@ -80,14 +89,19 @@ var (
 		flowcontrol.PriorityLevelConfigurationNameExempt,
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
+			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(int32(0)),
+				LendablePercent:          ptr.To(int32(0)),
+			},
 		},
 	)
 	MandatoryPriorityLevelConfigurationCatchAll = newPriorityLevelConfiguration(
-		"catch-all",
+		flowcontrol.PriorityLevelConfigurationNameCatchAll,
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 1,
+				NominalConcurrencyShares: ptr.To(int32(5)),
+				LendablePercent:          ptr.To(int32(0)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeReject,
 				},
@@ -126,8 +140,8 @@ var (
 	// "catch-all" priority-level only gets a minimal positive share of concurrency and won't be reaching
 	// ideally unless you intentionally deleted the suggested "global-default".
 	MandatoryFlowSchemaCatchAll = newFlowSchema(
-		"catch-all",
-		"catch-all",
+		flowcontrol.FlowSchemaNameCatchAll,
+		flowcontrol.PriorityLevelConfigurationNameCatchAll,
 		10000, // matchingPrecedence
 		flowcontrol.FlowDistinguisherMethodByUserType, // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{
@@ -159,7 +173,25 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 30,
+				NominalConcurrencyShares: ptr.To(int32(30)),
+				LendablePercent:          ptr.To(int32(33)),
+				LimitResponse: flowcontrol.LimitResponse{
+					Type: flowcontrol.LimitResponseTypeQueue,
+					Queuing: &flowcontrol.QueuingConfiguration{
+						Queues:           64,
+						HandSize:         6,
+						QueueLengthLimit: 50,
+					},
+				},
+			},
+		})
+	SuggestedPriorityLevelConfigurationNodeHigh = newPriorityLevelConfiguration(
+		"node-high",
+		flowcontrol.PriorityLevelConfigurationSpec{
+			Type: flowcontrol.PriorityLevelEnablementLimited,
+			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: ptr.To(int32(40)),
+				LendablePercent:          ptr.To(int32(25)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -176,7 +208,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 10,
+				NominalConcurrencyShares: ptr.To(int32(10)),
+				LendablePercent:          ptr.To(int32(0)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -193,7 +226,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 40,
+				NominalConcurrencyShares: ptr.To(int32(40)),
+				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -210,7 +244,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 20,
+				NominalConcurrencyShares: ptr.To(int32(100)),
+				LendablePercent:          ptr.To(int32(90)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -227,7 +262,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 100,
+				NominalConcurrencyShares: ptr.To(int32(20)),
+				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -240,23 +276,20 @@ var (
 		})
 )
 
-// Suggested FlowSchema objects
+// Suggested FlowSchema objects.
+// Ordered by matching precedence, so that their interactions are easier
+// to follow while reading this source.
 var (
-	SuggestedFlowSchemaSystemNodes = newFlowSchema(
-		"system-nodes", "system", 500,
-		flowcontrol.FlowDistinguisherMethodByUserType,
+	// the following flow schema exempts probes
+	SuggestedFlowSchemaProbes = newFlowSchema(
+		"probes", "exempt", 2,
+		"", // distinguisherMethodType
 		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.NodesGroup), // the nodes group
-			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
-				[]string{flowcontrol.VerbAll},
-				[]string{flowcontrol.APIGroupAll},
-				[]string{flowcontrol.ResourceAll},
-				[]string{flowcontrol.NamespaceEvery},
-				true)},
+			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
 			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
 				nonResourceRule(
-					[]string{flowcontrol.VerbAll},
-					[]string{flowcontrol.NonResourceAll}),
+					[]string{"get"},
+					[]string{"/healthz", "/readyz", "/livez"}),
 			},
 		},
 	)
@@ -270,12 +303,6 @@ var (
 			ResourceRules: []flowcontrol.ResourcePolicyRule{
 				resourceRule(
 					[]string{"get", "create", "update"},
-					[]string{corev1.GroupName},
-					[]string{"endpoints", "configmaps"},
-					[]string{"kube-system"},
-					false),
-				resourceRule(
-					[]string{"get", "create", "update"},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
@@ -283,6 +310,31 @@ var (
 			},
 		},
 	)
+	// We add an explicit rule for endpoint-controller with high precedence
+	// to ensure that those calls won't get caught by the following
+	// <workload-leader-election> flow-schema.
+	//
+	// TODO(#80289): Get rid of this rule once we get rid of support for
+	//   using endpoints and configmaps objects for leader election.
+	SuggestedFlowSchemaEndpointsController = newFlowSchema(
+		"endpoint-controller", "workload-high", 150,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: append(
+				users(user.KubeControllerManager),
+				kubeSystemServiceAccount("endpoint-controller", "endpointslicemirroring-controller")...),
+			ResourceRules: []flowcontrol.ResourcePolicyRule{
+				resourceRule(
+					[]string{"get", "create", "update"},
+					[]string{corev1.GroupName},
+					[]string{"endpoints"},
+					[]string{flowcontrol.NamespaceEvery},
+					false),
+			},
+		},
+	)
+	// TODO(#80289): Get rid of this rule once we get rid of support for
+	//   using endpoints and configmaps objects for leader election.
 	SuggestedFlowSchemaWorkloadLeaderElection = newFlowSchema(
 		"workload-leader-election", "leader-election", 200,
 		flowcontrol.FlowDistinguisherMethodByUserType,
@@ -301,6 +353,45 @@ var (
 					[]string{"leases"},
 					[]string{flowcontrol.NamespaceEvery},
 					false),
+			},
+		},
+	)
+	SuggestedFlowSchemaSystemNodeHigh = newFlowSchema(
+		"system-node-high", "node-high", 400,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{corev1.GroupName},
+					[]string{"nodes", "nodes/status"},
+					[]string{flowcontrol.NamespaceEvery},
+					true),
+				resourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{coordinationv1.GroupName},
+					[]string{"leases"},
+					[]string{flowcontrol.NamespaceEvery},
+					false),
+			},
+		},
+	)
+	SuggestedFlowSchemaSystemNodes = newFlowSchema(
+		"system-nodes", "system", 500,
+		flowcontrol.FlowDistinguisherMethodByUserType,
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.NodesGroup), // the nodes group
+			ResourceRules: []flowcontrol.ResourcePolicyRule{resourceRule(
+				[]string{flowcontrol.VerbAll},
+				[]string{flowcontrol.APIGroupAll},
+				[]string{flowcontrol.ResourceAll},
+				[]string{flowcontrol.NamespaceEvery},
+				true)},
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{flowcontrol.VerbAll},
+					[]string{flowcontrol.NonResourceAll}),
 			},
 		},
 	)
@@ -398,8 +489,14 @@ var (
 
 func newPriorityLevelConfiguration(name string, spec flowcontrol.PriorityLevelConfigurationSpec) *flowcontrol.PriorityLevelConfiguration {
 	return &flowcontrol.PriorityLevelConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       spec}
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				flowcontrol.AutoUpdateAnnotationKey: "true",
+			},
+		},
+		Spec: spec,
+	}
 }
 
 func newFlowSchema(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, rules ...flowcontrol.PolicyRulesWithSubjects) *flowcontrol.FlowSchema {
@@ -408,7 +505,12 @@ func newFlowSchema(name, plName string, matchingPrecedence int32, dmType flowcon
 		dm = &flowcontrol.FlowDistinguisherMethod{Type: dmType}
 	}
 	return &flowcontrol.FlowSchema{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				flowcontrol.AutoUpdateAnnotationKey: "true",
+			},
+		},
 		Spec: flowcontrol.FlowSchemaSpec{
 			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
 				Name: plName,

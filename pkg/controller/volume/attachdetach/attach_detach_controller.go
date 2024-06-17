@@ -19,13 +19,14 @@ limitations under the License.
 package attachdetach
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -45,7 +46,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -89,7 +89,7 @@ type TimerConfig struct {
 
 // DefaultTimerConfig is the default configuration of Attach/Detach controller
 // timers.
-var DefaultTimerConfig TimerConfig = TimerConfig{
+var DefaultTimerConfig = TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
 	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
@@ -98,12 +98,13 @@ var DefaultTimerConfig TimerConfig = TimerConfig{
 
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
-	Run(stopCh <-chan struct{})
+	Run(ctx context.Context)
 	GetDesiredStateOfWorld() cache.DesiredStateOfWorld
 }
 
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
@@ -112,12 +113,14 @@ func NewAttachDetachController(
 	csiNodeInformer storageinformersv1.CSINodeInformer,
 	csiDriverInformer storageinformersv1.CSIDriverInformer,
 	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer,
-	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
+	disableForceDetachOnTimeout bool,
 	timerConfig TimerConfig) (AttachDetachController, error) {
+
+	logger := klog.FromContext(ctx)
 
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
@@ -130,15 +133,14 @@ func NewAttachDetachController(
 		podIndexer:  podInformer.Informer().GetIndexer(),
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		pvcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcs"},
+		),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		adc.csiNodeLister = csiNodeInformer.Lister()
-		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
-	}
+	adc.csiNodeLister = csiNodeInformer.Lister()
+	adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
 
 	adc.csiDriverLister = csiDriverInformer.Lister()
 	adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
@@ -147,13 +149,11 @@ func NewAttachDetachController(
 	adc.volumeAttachmentSynced = volumeAttachmentInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
+	adc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
@@ -163,7 +163,6 @@ func NewAttachDetachController(
 			kubeClient,
 			&adc.volumePluginMgr,
 			recorder,
-			false, // flag for experimental binary check for volume mount
 			blkutil))
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
@@ -174,15 +173,17 @@ func NewAttachDetachController(
 		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,
+		disableForceDetachOnTimeout,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
 		adc.nodeStatusUpdater,
+		adc.nodeLister,
 		recorder)
 
 	csiTranslator := csitrans.New()
 	adc.intreeToCSITranslator = csiTranslator
-	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+	adc.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
@@ -196,21 +197,33 @@ func NewAttachDetachController(
 		adc.intreeToCSITranslator)
 
 	podInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc:    adc.podAdd,
-		UpdateFunc: adc.podUpdate,
-		DeleteFunc: adc.podDelete,
+		AddFunc: func(obj interface{}) {
+			adc.podAdd(logger, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			adc.podUpdate(logger, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			adc.podDelete(logger, obj)
+		},
 	})
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
 	if err := common.AddPodPVCIndexerIfNotPresent(adc.podIndexer); err != nil {
-		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
-		AddFunc:    adc.nodeAdd,
-		UpdateFunc: adc.nodeUpdate,
-		DeleteFunc: adc.nodeDelete,
+		AddFunc: func(obj interface{}) {
+			adc.nodeAdd(logger, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			adc.nodeUpdate(logger, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			adc.nodeDelete(logger, obj)
+		},
 	})
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -264,9 +277,6 @@ type attachDetachController struct {
 	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
 	volumeAttachmentSynced kcache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -302,11 +312,11 @@ type attachDetachController struct {
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	// broadcaster is broadcasting events
+	broadcaster record.EventBroadcaster
 
 	// pvcQueue is used to queue pvc objects
-	pvcQueue workqueue.RateLimitingInterface
+	pvcQueue workqueue.TypedRateLimitingInterface[string]
 
 	// csiMigratedPluginManager detects in-tree plugins that have been migrated to CSI
 	csiMigratedPluginManager csimigration.PluginManager
@@ -315,39 +325,36 @@ type attachDetachController struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
-func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
+func (adc *attachDetachController) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer adc.pvcQueue.ShutDown()
 
-	klog.Infof("Starting attach detach controller")
-	defer klog.Infof("Shutting down attach detach controller")
+	// Start events processing pipeline.
+	adc.broadcaster.StartStructuredLogging(3)
+	adc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: adc.kubeClient.CoreV1().Events("")})
+	defer adc.broadcaster.Shutdown()
 
-	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
-	if adc.csiNodeSynced != nil {
-		synced = append(synced, adc.csiNodeSynced)
-	}
-	if adc.csiDriversSynced != nil {
-		synced = append(synced, adc.csiDriversSynced)
-	}
-	if adc.volumeAttachmentSynced != nil {
-		synced = append(synced, adc.volumeAttachmentSynced)
-	}
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting attach detach controller")
+	defer logger.Info("Shutting down attach detach controller")
 
-	if !kcache.WaitForNamedCacheSync("attach detach", stopCh, synced...) {
+	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced,
+		adc.csiNodeSynced, adc.csiDriversSynced, adc.volumeAttachmentSynced}
+	if !kcache.WaitForNamedCacheSync("attach detach", ctx.Done(), synced...) {
 		return
 	}
 
-	err := adc.populateActualStateOfWorld()
+	err := adc.populateActualStateOfWorld(logger)
 	if err != nil {
-		klog.Errorf("Error populating the actual state of world: %v", err)
+		logger.Error(err, "Error populating the actual state of world")
 	}
-	err = adc.populateDesiredStateOfWorld()
+	err = adc.populateDesiredStateOfWorld(logger)
 	if err != nil {
-		klog.Errorf("Error populating the desired state of world: %v", err)
+		logger.Error(err, "Error populating the desired state of world")
 	}
-	go adc.reconciler.Run(stopCh)
-	go adc.desiredStateOfWorldPopulator.Run(stopCh)
-	go wait.Until(adc.pvcWorker, time.Second, stopCh)
+	go adc.reconciler.Run(ctx)
+	go adc.desiredStateOfWorldPopulator.Run(ctx)
+	go wait.UntilWithContext(ctx, adc.pvcWorker, time.Second)
 	metrics.Register(adc.pvcLister,
 		adc.pvLister,
 		adc.podLister,
@@ -357,11 +364,11 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		adc.csiMigratedPluginManager,
 		adc.intreeToCSITranslator)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (adc *attachDetachController) populateActualStateOfWorld() error {
-	klog.V(5).Infof("Populating ActualStateOfworld")
+func (adc *attachDetachController) populateActualStateOfWorld(logger klog.Logger) error {
+	logger.V(5).Info("Populating ActualStateOfworld")
 	nodes, err := adc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return err
@@ -369,6 +376,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
+
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			uniqueName := attachedVolume.Name
 			// The nil VolumeSpec is safe only in the case the volume is not in use by any pod.
@@ -376,16 +384,20 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 			// volume spec is not needed to detach a volume. If the volume is used by a pod, it
 			// its spec can be: this would happen during in the populateDesiredStateOfWorld which
 			// scans the pods and updates their volumes in the ActualStateOfWorld too.
-			err = adc.actualStateOfWorld.MarkVolumeAsAttached(uniqueName, nil /* VolumeSpec */, nodeName, attachedVolume.DevicePath)
+			err = adc.actualStateOfWorld.MarkVolumeAsAttached(logger, uniqueName, nil /* VolumeSpec */, nodeName, attachedVolume.DevicePath)
 			if err != nil {
-				klog.Errorf("Failed to mark the volume as attached: %v", err)
+				logger.Error(err, "Failed to mark the volume as attached")
 				continue
 			}
-			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-			adc.addNodeToDswp(node, types.NodeName(node.Name))
 		}
+		adc.actualStateOfWorld.SetVolumesMountedByNode(logger, node.Status.VolumesInUse, nodeName)
+		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
-	return nil
+	err = adc.processVolumeAttachments(logger)
+	if err != nil {
+		logger.Error(err, "Failed to process volume attachments")
+	}
+	return err
 }
 
 func (adc *attachDetachController) getNodeVolumeDevicePath(
@@ -410,8 +422,8 @@ func (adc *attachDetachController) getNodeVolumeDevicePath(
 	return devicePath, err
 }
 
-func (adc *attachDetachController) populateDesiredStateOfWorld() error {
-	klog.V(5).Infof("Populating DesiredStateOfworld")
+func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logger) error {
+	logger.V(5).Info("Populating DesiredStateOfworld")
 
 	pods, err := adc.podLister.List(labels.Everything())
 	if err != nil {
@@ -419,51 +431,52 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 	}
 	for _, pod := range pods {
 		podToAdd := pod
-		adc.podAdd(podToAdd)
+		adc.podAdd(logger, podToAdd)
 		for _, podVolume := range podToAdd.Spec.Volumes {
 			nodeName := types.NodeName(podToAdd.Spec.NodeName)
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
-				klog.Errorf(
-					"Error creating spec for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				logger.Error(
+					err,
+					"Error creating spec for volume of pod",
+					"pod", klog.KObj(podToAdd),
+					"volumeName", podVolume.Name)
 				continue
 			}
 			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 			if err != nil || plugin == nil {
-				klog.V(10).Infof(
-					"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				logger.V(10).Info(
+					"Skipping volume for pod: it does not implement attacher interface",
+					"pod", klog.KObj(podToAdd),
+					"volumeName", podVolume.Name,
+					"err", err)
 				continue
 			}
 			volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 			if err != nil {
-				klog.Errorf(
-					"Failed to find unique name for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				logger.Error(
+					err,
+					"Failed to find unique name for volume of pod",
+					"pod", klog.KObj(podToAdd),
+					"volumeName", podVolume.Name)
 				continue
 			}
-			if adc.actualStateOfWorld.IsVolumeAttachedToNode(volumeName, nodeName) {
+			attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
+			if attachState == cache.AttachStateAttached {
+				logger.V(10).Info("Volume is attached to node. Marking as attached in ActualStateOfWorld",
+					"node", klog.KRef("", string(nodeName)),
+					"volumeName", volumeName)
 				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
 				if err != nil {
-					klog.Errorf("Failed to find device path: %v", err)
+					logger.Error(err, "Failed to find device path")
 					continue
 				}
-				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
+				err = adc.actualStateOfWorld.MarkVolumeAsAttached(logger, volumeName, volumeSpec, nodeName, devicePath)
 				if err != nil {
-					klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
+					logger.Error(err, "Failed to update volume spec for node", "node", klog.KRef("", string(nodeName)))
 				}
 			}
 		}
@@ -472,7 +485,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 	return nil
 }
 
-func (adc *attachDetachController) podAdd(obj interface{}) {
+func (adc *attachDetachController) podAdd(logger klog.Logger, obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if pod == nil || !ok {
 		return
@@ -487,7 +500,7 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
-	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
+	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 }
 
@@ -496,7 +509,7 @@ func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOf
 	return adc.desiredStateOfWorld
 }
 
-func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
+func (adc *attachDetachController) podUpdate(logger klog.Logger, oldObj, newObj interface{}) {
 	pod, ok := newObj.(*v1.Pod)
 	if pod == nil || !ok {
 		return
@@ -511,21 +524,21 @@ func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
 		adc.desiredStateOfWorld,
 		true /* default volume action */)
 
-	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
+	util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 }
 
-func (adc *attachDetachController) podDelete(obj interface{}) {
+func (adc *attachDetachController) podDelete(logger klog.Logger, obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 	if pod == nil || !ok {
 		return
 	}
 
-	util.ProcessPodVolumes(pod, false, /* addVolumes */
+	util.ProcessPodVolumes(logger, pod, false, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 }
 
-func (adc *attachDetachController) nodeAdd(obj interface{}) {
+func (adc *attachDetachController) nodeAdd(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	// TODO: investigate if nodeName is empty then if we can return
 	// kubernetes/kubernetes/issues/37777
@@ -533,15 +546,15 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 		return
 	}
 	nodeName := types.NodeName(node.Name)
-	adc.nodeUpdate(nil, obj)
+	adc.nodeUpdate(logger, nil, obj)
 	// kubernetes/kubernetes/issues/37586
 	// This is to workaround the case when a node add causes to wipe out
 	// the attached volumes field. This function ensures that we sync with
 	// the actual status.
-	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
+	adc.actualStateOfWorld.SetNodeStatusUpdateNeeded(logger, nodeName)
 }
 
-func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
+func (adc *attachDetachController) nodeUpdate(logger klog.Logger, oldObj, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	// TODO: investigate if nodeName is empty then if we can return
 	if node == nil || !ok {
@@ -550,10 +563,10 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 
 	nodeName := types.NodeName(node.Name)
 	adc.addNodeToDswp(node, nodeName)
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
 }
 
-func (adc *attachDetachController) nodeDelete(obj interface{}) {
+func (adc *attachDetachController) nodeDelete(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if node == nil || !ok {
 		return
@@ -562,10 +575,10 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
 		// This might happen during drain, but we still want it to appear in our logs
-		klog.Infof("error removing node %q from desired-state-of-world: %v", nodeName, err)
+		logger.Info("Error removing node from desired-state-of-world", "node", klog.KObj(node), "err", err)
 	}
 
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+	adc.processVolumesInUse(logger, nodeName, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) enqueuePVC(obj interface{}) {
@@ -578,23 +591,23 @@ func (adc *attachDetachController) enqueuePVC(obj interface{}) {
 }
 
 // pvcWorker processes items from pvcQueue
-func (adc *attachDetachController) pvcWorker() {
-	for adc.processNextItem() {
+func (adc *attachDetachController) pvcWorker(ctx context.Context) {
+	for adc.processNextItem(klog.FromContext(ctx)) {
 	}
 }
 
-func (adc *attachDetachController) processNextItem() bool {
+func (adc *attachDetachController) processNextItem(logger klog.Logger) bool {
 	keyObj, shutdown := adc.pvcQueue.Get()
 	if shutdown {
 		return false
 	}
 	defer adc.pvcQueue.Done(keyObj)
 
-	if err := adc.syncPVCByKey(keyObj.(string)); err != nil {
+	if err := adc.syncPVCByKey(logger, keyObj); err != nil {
 		// Rather than wait for a full resync, re-add the key to the
 		// queue to be processed.
 		adc.pvcQueue.AddRateLimited(keyObj)
-		runtime.HandleError(fmt.Errorf("Failed to sync pvc %q, will retry again: %v", keyObj.(string), err))
+		runtime.HandleError(fmt.Errorf("failed to sync pvc %q, will retry again: %w", keyObj, err))
 		return true
 	}
 
@@ -604,16 +617,16 @@ func (adc *attachDetachController) processNextItem() bool {
 	return true
 }
 
-func (adc *attachDetachController) syncPVCByKey(key string) error {
-	klog.V(5).Infof("syncPVCByKey[%s]", key)
+func (adc *attachDetachController) syncPVCByKey(logger klog.Logger, key string) error {
+	logger.V(5).Info("syncPVCByKey", "pvcKey", key)
 	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.V(4).Infof("error getting namespace & name of pvc %q to get pvc from informer: %v", key, err)
+		logger.V(4).Info("Error getting namespace & name of pvc to get pvc from informer", "pvcKey", key, "err", err)
 		return nil
 	}
 	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("error getting pvc %q from informer: %v", key, err)
+		logger.V(4).Info("Error getting pvc from informer", "pvcKey", key, "err", err)
 		return nil
 	}
 	if err != nil {
@@ -643,7 +656,7 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 			adc.desiredStateOfWorld,
 			true /* default volume action */)
 
-		util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
+		util.ProcessPodVolumes(logger, pod, volumeActionFlag, /* addVolumes */
 			adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 	}
 	return nil
@@ -654,23 +667,82 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
-	klog.V(4).Infof("processVolumesInUse for node %q", nodeName)
-	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
-		mounted := false
-		for _, volumeInUse := range volumesInUse {
-			if attachedVolume.VolumeName == volumeInUse {
-				mounted = true
-				break
+	logger klog.Logger, nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
+	logger.V(4).Info("processVolumesInUse for node", "node", klog.KRef("", string(nodeName)))
+	adc.actualStateOfWorld.SetVolumesMountedByNode(logger, volumesInUse, nodeName)
+}
+
+// Process Volume-Attachment objects.
+// Should be called only after populating attached volumes in the ASW.
+// For each VA object, this function checks if its present in the ASW.
+// If not, adds the volume to ASW as an "uncertain" attachment.
+// In the reconciler, the logic checks if the volume is present in the DSW;
+//
+//	if yes, the reconciler will attempt attach on the volume;
+//	if not (could be a dangling attachment), the reconciler will detach this volume.
+func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) error {
+	vas, err := adc.volumeAttachmentLister.List(labels.Everything())
+	if err != nil {
+		logger.Error(err, "Failed to list VolumeAttachment objects")
+		return err
+	}
+	for _, va := range vas {
+		nodeName := types.NodeName(va.Spec.NodeName)
+		pvName := va.Spec.Source.PersistentVolumeName
+		if pvName == nil {
+			// Currently VA objects are created for CSI volumes only. nil pvName is unexpected, generate a warning
+			logger.Info("Skipping the va as its pvName is nil", "node", klog.KRef("", string(nodeName)), "vaName", va.Name)
+			continue
+		}
+		pv, err := adc.pvLister.Get(*pvName)
+		if err != nil {
+			logger.Error(err, "Unable to lookup pv object", "PV", klog.KRef("", *pvName))
+			continue
+		}
+
+		var plugin volume.AttachableVolumePlugin
+		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
+
+		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
+		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
+		// feature gate is enabled.
+		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
+			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
+				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
+				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
+				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
+				if err != nil {
+					logger.Error(err, "Failed to translate intree volumeSpec to CSI volumeSpec for volume", "node", klog.KRef("", string(nodeName)), "inTreePluginName", inTreePluginName, "vaName", va.Name, "PV", klog.KRef("", *pvName))
+					continue
+				}
 			}
 		}
-		err := adc.actualStateOfWorld.SetVolumeMountedByNode(attachedVolume.VolumeName, nodeName, mounted)
+
+		if plugin == nil {
+			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			if err != nil || plugin == nil {
+				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
+				logger.Info("Skipping processing the volume on node, no attacher interface found", "node", klog.KRef("", string(nodeName)), "PV", klog.KRef("", *pvName), "err", err)
+				continue
+			}
+		}
+
+		volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
-			klog.Warningf(
-				"SetVolumeMountedByNode(%q, %q, %v) returned an error: %v",
-				attachedVolume.VolumeName, nodeName, mounted, err)
+			logger.Error(err, "Failed to find unique name for volume", "node", klog.KRef("", string(nodeName)), "vaName", va.Name, "PV", klog.KRef("", *pvName))
+			continue
+		}
+		attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
+		if attachState == cache.AttachStateDetached {
+			logger.V(1).Info("Marking volume attachment as uncertain as volume is not attached", "node", klog.KRef("", string(nodeName)), "volumeName", volumeName, "attachState", attachState)
+			err = adc.actualStateOfWorld.MarkVolumeAsUncertain(logger, volumeName, volumeSpec, nodeName)
+			if err != nil {
+				logger.Error(err, "MarkVolumeAsUncertain fail to add the volume to ASW", "node", klog.KRef("", string(nodeName)), "volumeName", volumeName)
+			}
 		}
 	}
+	return nil
 }
 
 var _ volume.VolumeHost = &attachDetachController{}
@@ -734,10 +806,6 @@ func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volu
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
-}
-
 func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
@@ -752,6 +820,10 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (adc *attachDetachController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
 }
 
 func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
@@ -774,7 +846,8 @@ func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string
 
 func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		klog.Errorf("DeleteServiceAccountToken unsupported in attachDetachController")
+		// nolint:logcheck
+		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in attachDetachController")
 	}
 }
 
@@ -784,15 +857,9 @@ func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
 	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
-		keepTerminatedPodVolumes := false
-
-		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
-			keepTerminatedPodVolumes = (t == "true")
-		}
-
 		// Node specifies annotation indicating it should be managed by attach
 		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+		adc.desiredStateOfWorld.AddNode(nodeName)
 	}
 }
 
@@ -805,7 +872,7 @@ func (adc *attachDetachController) GetNodeName() types.NodeName {
 }
 
 func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
-	return adc.recorder
+	return nil
 }
 
 func (adc *attachDetachController) GetSubpather() subpath.Interface {

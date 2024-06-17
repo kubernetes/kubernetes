@@ -1,5 +1,3 @@
-// +build linux
-
 package intelrdt
 
 type L3CacheInfo struct {
@@ -17,15 +15,15 @@ type MemBwInfo struct {
 
 type MBMNumaNodeStats struct {
 	// The 'mbm_total_bytes' in 'container_id' group.
-	MBMTotalBytes uint64 `json:"mbm_total_bytes,omitempty"`
+	MBMTotalBytes uint64 `json:"mbm_total_bytes"`
 
 	// The 'mbm_local_bytes' in 'container_id' group.
-	MBMLocalBytes uint64 `json:"mbm_local_bytes,omitempty"`
+	MBMLocalBytes uint64 `json:"mbm_local_bytes"`
 }
 
 type CMTNumaNodeStats struct {
 	// The 'llc_occupancy' in 'container_id' group.
-	LLCOccupancy uint64 `json:"llc_occupancy,omitempty"`
+	LLCOccupancy uint64 `json:"llc_occupancy"`
 }
 
 type Stats struct {
@@ -54,6 +52,6 @@ type Stats struct {
 	CMTStats *[]CMTNumaNodeStats `json:"cmt_stats,omitempty"`
 }
 
-func NewStats() *Stats {
+func newStats() *Stats {
 	return &Stats{}
 }

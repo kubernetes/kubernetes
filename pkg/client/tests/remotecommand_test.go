@@ -18,6 +18,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -39,9 +40,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 )
 
 type fakeExecutor struct {
@@ -58,11 +59,11 @@ type fakeExecutor struct {
 	exec          bool
 }
 
-func (ex *fakeExecutor) ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
+func (ex *fakeExecutor) ExecInContainer(_ context.Context, name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
 	return ex.run(name, uid, container, cmd, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
+func (ex *fakeExecutor) AttachContainer(_ context.Context, name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
 	return ex.run(name, uid, container, nil, in, out, err, tty)
 }
 
@@ -195,108 +196,104 @@ func TestStream(t *testing.T) {
 			} else {
 				name = testCase.TestName + " (attach)"
 			}
-			var (
-				streamIn             io.Reader
-				streamOut, streamErr io.Writer
-			)
-			localOut := &bytes.Buffer{}
-			localErr := &bytes.Buffer{}
 
-			requestReceived := make(chan struct{})
-			server := httptest.NewServer(fakeServer(t, requestReceived, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
+			t.Run(name, func(t *testing.T) {
+				var (
+					streamIn             io.Reader
+					streamOut, streamErr io.Writer
+				)
+				localOut := &bytes.Buffer{}
+				localErr := &bytes.Buffer{}
 
-			url, _ := url.ParseRequestURI(server.URL)
-			config := restclient.ClientContentConfig{
-				GroupVersion: schema.GroupVersion{Group: "x"},
-				Negotiator:   runtime.NewClientNegotiator(legacyscheme.Codecs.WithoutConversion(), schema.GroupVersion{Group: "x"}),
-			}
-			c, err := restclient.NewRESTClient(url, "", config, nil, nil)
-			if err != nil {
-				t.Fatalf("failed to create a client: %v", err)
-			}
-			req := c.Post().Resource("testing")
+				requestReceived := make(chan struct{})
+				server := httptest.NewServer(fakeServer(t, requestReceived, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
+				defer server.Close()
 
-			if exec {
-				req.Param("command", "ls")
-				req.Param("command", "/")
-			}
+				url, _ := url.ParseRequestURI(server.URL)
+				config := restclient.ClientContentConfig{
+					GroupVersion: schema.GroupVersion{Group: "x"},
+					Negotiator:   runtime.NewClientNegotiator(legacyscheme.Codecs.WithoutConversion(), schema.GroupVersion{Group: "x"}),
+				}
+				c, err := restclient.NewRESTClient(url, "", config, nil, nil)
+				if err != nil {
+					t.Fatalf("failed to create a client: %v", err)
+				}
+				req := c.Post().Resource("testing")
 
-			if len(testCase.Stdin) > 0 {
-				req.Param(api.ExecStdinParam, "1")
-				streamIn = strings.NewReader(strings.Repeat(testCase.Stdin, testCase.MessageCount))
-			}
+				if exec {
+					req.Param("command", "ls")
+					req.Param("command", "/")
+				}
 
-			if len(testCase.Stdout) > 0 {
-				req.Param(api.ExecStdoutParam, "1")
-				streamOut = localOut
-			}
+				if len(testCase.Stdin) > 0 {
+					req.Param(api.ExecStdinParam, "1")
+					streamIn = strings.NewReader(strings.Repeat(testCase.Stdin, testCase.MessageCount))
+				}
 
-			if testCase.Tty {
-				req.Param(api.ExecTTYParam, "1")
-			} else if len(testCase.Stderr) > 0 {
-				req.Param(api.ExecStderrParam, "1")
-				streamErr = localErr
-			}
+				if len(testCase.Stdout) > 0 {
+					req.Param(api.ExecStdoutParam, "1")
+					streamOut = localOut
+				}
 
-			conf := &restclient.Config{
-				Host: server.URL,
-			}
-			transport, upgradeTransport, err := spdy.RoundTripperFor(conf)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", name, err)
-				continue
-			}
-			e, err := remoteclient.NewSPDYExecutorForProtocols(transport, upgradeTransport, "POST", req.URL(), testCase.ClientProtocols...)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", name, err)
-				continue
-			}
-			err = e.Stream(remoteclient.StreamOptions{
-				Stdin:  streamIn,
-				Stdout: streamOut,
-				Stderr: streamErr,
-				Tty:    testCase.Tty,
-			})
-			hasErr := err != nil
+				if testCase.Tty {
+					req.Param(api.ExecTTYParam, "1")
+				} else if len(testCase.Stderr) > 0 {
+					req.Param(api.ExecStderrParam, "1")
+					streamErr = localErr
+				}
 
-			if len(testCase.Error) > 0 {
-				if !hasErr {
-					t.Errorf("%s: expected an error", name)
-				} else {
-					if e, a := testCase.Error, err.Error(); !strings.Contains(a, e) {
-						t.Errorf("%s: expected error stream read %q, got %q", name, e, a)
+				conf := &restclient.Config{
+					Host: server.URL,
+				}
+				transport, upgradeTransport, err := spdy.RoundTripperFor(conf)
+				if err != nil {
+					t.Fatalf("%s: unexpected error: %v", name, err)
+				}
+				e, err := remoteclient.NewSPDYExecutorForProtocols(transport, upgradeTransport, "POST", req.URL(), testCase.ClientProtocols...)
+				if err != nil {
+					t.Fatalf("%s: unexpected error: %v", name, err)
+				}
+				err = e.StreamWithContext(context.Background(), remoteclient.StreamOptions{
+					Stdin:  streamIn,
+					Stdout: streamOut,
+					Stderr: streamErr,
+					Tty:    testCase.Tty,
+				})
+				hasErr := err != nil
+
+				if len(testCase.Error) > 0 {
+					if !hasErr {
+						t.Errorf("%s: expected an error", name)
+					} else {
+						if e, a := testCase.Error, err.Error(); !strings.Contains(a, e) {
+							t.Errorf("%s: expected error stream read %q, got %q", name, e, a)
+						}
+					}
+					return
+				}
+
+				if hasErr {
+					t.Fatalf("%s: unexpected error: %v", name, err)
+				}
+
+				if len(testCase.Stdout) > 0 {
+					if e, a := strings.Repeat(testCase.Stdout, testCase.MessageCount), localOut; e != a.String() {
+						t.Fatalf("%s: expected stdout data %q, got %q", name, e, a)
 					}
 				}
 
-				server.Close()
-				continue
-			}
-
-			if hasErr {
-				t.Errorf("%s: unexpected error: %v", name, err)
-				server.Close()
-				continue
-			}
-
-			if len(testCase.Stdout) > 0 {
-				if e, a := strings.Repeat(testCase.Stdout, testCase.MessageCount), localOut; e != a.String() {
-					t.Errorf("%s: expected stdout data %q, got %q", name, e, a)
+				if testCase.Stderr != "" {
+					if e, a := strings.Repeat(testCase.Stderr, testCase.MessageCount), localErr; e != a.String() {
+						t.Fatalf("%s: expected stderr data %q, got %q", name, e, a)
+					}
 				}
-			}
 
-			if testCase.Stderr != "" {
-				if e, a := strings.Repeat(testCase.Stderr, testCase.MessageCount), localErr; e != a.String() {
-					t.Errorf("%s: expected stderr data %q, got %q", name, e, a)
+				select {
+				case <-requestReceived:
+				case <-time.After(time.Minute):
+					t.Errorf("%s: expected fakeServerInstance to receive request", name)
 				}
-			}
-
-			select {
-			case <-requestReceived:
-			case <-time.After(time.Minute):
-				t.Errorf("%s: expected fakeServerInstance to receive request", name)
-			}
-
-			server.Close()
+			})
 		}
 	}
 }

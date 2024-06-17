@@ -1,13 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- api-approvers
-- sig-scheduling-maintainers
-- sttts
-- luxas
+  - api-approvers
 reviewers:
-- sig-scheduling
-- api-reviewers
-- dixudx
-- luxas
-- sttts
+  - api-reviewers
+  - sig-scheduling-api-reviewers
+  - sig-scheduling-api-approvers
+labels:
+  - kind/api-change
+  - sig/scheduling

@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"gopkg.in/yaml.v2"
 )
 
@@ -109,19 +109,39 @@ func (d *Definitions) parseReference(s *openapi_v2.Schema, path *Path) (Schema, 
 	if _, ok := d.models[reference]; !ok {
 		return nil, newSchemaError(path, "unknown model in reference: %q", reference)
 	}
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Ref{
-		BaseSchema:  d.parseBaseSchema(s, path),
+		BaseSchema:  base,
 		reference:   reference,
 		definitions: d,
 	}, nil
 }
 
-func (d *Definitions) parseBaseSchema(s *openapi_v2.Schema, path *Path) BaseSchema {
+func parseDefault(def *openapi_v2.Any) (interface{}, error) {
+	if def == nil {
+		return nil, nil
+	}
+	var i interface{}
+	if err := yaml.Unmarshal([]byte(def.Yaml), &i); err != nil {
+		return nil, err
+	}
+	return i, nil
+}
+
+func (d *Definitions) parseBaseSchema(s *openapi_v2.Schema, path *Path) (BaseSchema, error) {
+	def, err := parseDefault(s.GetDefault())
+	if err != nil {
+		return BaseSchema{}, err
+	}
 	return BaseSchema{
 		Description: s.GetDescription(),
+		Default:     def,
 		Extensions:  VendorExtensionToMap(s.GetVendorExtension()),
 		Path:        *path,
-	}
+	}, nil
 }
 
 // We believe the schema is a map, verify and return a new schema
@@ -132,8 +152,12 @@ func (d *Definitions) parseMap(s *openapi_v2.Schema, path *Path) (Schema, error)
 	var sub Schema
 	// TODO(incomplete): this misses the boolean case as AdditionalProperties is a bool+schema sum type.
 	if s.GetAdditionalProperties().GetSchema() == nil {
+		base, err := d.parseBaseSchema(s, path)
+		if err != nil {
+			return nil, err
+		}
 		sub = &Arbitrary{
-			BaseSchema: d.parseBaseSchema(s, path),
+			BaseSchema: base,
 		}
 	} else {
 		var err error
@@ -142,8 +166,12 @@ func (d *Definitions) parseMap(s *openapi_v2.Schema, path *Path) (Schema, error)
 			return nil, err
 		}
 	}
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Map{
-		BaseSchema: d.parseBaseSchema(s, path),
+		BaseSchema: base,
 		SubType:    sub,
 	}, nil
 }
@@ -165,8 +193,12 @@ func (d *Definitions) parsePrimitive(s *openapi_v2.Schema, path *Path) (Schema, 
 	default:
 		return nil, newSchemaError(path, "Unknown primitive type: %q", t)
 	}
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Primitive{
-		BaseSchema: d.parseBaseSchema(s, path),
+		BaseSchema: base,
 		Type:       t,
 		Format:     s.GetFormat(),
 	}, nil
@@ -188,8 +220,12 @@ func (d *Definitions) parseArray(s *openapi_v2.Schema, path *Path) (Schema, erro
 	if err != nil {
 		return nil, err
 	}
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Array{
-		BaseSchema: d.parseBaseSchema(s, path),
+		BaseSchema: base,
 		SubType:    sub,
 	}, nil
 }
@@ -216,8 +252,12 @@ func (d *Definitions) parseKind(s *openapi_v2.Schema, path *Path) (Schema, error
 		fieldOrder = append(fieldOrder, name)
 	}
 
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Kind{
-		BaseSchema:     d.parseBaseSchema(s, path),
+		BaseSchema:     base,
 		RequiredFields: s.GetRequired(),
 		Fields:         fields,
 		FieldOrder:     fieldOrder,
@@ -225,8 +265,12 @@ func (d *Definitions) parseKind(s *openapi_v2.Schema, path *Path) (Schema, error
 }
 
 func (d *Definitions) parseArbitrary(s *openapi_v2.Schema, path *Path) (Schema, error) {
+	base, err := d.parseBaseSchema(s, path)
+	if err != nil {
+		return nil, err
+	}
 	return &Arbitrary{
-		BaseSchema: d.parseBaseSchema(s, path),
+		BaseSchema: base,
 	}, nil
 }
 

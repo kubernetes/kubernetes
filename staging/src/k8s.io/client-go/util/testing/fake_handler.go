@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -83,7 +83,7 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	response.WriteHeader(f.StatusCode)
 	response.Write([]byte(f.ResponseBody))
 
-	bodyReceived, err := ioutil.ReadAll(request.Body)
+	bodyReceived, err := io.ReadAll(request.Body)
 	if err != nil && f.T != nil {
 		f.T.Logf("Received read error: %v", err)
 	}

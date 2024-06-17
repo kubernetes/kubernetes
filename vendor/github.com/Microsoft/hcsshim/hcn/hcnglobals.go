@@ -37,8 +37,11 @@ var (
 	RemoteSubnetVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 9, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 	// A Host Route policy allows for local container to local host communication Overlay networks
 	HostRouteVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 9, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
-	// HNS 10.2 allows for Direct Server Return for loadbalancing
-	DSRVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 10, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 9.3 through 10.0 (not included), and 10.2+ allows for Direct Server Return for loadbalancing
+	DSRVersion = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 9, Minor: 3}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 10, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+	}
 	// HNS 9.3 through 10.0 (not included) and, 10.4+ provide support for configuring endpoints with /32 prefixes
 	Slash32EndpointPrefixesVersion = VersionRanges{
 		VersionRange{MinVersion: Version{Major: 9, Minor: 3}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
@@ -46,16 +49,33 @@ var (
 	}
 	// HNS 9.3 through 10.0 (not included) and, 10.4+ allow for HNS ACL Policies to support protocol 252 for VXLAN
 	AclSupportForProtocol252Version = VersionRanges{
-		VersionRange{MinVersion: Version{Major: 9, Minor: 3}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
-		VersionRange{MinVersion: Version{Major: 10, Minor: 4}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 11, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
 	}
 	// HNS 12.0 allows for session affinity for loadbalancing
 	SessionAffinityVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 12, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
-	// HNS 10.5 through 11 (not included) and 12.0+ supports Ipv6 dual stack.
+	// HNS 11.10+ supports Ipv6 dual stack.
 	IPv6DualStackVersion = VersionRanges{
-		VersionRange{MinVersion: Version{Major: 10, Minor: 5}, MaxVersion: Version{Major: 10, Minor: math.MaxInt32}},
-		VersionRange{MinVersion: Version{Major: 12, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 11, Minor: 10}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
 	}
+	// HNS 13.0 allows for Set Policy support
+	SetPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 13, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 10.3 allows for VXLAN ports
+	VxlanPortVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 10, Minor: 3}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+
+	//HNS 9.5 through 10.0(not included), 10.5 through 11.0(not included), 11.11 through 12.0(not included), 12.1 through 13.0(not included), 13.1+ allows for Network L4Proxy Policy support
+	L4ProxyPolicyVersion = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 9, Minor: 5}, MaxVersion: Version{Major: 9, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 10, Minor: 5}, MaxVersion: Version{Major: 10, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 11, Minor: 11}, MaxVersion: Version{Major: 11, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 12, Minor: 1}, MaxVersion: Version{Major: 12, Minor: math.MaxInt32}},
+		VersionRange{MinVersion: Version{Major: 13, Minor: 1}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}},
+	}
+
+	//HNS 13.2 allows for L4WfpProxy Policy support
+	L4WfpProxyPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 13, Minor: 2}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+
+	//HNS 14.0 allows for TierAcl Policy support
+	TierAclPolicyVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 14, Minor: 0}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 )
 
 // GetGlobals returns the global properties of the HCN Service.

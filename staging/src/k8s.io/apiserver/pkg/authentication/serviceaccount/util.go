@@ -17,10 +17,18 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -28,6 +36,27 @@ const (
 	ServiceAccountUsernameSeparator = ":"
 	ServiceAccountGroupPrefix       = "system:serviceaccounts:"
 	AllServiceAccountsGroup         = "system:serviceaccounts"
+	// CredentialIDKey is the key used in a user's "extra" to specify the unique
+	// identifier for this identity document).
+	CredentialIDKey = "authentication.kubernetes.io/credential-id"
+	// IssuedCredentialIDAuditAnnotationKey is the annotation key used in the audit event that is persisted to the
+	// '/token' endpoint for service accounts.
+	// This annotation indicates the generated credential identifier for the service account token being issued.
+	// This is useful when tracing back the origin of tokens that have gone on to make request that have persisted
+	// their credential-identifier into the audit log via the user's extra info stored on subsequent audit events.
+	IssuedCredentialIDAuditAnnotationKey = "authentication.kubernetes.io/issued-credential-id"
+	// PodNameKey is the key used in a user's "extra" to specify the pod name of
+	// the authenticating request.
+	PodNameKey = "authentication.kubernetes.io/pod-name"
+	// PodUIDKey is the key used in a user's "extra" to specify the pod UID of
+	// the authenticating request.
+	PodUIDKey = "authentication.kubernetes.io/pod-uid"
+	// NodeNameKey is the key used in a user's "extra" to specify the node name of
+	// the authenticating request.
+	NodeNameKey = "authentication.kubernetes.io/node-name"
+	// NodeUIDKey is the key used in a user's "extra" to specify the node UID of
+	// the authenticating request.
+	NodeUIDKey = "authentication.kubernetes.io/node-uid"
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -91,4 +120,109 @@ func MakeGroupNames(namespace string) []string {
 // MakeNamespaceGroupName returns the name of the group all service accounts in the namespace are included in
 func MakeNamespaceGroupName(namespace string) string {
 	return ServiceAccountGroupPrefix + namespace
+}
+
+// UserInfo returns a user.Info interface for the given namespace, service account name and UID
+func UserInfo(namespace, name, uid string) user.Info {
+	return (&ServiceAccountInfo{
+		Name:      name,
+		Namespace: namespace,
+		UID:       uid,
+	}).UserInfo()
+}
+
+type ServiceAccountInfo struct {
+	Name, Namespace, UID string
+	PodName, PodUID      string
+	CredentialID         string
+	NodeName, NodeUID    string
+}
+
+func (sa *ServiceAccountInfo) UserInfo() user.Info {
+	info := &user.DefaultInfo{
+		Name:   MakeUsername(sa.Namespace, sa.Name),
+		UID:    sa.UID,
+		Groups: MakeGroupNames(sa.Namespace),
+	}
+
+	if sa.PodName != "" && sa.PodUID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[PodNameKey] = []string{sa.PodName}
+		info.Extra[PodUIDKey] = []string{sa.PodUID}
+	}
+	if sa.CredentialID != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[CredentialIDKey] = []string{sa.CredentialID}
+	}
+	if sa.NodeName != "" {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra[NodeNameKey] = []string{sa.NodeName}
+		// node UID is optional and will only be set if the node name is set
+		if sa.NodeUID != "" {
+			info.Extra[NodeUIDKey] = []string{sa.NodeUID}
+		}
+	}
+
+	return info
+}
+
+// CredentialIDForJTI converts a given JTI string into a credential identifier for use in a
+// users 'extra' info.
+func CredentialIDForJTI(jti string) string {
+	if len(jti) == 0 {
+		return ""
+	}
+	return "JTI=" + jti
+}
+
+// IsServiceAccountToken returns true if the secret is a valid api token for the service account
+func IsServiceAccountToken(secret *v1.Secret, sa *v1.ServiceAccount) bool {
+	if secret.Type != v1.SecretTypeServiceAccountToken {
+		return false
+	}
+
+	name := secret.Annotations[v1.ServiceAccountNameKey]
+	uid := secret.Annotations[v1.ServiceAccountUIDKey]
+	if name != sa.Name {
+		// Name must match
+		return false
+	}
+	if len(uid) > 0 && uid != string(sa.UID) {
+		// If UID is specified, it must match
+		return false
+	}
+
+	return true
+}
+
+func GetOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
+	sa, err := coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		return sa, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Create the namespace if we can't verify it exists.
+	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
+	if _, err := coreClient.Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		if _, err = coreClient.Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+		}
+	}
+
+	// Create the service account
+	sa, err = coreClient.ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}}, metav1.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		// If we're racing to init and someone else already created it, re-fetch
+		return coreClient.ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+	return sa, err
 }

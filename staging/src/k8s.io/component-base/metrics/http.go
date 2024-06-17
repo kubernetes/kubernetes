@@ -17,20 +17,30 @@ limitations under the License.
 package metrics
 
 import (
+	"io"
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+var (
+	processStartedAt time.Time
+)
+
+func init() {
+	processStartedAt = time.Now()
+}
+
 // These constants cause handlers serving metrics to behave as described if
 // errors are encountered.
 const (
-	// Serve an HTTP status code 500 upon the first error
+	// HTTPErrorOnError serve an HTTP status code 500 upon the first error
 	// encountered. Report the error message in the body.
 	HTTPErrorOnError promhttp.HandlerErrorHandling = iota
 
-	// Ignore errors and try to serve as many metrics as possible.  However,
-	// if no metrics can be served, serve an HTTP status code 500 and the
+	// ContinueOnError ignore errors and try to serve as many metrics as possible.
+	// However, if no metrics can be served, serve an HTTP status code 500 and the
 	// last error message in the body. Only use this in deliberate "best
 	// effort" metrics collection scenarios. In this case, it is highly
 	// recommended to provide other means of detecting errors: By setting an
@@ -40,7 +50,7 @@ const (
 	// alerts.
 	ContinueOnError
 
-	// Panic upon the first error encountered (useful for "crash only" apps).
+	// PanicOnError panics upon the first error encountered (useful for "crash only" apps).
 	PanicOnError
 )
 
@@ -49,6 +59,7 @@ const (
 type HandlerOpts promhttp.HandlerOpts
 
 func (ho *HandlerOpts) toPromhttpHandlerOpts() promhttp.HandlerOpts {
+	ho.ProcessStartTime = processStartedAt
 	return promhttp.HandlerOpts(*ho)
 }
 
@@ -60,4 +71,17 @@ func (ho *HandlerOpts) toPromhttpHandlerOpts() promhttp.HandlerOpts {
 // kind of instrumentation as it is used by the Handler function.
 func HandlerFor(reg Gatherer, opts HandlerOpts) http.Handler {
 	return promhttp.HandlerFor(reg, opts.toPromhttpHandlerOpts())
+}
+
+// HandlerWithReset return an http.Handler with Reset
+func HandlerWithReset(reg KubeRegistry, opts HandlerOpts) http.Handler {
+	defaultHandler := promhttp.HandlerFor(reg, opts.toPromhttpHandlerOpts())
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			reg.Reset()
+			io.WriteString(w, "metrics reset\n")
+			return
+		}
+		defaultHandler.ServeHTTP(w, r)
+	})
 }

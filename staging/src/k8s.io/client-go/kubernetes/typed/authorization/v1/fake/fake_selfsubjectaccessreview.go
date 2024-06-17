@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -32,16 +31,17 @@ type FakeSelfSubjectAccessReviews struct {
 	Fake *FakeAuthorizationV1
 }
 
-var selfsubjectaccessreviewsResource = schema.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1", Resource: "selfsubjectaccessreviews"}
+var selfsubjectaccessreviewsResource = v1.SchemeGroupVersion.WithResource("selfsubjectaccessreviews")
 
-var selfsubjectaccessreviewsKind = schema.GroupVersionKind{Group: "authorization.k8s.io", Version: "v1", Kind: "SelfSubjectAccessReview"}
+var selfsubjectaccessreviewsKind = v1.SchemeGroupVersion.WithKind("SelfSubjectAccessReview")
 
 // Create takes the representation of a selfSubjectAccessReview and creates it.  Returns the server's representation of the selfSubjectAccessReview, and an error, if there is any.
 func (c *FakeSelfSubjectAccessReviews) Create(ctx context.Context, selfSubjectAccessReview *v1.SelfSubjectAccessReview, opts metav1.CreateOptions) (result *v1.SelfSubjectAccessReview, err error) {
+	emptyResult := &v1.SelfSubjectAccessReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(selfsubjectaccessreviewsResource, selfSubjectAccessReview), &v1.SelfSubjectAccessReview{})
+		Invokes(testing.NewRootCreateAction(selfsubjectaccessreviewsResource, selfSubjectAccessReview), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*v1.SelfSubjectAccessReview), err
 }

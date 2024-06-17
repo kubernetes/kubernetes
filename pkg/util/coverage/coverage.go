@@ -1,3 +1,4 @@
+//go:build coverage
 // +build coverage
 
 /*
@@ -77,10 +78,11 @@ func FlushCoverage() {
 	tests := []testing.InternalTest{}
 	benchmarks := []testing.InternalBenchmark{}
 	examples := []testing.InternalExample{}
+	fuzztargets := []testing.InternalFuzzTarget{}
 
 	var deps fakeTestDeps
 
-	dummyRun := testing.MainStart(deps, tests, benchmarks, examples)
+	dummyRun := testing.MainStart(deps, tests, benchmarks, fuzztargets, examples)
 	dummyRun.Run()
 
 	// Once it writes to the temporary path, we move it to the intended path.

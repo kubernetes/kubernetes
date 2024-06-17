@@ -25,17 +25,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/spec"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	"github.com/googleapis/gnostic/compiler"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"gopkg.in/yaml.v2"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/pointer"
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
@@ -102,7 +102,7 @@ properties:
 	}
 
 	ssV2 := ToStructuralOpenAPIV2(ss)
-	schema := ssV2.ToGoOpenAPI()
+	schema := ssV2.ToKubeOpenAPI()
 
 	if _, found := schema.Properties["spec"]; !found {
 		t.Errorf("spec not found")
@@ -643,6 +643,30 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 				WithExample(testStr),
 			expectDiff: true,
 		},
+		{
+			name: "preserve-unknown-fields in arrays",
+			in: &apiextensions.JSONSchemaProps{
+				XPreserveUnknownFields: pointer.BoolPtr(true),
+				Type:                   "array",
+				Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{
+					Type: "string",
+				}},
+			},
+			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true),
+		},
+		{
+			name: "preserve-unknown-fields in objects",
+			in: &apiextensions.JSONSchemaProps{
+				XPreserveUnknownFields: pointer.BoolPtr(true),
+				Type:                   "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"foo": {
+						Type: "string",
+					},
+				},
+			},
+			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true),
+		},
 	}
 
 	for _, test := range tests {
@@ -655,7 +679,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			}
 
 			if !test.expectError {
-				out := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+				out := ToStructuralOpenAPIV2(ss).ToKubeOpenAPI()
 				if equal := reflect.DeepEqual(*out, *test.expected); !equal && !test.expectDiff {
 					t.Errorf("unexpected result:\n  want=%v\n   got=%v\n\n%s", *test.expected, *out, cmp.Diff(*test.expected, *out, cmp.Comparer(refEqual)))
 				} else if equal && test.expectDiff {
@@ -666,6 +690,11 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 	}
 }
 
+func withVendorExtensions(s *spec.Schema, key string, value interface{}) *spec.Schema {
+	s.VendorExtensible.AddExtension(key, value)
+	return s
+}
+
 func refEqual(x spec.Ref, y spec.Ref) bool {
 	return x.String() == y.String()
 }
@@ -673,7 +702,8 @@ func refEqual(x spec.Ref, y spec.Ref) bool {
 // TestKubeOpenapiRejectionFiltering tests that the CRD openapi schema filtering leads to a spec that the
 // kube-openapi/pkg/util/proto model code support in version used in Kubernetes 1.13.
 func TestKubeOpenapiRejectionFiltering(t *testing.T) {
-	for i := 0; i < 10000; i++ {
+	// 1000 iterations runs for ~2 seconds with race detection enabled
+	for i := 0; i < 1000; i++ {
 		f := fuzz.New()
 		seed := time.Now().UnixNano()
 		randSource := rand.New(rand.NewSource(seed))
@@ -721,7 +751,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		filtered := ToStructuralOpenAPIV2(ss).ToGoOpenAPI()
+		filtered := ToStructuralOpenAPIV2(ss).ToKubeOpenAPI()
 
 		// create a doc out of it
 		filteredSwagger := &spec.Swagger{
@@ -746,14 +776,8 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 			t.Fatalf("failed to encode filtered to JSON: %v", err)
 		}
 
-		// unmarshal as yaml
-		var yml yaml.MapSlice
-		if err := yaml.Unmarshal(bs, &yml); err != nil {
-			t.Fatalf("failed to decode filtered JSON by into memory: %v", err)
-		}
-
 		// create gnostic doc
-		doc, err := openapi_v2.NewDocument(yml, compiler.NewContext("$root", nil))
+		doc, err := openapi_v2.ParseDocument(bs)
 		if err != nil {
 			t.Fatalf("failed to create gnostic doc: %v", err)
 		}

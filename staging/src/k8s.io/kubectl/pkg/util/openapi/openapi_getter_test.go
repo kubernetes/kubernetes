@@ -19,8 +19,8 @@ package openapi_test
 import (
 	"fmt"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	. "github.com/onsi/ginkgo"
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubectl/pkg/util/openapi"
@@ -40,28 +40,28 @@ func (f *FakeCounter) OpenAPISchema() (*openapi_v2.Document, error) {
 
 var _ = Describe("Getting the Resources", func() {
 	var client FakeCounter
-	var instance openapi.Getter
+	var instance *openapi.CachedOpenAPIParser
 	var expectedData openapi.Resources
 
 	BeforeEach(func() {
 		client = FakeCounter{}
-		instance = openapi.NewOpenAPIGetter(&client)
+		instance = openapi.NewOpenAPIParser(openapi.NewOpenAPIGetter(&client))
 		var err error
 		expectedData, err = openapi.NewOpenAPIData(nil)
-		Expect(err).To(BeNil())
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	Context("when the server returns a successful result", func() {
 		It("should return the same data for multiple calls", func() {
 			Expect(client.Calls).To(Equal(0))
 
-			result, err := instance.Get()
-			Expect(err).To(BeNil())
+			result, err := instance.Parse()
+			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(expectedData))
 			Expect(client.Calls).To(Equal(1))
 
-			result, err = instance.Get()
-			Expect(err).To(BeNil())
+			result, err = instance.Parse()
+			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(expectedData))
 			// No additional client calls expected
 			Expect(client.Calls).To(Equal(1))
@@ -73,11 +73,11 @@ var _ = Describe("Getting the Resources", func() {
 			Expect(client.Calls).To(Equal(0))
 
 			client.Err = fmt.Errorf("expected error")
-			_, err := instance.Get()
+			_, err := instance.Parse()
 			Expect(err).To(Equal(client.Err))
 			Expect(client.Calls).To(Equal(1))
 
-			_, err = instance.Get()
+			_, err = instance.Parse()
 			Expect(err).To(Equal(client.Err))
 			// No additional client calls expected
 			Expect(client.Calls).To(Equal(1))

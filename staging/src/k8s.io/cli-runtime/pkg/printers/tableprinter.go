@@ -94,9 +94,8 @@ func printHeader(columnNames []string, w io.Writer) error {
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
 
-	w, found := output.(*tabwriter.Writer)
-	if !found {
-		w = GetNewTabWriter(output)
+	if _, found := output.(*tabwriter.Writer); !found {
+		w := GetNewTabWriter(output)
 		output = w
 		defer w.Flush()
 	}
@@ -209,7 +208,24 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 				fmt.Fprint(output, "\t")
 			}
 			if cell != nil {
-				fmt.Fprint(output, cell)
+				switch val := cell.(type) {
+				case string:
+					print := val
+					truncated := false
+					// Truncate at the first newline, carriage return or formfeed
+					// (treated as a newline by tabwriter).
+					breakchar := strings.IndexAny(print, "\f\n\r")
+					if breakchar >= 0 {
+						truncated = true
+						print = print[:breakchar]
+					}
+					WriteEscaped(output, print)
+					if truncated {
+						fmt.Fprint(output, "...")
+					}
+				default:
+					WriteEscaped(output, fmt.Sprint(val))
+				}
 			}
 		}
 		fmt.Fprintln(output)
@@ -434,7 +450,7 @@ func formatEventType(eventType string) string {
 	if formatted, ok := formattedEventType[eventType]; ok {
 		return formatted
 	}
-	return string(eventType)
+	return eventType
 }
 
 // printRows writes the provided rows to output.
@@ -484,7 +500,7 @@ func formatLabelHeaders(columnLabels []string) []string {
 	formHead := make([]string, len(columnLabels))
 	for i, l := range columnLabels {
 		p := strings.Split(l, "/")
-		formHead[i] = strings.ToUpper((p[len(p)-1]))
+		formHead[i] = strings.ToUpper(p[len(p)-1])
 	}
 	return formHead
 }

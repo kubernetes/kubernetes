@@ -20,14 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 )
 
 // auditHandler logs annotations set by other admission handlers
 type auditHandler struct {
 	Interface
-	ae *auditinternal.Event
 }
 
 var _ Interface = &auditHandler{}
@@ -38,14 +36,14 @@ var _ ValidationInterface = &auditHandler{}
 // of attribute into the audit event. Attributes passed to the Admit and
 // Validate function must be instance of privateAnnotationsGetter or
 // AnnotationsGetter, otherwise an error is returned.
-func WithAudit(i Interface, ae *auditinternal.Event) Interface {
+func WithAudit(i Interface) Interface {
 	if i == nil {
 		return i
 	}
-	return &auditHandler{i, ae}
+	return &auditHandler{Interface: i}
 }
 
-func (handler auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
+func (handler *auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if !handler.Interface.Handles(a.GetOperation()) {
 		return nil
 	}
@@ -55,12 +53,12 @@ func (handler auditHandler) Admit(ctx context.Context, a Attributes, o ObjectInt
 	var err error
 	if mutator, ok := handler.Interface.(MutationInterface); ok {
 		err = mutator.Admit(ctx, a, o)
-		handler.logAnnotations(a)
+		handler.logAnnotations(ctx, a)
 	}
 	return err
 }
 
-func (handler auditHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) error {
+func (handler *auditHandler) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if !handler.Interface.Handles(a.GetOperation()) {
 		return nil
 	}
@@ -70,7 +68,7 @@ func (handler auditHandler) Validate(ctx context.Context, a Attributes, o Object
 	var err error
 	if validator, ok := handler.Interface.(ValidationInterface); ok {
 		err = validator.Validate(ctx, a, o)
-		handler.logAnnotations(a)
+		handler.logAnnotations(ctx, a)
 	}
 	return err
 }
@@ -84,20 +82,21 @@ func ensureAnnotationGetter(a Attributes) error {
 	return fmt.Errorf("attributes must be an instance of privateAnnotationsGetter or AnnotationsGetter")
 }
 
-func (handler auditHandler) logAnnotations(a Attributes) {
-	if handler.ae == nil {
+func (handler *auditHandler) logAnnotations(ctx context.Context, a Attributes) {
+	ae := audit.AuditEventFrom(ctx)
+	if ae == nil {
 		return
 	}
+
+	var annotations map[string]string
 	switch a := a.(type) {
 	case privateAnnotationsGetter:
-		for key, value := range a.getAnnotations(handler.ae.Level) {
-			audit.LogAnnotation(handler.ae, key, value)
-		}
+		annotations = a.getAnnotations(ae.Level)
 	case AnnotationsGetter:
-		for key, value := range a.GetAnnotations(handler.ae.Level) {
-			audit.LogAnnotation(handler.ae, key, value)
-		}
+		annotations = a.GetAnnotations(ae.Level)
 	default:
 		// this will never happen, because we have already checked it in ensureAnnotationGetter
 	}
+
+	audit.AddAuditAnnotationsMap(ctx, annotations)
 }

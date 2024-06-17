@@ -17,14 +17,16 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const maxNodes = 100
@@ -32,6 +34,7 @@ const maxNodes = 100
 var _ = SIGDescribe("SSH", func() {
 
 	f := framework.NewDefaultFramework("ssh")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// When adding more providers here, also implement their functionality in e2essh.GetSigner(...).
@@ -42,13 +45,14 @@ var _ = SIGDescribe("SSH", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 	})
 
-	ginkgo.It("should SSH to all nodes and run commands", func() {
+	ginkgo.It("should SSH to all nodes and run commands", func(ctx context.Context) {
 		// Get all nodes' external IPs.
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
+		hosts, err := e2essh.NodeSSHHosts(ctx, f.ClientSet)
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
+		ginkgo.By(fmt.Sprintf("Found %d SSH'able hosts", len(hosts)))
 
 		testCases := []struct {
 			cmd            string
@@ -79,7 +83,9 @@ var _ = SIGDescribe("SSH", func() {
 			ginkgo.By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
 
 			for _, host := range testhosts {
-				result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
+				ginkgo.By(fmt.Sprintf("SSH'ing host %s", host))
+
+				result, err := e2essh.SSH(ctx, testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {
 					framework.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
@@ -105,7 +111,7 @@ var _ = SIGDescribe("SSH", func() {
 
 		// Quickly test that SSH itself errors correctly.
 		ginkgo.By("SSH'ing to a nonexistent host")
-		if _, err = e2essh.SSH(`echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
+		if _, err = e2essh.SSH(ctx, `echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
 			framework.Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})

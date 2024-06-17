@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !go1.7
+//go:build !go1.7
 
 package context
 
@@ -263,11 +263,11 @@ func (c *timerCtx) cancel(removeFromParent bool, err error) {
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete:
 //
-// 	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
-// 		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-// 		defer cancel()  // releases resources if slowOperation completes before timeout elapses
-// 		return slowOperation(ctx)
-// 	}
+//	func slowOperationWithTimeout(ctx context.Context) (Result, error) {
+//		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+//		defer cancel()  // releases resources if slowOperation completes before timeout elapses
+//		return slowOperation(ctx)
+//	}
 func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
 	return WithDeadline(parent, time.Now().Add(timeout))
 }

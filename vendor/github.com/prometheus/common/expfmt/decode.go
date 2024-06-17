@@ -14,6 +14,7 @@
 package expfmt
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"math"
@@ -21,8 +22,8 @@ import (
 	"net/http"
 
 	dto "github.com/prometheus/client_model/go"
+	"google.golang.org/protobuf/encoding/protodelim"
 
-	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/prometheus/common/model"
 )
 
@@ -44,7 +45,7 @@ func ResponseFormat(h http.Header) Format {
 
 	mediatype, params, err := mime.ParseMediaType(ct)
 	if err != nil {
-		return FmtUnknown
+		return fmtUnknown
 	}
 
 	const textType = "text/plain"
@@ -52,28 +53,28 @@ func ResponseFormat(h http.Header) Format {
 	switch mediatype {
 	case ProtoType:
 		if p, ok := params["proto"]; ok && p != ProtoProtocol {
-			return FmtUnknown
+			return fmtUnknown
 		}
 		if e, ok := params["encoding"]; ok && e != "delimited" {
-			return FmtUnknown
+			return fmtUnknown
 		}
-		return FmtProtoDelim
+		return fmtProtoDelim
 
 	case textType:
 		if v, ok := params["version"]; ok && v != TextVersion {
-			return FmtUnknown
+			return fmtUnknown
 		}
-		return FmtText
+		return fmtText
 	}
 
-	return FmtUnknown
+	return fmtUnknown
 }
 
 // NewDecoder returns a new decoder based on the given input format.
 // If the input format does not imply otherwise, a text format decoder is returned.
 func NewDecoder(r io.Reader, format Format) Decoder {
-	switch format {
-	case FmtProtoDelim:
+	switch format.FormatType() {
+	case TypeProtoDelim:
 		return &protoDecoder{r: r}
 	}
 	return &textDecoder{r: r}
@@ -86,8 +87,10 @@ type protoDecoder struct {
 
 // Decode implements the Decoder interface.
 func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
-	_, err := pbutil.ReadDelimited(d.r, v)
-	if err != nil {
+	opts := protodelim.UnmarshalOptions{
+		MaxSize: -1,
+	}
+	if err := opts.UnmarshalFrom(bufio.NewReader(d.r), v); err != nil {
 		return err
 	}
 	if !model.IsValidMetricName(model.LabelValue(v.GetName())) {
@@ -115,32 +118,31 @@ func (d *protoDecoder) Decode(v *dto.MetricFamily) error {
 // textDecoder implements the Decoder interface for the text protocol.
 type textDecoder struct {
 	r    io.Reader
-	p    TextParser
-	fams []*dto.MetricFamily
+	fams map[string]*dto.MetricFamily
+	err  error
 }
 
 // Decode implements the Decoder interface.
 func (d *textDecoder) Decode(v *dto.MetricFamily) error {
-	// TODO(fabxc): Wrap this as a line reader to make streaming safer.
-	if len(d.fams) == 0 {
-		// No cached metric families, read everything and parse metrics.
-		fams, err := d.p.TextToMetricFamilies(d.r)
-		if err != nil {
-			return err
-		}
-		if len(fams) == 0 {
-			return io.EOF
-		}
-		d.fams = make([]*dto.MetricFamily, 0, len(fams))
-		for _, f := range fams {
-			d.fams = append(d.fams, f)
+	if d.err == nil {
+		// Read all metrics in one shot.
+		var p TextParser
+		d.fams, d.err = p.TextToMetricFamilies(d.r)
+		// If we don't get an error, store io.EOF for the end.
+		if d.err == nil {
+			d.err = io.EOF
 		}
 	}
-
-	*v = *d.fams[0]
-	d.fams = d.fams[1:]
-
-	return nil
+	// Pick off one MetricFamily per Decode until there's nothing left.
+	for key, fam := range d.fams {
+		v.Name = fam.Name
+		v.Help = fam.Help
+		v.Type = fam.Type
+		v.Metric = fam.Metric
+		delete(d.fams, key)
+		return nil
+	}
+	return d.err
 }
 
 // SampleDecoder wraps a Decoder to extract samples from the metric families
@@ -164,7 +166,7 @@ func (sd *SampleDecoder) Decode(s *model.Vector) error {
 }
 
 // ExtractSamples builds a slice of samples from the provided metric
-// families. If an error occurrs during sample extraction, it continues to
+// families. If an error occurs during sample extraction, it continues to
 // extract from the remaining metric families. The returned error is the last
 // error that has occurred.
 func ExtractSamples(o *DecodeOptions, fams ...*dto.MetricFamily) (model.Vector, error) {

@@ -1,3 +1,4 @@
+//go:build go1.8
 // +build go1.8
 
 /*
@@ -121,7 +122,7 @@ func TestEvaluateTypes(t *testing.T) {
 		},
 		{
 			In:   `-0.0`,
-			Data: float64(-0.0),
+			Data: float64(-0.0), //nolint:staticcheck // SA4026: in Go, the floating-point literal '-0.0' is the same as '0.0'
 			Out:  `-0`,
 		},
 		{
@@ -351,8 +352,8 @@ func TestEvaluateTypes(t *testing.T) {
 
 		t.Run(fmt.Sprintf("%d_raw", i), func(t *testing.T) {
 			// decode the input as a standalone object
-			inputJSON := fmt.Sprintf(`%s`, tc.In)
-			expectedJSON := fmt.Sprintf(`%s`, tc.Out)
+			inputJSON := tc.In
+			expectedJSON := tc.Out
 			var m interface{}
 			err := Unmarshal([]byte(inputJSON), &m)
 			if tc.Err && err != nil {

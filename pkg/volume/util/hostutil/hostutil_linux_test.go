@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,15 +20,9 @@ limitations under the License.
 package hostutil
 
 import (
-	"fmt"
-	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"k8s.io/utils/exec"
 )
 
 func TestIsSharedSuccess(t *testing.T) {
@@ -156,27 +151,37 @@ func TestGetSELinuxSupport(t *testing.T) {
 	tests := []struct {
 		name           string
 		mountPoint     string
+		selinuxEnabled bool
 		expectedResult bool
 	}{
 		{
+			"ext4 on / with disabled SELinux",
+			"/",
+			false,
+			false,
+		},
+		{
 			"ext4 on /",
 			"/",
+			true,
 			true,
 		},
 		{
 			"tmpfs on /var/lib/bar",
 			"/var/lib/bar",
+			true,
 			false,
 		},
 		{
 			"nfsv4",
 			"/media/nfs_vol",
+			true,
 			false,
 		},
 	}
 
 	for _, test := range tests {
-		out, err := GetSELinux(test.mountPoint, filename)
+		out, err := GetSELinux(test.mountPoint, filename, func() bool { return test.selinuxEnabled })
 		if err != nil {
 			t.Errorf("Test %s failed with error: %s", test.name, err)
 		}
@@ -186,142 +191,73 @@ func TestGetSELinuxSupport(t *testing.T) {
 	}
 }
 
-func createSocketFile(socketDir string) (string, error) {
-	testSocketFile := filepath.Join(socketDir, "mt.sock")
-
-	// Switch to volume path and create the socket file
-	// socket file can not have length of more than 108 character
-	// and hence we must use relative path
-	oldDir, _ := os.Getwd()
-
-	err := os.Chdir(socketDir)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		os.Chdir(oldDir)
-	}()
-	_, socketCreateError := net.Listen("unix", "mt.sock")
-	return testSocketFile, socketCreateError
-}
-
-func TestGetFileType(t *testing.T) {
-	hu := NewHostUtil()
-
-	testCase := []struct {
-		name         string
-		expectedType FileType
-		setUp        func() (string, string, error)
-	}{
-		{
-			"Directory Test",
-			FileTypeDirectory,
-			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
-				return tempDir, tempDir, err
-			},
-		},
-		{
-			"File Test",
-			FileTypeFile,
-			func() (string, string, error) {
-				tempFile, err := ioutil.TempFile("", "test-get-filetype")
-				if err != nil {
-					return "", "", err
-				}
-				tempFile.Close()
-				return tempFile.Name(), tempFile.Name(), nil
-			},
-		},
-		{
-			"Socket Test",
-			FileTypeSocket,
-			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
-				if err != nil {
-					return "", "", err
-				}
-				tempSocketFile, err := createSocketFile(tempDir)
-				return tempSocketFile, tempDir, err
-			},
-		},
-		{
-			"Block Device Test",
-			FileTypeBlockDev,
-			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
-				if err != nil {
-					return "", "", err
-				}
-
-				tempBlockFile := filepath.Join(tempDir, "test_blk_dev")
-				outputBytes, err := exec.New().Command("mknod", tempBlockFile, "b", "89", "1").CombinedOutput()
-				if err != nil {
-					err = fmt.Errorf("%v: %s ", err, outputBytes)
-				}
-				return tempBlockFile, tempDir, err
-			},
-		},
-		{
-			"Character Device Test",
-			FileTypeCharDev,
-			func() (string, string, error) {
-				tempDir, err := ioutil.TempDir("", "test-get-filetype-")
-				if err != nil {
-					return "", "", err
-				}
-
-				tempCharFile := filepath.Join(tempDir, "test_char_dev")
-				outputBytes, err := exec.New().Command("mknod", tempCharFile, "c", "89", "1").CombinedOutput()
-				if err != nil {
-					err = fmt.Errorf("%v: %s ", err, outputBytes)
-				}
-				return tempCharFile, tempDir, err
-			},
-		},
-	}
-
-	for idx, tc := range testCase {
-		path, cleanUpPath, err := tc.setUp()
-		if err != nil {
-			// Locally passed, but upstream CI is not friendly to create such device files
-			// Leave "Operation not permitted" out, which can be covered in an e2e test
-			if isOperationNotPermittedError(err) {
-				continue
-			}
-			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
-		}
-		if len(cleanUpPath) > 0 {
-			defer os.RemoveAll(cleanUpPath)
-		}
-
-		fileType, err := hu.GetFileType(path)
-		if err != nil {
-			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
-		}
-		if fileType != tc.expectedType {
-			t.Fatalf("[%d-%s] expected %s, but got %s", idx, tc.name, tc.expectedType, fileType)
-		}
-	}
-}
-
-func isOperationNotPermittedError(err error) bool {
-	if strings.Contains(err.Error(), "Operation not permitted") {
-		return true
-	}
-	return false
-}
-
 func writeFile(content string) (string, string, error) {
-	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+	tempDir, err := os.MkdirTemp("", "mounter_shared_test")
 	if err != nil {
 		return "", "", err
 	}
 	filename := filepath.Join(tempDir, "mountinfo")
-	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	err = os.WriteFile(filename, []byte(content), 0600)
 	if err != nil {
 		os.RemoveAll(tempDir)
 		return "", "", err
 	}
 	return tempDir, filename, nil
+}
+
+func TestGetSELinuxMountContext(t *testing.T) {
+	info :=
+		`840 60 8:0 / /var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv rw,relatime shared:421 - ext4 /dev/sda rw,context="system_u:object_r:container_file_t:s0:c314,c894"
+224 62 253:0 /var/lib/docker/devicemapper/test/shared /var/lib/docker/devicemapper/test/shared rw,relatime master:1 shared:44 - ext4 /dev/mapper/ssd-root rw,seclabel,data=ordered
+82 62 0:43 / /var/lib/foo rw,relatime shared:32 - tmpfs tmpfs rw
+83 63 0:44 / /var/lib/bar rw,relatime - tmpfs tmpfs rw
+`
+	tempDir, filename, err := writeFile(info)
+	if err != nil {
+		t.Fatalf("cannot create temporary file: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tests := []struct {
+		name            string
+		mountPoint      string
+		seLinuxEnabled  bool
+		expectedContext string
+	}{
+		{
+			"no context",
+			"/var/lib/foo",
+			true,
+			"",
+		},
+		{
+			"with context with SELinux",
+			"/var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv",
+			true,
+			"system_u:object_r:container_file_t:s0:c314,c894",
+		},
+		{
+			"with context with no SELinux",
+			"/var/lib/kubelet/pods/d4f3b306-ad4c-4f7a-8983-b5b228039a8c/volumes/kubernetes.io~iscsi/mypv",
+			false,
+			"",
+		},
+		{
+			"no context with seclabel",
+			"/var/lib/docker/devicemapper/test/shared",
+			true,
+			"",
+		},
+	}
+
+	for _, test := range tests {
+		out, err := getSELinuxMountContext(test.mountPoint, filename, func() bool { return test.seLinuxEnabled })
+		if err != nil {
+			t.Errorf("Test %s failed with error: %s", test.name, err)
+		}
+		if test.expectedContext != out {
+			t.Errorf("Test %s failed: expected %v, got %v", test.name, test.expectedContext, out)
+		}
+	}
+
 }

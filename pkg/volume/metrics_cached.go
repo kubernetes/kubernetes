@@ -38,7 +38,7 @@ func NewCachedMetrics(provider MetricsProvider) MetricsProvider {
 	return &cachedMetrics{wrapped: provider}
 }
 
-// GetMetrics runs the wrapped metrics provider's GetMetrics methd once and
+// GetMetrics runs the wrapped metrics provider's GetMetrics method once and
 // caches the result. Will not cache result if there is an error.
 // See MetricsProvider.GetMetrics
 func (md *cachedMetrics) GetMetrics() (*Metrics, error) {

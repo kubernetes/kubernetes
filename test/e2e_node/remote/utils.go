@@ -19,19 +19,20 @@ package remote
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/klog/v2"
+
+	"k8s.io/kubernetes/test/e2e_node/builder"
 )
 
 // utils.go contains functions used across test suites.
 
 const (
-	cniVersion       = "v0.8.6"
-	cniArch          = "amd64"
+	cniVersion       = "v1.5.0"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
-	cniURL           = "https://storage.googleapis.com/k8s-artifacts-cni/release/" + cniVersion + "/" + "cni-plugins-linux-" + cniArch + "-" + cniVersion + ".tgz"
+
+	ecrCredentialProviderVersion = "v1.27.1"
 )
 
 const cniConfig = `{
@@ -49,14 +50,50 @@ const cniConfig = `{
 }
 `
 
+const credentialGCPProviderConfig = `kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: gcp-credential-provider
+    apiVersion: credentialprovider.kubelet.k8s.io/v1
+    matchImages:
+    - "gcr.io"
+    - "*.gcr.io"
+    - "container.cloud.google.com"
+    - "*.pkg.dev"
+    defaultCacheDuration: 1m`
+
+const credentialAWSProviderConfig = `kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+- name: ecr-credential-provider
+  apiVersion: credentialprovider.kubelet.k8s.io/v1
+  matchImages:
+  - "*.dkr.ecr.*.amazonaws.com"
+  - "*.dkr.ecr.*.amazonaws.com.cn"
+  - "*.dkr.ecr-fips.*.amazonaws.com"
+  - "*.dkr.ecr.us-iso-east-1.c2s.ic.gov"
+  - "*.dkr.ecr.us-isob-east-1.sc2s.sgov.gov"
+  defaultCacheDuration: 12h`
+
+func getCNIURL() string {
+	cniArch := "amd64"
+	if builder.IsTargetArchArm64() {
+		cniArch = "arm64"
+	}
+	cniURL := fmt.Sprintf("https://storage.googleapis.com/k8s-artifacts-cni/release/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
+	return cniURL
+
+}
+
 // Install the cni plugin and add basic bridge configuration to the
 // configuration directory.
 func setupCNI(host, workspace string) error {
 	klog.V(2).Infof("Install CNI on %q", host)
 	cniPath := filepath.Join(workspace, cniDirectory)
+	klog.V(2).Infof("Install CNI on path %q", cniPath)
 	cmd := getSSHCommand(" ; ",
 		fmt.Sprintf("mkdir -p %s", cniPath),
-		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", cniURL, cniPath),
+		fmt.Sprintf("curl -s -L %s | tar -xz -C %s", getCNIURL(), cniPath),
 	)
 	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
 		return fmt.Errorf("failed to install cni plugin on %q: %v output: %q", host, err, output)
@@ -77,37 +114,65 @@ func setupCNI(host, workspace string) error {
 	return nil
 }
 
+func getECRCredentialProviderURL() string {
+	arch := "amd64"
+	if builder.IsTargetArchArm64() {
+		arch = "arm64"
+	}
+	return fmt.Sprintf("https://artifacts.k8s.io/binaries/cloud-provider-aws/%s/linux/%s/ecr-credential-provider-linux-%s", ecrCredentialProviderVersion, arch, arch)
+}
+
+func setupECRCredentialProvider(host, workspace string) error {
+	klog.V(2).Infof("Install ecr-credential-provider on %q at %q", host, workspace)
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("curl -s -Lo %s/ecr-credential-provider %s", workspace, getECRCredentialProviderURL()),
+		fmt.Sprintf("chmod a+x %s/ecr-credential-provider", workspace),
+	)
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+		return fmt.Errorf("failed to install ecr-credential-provider plugin on %q: %v output: %q", host, err, output)
+	}
+	return nil
+}
+
+func configureCredentialProvider(host, workspace string) error {
+	klog.V(2).Infof("Configuring kubelet credential provider on %q", host)
+
+	credentialProviderConfig := credentialGCPProviderConfig
+	if GetSSHUser() == "ec2-user" {
+		credentialProviderConfig = credentialAWSProviderConfig
+		err := setupECRCredentialProvider(host, workspace)
+		if err != nil {
+			return err
+		}
+	}
+
+	cmd := getSSHCommand(" ; ",
+		fmt.Sprintf("echo %s > %s", quote(credentialProviderConfig), filepath.Join(workspace, "credential-provider.yaml")),
+	)
+	if output, err := SSH(host, "sh", "-c", cmd); err != nil {
+		return fmt.Errorf("failed to write credential provider configuration on %q: %v output: %q", host, err, output)
+	}
+
+	return nil
+}
+
 // configureFirewall configures iptable firewall rules.
 func configureFirewall(host string) error {
 	klog.V(2).Infof("Configure iptables firewall rules on %q", host)
-	// TODO: consider calling bootstrap script to configure host based on OS
-	output, err := SSH(host, "iptables", "-L", "INPUT")
+
+	// Since the goal is to enable connectivity without taking into account current rule,
+	// we can just prepend the accept rules directly without any check
+	cmd := getSSHCommand("&&",
+		"iptables -I INPUT 1 -w -p tcp -j ACCEPT",
+		"iptables -I INPUT 1 -w -p udp -j ACCEPT",
+		"iptables -I INPUT 1 -w -p icmp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p tcp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p udp -j ACCEPT",
+		"iptables -I FORWARD 1 -w -p icmp -j ACCEPT",
+	)
+	output, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to get iptables INPUT on %q: %v output: %q", host, err, output)
-	}
-	if strings.Contains(output, "Chain INPUT (policy DROP)") {
-		cmd := getSSHCommand("&&",
-			"(iptables -C INPUT -w -p TCP -j ACCEPT || iptables -A INPUT -w -p TCP -j ACCEPT)",
-			"(iptables -C INPUT -w -p UDP -j ACCEPT || iptables -A INPUT -w -p UDP -j ACCEPT)",
-			"(iptables -C INPUT -w -p ICMP -j ACCEPT || iptables -A INPUT -w -p ICMP -j ACCEPT)")
-		output, err := SSH(host, "sh", "-c", cmd)
-		if err != nil {
-			return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
-		}
-	}
-	output, err = SSH(host, "iptables", "-L", "FORWARD")
-	if err != nil {
-		return fmt.Errorf("failed to get iptables FORWARD on %q: %v output: %q", host, err, output)
-	}
-	if strings.Contains(output, "Chain FORWARD (policy DROP)") {
-		cmd := getSSHCommand("&&",
-			"(iptables -C FORWARD -w -p TCP -j ACCEPT || iptables -A FORWARD -w -p TCP -j ACCEPT)",
-			"(iptables -C FORWARD -w -p UDP -j ACCEPT || iptables -A FORWARD -w -p UDP -j ACCEPT)",
-			"(iptables -C FORWARD -w -p ICMP -j ACCEPT || iptables -A FORWARD -w -p ICMP -j ACCEPT)")
-		output, err = SSH(host, "sh", "-c", cmd)
-		if err != nil {
-			return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
-		}
+		return fmt.Errorf("failed to configured firewall on %q: %v output: %v", host, err, output)
 	}
 	return nil
 }

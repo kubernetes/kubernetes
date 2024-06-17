@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -21,7 +22,6 @@ package fsquota
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -163,6 +163,9 @@ func readProjectFiles(projects *os.File, projid *os.File) projectsList {
 	return projectsList{parseProjFile(projects, parseProject), parseProjFile(projid, parseProjid)}
 }
 
+// findAvailableQuota finds the next available quota from the FirstQuota
+// it returns error if QuotaIDIsInUse returns error when getting quota id in use;
+// it searches at most maxUnusedQuotasToSearch(128) time
 func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.QuotaID, error) {
 	unusedQuotasSearched := 0
 	for id := common.FirstQuota; true; id++ {
@@ -179,20 +182,20 @@ func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.Quot
 			}
 		}
 	}
-	return common.BadQuotaID, fmt.Errorf("Cannot find available quota ID")
+	return common.BadQuotaID, fmt.Errorf("cannot find available quota ID")
 }
 
 func addDirToProject(path string, id common.QuotaID, list *projectsList) (common.QuotaID, bool, error) {
 	idMap := make(map[common.QuotaID]bool)
 	for _, project := range list.projects {
 		if project.data == path {
-			if id != project.id {
-				return common.BadQuotaID, false, fmt.Errorf("Attempt to reassign project ID for %s", path)
+			if id != common.BadQuotaID && id != project.id {
+				return common.BadQuotaID, false, fmt.Errorf("attempt to reassign project ID for %s", path)
 			}
 			// Trying to reassign a directory to the project it's
 			// already in.  Maybe this should be an error, but for
 			// now treat it as an idempotent operation
-			return id, false, nil
+			return project.id, false, nil
 		}
 		idMap[project.id] = true
 	}
@@ -223,16 +226,16 @@ func addDirToProject(path string, id common.QuotaID, list *projectsList) (common
 
 func removeDirFromProject(path string, id common.QuotaID, list *projectsList) (bool, error) {
 	if id == common.BadQuotaID {
-		return false, fmt.Errorf("Attempt to remove invalid quota ID from %s", path)
+		return false, fmt.Errorf("attempt to remove invalid quota ID from %s", path)
 	}
 	foundAt := -1
 	countByID := make(map[common.QuotaID]int)
 	for i, project := range list.projects {
 		if project.data == path {
 			if id != project.id {
-				return false, fmt.Errorf("Attempting to remove quota ID %v from path %s, but expecting ID %v", id, path, project.id)
+				return false, fmt.Errorf("attempting to remove quota ID %v from path %s, but expecting ID %v", id, path, project.id)
 			} else if foundAt != -1 {
-				return false, fmt.Errorf("Found multiple quota IDs for path %s", path)
+				return false, fmt.Errorf("found multiple quota IDs for path %s", path)
 			}
 			// Faster and easier than deleting an element
 			list.projects[i].isValid = false
@@ -241,7 +244,7 @@ func removeDirFromProject(path string, id common.QuotaID, list *projectsList) (b
 		countByID[project.id]++
 	}
 	if foundAt == -1 {
-		return false, fmt.Errorf("Cannot find quota associated with path %s", path)
+		return false, fmt.Errorf("cannot find quota associated with path %s", path)
 	}
 	if countByID[id] <= 1 {
 		// Removing the last entry means that we're no longer using
@@ -263,7 +266,7 @@ func writeProjectFile(base *os.File, projects []projectType) (string, error) {
 		return "", err
 	}
 	mode := stat.Mode() & os.ModePerm
-	f, err := ioutil.TempFile(filepath.Dir(oname), filepath.Base(oname))
+	f, err := os.CreateTemp(filepath.Dir(oname), filepath.Base(oname))
 	if err != nil {
 		return "", err
 	}
@@ -314,9 +317,10 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 		}
 		os.Remove(tmpProjects)
 	}
-	return fmt.Errorf("Unable to write project files: %v", err)
+	return fmt.Errorf("unable to write project files: %v", err)
 }
 
+// if ID is common.BadQuotaID, generate new project id if the dir is not in a project
 func createProjectID(path string, ID common.QuotaID) (common.QuotaID, error) {
 	quotaIDLock.Lock()
 	defer quotaIDLock.Unlock()

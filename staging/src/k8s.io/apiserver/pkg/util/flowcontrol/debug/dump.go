@@ -17,22 +17,40 @@ limitations under the License.
 package debug
 
 import (
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"time"
+
+	"k8s.io/apiserver/pkg/endpoints/request"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 // QueueSetDump is an instant dump of queue-set.
 type QueueSetDump struct {
-	Queues    []QueueDump
-	Waiting   int
-	Executing int
+	Queues                     []QueueDump
+	QueuelessExecutingRequests []RequestDump
+	Waiting                    int
+	Executing                  int
+	SeatsInUse                 int
+	SeatsWaiting               int
+	Dispatched                 int
+	Rejected                   int
+	Timedout                   int
+	Cancelled                  int
 }
 
 // QueueDump is an instant dump of one queue in a queue-set.
 type QueueDump struct {
-	Requests          []RequestDump
-	VirtualStart      float64
+	QueueSum          QueueSum
+	Requests          []RequestDump // just the waiting ones
+	RequestsExecuting []RequestDump
+	NextDispatchR     string
 	ExecutingRequests int
+	SeatsInUse        int
+}
+
+type QueueSum struct {
+	InitialSeatsSum int
+	MaxSeatsSum     int
+	TotalWorkSum    string
 }
 
 // RequestDump is an instant dump of one requests pending in the queue.
@@ -41,6 +59,7 @@ type RequestDump struct {
 	FlowDistinguisher string
 	ArriveTime        time.Time
 	StartTime         time.Time
+	WorkEstimate      flowcontrolrequest.WorkEstimate
 	// request details
 	UserName    string
 	RequestInfo request.RequestInfo

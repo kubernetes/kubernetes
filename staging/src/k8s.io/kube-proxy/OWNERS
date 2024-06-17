@@ -1,11 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-network-approvers
-- sttts
-- luxas
+  - sig-network-approvers
+  - sttts
+  - luxas
 reviewers:
-- sig-network-reviewers
-- luxas
-- sttts
-- Lion-Wei
+  - sig-network-reviewers
+  - luxas
+  - sttts
+labels:
+  - sig/network
+  - area/kube-proxy

@@ -19,12 +19,12 @@ package scale
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"path"
 	"strings"
 	"testing"
 
-	"github.com/coreos/pkg/capnslog"
-	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
+	"google.golang.org/grpc/grpclog"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -203,21 +203,9 @@ var (
 )
 
 func setupWithOptions(t *testing.T, instanceOptions *apitesting.TestServerInstanceOptions, flags []string) (client kubernetes.Interface, tearDown func()) {
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
+
 	result := apitesting.StartTestServerOrDie(t, instanceOptions, flags, framework.SharedEtcd())
-
-	// TODO: Disable logging here until we resolve teardown issues which result in
-	// massive log spam. Another path forward would be to refactor
-	// StartTestServerOrDie to work with the etcd instance already started by the
-	// integration test scripts.
-	// See https://github.com/kubernetes/kubernetes/issues/49489.
-	repo, err := capnslog.GetRepoLogger("go.etcd.io/etcd")
-	if err != nil {
-		t.Fatalf("couldn't configure logging: %v", err)
-	}
-	repo.SetLogLevel(map[string]capnslog.LogLevel{
-		"etcdserver/api/v3rpc": capnslog.CRITICAL,
-	})
-
 	result.ClientConfig.AcceptContentTypes = ""
 	result.ClientConfig.ContentType = ""
 	result.ClientConfig.NegotiatedSerializer = nil

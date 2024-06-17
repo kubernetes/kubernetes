@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,6 +20,8 @@ limitations under the License.
 package oom
 
 import (
+	"os"
+
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"testing"
 
@@ -100,5 +103,5 @@ func TestOOMScoreAdjContainer(t *testing.T) {
 
 func TestPidListerFailure(t *testing.T) {
 	_, err := getPids("/does/not/exist")
-	assert.True(t, cgroups.IsNotFound(err), "expected getPids to return not exists error. Got %v", err)
+	assert.True(t, cgroups.IsNotFound(err) || os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
 }

@@ -722,3 +722,82 @@ func TestUnknownTypePrinting(t *testing.T) {
 		t.Errorf("An error was expected from printing unknown type")
 	}
 }
+
+func TestStringPrinting(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		expected string
+	}{
+		// multiline string
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Age", Type: "string"},
+				{Name: "Description", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "20h", "This is first line\nThis is second line\nThis is third line\nand another one\n"}},
+			},
+			expected: `NAME    AGE   DESCRIPTION
+test1   20h   This is first line...
+`,
+		},
+		// lengthy string
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Age", Type: "string"},
+				{Name: "Description", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "20h", "This is first line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
+			},
+			expected: `NAME    AGE   DESCRIPTION
+test1   20h   This is first line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on
+`,
+		},
+		// lengthy string + newline
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Age", Type: "string"},
+				{Name: "Description", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "20h", "This is first\n line which is long and goes for on and on and on an on and on and on and on and on and on and on and on and on and on and on"}},
+			},
+			expected: `NAME    AGE   DESCRIPTION
+test1   20h   This is first...
+`,
+		},
+		// terminal special character, should be escaped
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1\x1b"}},
+			},
+			expected: `NAME
+test1^[
+`,
+		},
+	}
+
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(PrintOptions{})
+		printer.PrintObj(table, out)
+
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected \n(%s), got \n(%s)", test.expected, out.String())
+		}
+	}
+}

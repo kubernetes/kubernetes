@@ -17,9 +17,11 @@ limitations under the License.
 package collectors
 
 import (
+	"context"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 var (
@@ -40,7 +42,7 @@ var (
 type logMetricsCollector struct {
 	metrics.BaseStableCollector
 
-	podStats func() ([]statsapi.PodStats, error)
+	podStats func(ctx context.Context) ([]statsapi.PodStats, error)
 }
 
 // Check if logMetricsCollector implements necessary interface
@@ -48,7 +50,7 @@ var _ metrics.StableCollector = &logMetricsCollector{}
 
 // NewLogMetricsCollector implements the metrics.StableCollector interface and
 // exposes metrics about container's log volume size.
-func NewLogMetricsCollector(podStats func() ([]statsapi.PodStats, error)) metrics.StableCollector {
+func NewLogMetricsCollector(podStats func(ctx context.Context) ([]statsapi.PodStats, error)) metrics.StableCollector {
 	return &logMetricsCollector{
 		podStats: podStats,
 	}
@@ -61,9 +63,9 @@ func (c *logMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 
 // CollectWithStability implements the metrics.StableCollector interface.
 func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	podStats, err := c.podStats()
+	podStats, err := c.podStats(context.Background())
 	if err != nil {
-		klog.Errorf("failed to get pod stats: %v", err)
+		klog.ErrorS(err, "Failed to get pod stats")
 		return
 	}
 

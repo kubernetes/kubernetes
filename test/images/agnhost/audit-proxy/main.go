@@ -17,7 +17,7 @@ limitations under the License.
 package auditproxy
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -48,7 +48,7 @@ var (
 func main(cmd *cobra.Command, args []string) {
 	scheme := runtime.NewScheme()
 	auditinstall.Install(scheme)
-	serializer := json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false)
+	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Pretty: false})
 	encoder = audit.Codecs.EncoderForVersion(serializer, auditv1.SchemeGroupVersion)
 	decoder = audit.Codecs.UniversalDecoder(auditv1.SchemeGroupVersion)
 
@@ -57,7 +57,7 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func handler(w http.ResponseWriter, req *http.Request) {
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		log.Printf("could not read request body: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)

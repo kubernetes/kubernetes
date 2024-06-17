@@ -44,7 +44,8 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
 	}
 	if obj.ResourceLock == "" {
-		// TODO: Migrate to LeaseLock.
+		// TODO(#80289): Figure out how to migrate to LeaseLock at this point.
+		//   This will most probably require going through EndpointsLease first.
 		obj.ResourceLock = EndpointsResourceLock
 	}
 	if obj.LeaderElect == nil {
@@ -94,19 +95,4 @@ func NewRecommendedDebuggingConfiguration() *DebuggingConfiguration {
 	ret := &DebuggingConfiguration{}
 	RecommendedDebuggingConfiguration(ret)
 	return ret
-}
-
-// RecommendedLoggingConfiguration defaults logging configuration.
-// This will set the recommended default
-// values, but they may be subject to change between API versions. This function
-// is intentionally not registered in the scheme as a "normal" `SetDefaults_Foo`
-// function to allow consumers of this type to set whatever defaults for their
-// embedded configs. Forcing consumers to use these defaults would be problematic
-// as defaulting in the scheme is done as part of the conversion, and there would
-// be no easy way to opt-out. Instead, if you want to use this defaulting method
-// run it in your wrapper struct of this type in its `SetDefaults_` method.
-func RecommendedLoggingConfiguration(obj *LoggingConfiguration) {
-	if obj.Format == "" {
-		obj.Format = "text"
-	}
 }

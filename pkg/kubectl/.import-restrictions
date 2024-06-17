@@ -2,6 +2,19 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes/pkg
     allowedPrefixes:
       - k8s.io/kubernetes/pkg/api/legacyscheme
+      - k8s.io/kubernetes/pkg/api/v1/service
+      - k8s.io/kubernetes/pkg/apis/admission
+      - k8s.io/kubernetes/pkg/apis/admission/install
+      - k8s.io/kubernetes/pkg/apis/admission/v1
+      - k8s.io/kubernetes/pkg/apis/admission/v1beta1
+      - k8s.io/kubernetes/pkg/apis/admissionregistration
+      - k8s.io/kubernetes/pkg/apis/admissionregistration/install
+      - k8s.io/kubernetes/pkg/apis/admissionregistration/v1
+      - k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1
+      - k8s.io/kubernetes/pkg/apis/apiserverinternal
+      - k8s.io/kubernetes/pkg/apis/apiserverinternal/fuzzer
+      - k8s.io/kubernetes/pkg/apis/apiserverinternal/install
+      - k8s.io/kubernetes/pkg/apis/apiserverinternal/v1alpha1
       - k8s.io/kubernetes/pkg/apis/apps
       - k8s.io/kubernetes/pkg/apis/apps/install
       - k8s.io/kubernetes/pkg/apis/apps/v1
@@ -35,13 +48,28 @@ rules:
       - k8s.io/kubernetes/pkg/apis/core/helper
       - k8s.io/kubernetes/pkg/apis/core/install
       - k8s.io/kubernetes/pkg/apis/core/v1
+      - k8s.io/kubernetes/pkg/apis/discovery
+      - k8s.io/kubernetes/pkg/apis/discovery/install
+      - k8s.io/kubernetes/pkg/apis/discovery/v1alpha1
+      - k8s.io/kubernetes/pkg/apis/discovery/v1beta1
       - k8s.io/kubernetes/pkg/apis/events
       - k8s.io/kubernetes/pkg/apis/events/install
       - k8s.io/kubernetes/pkg/apis/events/v1beta1
       - k8s.io/kubernetes/pkg/apis/extensions
       - k8s.io/kubernetes/pkg/apis/extensions/install
       - k8s.io/kubernetes/pkg/apis/extensions/v1beta1
+      - k8s.io/kubernetes/pkg/apis/flowcontrol
+      - k8s.io/kubernetes/pkg/apis/flowcontrol/install
+      - k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1
+      - k8s.io/kubernetes/pkg/apis/imagepolicy
+      - k8s.io/kubernetes/pkg/apis/imagepolicy/install
+      - k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1
       - k8s.io/kubernetes/pkg/apis/networking
+      - k8s.io/kubernetes/pkg/apis/node
+      - k8s.io/kubernetes/pkg/apis/node/install
+      - k8s.io/kubernetes/pkg/apis/node/v1
+      - k8s.io/kubernetes/pkg/apis/node/v1alpha1
+      - k8s.io/kubernetes/pkg/apis/node/v1beta1
       - k8s.io/kubernetes/pkg/apis/policy
       - k8s.io/kubernetes/pkg/apis/policy/install
       - k8s.io/kubernetes/pkg/apis/policy/v1beta1
@@ -50,6 +78,9 @@ rules:
       - k8s.io/kubernetes/pkg/apis/rbac/v1
       - k8s.io/kubernetes/pkg/apis/rbac/v1alpha1
       - k8s.io/kubernetes/pkg/apis/rbac/v1beta1
+      - k8s.io/kubernetes/pkg/apis/resource
+      - k8s.io/kubernetes/pkg/apis/resource/install
+      - k8s.io/kubernetes/pkg/apis/resource/v1alpha2
       - k8s.io/kubernetes/pkg/apis/scheduling
       - k8s.io/kubernetes/pkg/apis/scheduling/install
       - k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1
@@ -63,6 +94,4 @@ rules:
       - k8s.io/kubernetes/pkg/apis/storage/v1beta1
       - k8s.io/kubernetes/pkg/features
       - k8s.io/kubernetes/pkg/kubectl
-      - k8s.io/kubernetes/pkg/registry/rbac/reconciliation
-      - k8s.io/kubernetes/pkg/registry/rbac/validation
       - k8s.io/kubernetes/pkg/util/parsers

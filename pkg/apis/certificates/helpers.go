@@ -50,10 +50,16 @@ var (
 	uriSANNotAllowedErr           = fmt.Errorf("URI subjectAltNames are not allowed")
 )
 
-var kubeletServingRequiredUsages = sets.NewString(
-	string(UsageDigitalSignature),
-	string(UsageKeyEncipherment),
-	string(UsageServerAuth),
+var (
+	kubeletServingRequiredUsages = sets.NewString(
+		string(UsageDigitalSignature),
+		string(UsageKeyEncipherment),
+		string(UsageServerAuth),
+	)
+	kubeletServingRequiredUsagesNoRSA = sets.NewString(
+		string(UsageDigitalSignature),
+		string(UsageServerAuth),
+	)
 )
 
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages sets.String) bool {
@@ -76,7 +82,7 @@ func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String)
 		return uriSANNotAllowedErr
 	}
 
-	if !kubeletServingRequiredUsages.Equal(usages) {
+	if !kubeletServingRequiredUsages.Equal(usages) && !kubeletServingRequiredUsagesNoRSA.Equal(usages) {
 		return fmt.Errorf("usages did not match %v", kubeletServingRequiredUsages.List())
 	}
 
@@ -87,10 +93,16 @@ func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages sets.String)
 	return nil
 }
 
-var kubeletClientRequiredUsages = sets.NewString(
-	string(UsageDigitalSignature),
-	string(UsageKeyEncipherment),
-	string(UsageClientAuth),
+var (
+	kubeletClientRequiredUsagesNoRSA = sets.NewString(
+		string(UsageDigitalSignature),
+		string(UsageClientAuth),
+	)
+	kubeletClientRequiredUsages = sets.NewString(
+		string(UsageDigitalSignature),
+		string(UsageKeyEncipherment),
+		string(UsageClientAuth),
+	)
 )
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) bool {
@@ -118,7 +130,7 @@ func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages sets.String) 
 		return commonNameNotSystemNode
 	}
 
-	if !kubeletClientRequiredUsages.Equal(usages) {
+	if !kubeletClientRequiredUsages.Equal(usages) && !kubeletClientRequiredUsagesNoRSA.Equal(usages) {
 		return fmt.Errorf("usages did not match %v", kubeletClientRequiredUsages.List())
 	}
 

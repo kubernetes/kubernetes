@@ -1,25 +1,16 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- deads2k
-- erictune
-- liggitt
+  - deads2k
+  - liggitt
 reviewers:
-- thockin
-- smarterclayton
-- yujuhong
-- brendandburns
-- derekwaynecarr
-- vishh
-- mikedanese
-- davidopp
-- pmorie
-- dchen1107
-- justinsb
-- dims
-- resouer
-- mbohlool
-- mfojtik
-- therc
-- andrewsykim
-- mcrute
+  - thockin
+  - smarterclayton
+  - yujuhong
+  - derekwaynecarr
+  - mikedanese
+  - dchen1107
+  - justinsb
+  - dims
+  - andrewsykim
+  - andyzhangx

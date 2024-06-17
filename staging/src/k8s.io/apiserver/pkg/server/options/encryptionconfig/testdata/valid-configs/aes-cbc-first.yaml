@@ -14,6 +14,11 @@ resources:
           name: testprovider
           endpoint: unix:///tmp/testprovider.sock
           cachesize: 10
+          timeout: 5s
+      - kms:
+          apiVersion: v2
+          name: testproviderv2
+          endpoint: unix:///tmp/testprovider.sock
       - identity: {}
       - secretbox:
           keys:

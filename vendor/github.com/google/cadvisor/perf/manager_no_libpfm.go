@@ -1,3 +1,4 @@
+//go:build !libpfm || !cgo
 // +build !libpfm !cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
@@ -24,7 +25,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func NewManager(configFile string, numCores int, topology []info.Node) (stats.Manager, error) {
+func NewManager(configFile string, topology []info.Node) (stats.Manager, error) {
 	klog.V(1).Info("cAdvisor is build without cgo and/or libpfm support. Perf event counters are not available.")
 	return &stats.NoopManager{}, nil
 }

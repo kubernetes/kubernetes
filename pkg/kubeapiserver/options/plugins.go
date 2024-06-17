@@ -20,36 +20,34 @@ package options
 // This should probably be part of some configuration fed into the build for a
 // given binary target.
 import (
+	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	// Admission policies
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages"
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
+	"k8s.io/kubernetes/plugin/pkg/admission/certificates/ctbattest"
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
-	"k8s.io/kubernetes/plugin/pkg/admission/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
-	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/exists"
+	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
+	"k8s.io/kubernetes/plugin/pkg/admission/network/denyserviceexternalips"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
-	"k8s.io/kubernetes/plugin/pkg/admission/podpreset"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
-	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
-	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
-	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
+	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageobjectinuseprotection"
@@ -57,6 +55,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
 )
@@ -67,25 +66,20 @@ var AllOrderedPlugins = []string{
 	autoprovision.PluginName,                // NamespaceAutoProvision
 	lifecycle.PluginName,                    // NamespaceLifecycle
 	exists.PluginName,                       // NamespaceExists
-	scdeny.PluginName,                       // SecurityContextDeny
 	antiaffinity.PluginName,                 // LimitPodHardAntiAffinityTopology
-	podpreset.PluginName,                    // PodPreset
 	limitranger.PluginName,                  // LimitRanger
 	serviceaccount.PluginName,               // ServiceAccount
 	noderestriction.PluginName,              // NodeRestriction
 	nodetaint.PluginName,                    // TaintNodesByCondition
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
-	podsecuritypolicy.PluginName,            // PodSecurityPolicy
+	podsecurity.PluginName,                  // PodSecurity
 	podnodeselector.PluginName,              // PodNodeSelector
 	podpriority.PluginName,                  // Priority
 	defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
 	podtolerationrestriction.PluginName,     // PodTolerationRestriction
-	exec.DenyEscalatingExec,                 // DenyEscalatingExec
-	exec.DenyExecOnPrivileged,               // DenyExecOnPrivileged
 	eventratelimit.PluginName,               // EventRateLimit
 	extendedresourcetoleration.PluginName,   // ExtendedResourceToleration
-	label.PluginName,                        // PersistentVolumeLabel
 	setdefault.PluginName,                   // DefaultStorageClass
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
@@ -93,29 +87,32 @@ var AllOrderedPlugins = []string{
 	runtimeclass.PluginName,                 // RuntimeClass
 	certapproval.PluginName,                 // CertificateApproval
 	certsigning.PluginName,                  // CertificateSigning
+	ctbattest.PluginName,                    // ClusterTrustBundleAttest
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
+	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
 
-	mutatingwebhook.PluginName,   // MutatingAdmissionWebhook
-	validatingwebhook.PluginName, // ValidatingAdmissionWebhook
-	resourcequota.PluginName,     // ResourceQuota
-	deny.PluginName,              // AlwaysDeny
+	mutatingwebhook.PluginName,           // MutatingAdmissionWebhook
+	validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
+	validatingwebhook.PluginName,         // ValidatingAdmissionWebhook
+	resourcequota.PluginName,             // ResourceQuota
+	deny.PluginName,                      // AlwaysDeny
 }
 
-// RegisterAllAdmissionPlugins registers all admission plugins and
-// sets the recommended plugins order.
+// RegisterAllAdmissionPlugins registers all admission plugins.
+// The order of registration is irrelevant, see AllOrderedPlugins for execution order.
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)
 	antiaffinity.Register(plugins)
 	defaulttolerationseconds.Register(plugins)
 	defaultingressclass.Register(plugins)
+	denyserviceexternalips.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
 	eventratelimit.Register(plugins)
-	exec.Register(plugins)
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
@@ -124,45 +121,46 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
 	nodetaint.Register(plugins)
-	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
 	podnodeselector.Register(plugins)
-	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
-	podsecuritypolicy.Register(plugins)
+	podsecurity.Register(plugins)
 	podpriority.Register(plugins)
-	scdeny.Register(plugins)
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	storageobjectinuseprotection.Register(plugins)
 	certapproval.Register(plugins)
 	certsigning.Register(plugins)
+	ctbattest.Register(plugins)
 	certsubjectrestriction.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
-func DefaultOffAdmissionPlugins() sets.String {
-	defaultOnPlugins := sets.NewString(
-		lifecycle.PluginName,                    //NamespaceLifecycle
-		limitranger.PluginName,                  //LimitRanger
-		serviceaccount.PluginName,               //ServiceAccount
-		setdefault.PluginName,                   //DefaultStorageClass
-		resize.PluginName,                       //PersistentVolumeClaimResize
-		defaulttolerationseconds.PluginName,     //DefaultTolerationSeconds
-		mutatingwebhook.PluginName,              //MutatingAdmissionWebhook
-		validatingwebhook.PluginName,            //ValidatingAdmissionWebhook
-		resourcequota.PluginName,                //ResourceQuota
-		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
-		podpriority.PluginName,                  //PodPriority
-		nodetaint.PluginName,                    //TaintNodesByCondition
-		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
+func DefaultOffAdmissionPlugins() sets.Set[string] {
+	defaultOnPlugins := sets.New(
+		lifecycle.PluginName,                    // NamespaceLifecycle
+		limitranger.PluginName,                  // LimitRanger
+		serviceaccount.PluginName,               // ServiceAccount
+		setdefault.PluginName,                   // DefaultStorageClass
+		resize.PluginName,                       // PersistentVolumeClaimResize
+		defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
+		mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
+		validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
+		resourcequota.PluginName,                // ResourceQuota
+		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+		podpriority.PluginName,                  // Priority
+		nodetaint.PluginName,                    // TaintNodesByCondition
+		runtimeclass.PluginName,                 // RuntimeClass
 		certapproval.PluginName,                 // CertificateApproval
 		certsigning.PluginName,                  // CertificateSigning
+		ctbattest.PluginName,                    // ClusterTrustBundleAttest
 		certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
-		defaultingressclass.PluginName,          //DefaultIngressClass
+		defaultingressclass.PluginName,          // DefaultIngressClass
+		podsecurity.PluginName,                  // PodSecurity
+		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
-	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
+	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }

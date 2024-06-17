@@ -19,16 +19,18 @@ package phases
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"text/template"
 	"time"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
+
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
@@ -48,26 +50,22 @@ var (
 
 	Additionally, a control plane component may have crashed or exited when started by the container runtime.
 	To troubleshoot, list all containers using your preferred container runtimes CLI.
-{{ if .IsDocker }}
-	Here is one example how you may list all Kubernetes containers running in docker:
-		- 'docker ps -a | grep kube | grep -v pause'
-		Once you have found the failing container, you can inspect its logs with:
-		- 'docker logs CONTAINERID'
-{{ else }}
-	Here is one example how you may list all Kubernetes containers running in cri-o/containerd using crictl:
+	Here is one example how you may list all running Kubernetes containers by using crictl:
 		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
 		Once you have found the failing container, you can inspect its logs with:
 		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
-{{ end }}
 	`)))
 )
 
 // NewWaitControlPlanePhase is a hidden phase that runs after the control-plane and etcd phases
 func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
-		Name:   "wait-control-plane",
-		Run:    runWaitControlPlanePhase,
+		Name:  "wait-control-plane",
+		Short: "Wait for the control plane to start",
+		// TODO: unhide this phase once WaitForAllControlPlaneComponents goes GA:
+		// https://github.com/kubernetes/kubeadm/issues/2907
 		Hidden: true,
+		Run:    runWaitControlPlanePhase,
 	}
 	return phase
 }
@@ -78,73 +76,63 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.New("wait-control-plane phase invoked with an invalid data struct")
 	}
 
-	// If we're dry-running, print the generated manifests
-	if err := printFilesIfDryRunning(data); err != nil {
-		return errors.Wrap(err, "error printing files on dryrun")
+	// If we're dry-running, print the generated manifests.
+	// TODO: think of a better place to move this call - e.g. a hidden phase.
+	if data.DryRun() {
+		if err := dryrunutil.PrintFilesIfDryRunning(true /* needPrintManifest */, data.ManifestDir(), data.OutputWriter()); err != nil {
+			return errors.Wrap(err, "error printing files on dryrun")
+		}
 	}
 
-	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
-
-	client, err := data.Client()
+	// Both Wait* calls below use a /healthz endpoint, thus a client without permissions works fine
+	client, err := data.ClientWithoutBootstrap()
 	if err != nil {
-		return errors.Wrap(err, "cannot obtain client")
+		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}
 
-	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
-	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
+	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
+	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods"+
+		" from directory %q\n",
+		data.ManifestDir())
 
-	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
+	handleError := func(err error) error {
 		context := struct {
-			Error    string
-			Socket   string
-			IsDocker bool
+			Error  string
+			Socket string
 		}{
-			Error:    fmt.Sprintf("%v", err),
-			Socket:   data.Cfg().NodeRegistration.CRISocket,
-			IsDocker: data.Cfg().NodeRegistration.CRISocket == kubeadmconstants.DefaultDockerCRISocket,
+			Error:  fmt.Sprintf("%v", err),
+			Socket: data.Cfg().NodeRegistration.CRISocket,
 		}
 
 		kubeletFailTempl.Execute(data.OutputWriter(), context)
-		return errors.New("couldn't initialize a Kubernetes cluster")
+		return errors.New("could not initialize a Kubernetes cluster")
+	}
+
+	waiter.SetTimeout(data.Cfg().Timeouts.KubeletHealthCheck.Duration)
+	kubeletConfig := data.Cfg().ClusterConfiguration.ComponentConfigs[componentconfigs.KubeletGroup].Get()
+	kubeletConfigTyped, ok := kubeletConfig.(*kubeletconfig.KubeletConfiguration)
+	if !ok {
+		return errors.New("could not convert the KubeletConfiguration to a typed object")
+	}
+	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
+		return handleError(err)
+	}
+
+	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
+	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
+		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration)
+	} else {
+		err = waiter.WaitForAPI()
+	}
+	if err != nil {
+		return handleError(err)
 	}
 
 	return nil
-}
-
-// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
-func printFilesIfDryRunning(data InitData) error {
-	if !data.DryRun() {
-		return nil
-	}
-	manifestDir := data.ManifestDir()
-
-	fmt.Printf("[dryrun] Wrote certificates, kubeconfig files and control plane manifests to the %q directory\n", manifestDir)
-	fmt.Println("[dryrun] The certificates or kubeconfig files would not be printed due to their sensitive nature")
-	fmt.Printf("[dryrun] Please examine the %q directory for details about what would be written\n", manifestDir)
-
-	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
-	files := []dryrunutil.FileToPrint{}
-	// Print static pod manifests
-	for _, component := range kubeadmconstants.ControlPlaneComponents {
-		realPath := kubeadmconstants.GetStaticPodFilepath(component, manifestDir)
-		outputPath := kubeadmconstants.GetStaticPodFilepath(component, kubeadmconstants.GetStaticPodDirectory())
-		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
-	}
-	// Print kubelet config manifests
-	kubeletConfigFiles := []string{kubeadmconstants.KubeletConfigurationFileName, kubeadmconstants.KubeletEnvFileName}
-	for _, filename := range kubeletConfigFiles {
-		realPath := filepath.Join(manifestDir, filename)
-		outputPath := filepath.Join(kubeadmconstants.KubeletRunDirectory, filename)
-		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
-	}
-
-	return dryrunutil.PrintDryRunFiles(files, data.OutputWriter())
 }
 
 // newControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.

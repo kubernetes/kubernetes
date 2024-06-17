@@ -6,6 +6,7 @@ package language
 
 import (
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -43,6 +44,13 @@ func Parse(s string) (t Tag, err error) {
 // https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // The resulting tag is canonicalized using the canonicalization type c.
 func (c CanonType) Parse(s string) (t Tag, err error) {
+	defer func() {
+		if recover() != nil {
+			t = Tag{}
+			err = language.ErrSyntax
+		}
+	}()
+
 	tt, err := language.Parse(s)
 	if err != nil {
 		return makeTag(tt), err
@@ -79,6 +87,13 @@ func Compose(part ...interface{}) (t Tag, err error) {
 // tag is returned after canonicalizing using CanonType c. If one or more errors
 // are encountered, one of the errors is returned.
 func (c CanonType) Compose(part ...interface{}) (t Tag, err error) {
+	defer func() {
+		if recover() != nil {
+			t = Tag{}
+			err = language.ErrSyntax
+		}
+	}()
+
 	var b language.Builder
 	if err = update(&b, part...); err != nil {
 		return und, err
@@ -133,6 +148,7 @@ func update(b *language.Builder, part ...interface{}) (err error) {
 }
 
 var errInvalidWeight = errors.New("ParseAcceptLanguage: invalid weight")
+var errTagListTooLarge = errors.New("tag list exceeds max length")
 
 // ParseAcceptLanguage parses the contents of an Accept-Language header as
 // defined in http://www.ietf.org/rfc/rfc2616.txt and returns a list of Tags and
@@ -142,6 +158,18 @@ var errInvalidWeight = errors.New("ParseAcceptLanguage: invalid weight")
 // Tags with a weight of zero will be dropped. An error will be returned if the
 // input could not be parsed.
 func ParseAcceptLanguage(s string) (tag []Tag, q []float32, err error) {
+	defer func() {
+		if recover() != nil {
+			tag = nil
+			q = nil
+			err = language.ErrSyntax
+		}
+	}()
+
+	if strings.Count(s, "-") > 1000 {
+		return nil, nil, errTagListTooLarge
+	}
+
 	var entry string
 	for s != "" {
 		if entry, s = split(s, ','); entry == "" {
@@ -179,7 +207,7 @@ func ParseAcceptLanguage(s string) (tag []Tag, q []float32, err error) {
 		tag = append(tag, t)
 		q = append(q, float32(w))
 	}
-	sortStable(&tagSort{tag, q})
+	sort.Stable(&tagSort{tag, q})
 	return tag, q, nil
 }
 

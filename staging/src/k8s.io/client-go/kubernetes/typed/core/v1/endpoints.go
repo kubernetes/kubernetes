@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // EndpointsGetter has a method to return a EndpointsInterface.
@@ -46,6 +52,7 @@ type EndpointsInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointsList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoints, err error)
+	Apply(ctx context.Context, endpoints *corev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoints, err error)
 	EndpointsExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *endpoints) Get(ctx context.Context, name string, options metav1.GetOpti
 }
 
 // List takes label and field selectors, and returns the list of Endpoints that match those selectors.
-func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EndpointsList, err error) {
+func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (*v1.EndpointsList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for endpoints, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for endpoints", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for endpoints ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for endpoints", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Endpoints that match those selectors.
+func (c *endpoints) list(ctx context.Context, opts metav1.ListOptions) (result *v1.EndpointsList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (result *
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Endpoints
+func (c *endpoints) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.EndpointsList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.EndpointsList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("endpoints").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, 
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied endpoints.
+func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Endpoints, err error) {
+	if endpoints == nil {
+		return nil, fmt.Errorf("endpoints provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(endpoints)
+	if err != nil {
+		return nil, err
+	}
+	name := endpoints.Name
+	if name == nil {
+		return nil, fmt.Errorf("endpoints.Name must be provided to Apply")
+	}
+	result = &v1.Endpoints{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("endpoints").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

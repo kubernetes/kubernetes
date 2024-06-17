@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	validTmpl    = "image: {{ .ImageRepository }}/pause:3.2"
-	validTmplOut = "image: k8s.gcr.io/pause:3.2"
-	doNothing    = "image: k8s.gcr.io/pause:3.2"
+	validTmpl    = "image: {{ .ImageRepository }}/pause:ver"
+	validTmplOut = "image: registry.k8s.io/pause:ver"
+	doNothing    = "image: registry.k8s.io/pause:ver"
 	invalidTmpl1 = "{{ .baz }/d}"
 	invalidTmpl2 = "{{ !foobar }}"
 )
@@ -40,7 +40,7 @@ func TestParseTemplate(t *testing.T) {
 			name:     "should parse a valid template and set the right values",
 			template: validTmpl,
 			data: struct{ ImageRepository, Arch string }{
-				ImageRepository: "k8s.gcr.io",
+				ImageRepository: "registry.k8s.io",
 				Arch:            "amd64",
 			},
 			output:      validTmplOut,
@@ -50,7 +50,7 @@ func TestParseTemplate(t *testing.T) {
 			name:     "should noop if there aren't any {{ .foo }} present",
 			template: doNothing,
 			data: struct{ ImageRepository, Arch string }{
-				ImageRepository: "k8s.gcr.io",
+				ImageRepository: "registry.k8s.io",
 				Arch:            "amd64",
 			},
 			output:      doNothing,

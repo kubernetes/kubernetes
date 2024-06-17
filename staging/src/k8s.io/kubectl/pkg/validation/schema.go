@@ -22,7 +22,10 @@ import (
 	"fmt"
 
 	ejson "github.com/exponent-io/jsonpath"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/klog/v2"
 )
 
 // Schema is an interface that knows how to validate an API object serialized to a byte array.
@@ -100,4 +103,51 @@ func (c ConjunctiveSchema) ValidateBytes(data []byte) error {
 		}
 	}
 	return utilerrors.NewAggregate(list)
+}
+
+func NewParamVerifyingSchema(s Schema, verifier resource.Verifier, directive string) Schema {
+	return &paramVerifyingSchema{
+		schema:    s,
+		verifier:  verifier,
+		directive: directive,
+	}
+}
+
+// paramVerifyingSchema only performs validation
+// based on the fieldValidation query param
+// being unsupported by the apiserver, because
+// server-side validation will be performed instead
+// of client-side validation.
+type paramVerifyingSchema struct {
+	schema    Schema
+	verifier  resource.Verifier
+	directive string
+}
+
+// ValidateBytes validates bytes per a ParamVerifyingSchema
+func (c *paramVerifyingSchema) ValidateBytes(data []byte) error {
+	obj, err := parse(data)
+	if err != nil {
+		return err
+	}
+
+	gvk, errs := getObjectKind(obj)
+	if errs != nil {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	err = c.verifier.HasSupport(gvk)
+	if resource.IsParamUnsupportedError(err) {
+		switch c.directive {
+		case metav1.FieldValidationStrict:
+			return c.schema.ValidateBytes(data)
+		case metav1.FieldValidationWarn:
+			klog.Warningf("cannot perform warn validation if server-side field validation is unsupported, skipping validation")
+		default:
+			// can't be reached
+			klog.Warningf("unexpected field validation directive: %s, skipping validation", c.directive)
+		}
+		return nil
+	}
+	return err
 }

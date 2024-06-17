@@ -17,15 +17,15 @@ limitations under the License.
 package fc
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 
+	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +48,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/fc" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -172,7 +172,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	path := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~fc/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~fc/vol1")
 	if path != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
 	}
@@ -190,7 +190,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	fakeManager2 := newFakeDiskManager()
 	defer fakeManager2.Cleanup()
-	unmounter, err := plug.(*fcPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter)
+	unmounter, err := plug.(*fcPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}

@@ -17,6 +17,9 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
+	unsafe "unsafe"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -36,20 +39,29 @@ func Convert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiextensio
 	return nil
 }
 
+var nullLiteral = []byte(`null`)
+
 func Convert_apiextensions_JSON_To_v1_JSON(in *apiextensions.JSON, out *JSON, s conversion.Scope) error {
 	raw, err := json.Marshal(*in)
 	if err != nil {
 		return err
 	}
-	out.Raw = raw
+	if len(raw) == 0 || bytes.Equal(raw, nullLiteral) {
+		// match JSON#UnmarshalJSON treatment of literal nulls
+		out.Raw = nil
+	} else {
+		out.Raw = raw
+	}
 	return nil
 }
 
 func Convert_v1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
 	if in != nil {
 		var i interface{}
-		if err := json.Unmarshal(in.Raw, &i); err != nil {
-			return err
+		if len(in.Raw) > 0 && !bytes.Equal(in.Raw, nullLiteral) {
+			if err := json.Unmarshal(in.Raw, &i); err != nil {
+				return err
+			}
 		}
 		*out = i
 	} else {
@@ -68,7 +80,7 @@ func Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefi
 		out.Versions = []CustomResourceDefinitionVersion{{Name: in.Version, Served: true, Storage: true}}
 	}
 
-	// If spec.{subresources,validation,additionalPrinterColumns} exists, move to versions
+	// If spec.{subresources,validation,additionalPrinterColumns,selectableFields} exists, move to versions
 	if in.Subresources != nil {
 		subresources := &CustomResourceSubresources{}
 		if err := Convert_apiextensions_CustomResourceSubresources_To_v1_CustomResourceSubresources(in.Subresources, subresources, s); err != nil {
@@ -98,12 +110,23 @@ func Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefi
 			out.Versions[i].AdditionalPrinterColumns = additionalPrinterColumns
 		}
 	}
+	if in.SelectableFields != nil {
+		selectableFields := make([]SelectableField, len(in.SelectableFields))
+		for i := range in.SelectableFields {
+			if err := Convert_apiextensions_SelectableField_To_v1_SelectableField(&in.SelectableFields[i], &selectableFields[i], s); err != nil {
+				return err
+			}
+		}
+		for i := range out.Versions {
+			out.Versions[i].SelectableFields = selectableFields
+		}
+	}
 	return nil
 }
 
 func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in *CustomResourceDefinitionSpec, out *apiextensions.CustomResourceDefinitionSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 
 	if len(out.Versions) == 0 {
@@ -113,13 +136,15 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 	// Copy versions[0] to version
 	out.Version = out.Versions[0].Name
 
-	// If versions[*].{subresources,schema,additionalPrinterColumns} are identical, move to spec
+	// If versions[*].{subresources,schema,additionalPrinterColumns,selectableFields} are identical, move to spec
 	subresources := out.Versions[0].Subresources
 	subresourcesIdentical := true
 	validation := out.Versions[0].Schema
 	validationIdentical := true
 	additionalPrinterColumns := out.Versions[0].AdditionalPrinterColumns
 	additionalPrinterColumnsIdentical := true
+	selectableFields := out.Versions[0].SelectableFields
+	selectableFieldsIdentical := true
 
 	// Detect if per-version fields are identical
 	for _, v := range out.Versions {
@@ -131,6 +156,9 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 		}
 		if additionalPrinterColumnsIdentical && !apiequality.Semantic.DeepEqual(v.AdditionalPrinterColumns, additionalPrinterColumns) {
 			additionalPrinterColumnsIdentical = false
+		}
+		if selectableFieldsIdentical && !apiequality.Semantic.DeepEqual(v.SelectableFields, selectableFields) {
+			selectableFieldsIdentical = false
 		}
 	}
 
@@ -144,6 +172,9 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 	if additionalPrinterColumnsIdentical {
 		out.AdditionalPrinterColumns = additionalPrinterColumns
 	}
+	if selectableFieldsIdentical {
+		out.SelectableFields = selectableFields
+	}
 	for i := range out.Versions {
 		if subresourcesIdentical {
 			out.Versions[i].Subresources = nil
@@ -153,6 +184,9 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 		}
 		if additionalPrinterColumnsIdentical {
 			out.Versions[i].AdditionalPrinterColumns = nil
+		}
+		if selectableFieldsIdentical {
+			out.Versions[i].SelectableFields = nil
 		}
 	}
 
@@ -194,5 +228,10 @@ func Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversi
 			}
 		}
 	}
+	return nil
+}
+
+func Convert_apiextensions_ValidationRules_To_v1_ValidationRules(in *apiextensions.ValidationRules, out *ValidationRules, s conversion.Scope) error {
+	*out = *(*ValidationRules)(unsafe.Pointer(in))
 	return nil
 }

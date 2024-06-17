@@ -1,0 +1,17 @@
+#####################################################
+#
+# List of approvers for this repository
+#
+#####################################################
+#
+# Learn about membership in OpenTelemetry community:
+#  https://github.com/open-telemetry/community/blob/main/community-membership.md
+#
+#
+# Learn about CODEOWNERS file format:
+#  https://help.github.com/en/articles/about-code-owners
+#
+
+* @MrAlias @Aneurysm9 @evantorrie @XSAM @dashpole @MadVikingGod @pellared @hanyuancheung @dmathieu
+
+CODEOWNERS @MrAlias @MadVikingGod @pellared

@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
 	"k8s.io/apiserver/pkg/authentication/user"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
@@ -195,12 +196,20 @@ func newV1beta1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []
 		return nil, err
 	}
 
-	c, err := tokenReviewInterfaceFromKubeconfig(p, "v1beta1", nil)
+	clientConfig, err := webhookutil.LoadKubeconfig(p, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	authn, err := newWithBackoff(c, 0, implicitAuds)
+	c, err := tokenReviewInterfaceFromConfig(clientConfig, "v1beta1", testRetryBackoff)
+	if err != nil {
+		return nil, err
+	}
+
+	authn, err := newWithBackoff(c, testRetryBackoff, implicitAuds, 10*time.Second, AuthenticatorMetrics{
+		RecordRequestTotal:   noopMetrics{}.RequestTotal,
+		RecordRequestLatency: noopMetrics{}.RequestLatency,
+	})
 	if err != nil {
 		return nil, err
 	}

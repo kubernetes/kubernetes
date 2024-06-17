@@ -17,7 +17,7 @@ limitations under the License.
 /*
 This soak tests places a specified number of pods on each node and then
 repeatedly sends queries to a service running on these pods via
-a serivce
+a service
 */
 
 package main
@@ -39,8 +39,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/service"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/klog/v2"
 )
@@ -155,7 +155,7 @@ func main() {
 				Ports: []v1.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
-					TargetPort: intstr.FromInt(9376),
+					TargetPort: intstr.FromInt32(9376),
 				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",
@@ -205,7 +205,7 @@ func main() {
 						Containers: []v1.Container{
 							{
 								Name:  "serve-hostname",
-								Image: e2e.ServeHostnameImage,
+								Image: imageutils.GetE2EImage(imageutils.Agnhost),
 								Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 							},
 						},

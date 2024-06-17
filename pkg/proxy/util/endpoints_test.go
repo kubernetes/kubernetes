@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"net"
 	"testing"
 )
 
@@ -46,76 +45,6 @@ func TestIPPart(t *testing.T) {
 			}
 		} else if ip != "" {
 			t.Errorf("Error did not occur for %s, expected: '%s' error", tc.endpoint, tc.expectedError)
-		}
-	}
-}
-
-func TestPortPart(t *testing.T) {
-	tests := []struct {
-		name     string
-		endpoint string
-		want     int
-		wantErr  bool
-	}{
-		{
-			"no error parsing from ipv4-ip:port",
-			"1.2.3.4:1024",
-			1024,
-			false,
-		},
-		{
-			"no error parsing from ipv6-ip:port",
-			"[2001:db8::2:2]:9999",
-			9999,
-			false,
-		},
-		{
-			"error: missing port",
-			"1.2.3.4",
-			-1,
-			true,
-		},
-		{
-			"error: invalid port '1-2'",
-			"1.2.3.4:1-2",
-			-1,
-			true,
-		},
-		{
-			"error: invalid port 'port'",
-			"100.200.3.4:port",
-			-1,
-			true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := PortPart(tt.endpoint)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PortPart() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("PortPart() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestToCIDR(t *testing.T) {
-	testCases := []struct {
-		ip           string
-		expectedAddr string
-	}{
-		{"1.2.3.4", "1.2.3.4/32"},
-		{"2001:db8::1:1", "2001:db8::1:1/128"},
-	}
-
-	for _, tc := range testCases {
-		ip := net.ParseIP(tc.ip)
-		addr := ToCIDR(ip)
-		if addr != tc.expectedAddr {
-			t.Errorf("Unexpected host address for %s: Expected: %s, Got %s", tc.ip, tc.expectedAddr, addr)
 		}
 	}
 }

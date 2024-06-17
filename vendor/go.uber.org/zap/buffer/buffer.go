@@ -23,7 +23,10 @@
 // package's zero-allocation formatters.
 package buffer // import "go.uber.org/zap/buffer"
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 const _size = 1024 // by default, create 1 KiB buffers
 
@@ -39,6 +42,11 @@ func (b *Buffer) AppendByte(v byte) {
 	b.bs = append(b.bs, v)
 }
 
+// AppendBytes writes a single byte to the Buffer.
+func (b *Buffer) AppendBytes(v []byte) {
+	b.bs = append(b.bs, v...)
+}
+
 // AppendString writes a string to the Buffer.
 func (b *Buffer) AppendString(s string) {
 	b.bs = append(b.bs, s...)
@@ -47,6 +55,11 @@ func (b *Buffer) AppendString(s string) {
 // AppendInt appends an integer to the underlying buffer (assuming base 10).
 func (b *Buffer) AppendInt(i int64) {
 	b.bs = strconv.AppendInt(b.bs, i, 10)
+}
+
+// AppendTime appends the time formatted using the specified layout.
+func (b *Buffer) AppendTime(t time.Time, layout string) {
+	b.bs = t.AppendFormat(b.bs, layout)
 }
 
 // AppendUint appends an unsigned integer to the underlying buffer (assuming
@@ -96,6 +109,24 @@ func (b *Buffer) Reset() {
 func (b *Buffer) Write(bs []byte) (int, error) {
 	b.bs = append(b.bs, bs...)
 	return len(bs), nil
+}
+
+// WriteByte writes a single byte to the Buffer.
+//
+// Error returned is always nil, function signature is compatible
+// with bytes.Buffer and bufio.Writer
+func (b *Buffer) WriteByte(v byte) error {
+	b.AppendByte(v)
+	return nil
+}
+
+// WriteString writes a string to the Buffer.
+//
+// Error returned is always nil, function signature is compatible
+// with bytes.Buffer and bufio.Writer
+func (b *Buffer) WriteString(s string) (int, error) {
+	b.AppendString(s)
+	return len(s), nil
 }
 
 // TrimNewline trims any final "\n" byte from the end of the buffer.

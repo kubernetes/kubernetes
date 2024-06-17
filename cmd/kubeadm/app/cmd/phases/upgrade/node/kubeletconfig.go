@@ -18,25 +18,18 @@ package node
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
 var (
 	kubeletConfigLongDesc = cmdutil.LongDesc(`
-		Download the kubelet configuration from a ConfigMap of the form "kubelet-config-1.X" in the cluster,
-		where X is the minor version of the kubelet. kubeadm uses the KuberneteVersion field in the kubeadm-config
-		ConfigMap to determine what the _desired_ kubelet version is.
+		Download the kubelet configuration from the kubelet-config ConfigMap stored in the cluster
 		`)
 )
 
@@ -50,7 +43,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.DryRun,
 			options.KubeconfigPath,
-			options.KubeletVersion,
+			options.Patches,
 		},
 	}
 	return phase
@@ -64,56 +57,19 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for kubelet config upgrade
-		cfg := data.Cfg()
+		cfg := data.InitCfg()
 		dryRun := data.DryRun()
 
-		// Set up the kubelet directory to use. If dry-running, this will return a fake directory
-		kubeletDir, err := upgrade.GetKubeletDir(dryRun)
+		// Write the configuration for the kubelet down to disk and print the generated manifests instead if dry-running.
+		// If not dry-running, the kubelet config file will be backed up to /etc/kubernetes/tmp/ dir, so that it could be
+		// recovered if there is anything goes wrong.
+		err := upgrade.WriteKubeletConfigFiles(cfg, data.PatchesDir(), dryRun, data.OutputWriter())
 		if err != nil {
 			return err
-		}
-
-		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
-
-		// Store the kubelet component configuration.
-		// By default the kubelet version is expected to be equal to cfg.ClusterConfiguration.KubernetesVersion, but
-		// users can specify a different kubelet version (this is a legacy of the original implementation
-		// of `kubeadm upgrade node config` which we are preserving in order to not break the GA contract)
-		if data.KubeletVersion() != "" && data.KubeletVersion() != cfg.ClusterConfiguration.KubernetesVersion {
-			fmt.Printf("[upgrade] Using kubelet config version %s, while kubernetes-version is %s\n", data.KubeletVersion(), cfg.ClusterConfiguration.KubernetesVersion)
-			if err := kubeletphase.DownloadConfig(data.Client(), data.KubeletVersion(), kubeletDir); err != nil {
-				return err
-			}
-
-			// WriteConfigToDisk is what we should be calling since we already have the correct component config loaded
-		} else if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
-			return err
-		}
-
-		// If we're dry-running, print the generated manifests
-		if dryRun {
-			if err := printFilesIfDryRunning(dryRun, kubeletDir); err != nil {
-				return errors.Wrap(err, "error printing files on dryrun")
-			}
-			return nil
 		}
 
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")
 		fmt.Println("[upgrade] Now you should go ahead and upgrade the kubelet package using your package manager.")
 		return nil
 	}
-}
-
-// printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
-func printFilesIfDryRunning(dryRun bool, kubeletDir string) error {
-	if !dryRun {
-		return nil
-	}
-
-	// Print the contents of the upgraded file and pretend like they were in kubeadmconstants.KubeletRunDirectory
-	fileToPrint := dryrunutil.FileToPrint{
-		RealPath:  filepath.Join(kubeletDir, constants.KubeletConfigurationFileName),
-		PrintPath: filepath.Join(constants.KubeletRunDirectory, constants.KubeletConfigurationFileName),
-	}
-	return dryrunutil.PrintDryRunFiles([]dryrunutil.FileToPrint{fileToPrint}, os.Stdout)
 }

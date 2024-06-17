@@ -21,7 +21,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -103,27 +106,32 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 	}{
 		{
 			input: kubecontainer.ImageSpec{
-				Image:       "test",
-				Annotations: nil,
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    nil,
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image:       "test",
-				Annotations: map[string]string{},
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    map[string]string{},
 			},
 		},
 		{
 			input: kubecontainer.ImageSpec{
-				Image:       "test",
-				Annotations: []kubecontainer.Annotation{},
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    []kubecontainer.Annotation{},
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image:       "test",
-				Annotations: map[string]string{},
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    map[string]string{},
 			},
 		},
 		{
 			input: kubecontainer.ImageSpec{
-				Image: "test",
+				Image:          "test",
+				RuntimeHandler: "",
 				Annotations: []kubecontainer.Annotation{
 					{
 						Name:  "kubernetes.io/os",
@@ -136,7 +144,8 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 				},
 			},
 			expected: &runtimeapi.ImageSpec{
-				Image: "test",
+				Image:          "test",
+				RuntimeHandler: "",
 				Annotations: map[string]string{
 					"kubernetes.io/os":             "linux",
 					"kubernetes.io/runtimehandler": "handler",
@@ -146,6 +155,145 @@ func TestConvertToRuntimeAPIImageSpec(t *testing.T) {
 	}
 
 	for _, test := range testCases {
+		actual := toRuntimeAPIImageSpec(test.input)
+		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestConvertToKubeContainerImageSpecWithRuntimeHandlerInImageSpecCri(t *testing.T) {
+	testCases := []struct {
+		input    *runtimeapi.Image
+		expected kubecontainer.ImageSpec
+	}{
+		{
+			input: &runtimeapi.Image{
+				Id:   "test",
+				Spec: nil,
+			},
+			expected: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    []kubecontainer.Annotation(nil),
+			},
+		},
+		{
+			input: &runtimeapi.Image{
+				Id: "test",
+				Spec: &runtimeapi.ImageSpec{
+					Annotations: nil,
+				},
+			},
+			expected: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    []kubecontainer.Annotation(nil),
+			},
+		},
+		{
+			input: &runtimeapi.Image{
+				Id: "test",
+				Spec: &runtimeapi.ImageSpec{
+					Annotations: map[string]string{},
+				},
+			},
+			expected: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    []kubecontainer.Annotation(nil),
+			},
+		},
+		{
+			input: &runtimeapi.Image{
+				Id: "test",
+				Spec: &runtimeapi.ImageSpec{
+					RuntimeHandler: "test-runtimeHandler",
+					Annotations: map[string]string{
+						"kubernetes.io/os":             "linux",
+						"kubernetes.io/runtimehandler": "handler",
+					},
+				},
+			},
+			expected: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "test-runtimeHandler",
+				Annotations: []kubecontainer.Annotation{
+					{
+						Name:  "kubernetes.io/os",
+						Value: "linux",
+					},
+					{
+						Name:  "kubernetes.io/runtimehandler",
+						Value: "handler",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
+		actual := toKubeContainerImageSpec(test.input)
+		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestConvertToRuntimeAPIImageSpecWithRuntimeHandlerInImageSpecCri(t *testing.T) {
+	testCases := []struct {
+		input    kubecontainer.ImageSpec
+		expected *runtimeapi.ImageSpec
+	}{
+		{
+			input: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    nil,
+			},
+			expected: &runtimeapi.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    map[string]string{},
+			},
+		},
+		{
+			input: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    []kubecontainer.Annotation{},
+			},
+			expected: &runtimeapi.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "",
+				Annotations:    map[string]string{},
+			},
+		},
+		{
+			input: kubecontainer.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "test-runtimeHandler",
+				Annotations: []kubecontainer.Annotation{
+					{
+						Name:  "kubernetes.io/os",
+						Value: "linux",
+					},
+					{
+						Name:  "kubernetes.io/runtimehandler",
+						Value: "handler",
+					},
+				},
+			},
+			expected: &runtimeapi.ImageSpec{
+				Image:          "test",
+				RuntimeHandler: "test-runtimeHandler",
+				Annotations: map[string]string{
+					"kubernetes.io/os":             "linux",
+					"kubernetes.io/runtimehandler": "handler",
+				},
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 		actual := toRuntimeAPIImageSpec(test.input)
 		assert.Equal(t, test.expected, actual)
 	}

@@ -27,20 +27,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+kube::util::require-jq
 
-make -C "${KUBE_ROOT}" WHAT=vendor/k8s.io/code-generator/cmd/import-boss
-
-packages=(
-  "k8s.io/kubernetes/pkg/..."
-  "k8s.io/kubernetes/cmd/..."
-  "k8s.io/kubernetes/plugin/..."
-  "k8s.io/kubernetes/test/e2e/framework/..."
-  "k8s.io/kubernetes/test/integration/..."
+# Doing it this way is MUCH faster than simply saying "all", and there doesn't
+# seem to be a simpler way to express "this whole workspace".
+packages=()
+kube::util::read-array packages < <(
+    go work edit -json | jq -r '.Use[].DiskPath + "/..."'
 )
-for d in staging/src/k8s.io/*/; do
-  if [ -d "$d" ]; then
-    packages+=("./vendor/${d#"staging/src/"}...")
-  fi
-done
 
-$(kube::util::find-binary "import-boss") --include-test-files=true --verify-only --input-dirs "$(IFS=, ; echo "${packages[*]}")"
+GOPROXY=off \
+    go run ./cmd/import-boss -v "${KUBE_VERBOSE:-0}" "${packages[@]}"

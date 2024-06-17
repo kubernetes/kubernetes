@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ResourceQuotasGetter has a method to return a ResourceQuotaInterface.
@@ -47,6 +53,8 @@ type ResourceQuotaInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ResourceQuotaList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error)
+	Apply(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error)
+	ApplyStatus(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error)
 	ResourceQuotaExpansion
 }
 
@@ -78,7 +86,26 @@ func (c *resourceQuotas) Get(ctx context.Context, name string, options metav1.Ge
 }
 
 // List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
-func (c *resourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+func (c *resourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (*v1.ResourceQuotaList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for resourcequotas, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for resourcequotas", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for resourcequotas ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for resourcequotas", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
+func (c *resourceQuotas) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -90,6 +117,23 @@ func (c *resourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (res
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ResourceQuotas
+func (c *resourceQuotas) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ResourceQuotaList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.ResourceQuotaList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -188,6 +232,62 @@ func (c *resourceQuotas) Patch(ctx context.Context, name string, pt types.PatchT
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied resourceQuota.
+func (c *resourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error) {
+	if resourceQuota == nil {
+		return nil, fmt.Errorf("resourceQuota provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(resourceQuota)
+	if err != nil {
+		return nil, err
+	}
+	name := resourceQuota.Name
+	if name == nil {
+		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
+	}
+	result = &v1.ResourceQuota{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *resourceQuotas) ApplyStatus(ctx context.Context, resourceQuota *corev1.ResourceQuotaApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ResourceQuota, err error) {
+	if resourceQuota == nil {
+		return nil, fmt.Errorf("resourceQuota provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(resourceQuota)
+	if err != nil {
+		return nil, err
+	}
+
+	name := resourceQuota.Name
+	if name == nil {
+		return nil, fmt.Errorf("resourceQuota.Name must be provided to Apply")
+	}
+
+	result = &v1.ResourceQuota{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

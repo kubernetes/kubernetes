@@ -18,8 +18,10 @@ package healthz
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/client-go/informers"
+	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/klog/v2"
 )
 
@@ -82,16 +84,20 @@ func (l *log) Check(_ *http.Request) error {
 	return fmt.Errorf("logging blocked")
 }
 
+type cacheSyncWaiter interface {
+	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+}
+
 type informerSync struct {
-	sharedInformerFactory informers.SharedInformerFactory
+	cacheSyncWaiter cacheSyncWaiter
 }
 
 var _ HealthChecker = &informerSync{}
 
-// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given sharedInformerFactory sync.
-func NewInformerSyncHealthz(sharedInformerFactory informers.SharedInformerFactory) HealthChecker {
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given cacheSyncWaiter sync.
+func NewInformerSyncHealthz(cacheSyncWaiter cacheSyncWaiter) HealthChecker {
 	return &informerSync{
-		sharedInformerFactory: sharedInformerFactory,
+		cacheSyncWaiter: cacheSyncWaiter,
 	}
 }
 
@@ -99,13 +105,36 @@ func (i *informerSync) Name() string {
 	return "informer-sync"
 }
 
+type shutdown struct {
+	stopCh <-chan struct{}
+}
+
+// NewShutdownHealthz returns a new HealthChecker that will fail if the embedded channel is closed.
+// This is intended to allow for graceful shutdown sequences.
+func NewShutdownHealthz(stopCh <-chan struct{}) HealthChecker {
+	return &shutdown{stopCh}
+}
+
+func (s *shutdown) Name() string {
+	return "shutdown"
+}
+
+func (s *shutdown) Check(req *http.Request) error {
+	select {
+	case <-s.stopCh:
+		return fmt.Errorf("process is shutting down")
+	default:
+	}
+	return nil
+}
+
 func (i *informerSync) Check(_ *http.Request) error {
 	stopCh := make(chan struct{})
 	// Close stopCh to force checking if informers are synced now.
 	close(stopCh)
 
-	var informersByStarted map[bool][]string
-	for informerType, started := range i.sharedInformerFactory.WaitForCacheSync(stopCh) {
+	informersByStarted := make(map[bool][]string)
+	for informerType, started := range i.cacheSyncWaiter.WaitForCacheSync(stopCh) {
 		informersByStarted[started] = append(informersByStarted[started], informerType.String())
 	}
 
@@ -150,6 +179,12 @@ func InstallLivezHandler(mux mux, checks ...HealthChecker) {
 // InstallPathHandler more than once for the same path and mux will
 // result in a panic.
 func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
+	InstallPathHandlerWithHealthyFunc(mux, path, nil, checks...)
+}
+
+// InstallPathHandlerWithHealthyFunc is like InstallPathHandler, but calls firstTimeHealthy exactly once
+// when the handler succeeds for the first time.
+func InstallPathHandlerWithHealthyFunc(mux mux, path string, firstTimeHealthy func(), checks ...HealthChecker) {
 	if len(checks) == 0 {
 		klog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthChecker{PingHealthz}
@@ -157,6 +192,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 
 	klog.V(5).Infof("Installing health checkers for (%v): %v", path, formatQuoted(checkerNames(checks...)...))
 
+	name := strings.Split(strings.TrimPrefix(path, "/"), "/")[0]
 	mux.Handle(path,
 		metrics.InstrumentHandlerFunc("GET",
 			/* group = */ "",
@@ -167,7 +203,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 			/* component = */ "",
 			/* deprecated */ false,
 			/* removedRelease */ "",
-			handleRootHealthz(checks...)))
+			handleRootHealth(name, firstTimeHealthy, checks...)))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
@@ -203,9 +239,10 @@ func getExcludedChecks(r *http.Request) sets.String {
 	return sets.NewString()
 }
 
-// handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
-func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// handleRootHealth returns an http.HandlerFunc that serves the provided checks.
+func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChecker) http.HandlerFunc {
+	var notifyOnce sync.Once
+	return func(w http.ResponseWriter, r *http.Request) {
 		excluded := getExcludedChecks(r)
 		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
 		var failedVerboseLogOutput bytes.Buffer
@@ -219,6 +256,7 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 				continue
 			}
 			if err := check.Check(r); err != nil {
+				slis.ObserveHealthcheck(context.Background(), check.Name(), name, slis.Error)
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
 				fmt.Fprintf(&individualCheckOutput, "[-]%s failed: reason withheld\n", check.Name())
@@ -226,19 +264,26 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 				fmt.Fprintf(&failedVerboseLogOutput, "[-]%s failed: %v\n", check.Name(), err)
 				failedChecks = append(failedChecks, check.Name())
 			} else {
+				slis.ObserveHealthcheck(context.Background(), check.Name(), name, slis.Success)
 				fmt.Fprintf(&individualCheckOutput, "[+]%s ok\n", check.Name())
 			}
 		}
 		if excluded.Len() > 0 {
 			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(excluded.List()...))
-			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %s",
+			klog.V(6).Infof("cannot exclude some health checks, no health checks are installed matching %s",
 				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure
 		if len(failedChecks) > 0 {
-			klog.V(2).Infof("healthz check failed: %s\n%v", strings.Join(failedChecks, ","), failedVerboseLogOutput.String())
-			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%shealthz check failed", individualCheckOutput.String()), http.StatusInternalServerError)
+			klog.V(2).Infof("%s check failed: %s\n%v", strings.Join(failedChecks, ","), name, failedVerboseLogOutput.String())
+			httplog.SetStacktracePredicate(r.Context(), func(int) bool { return false })
+			http.Error(w, fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
 			return
+		}
+
+		// signal first time this is healthy
+		if firstTimeHealthy != nil {
+			notifyOnce.Do(firstTimeHealthy)
 		}
 
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -249,8 +294,8 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 		}
 
 		individualCheckOutput.WriteTo(w)
-		fmt.Fprint(w, "healthz check passed\n")
-	})
+		fmt.Fprintf(w, "%s check passed\n", name)
+	}
 }
 
 // adaptCheckToHandler returns an http.HandlerFunc that serves the provided checks.

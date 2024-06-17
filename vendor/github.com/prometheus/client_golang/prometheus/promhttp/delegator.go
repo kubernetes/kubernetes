@@ -76,17 +76,19 @@ func (r *responseWriterDelegator) Write(b []byte) (int, error) {
 	return n, err
 }
 
-type closeNotifierDelegator struct{ *responseWriterDelegator }
-type flusherDelegator struct{ *responseWriterDelegator }
-type hijackerDelegator struct{ *responseWriterDelegator }
-type readerFromDelegator struct{ *responseWriterDelegator }
-type pusherDelegator struct{ *responseWriterDelegator }
+type (
+	closeNotifierDelegator struct{ *responseWriterDelegator }
+	flusherDelegator       struct{ *responseWriterDelegator }
+	hijackerDelegator      struct{ *responseWriterDelegator }
+	readerFromDelegator    struct{ *responseWriterDelegator }
+	pusherDelegator        struct{ *responseWriterDelegator }
+)
 
 func (d closeNotifierDelegator) CloseNotify() <-chan bool {
-	//lint:ignore SA1019 http.CloseNotifier is deprecated but we don't want to
-	//remove support from client_golang yet.
+	//nolint:staticcheck // Ignore SA1019. http.CloseNotifier is deprecated but we keep it here to not break existing users.
 	return d.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
+
 func (d flusherDelegator) Flush() {
 	// If applicable, call WriteHeader here so that observeWriteHeader is
 	// handled appropriately.
@@ -95,9 +97,11 @@ func (d flusherDelegator) Flush() {
 	}
 	d.ResponseWriter.(http.Flusher).Flush()
 }
+
 func (d hijackerDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return d.ResponseWriter.(http.Hijacker).Hijack()
 }
+
 func (d readerFromDelegator) ReadFrom(re io.Reader) (int64, error) {
 	// If applicable, call WriteHeader here so that observeWriteHeader is
 	// handled appropriately.
@@ -108,6 +112,7 @@ func (d readerFromDelegator) ReadFrom(re io.Reader) (int64, error) {
 	d.written += n
 	return n, err
 }
+
 func (d pusherDelegator) Push(target string, opts *http.PushOptions) error {
 	return d.ResponseWriter.(http.Pusher).Push(target, opts)
 }
@@ -262,7 +267,7 @@ func init() {
 			http.Flusher
 		}{d, pusherDelegator{d}, hijackerDelegator{d}, flusherDelegator{d}}
 	}
-	pickDelegator[pusher+hijacker+flusher+closeNotifier] = func(d *responseWriterDelegator) delegator { //23
+	pickDelegator[pusher+hijacker+flusher+closeNotifier] = func(d *responseWriterDelegator) delegator { // 23
 		return struct {
 			*responseWriterDelegator
 			http.Pusher
@@ -348,8 +353,7 @@ func newDelegator(w http.ResponseWriter, observeWriteHeaderFunc func(int)) deleg
 	}
 
 	id := 0
-	//lint:ignore SA1019 http.CloseNotifier is deprecated but we don't want to
-	//remove support from client_golang yet.
+	//nolint:staticcheck // Ignore SA1019. http.CloseNotifier is deprecated but we keep it here to not break existing users.
 	if _, ok := w.(http.CloseNotifier); ok {
 		id += closeNotifier
 	}

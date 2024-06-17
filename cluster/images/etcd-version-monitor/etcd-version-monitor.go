@@ -61,7 +61,7 @@ var (
 	customMetricRegistry = metrics.NewKubeRegistry()
 
 	// Custom etcd version metric since etcd 3.2- does not export one.
-	// This will be replaced by https://github.com/coreos/etcd/pull/8960 in etcd 3.3.
+	// This will be replaced by https://github.com/etcd-io/etcd/pull/8960 in etcd 3.3.
 	etcdVersion = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Namespace:      namespace,
@@ -251,6 +251,7 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 		}
 		select {
 		case <-stopCh:
+			return
 		case <-time.After(scrapeTimeout):
 		}
 	}

@@ -17,7 +17,11 @@ limitations under the License.
 package kuberuntime
 
 import (
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"sort"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -26,19 +30,34 @@ import (
 func toKubeContainerImageSpec(image *runtimeapi.Image) kubecontainer.ImageSpec {
 	var annotations []kubecontainer.Annotation
 
-	if image.Spec != nil && image.Spec.Annotations != nil {
-		for k, v := range image.Spec.Annotations {
+	if image.Spec != nil && len(image.Spec.Annotations) > 0 {
+		annotationKeys := make([]string, 0, len(image.Spec.Annotations))
+		for k := range image.Spec.Annotations {
+			annotationKeys = append(annotationKeys, k)
+		}
+		sort.Strings(annotationKeys)
+		for _, k := range annotationKeys {
 			annotations = append(annotations, kubecontainer.Annotation{
 				Name:  k,
-				Value: v,
+				Value: image.Spec.Annotations[k],
 			})
 		}
 	}
 
-	return kubecontainer.ImageSpec{
+	spec := kubecontainer.ImageSpec{
 		Image:       image.Id,
 		Annotations: annotations,
 	}
+	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+		runtimeHandler := ""
+		if image.Spec != nil {
+			runtimeHandler = image.Spec.RuntimeHandler
+		}
+		spec.RuntimeHandler = runtimeHandler
+	}
+
+	return spec
 }
 
 func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageSpec {
@@ -48,8 +67,15 @@ func toRuntimeAPIImageSpec(imageSpec kubecontainer.ImageSpec) *runtimeapi.ImageS
 			annotations[a.Name] = a.Value
 		}
 	}
-	return &runtimeapi.ImageSpec{
+
+	spec := runtimeapi.ImageSpec{
 		Image:       imageSpec.Image,
 		Annotations: annotations,
 	}
+	// if RuntimeClassInImageCriAPI feature gate is enabled, set runtimeHandler CRI field
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
+		spec.RuntimeHandler = imageSpec.RuntimeHandler
+	}
+
+	return &spec
 }

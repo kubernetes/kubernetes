@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for CertificateSigningRequest.
@@ -39,14 +40,15 @@ type REST struct {
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
-		NewListFunc:              func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
-		DefaultQualifiedResource: certificates.Resource("certificatesigningrequests"),
+		NewFunc:                   func() runtime.Object { return &certificates.CertificateSigningRequest{} },
+		NewListFunc:               func() runtime.Object { return &certificates.CertificateSigningRequestList{} },
+		DefaultQualifiedResource:  certificates.Resource("certificatesigningrequests"),
+		SingularQualifiedResource: certificates.Resource("certificatesigningrequest"),
 
-		CreateStrategy: csrregistry.Strategy,
-		UpdateStrategy: csrregistry.Strategy,
-		DeleteStrategy: csrregistry.Strategy,
-		ExportStrategy: csrregistry.Strategy,
+		CreateStrategy:      csrregistry.Strategy,
+		UpdateStrategy:      csrregistry.Strategy,
+		DeleteStrategy:      csrregistry.Strategy,
+		ResetFieldsStrategy: csrregistry.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -60,9 +62,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Approva
 	// dedicated strategies.
 	statusStore := *store
 	statusStore.UpdateStrategy = csrregistry.StatusStrategy
+	statusStore.ResetFieldsStrategy = csrregistry.StatusStrategy
+	statusStore.BeginUpdate = countCSRDurationMetric(csrDurationRequested, csrDurationHonored)
 
 	approvalStore := *store
 	approvalStore.UpdateStrategy = csrregistry.ApprovalStrategy
+	approvalStore.ResetFieldsStrategy = csrregistry.ApprovalStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, &ApprovalREST{store: &approvalStore}, nil
 }
@@ -85,6 +90,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -95,6 +106,15 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
 var _ = rest.Patcher(&StatusREST{})
@@ -109,6 +129,12 @@ func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *ApprovalREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *ApprovalREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -119,6 +145,11 @@ func (r *ApprovalREST) Update(ctx context.Context, name string, objInfo rest.Upd
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *ApprovalREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 var _ = rest.Patcher(&ApprovalREST{})

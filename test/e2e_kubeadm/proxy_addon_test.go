@@ -17,11 +17,14 @@ limitations under the License.
 package kubeadm
 
 import (
+	"context"
+
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -52,17 +55,18 @@ var _ = Describe("proxy addon", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("proxy")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
 	ginkgo.Context("kube-proxy ServiceAccount", func() {
-		ginkgo.It("should exist", func() {
+		ginkgo.It("should exist", func(ctx context.Context) {
 			ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeProxyServiceAccountName)
 		})
 
-		ginkgo.It("should be bound to the system:node-proxier cluster role", func() {
+		ginkgo.It("should be bound to the system:node-proxier cluster role", func(ctx context.Context) {
 			ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 				kubeProxyClusterRoleBindingName,
 				rbacv1.ServiceAccountKind, kubeProxyServiceAccountName,
@@ -72,19 +76,19 @@ var _ = Describe("proxy addon", func() {
 	})
 
 	ginkgo.Context("kube-proxy ConfigMap", func() {
-		ginkgo.It("should exist and be properly configured", func() {
+		ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 			cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeProxyConfigMap)
 
 			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKey))
 			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKeyKubeconfig))
 		})
 
-		ginkgo.It("should have related Role and RoleBinding", func() {
+		ginkgo.It("should have related Role and RoleBinding", func(ctx context.Context) {
 			ExpectRole(f.ClientSet, kubeSystemNamespace, kubeProxyRoleName)
 			ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeProxyRoleBindingName)
 		})
 
-		ginkgo.It("should be accessible by bootstrap tokens", func() {
+		ginkgo.It("should be accessible by bootstrap tokens", func(ctx context.Context) {
 			ExpectSubjectHasAccessToResource(f.ClientSet,
 				rbacv1.GroupKind, bootstrapTokensGroup,
 				kubeProxyConfigMapResource,
@@ -93,10 +97,10 @@ var _ = Describe("proxy addon", func() {
 	})
 
 	ginkgo.Context("kube-proxy DaemonSet", func() {
-		ginkgo.It("should exist and be properly configured", func() {
+		ginkgo.It("should exist and be properly configured", func(ctx context.Context) {
 			ds := GetDaemonSet(f.ClientSet, kubeSystemNamespace, kubeProxyDaemonSetName)
 
-			framework.ExpectEqual(ds.Spec.Template.Spec.ServiceAccountName, kubeProxyServiceAccountName)
+			gomega.Expect(ds.Spec.Template.Spec.ServiceAccountName).To(gomega.Equal(kubeProxyServiceAccountName))
 		})
 	})
 })

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implement KEP 32: https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/wgs/0032-create-a-k8s-io-component-repo.md
+Implement KEP 32: https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/wgs/783-component-base/README.md
 
 The proposal is essentially about refactoring the Kubernetes core package structure in a way that all core components may share common code around:
  - ComponentConfig implementation
@@ -32,3 +32,4 @@ Code changes are made in that location, merged into `k8s.io/kubernetes` and late
 
 WG Component Standard is working on this refactoring process, which is happening incrementally, starting in the v1.14 cycle.
 SIG API Machinery and SIG Cluster Lifecycle owns the code.
+

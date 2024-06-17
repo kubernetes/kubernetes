@@ -19,18 +19,16 @@ package node
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -87,152 +85,93 @@ func makeNode(podCIDRs []string, addSpecDynamicConfig bool, addStatusDynamicConf
 
 func TestDropFields(t *testing.T) {
 	testCases := []struct {
-		name                    string
-		node                    *api.Node
-		oldNode                 *api.Node
-		compareNode             *api.Node
-		enableDualStack         bool
-		enableNodeDynamicConfig bool
+		name        string
+		node        *api.Node
+		oldNode     *api.Node
+		compareNode *api.Node
 	}{
 		{
-			name:            "nil pod cidrs",
-			enableDualStack: false,
-			node:            makeNode(nil, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode(nil, false, false),
+			name:        "nil pod cidrs",
+			node:        makeNode(nil, false, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:            "empty pod ips",
-			enableDualStack: false,
-			node:            makeNode([]string{}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{}, false, false),
+			name:        "empty pod ips",
+			node:        makeNode([]string{}, false, false),
+			oldNode:     nil,
+			compareNode: makeNode([]string{}, false, false),
 		},
 		{
-			name:            "single family ipv6",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
+			name:        "single family ipv6",
+			node:        makeNode([]string{"2000::/10"}, false, false),
+			compareNode: makeNode([]string{"2000::/10"}, false, false),
 		},
 		{
-			name:            "single family ipv4",
-			enableDualStack: false,
-			node:            makeNode([]string{"10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"10.0.0.0/8"}, false, false),
+			name:        "single family ipv4",
+			node:        makeNode([]string{"10.0.0.0/8"}, false, false),
+			compareNode: makeNode([]string{"10.0.0.0/8"}, false, false),
 		},
 		{
-			name:            "dualstack 4-6",
-			enableDualStack: true,
-			node:            makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
-			compareNode:     makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
+			name:        "dualstack 4-6",
+			node:        makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
+			compareNode: makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
 		},
 		{
-			name:            "dualstack 6-4",
-			enableDualStack: true,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			name:        "dualstack 6-4",
+			node:        makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			compareNode: makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 		},
 		{
-			name:            "not dualstack 6-4=>4only",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
+			name:        "new with no Spec.ConfigSource and no Status.Config",
+			node:        makeNode(nil, false, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:            "not dualstack 6-4=>as is (used in old)",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			name:        "new with Spec.ConfigSource and no Status.Config",
+			node:        makeNode(nil, true, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:            "not dualstack 6-4=>6only",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
+			name:        "new with Spec.ConfigSource and Status.Config",
+			node:        makeNode(nil, true, true),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:            "not dualstack 6-4=>as is (used in old)",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			name:        "update with Spec.ConfigSource and Status.Config (old has none)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, false, false),
+			compareNode: makeNode(nil, false, true),
 		},
 		{
-			name:                    "new with no Spec.ConfigSource and no Status.Config , enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, false, false),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
+			name:        "update with Spec.ConfigSource and Status.Config (old has them)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, true, true),
+			compareNode: makeNode(nil, true, true),
 		},
 		{
-			name:                    "new with Spec.ConfigSource and no Status.Config, enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, false),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
-		},
-		{
-			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, false, false),
-		},
-		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has none), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, false, false),
-			compareNode:             makeNode(nil, false, true),
-		},
-		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has them), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, true, true),
-			compareNode:             makeNode(nil, true, true),
-		},
-		{
-			name:                    "update with Spec.ConfigSource and Status.Config (old has Status.Config), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: false,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 makeNode(nil, false, true),
-			compareNode:             makeNode(nil, false, true),
-		},
-		{
-			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig enabled",
-			enableDualStack:         false,
-			enableNodeDynamicConfig: true,
-			node:                    makeNode(nil, true, true),
-			oldNode:                 nil,
-			compareNode:             makeNode(nil, true, true),
+			name:        "update with Spec.ConfigSource and Status.Config (old has Status.Config)",
+			node:        makeNode(nil, true, true),
+			oldNode:     makeNode(nil, false, true),
+			compareNode: makeNode(nil, false, true),
 		},
 	}
 
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
-
 			dropDisabledFields(tc.node, tc.oldNode)
 
 			old := tc.oldNode.DeepCopy()
 			// old node  should never be changed
 			if !reflect.DeepEqual(tc.oldNode, old) {
-				t.Errorf("%v: old node changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldNode, old))
+				t.Errorf("%v: old node changed: %v", tc.name, cmp.Diff(tc.oldNode, old))
 			}
 
 			if !reflect.DeepEqual(tc.node, tc.compareNode) {
-				t.Errorf("%v: unexpected node spec: %v", tc.name, diff.ObjectReflectDiff(tc.node, tc.compareNode))
+				t.Errorf("%v: unexpected node spec: %v", tc.name, cmp.Diff(tc.node, tc.compareNode))
 			}
 		}()
 	}
@@ -338,6 +277,51 @@ func TestValidate(t *testing.T) {
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
+
+func TestWarningOnUpdateAndCreate(t *testing.T) {
+	tests := []struct {
+		oldNode     api.Node
+		node        api.Node
+		warningText string
+	}{
+		{api.Node{},
+			api.Node{},
+			""},
+		{api.Node{},
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource"},
+		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			"spec.configSource"},
+		{api.Node{Spec: api.NodeSpec{ConfigSource: &api.NodeConfigSource{}}},
+			api.Node{}, ""},
+		{api.Node{},
+			api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			"spec.externalID"},
+		{api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			"spec.externalID"},
+		{api.Node{Spec: api.NodeSpec{DoNotUseExternalID: "externalID"}},
+			api.Node{}, ""},
+	}
+	for i, test := range tests {
+		warnings := (nodeStrategy{}).WarningsOnUpdate(context.Background(), &test.node, &test.oldNode)
+		if (test.warningText != "" && len(warnings) != 1) || (test.warningText == "" && len(warnings) != 0) {
+			t.Errorf("%d: Unexpected warnings count: %v", i, warnings)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		} else if test.warningText != "" && !strings.Contains(warnings[0], test.warningText) {
+			t.Errorf("%d: Wrong warning message: %v", i, warnings[0])
+		}
+
+		warnings = (nodeStrategy{}).WarningsOnCreate(context.Background(), &test.node)
+		if (test.warningText != "" && len(warnings) != 1) || (test.warningText == "" && len(warnings) != 0) {
+			t.Errorf("%d: Unexpected warnings count: %v", i, warnings)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		} else if test.warningText != "" && !strings.Contains(warnings[0], test.warningText) {
+			t.Errorf("%d: Wrong warning message: %v", i, warnings[0])
 		}
 	}
 }

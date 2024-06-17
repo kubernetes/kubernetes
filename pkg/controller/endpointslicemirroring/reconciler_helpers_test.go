@@ -17,9 +17,10 @@ limitations under the License.
 package endpointslicemirroring
 
 import (
+	"sort"
 	"testing"
 
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,8 +51,8 @@ func TestRecycleSlices(t *testing.T) {
 		},
 		expectedSlices: &slicesByAction{
 			toUpdate: []*discovery.EndpointSlice{
-				simpleEndpointSlice("baz", "10.2.3.4", discovery.AddressTypeIPv4),
 				simpleEndpointSlice("bar", "10.1.2.3", discovery.AddressTypeIPv4),
+				simpleEndpointSlice("baz", "10.2.3.4", discovery.AddressTypeIPv4),
 			},
 		},
 	}, {
@@ -122,11 +123,19 @@ func TestRecycleSlices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			recycleSlices(tc.startingSlices)
+			startingSlices := tc.startingSlices
+			recycleSlices(startingSlices)
 
-			expectEqualSlices(t, tc.startingSlices.toCreate, tc.expectedSlices.toCreate)
-			expectEqualSlices(t, tc.startingSlices.toUpdate, tc.expectedSlices.toUpdate)
-			expectEqualSlices(t, tc.startingSlices.toDelete, tc.expectedSlices.toDelete)
+			unorderedSlices := [][]*discovery.EndpointSlice{startingSlices.toCreate, startingSlices.toUpdate, startingSlices.toDelete}
+			for _, actual := range unorderedSlices {
+				sort.Slice(actual, func(i, j int) bool {
+					return actual[i].Name < actual[j].Name
+				})
+			}
+
+			expectEqualSlices(t, startingSlices.toCreate, tc.expectedSlices.toCreate)
+			expectEqualSlices(t, startingSlices.toUpdate, tc.expectedSlices.toUpdate)
+			expectEqualSlices(t, startingSlices.toDelete, tc.expectedSlices.toDelete)
 		})
 	}
 }

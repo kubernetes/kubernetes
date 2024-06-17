@@ -18,7 +18,7 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
@@ -57,9 +58,10 @@ func TestResourcesLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
@@ -105,9 +107,10 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 
 	outputFormat := "name"
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdResources(tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
@@ -480,7 +483,7 @@ func TestSetResourcesRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}
@@ -495,7 +498,7 @@ func TestSetResourcesRemote(t *testing.T) {
 
 			outputFormat := "yaml"
 
-			streams := genericclioptions.NewTestIOStreamsDiscard()
+			streams := genericiooptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
 			opts := SetResourcesOptions{
@@ -503,6 +506,115 @@ func TestSetResourcesRemote(t *testing.T) {
 
 				Limits:            "cpu=200m,memory=512Mi",
 				ContainerSelector: "*",
+				IOStreams:         streams,
+			}
+			err := opts.Complete(tf, cmd, input.args)
+			if err == nil {
+				err = opts.Validate()
+			}
+			if err == nil {
+				err = opts.Run()
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSetResourcesRemoteWithSpecificContainers(t *testing.T) {
+	inputs := []struct {
+		name     string
+		selector string
+		args     []string
+
+		expectedContainers int
+	}{
+		{
+			name:               "all containers",
+			args:               []string{"deployments", "redis"},
+			selector:           "*",
+			expectedContainers: 2,
+		},
+		{
+			name:               "use wildcards to select some containers",
+			args:               []string{"deployments", "redis"},
+			selector:           "red*",
+			expectedContainers: 1,
+		},
+		{
+			name:               "single container",
+			args:               []string{"deployments", "redis"},
+			selector:           "redis",
+			expectedContainers: 1,
+		},
+	}
+
+	for _, input := range inputs {
+		mockDeployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "redis",
+				Namespace: "test",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{
+							{
+								Name:  "init",
+								Image: "redis",
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "redis",
+								Image: "redis",
+							},
+						},
+					},
+				},
+			},
+		}
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := io.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						updated := strings.Count(string(bytes), "200m")
+						if updated != input.expectedContainers {
+							t.Errorf("expected %d containers to be selected but got %d \n", input.expectedContainers, updated)
+						}
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %#v\n%#v", input.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+
+			outputFormat := "yaml"
+
+			streams := genericiooptions.NewTestIOStreamsDiscard()
+			cmd := NewCmdResources(tf, streams)
+			cmd.Flags().Set("output", outputFormat)
+			opts := SetResourcesOptions{
+				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
+
+				Limits:            "cpu=200m,memory=512Mi",
+				ContainerSelector: input.selector,
 				IOStreams:         streams,
 			}
 			err := opts.Complete(tf, cmd, input.args)

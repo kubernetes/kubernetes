@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
@@ -31,14 +31,14 @@ func TestGauge(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		registryVersion     *semver.Version
 		expectedMetricCount int
 		expectedHelp        string
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -50,7 +50,7 @@ func TestGauge(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -63,7 +63,7 @@ func TestGauge(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -83,7 +83,7 @@ func TestGauge(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewGauge(&test.GaugeOpts)
+			c := NewGauge(test.GaugeOpts)
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
@@ -115,7 +115,7 @@ func TestGaugeVec(t *testing.T) {
 	v115 := semver.MustParse("1.15.0")
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		labels              []string
 		registryVersion     *semver.Version
 		expectedMetricCount int
@@ -123,7 +123,7 @@ func TestGaugeVec(t *testing.T) {
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Name:      "metric_test_name",
 				Subsystem: "subsystem",
@@ -136,7 +136,7 @@ func TestGaugeVec(t *testing.T) {
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -150,7 +150,7 @@ func TestGaugeVec(t *testing.T) {
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Name:              "metric_test_name",
 				Subsystem:         "subsystem",
@@ -171,7 +171,7 @@ func TestGaugeVec(t *testing.T) {
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",
 			})
-			c := NewGaugeVec(&test.GaugeOpts, test.labels)
+			c := NewGaugeVec(test.GaugeOpts, test.labels)
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Set(1.0)
 			ms, err := registry.Gather()
@@ -207,12 +207,12 @@ func TestGaugeFunc(t *testing.T) {
 
 	var tests = []struct {
 		desc string
-		GaugeOpts
+		*GaugeOpts
 		expectedMetrics string
 	}{
 		{
 			desc: "Test non deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace: "namespace",
 				Subsystem: "subsystem",
 				Name:      "metric_non_deprecated",
@@ -226,7 +226,7 @@ namespace_subsystem_metric_non_deprecated 1
 		},
 		{
 			desc: "Test deprecated",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_deprecated",
@@ -241,7 +241,7 @@ namespace_subsystem_metric_deprecated 1
 		},
 		{
 			desc: "Test hidden",
-			GaugeOpts: GaugeOpts{
+			GaugeOpts: &GaugeOpts{
 				Namespace:         "namespace",
 				Subsystem:         "subsystem",
 				Name:              "metric_hidden",
@@ -264,6 +264,83 @@ namespace_subsystem_metric_deprecated 1
 			metricName := BuildFQName(tc.GaugeOpts.Namespace, tc.GaugeOpts.Subsystem, tc.GaugeOpts.Name)
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetrics), metricName); err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestGaugeWithLabelValueAllowList(t *testing.T) {
+	labelAllowValues := map[string]string{
+		"namespace_subsystem_metric_allowlist_test,label_a": "allowed",
+	}
+	labels := []string{"label_a", "label_b"}
+	opts := &GaugeOpts{
+		Namespace: "namespace",
+		Name:      "metric_allowlist_test",
+		Subsystem: "subsystem",
+	}
+	var tests = []struct {
+		desc               string
+		labelValues        [][]string
+		expectMetricValues map[string]float64
+	}{
+		{
+			desc:        "Test no unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"allowed", "b2"}},
+			expectMetricValues: map[string]float64{
+				"allowed b1": 100.0,
+				"allowed b2": 100.0,
+			},
+		},
+		{
+			desc:        "Test unexpected input",
+			labelValues: [][]string{{"allowed", "b1"}, {"not_allowed", "b1"}},
+			expectMetricValues: map[string]float64{
+				"allowed b1":    100.0,
+				"unexpected b1": 100.0,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			SetLabelAllowListFromCLI(labelAllowValues)
+			registry := newKubeRegistry(apimachineryversion.Info{
+				Major:      "1",
+				Minor:      "15",
+				GitVersion: "v1.15.0-alpha-1.12345",
+			})
+			g := NewGaugeVec(opts, labels)
+			registry.MustRegister(g)
+
+			for _, lv := range test.labelValues {
+				g.WithLabelValues(lv...).Set(100.0)
+			}
+			mfs, err := registry.Gather()
+			assert.Nil(t, err, "Gather failed %v", err)
+
+			for _, mf := range mfs {
+				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
+					continue
+				}
+				mfMetric := mf.GetMetric()
+
+				for _, m := range mfMetric {
+					var aValue, bValue string
+					for _, l := range m.Label {
+						if *l.Name == "label_a" {
+							aValue = *l.Value
+						}
+						if *l.Name == "label_b" {
+							bValue = *l.Value
+						}
+					}
+					labelValuePair := aValue + " " + bValue
+					expectedValue, ok := test.expectMetricValues[labelValuePair]
+					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
+					actualValue := m.GetGauge().GetValue()
+					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the gauge while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
+				}
 			}
 		})
 	}

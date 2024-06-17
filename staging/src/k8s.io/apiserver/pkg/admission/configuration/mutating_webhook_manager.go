@@ -19,9 +19,9 @@ package configuration
 import (
 	"fmt"
 	"sort"
-	"sync/atomic"
+	"sync"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
@@ -29,13 +29,23 @@ import (
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/cache/synctrack"
+	"k8s.io/klog/v2"
 )
+
+// Type for test injection.
+type mutatingWebhookAccessorCreator func(uid string, configurationName string, h *v1.MutatingWebhook) webhook.WebhookAccessor
 
 // mutatingWebhookConfigurationManager collects the mutating webhook objects so that they can be called.
 type mutatingWebhookConfigurationManager struct {
-	configuration *atomic.Value
-	lister        admissionregistrationlisters.MutatingWebhookConfigurationLister
-	hasSynced     func() bool
+	lister              admissionregistrationlisters.MutatingWebhookConfigurationLister
+	hasSynced           func() bool
+	lazy                synctrack.Lazy[[]webhook.WebhookAccessor]
+	configurationsCache sync.Map
+	// createMutatingWebhookAccessor is used to instantiate webhook accessors.
+	// This function is defined as field instead of a struct method to allow injection
+	// during tests
+	createMutatingWebhookAccessor mutatingWebhookAccessorCreator
 }
 
 var _ generic.Source = &mutatingWebhookConfigurationManager{}
@@ -43,58 +53,99 @@ var _ generic.Source = &mutatingWebhookConfigurationManager{}
 func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
-		configuration: &atomic.Value{},
-		lister:        informer.Lister(),
-		hasSynced:     informer.Informer().HasSynced,
+		lister:                        informer.Lister(),
+		createMutatingWebhookAccessor: webhook.NewMutatingWebhookAccessor,
 	}
+	manager.lazy.Evaluate = manager.getConfiguration
 
-	// Start with an empty list
-	manager.configuration.Store([]webhook.WebhookAccessor{})
-
-	// On any change, rebuild the config
-	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(_ interface{}) { manager.updateConfiguration() },
-		UpdateFunc: func(_, _ interface{}) { manager.updateConfiguration() },
-		DeleteFunc: func(_ interface{}) { manager.updateConfiguration() },
+	handle, _ := informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(_ interface{}) { manager.lazy.Notify() },
+		UpdateFunc: func(old, new interface{}) {
+			obj := new.(*v1.MutatingWebhookConfiguration)
+			manager.configurationsCache.Delete(obj.GetName())
+			manager.lazy.Notify()
+		},
+		DeleteFunc: func(obj interface{}) {
+			vwc, ok := obj.(*v1.MutatingWebhookConfiguration)
+			if !ok {
+				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				if !ok {
+					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					return
+				}
+				vwc, ok = tombstone.Obj.(*v1.MutatingWebhookConfiguration)
+				if !ok {
+					klog.V(2).Infof("Tombstone contained object that is not expected %#v", obj)
+					return
+				}
+			}
+			manager.configurationsCache.Delete(vwc.Name)
+			manager.lazy.Notify()
+		},
 	})
+	manager.hasSynced = handle.HasSynced
 
 	return manager
 }
 
 // Webhooks returns the merged MutatingWebhookConfiguration.
 func (m *mutatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAccessor {
-	return m.configuration.Load().([]webhook.WebhookAccessor)
+	out, err := m.lazy.Get()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error getting webhook configuration: %v", err))
+	}
+	return out
 }
 
-func (m *mutatingWebhookConfigurationManager) HasSynced() bool {
-	return m.hasSynced()
-}
+// HasSynced returns true if the initial set of mutating webhook configurations
+// has been loaded.
+func (m *mutatingWebhookConfigurationManager) HasSynced() bool { return m.hasSynced() }
 
-func (m *mutatingWebhookConfigurationManager) updateConfiguration() {
+func (m *mutatingWebhookConfigurationManager) getConfiguration() ([]webhook.WebhookAccessor, error) {
 	configurations, err := m.lister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error updating configuration: %v", err))
-		return
+		return []webhook.WebhookAccessor{}, err
 	}
-	m.configuration.Store(mergeMutatingWebhookConfigurations(configurations))
+	return m.getMutatingWebhookConfigurations(configurations), nil
 }
 
-func mergeMutatingWebhookConfigurations(configurations []*v1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
+// getMutatingWebhookConfigurations returns the webhook accessors for a given list of
+// mutating webhook configurations.
+//
+// This function will, first, try to load the webhook accessors from the cache and avoid
+// recreating them, which can be expessive (requiring CEL expression recompilation).
+func (m *mutatingWebhookConfigurationManager) getMutatingWebhookConfigurations(configurations []*v1.MutatingWebhookConfiguration) []webhook.WebhookAccessor {
 	// The internal order of webhooks for each configuration is provided by the user
 	// but configurations themselves can be in any order. As we are going to run these
 	// webhooks in serial, they are sorted here to have a deterministic order.
 	sort.SliceStable(configurations, MutatingWebhookConfigurationSorter(configurations).ByName)
-	accessors := []webhook.WebhookAccessor{}
+	size := 0
+	for _, cfg := range configurations {
+		size += len(cfg.Webhooks)
+	}
+	accessors := make([]webhook.WebhookAccessor, 0, size)
+
 	for _, c := range configurations {
+		cachedConfigurationAccessors, ok := m.configurationsCache.Load(c.Name)
+		if ok {
+			// Pick an already cached webhookAccessor
+			accessors = append(accessors, cachedConfigurationAccessors.([]webhook.WebhookAccessor)...)
+			continue
+		}
+
 		// webhook names are not validated for uniqueness, so we check for duplicates and
 		// add a int suffix to distinguish between them
 		names := map[string]int{}
+		configurationAccessors := make([]webhook.WebhookAccessor, 0, len(c.Webhooks))
 		for i := range c.Webhooks {
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
+			configurationAccessor := m.createMutatingWebhookAccessor(uid, c.Name, &c.Webhooks[i])
+			configurationAccessors = append(configurationAccessors, configurationAccessor)
 		}
+		accessors = append(accessors, configurationAccessors...)
+		m.configurationsCache.Store(c.Name, configurationAccessors)
 	}
 	return accessors
 }

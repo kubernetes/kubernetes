@@ -21,10 +21,15 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
 )
+
+var klogV = func(lvl klog.Level) bool {
+	return klog.V(lvl).Enabled()
+}
 
 // Field is a key value pair that provides additional details about the trace.
 type Field struct {
@@ -52,7 +57,7 @@ func writeTraceItemSummary(b *bytes.Buffer, msg string, totalTime time.Duration,
 		b.WriteString(" ")
 	}
 
-	b.WriteString(fmt.Sprintf("%vms (%v)", durationToMilliseconds(totalTime), startTime.Format("15:04:00.000")))
+	b.WriteString(fmt.Sprintf("%vms (%v)", durationToMilliseconds(totalTime), startTime.Format("15:04:05.000")))
 }
 
 func durationToMilliseconds(timeDuration time.Duration) int64 {
@@ -60,6 +65,11 @@ func durationToMilliseconds(timeDuration time.Duration) int64 {
 }
 
 type traceItem interface {
+	// rLock must be called before invoking time or writeItem.
+	rLock()
+	// rUnlock must be called after processing the item is complete.
+	rUnlock()
+
 	// time returns when the trace was recorded as completed.
 	time() time.Time
 	// writeItem outputs the traceItem to the buffer. If stepThreshold is non-nil, only output the
@@ -74,13 +84,17 @@ type traceStep struct {
 	fields   []Field
 }
 
+// rLock doesn't need to do anything because traceStep instances are immutable.
+func (s traceStep) rLock()   {}
+func (s traceStep) rUnlock() {}
+
 func (s traceStep) time() time.Time {
 	return s.stepTime
 }
 
 func (s traceStep) writeItem(b *bytes.Buffer, formatter string, startTime time.Time, stepThreshold *time.Duration) {
 	stepDuration := s.stepTime.Sub(startTime)
-	if stepThreshold == nil || *stepThreshold == 0 || stepDuration >= *stepThreshold {
+	if stepThreshold == nil || *stepThreshold == 0 || stepDuration >= *stepThreshold || klogV(4) {
 		b.WriteString(fmt.Sprintf("%s---", formatter))
 		writeTraceItemSummary(b, s.msg, stepDuration, s.stepTime, s.fields)
 	}
@@ -89,13 +103,24 @@ func (s traceStep) writeItem(b *bytes.Buffer, formatter string, startTime time.T
 // Trace keeps track of a set of "steps" and allows us to log a specific
 // step if it took longer than its share of the total allowed time
 type Trace struct {
+	// constant fields
 	name        string
 	fields      []Field
-	threshold   *time.Duration
 	startTime   time.Time
-	endTime     *time.Time
-	traceItems  []traceItem
 	parentTrace *Trace
+	// fields guarded by a lock
+	lock       sync.RWMutex
+	threshold  *time.Duration
+	endTime    *time.Time
+	traceItems []traceItem
+}
+
+func (t *Trace) rLock() {
+	t.lock.RLock()
+}
+
+func (t *Trace) rUnlock() {
+	t.lock.RUnlock()
 }
 
 func (t *Trace) time() time.Time {
@@ -106,7 +131,7 @@ func (t *Trace) time() time.Time {
 }
 
 func (t *Trace) writeItem(b *bytes.Buffer, formatter string, startTime time.Time, stepThreshold *time.Duration) {
-	if t.durationIsWithinThreshold() {
+	if t.durationIsWithinThreshold() || klogV(4) {
 		b.WriteString(fmt.Sprintf("%v[", formatter))
 		writeTraceItemSummary(b, t.name, t.TotalTime(), t.startTime, t.fields)
 		if st := t.calculateStepThreshold(); st != nil {
@@ -134,6 +159,8 @@ func New(name string, fields ...Field) *Trace {
 // how long it took. The Fields add key value pairs to provide additional details about the trace
 // step.
 func (t *Trace) Step(msg string, fields ...Field) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	if t.traceItems == nil {
 		// traces almost always have less than 6 steps, do this to avoid more than a single allocation
 		t.traceItems = make([]traceItem, 0, 6)
@@ -149,7 +176,9 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 	newTrace := New(msg, fields...)
 	if t != nil {
 		newTrace.parentTrace = t
+		t.lock.Lock()
 		t.traceItems = append(t.traceItems, newTrace)
+		t.lock.Unlock()
 	}
 	return newTrace
 }
@@ -159,7 +188,9 @@ func (t *Trace) Nest(msg string, fields ...Field) *Trace {
 // is logged.
 func (t *Trace) Log() {
 	endTime := time.Now()
+	t.lock.Lock()
 	t.endTime = &endTime
+	t.lock.Unlock()
 	// an explicit logging request should dump all the steps out at the higher level
 	if t.parentTrace == nil { // We don't start logging until Log or LogIfLong is called on the root trace
 		t.logTrace()
@@ -168,19 +199,23 @@ func (t *Trace) Log() {
 
 // LogIfLong only logs the trace if the duration of the trace exceeds the threshold.
 // Only steps that took longer than their share or the given threshold are logged.
-// If klog is at verbosity level 4 or higher, the trace and its steps are logged regardless of threshold.
-// If the Trace is nested it is not immediately logged. Instead, it is logged when the trace it is nested within
-// is logged.
+// If klog is at verbosity level 4 or higher and the trace took longer than the threshold,
+// all substeps and subtraces are logged. Otherwise, only those which took longer than
+// their own threshold.
+// If the Trace is nested it is not immediately logged. Instead, it is logged when the trace it
+// is nested within is logged.
 func (t *Trace) LogIfLong(threshold time.Duration) {
-	if !klog.V(4).Enabled() { // don't set threshold if verbosity is level 4 of higher
-		t.threshold = &threshold
-	}
+	t.lock.Lock()
+	t.threshold = &threshold
+	t.lock.Unlock()
 	t.Log()
 }
 
 // logTopLevelTraces finds all traces in a hierarchy of nested traces that should be logged but do not have any
 // parents that will be logged, due to threshold limits, and logs them as top level traces.
 func (t *Trace) logTrace() {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	if t.durationIsWithinThreshold() {
 		var buffer bytes.Buffer
 		traceNum := rand.Int31()
@@ -193,7 +228,7 @@ func (t *Trace) logTrace() {
 		}
 
 		// if any step took more than it's share of the total allowed time, it deserves a higher log level
-		buffer.WriteString(fmt.Sprintf("(%v) (total time: %vms):", t.startTime.Format("02-Jan-2006 15:04:00.000"), totalTime.Milliseconds()))
+		buffer.WriteString(fmt.Sprintf("(%v) (total time: %vms):", t.startTime.Format("02-Jan-2006 15:04:05.000"), totalTime.Milliseconds()))
 		stepThreshold := t.calculateStepThreshold()
 		t.writeTraceSteps(&buffer, fmt.Sprintf("\nTrace[%d]: ", traceNum), stepThreshold)
 		buffer.WriteString(fmt.Sprintf("\nTrace[%d]: [%v] [%v] END\n", traceNum, t.endTime.Sub(t.startTime), totalTime))
@@ -213,8 +248,10 @@ func (t *Trace) logTrace() {
 func (t *Trace) writeTraceSteps(b *bytes.Buffer, formatter string, stepThreshold *time.Duration) {
 	lastStepTime := t.startTime
 	for _, stepOrTrace := range t.traceItems {
+		stepOrTrace.rLock()
 		stepOrTrace.writeItem(b, formatter, lastStepTime, stepThreshold)
 		lastStepTime = stepOrTrace.time()
+		stepOrTrace.rUnlock()
 	}
 }
 
@@ -240,9 +277,13 @@ func (t *Trace) calculateStepThreshold() *time.Duration {
 	traceThreshold := *t.threshold
 	for _, s := range t.traceItems {
 		nestedTrace, ok := s.(*Trace)
-		if ok && nestedTrace.threshold != nil {
-			traceThreshold = traceThreshold - *nestedTrace.threshold
-			lenTrace--
+		if ok {
+			nestedTrace.lock.RLock()
+			if nestedTrace.threshold != nil {
+				traceThreshold = traceThreshold - *nestedTrace.threshold
+				lenTrace--
+			}
+			nestedTrace.lock.RUnlock()
 		}
 	}
 

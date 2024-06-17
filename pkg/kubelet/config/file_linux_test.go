@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -27,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -108,11 +109,16 @@ var (
 	testCases = []struct {
 		watchDir bool
 		symlink  bool
+		period   time.Duration
 	}{
-		{true, true},
-		{true, false},
-		{false, true},
-		{false, false},
+		// set the period to be long enough for the file to be changed
+		// and short enough to trigger the event
+		{true, true, 3 * time.Second},
+
+		// set the period to avoid periodic PodUpdate event
+		{true, false, 60 * time.Second},
+		{false, true, 60 * time.Second},
+		{false, false, 60 * time.Second},
 	}
 )
 
@@ -124,7 +130,7 @@ func TestWatchFileAdded(t *testing.T) {
 
 func TestWatchFileChanged(t *testing.T) {
 	for _, testCase := range testCases {
-		watchFileChanged(testCase.watchDir, testCase.symlink, t)
+		watchFileChanged(testCase.watchDir, testCase.symlink, testCase.period, t)
 	}
 }
 
@@ -155,7 +161,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 				Spec: v1.PodSpec{
 					Containers:      []v1.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 					SecurityContext: &v1.PodSecurityContext{},
-					SchedulerName:   api.DefaultSchedulerName,
+					SchedulerName:   v1.DefaultSchedulerName,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,
@@ -167,7 +173,6 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					UID:         "12345",
 					Namespace:   "mynamespace",
 					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
-					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
 				Spec: v1.PodSpec{
 					NodeName:                      string(hostname),
@@ -187,7 +192,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						TerminationMessagePolicy: v1.TerminationMessageReadFile,
 					}},
 					SecurityContext:    &v1.PodSecurityContext{},
-					SchedulerName:      api.DefaultSchedulerName,
+					SchedulerName:      v1.DefaultSchedulerName,
 					EnableServiceLinks: &enableServiceLinks,
 				},
 				Status: v1.PodStatus{
@@ -275,7 +280,7 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 	}
 }
 
-func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
+func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -314,22 +319,23 @@ func watchFileChanged(watchDir bool, symlink bool, t *testing.T) {
 			}()
 
 			if watchDir {
-				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(dirName, hostname, period, ch)
 			} else {
-				NewSourceFile(file, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(file, hostname, period, ch)
 			}
+
+			// await fsnotify to be ready
+			time.Sleep(time.Second)
+
 			// expect an update by SourceFile.resetStoreFromPath()
 			expectUpdate(t, ch, testCase)
 
+			pod := testCase.pod.(*v1.Pod)
+			pod.Spec.Containers[0].Name = "image2"
+
+			testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
 			changeFile := func() {
 				// Edit the file content
-				testCase.lock.Lock()
-				defer testCase.lock.Unlock()
-
-				pod := testCase.pod.(*v1.Pod)
-				pod.Spec.Containers[0].Name = "image2"
-
-				testCase.expected.Pods[0].Spec.Containers[0].Name = "image2"
 				if symlink {
 					file = testCase.writeToFile(linkedDirName, fileName, t)
 					return
@@ -374,8 +380,6 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				}
 			}
 
-			testCase.lock.Lock()
-			defer testCase.lock.Unlock()
 			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
 				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 			}

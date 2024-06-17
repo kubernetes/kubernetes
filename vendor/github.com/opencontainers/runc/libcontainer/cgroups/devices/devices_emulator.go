@@ -1,5 +1,3 @@
-// +build linux
-
 // SPDX-License-Identifier: Apache-2.0
 /*
  * Copyright (C) 2020 Aleksa Sarai <cyphar@cyphar.com>
@@ -22,34 +20,33 @@ package devices
 
 import (
 	"bufio"
+	"fmt"
 	"io"
-	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/configs"
-
-	"github.com/pkg/errors"
+	"github.com/opencontainers/runc/libcontainer/devices"
 )
 
-// deviceMeta is a DeviceRule without the Allow or Permissions fields, and no
+// deviceMeta is a Rule without the Allow or Permissions fields, and no
 // wildcard-type support. It's effectively the "match" portion of a metadata
 // rule, for the purposes of our emulation.
 type deviceMeta struct {
-	node  configs.DeviceType
+	node  devices.Type
 	major int64
 	minor int64
 }
 
-// deviceRule is effectively the tuple (deviceMeta, DevicePermissions).
+// deviceRule is effectively the tuple (deviceMeta, Permissions).
 type deviceRule struct {
 	meta  deviceMeta
-	perms configs.DevicePermissions
+	perms devices.Permissions
 }
 
 // deviceRules is a mapping of device metadata rules to the associated
 // permissions in the ruleset.
-type deviceRules map[deviceMeta]configs.DevicePermissions
+type deviceRules map[deviceMeta]devices.Permissions
 
 func (r deviceRules) orderedEntries() []deviceRule {
 	var rules []deviceRule
@@ -79,19 +76,21 @@ func (e *Emulator) IsAllowAll() bool {
 	return e.IsBlacklist() && len(e.rules) == 0
 }
 
-var devicesListRegexp = regexp.MustCompile(`^([abc])\s+(\d+|\*):(\d+|\*)\s+([rwm]+)$`)
-
 func parseLine(line string) (*deviceRule, error) {
-	matches := devicesListRegexp.FindStringSubmatch(line)
-	if matches == nil {
-		return nil, errors.Errorf("line doesn't match devices.list format")
+	// Input: node major:minor perms.
+	fields := strings.FieldsFunc(line, func(r rune) bool {
+		return r == ' ' || r == ':'
+	})
+	if len(fields) != 4 {
+		return nil, fmt.Errorf("malformed devices.list rule %s", line)
 	}
+
 	var (
 		rule  deviceRule
-		node  = matches[1]
-		major = matches[2]
-		minor = matches[3]
-		perms = matches[4]
+		node  = fields[0]
+		major = fields[1]
+		minor = fields[2]
+		perms = fields[3]
 	)
 
 	// Parse the node type.
@@ -103,48 +102,46 @@ func parseLine(line string) (*deviceRule, error) {
 		// TODO: Double-check that the entire file is "a *:* rwm".
 		return nil, nil
 	case "b":
-		rule.meta.node = configs.BlockDevice
+		rule.meta.node = devices.BlockDevice
 	case "c":
-		rule.meta.node = configs.CharDevice
+		rule.meta.node = devices.CharDevice
 	default:
-		// Should never happen!
-		return nil, errors.Errorf("unknown device type %q", node)
+		return nil, fmt.Errorf("unknown device type %q", node)
 	}
 
 	// Parse the major number.
 	if major == "*" {
-		rule.meta.major = configs.Wildcard
+		rule.meta.major = devices.Wildcard
 	} else {
 		val, err := strconv.ParseUint(major, 10, 32)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse major number")
+			return nil, fmt.Errorf("invalid major number: %w", err)
 		}
 		rule.meta.major = int64(val)
 	}
 
 	// Parse the minor number.
 	if minor == "*" {
-		rule.meta.minor = configs.Wildcard
+		rule.meta.minor = devices.Wildcard
 	} else {
 		val, err := strconv.ParseUint(minor, 10, 32)
 		if err != nil {
-			return nil, errors.Wrap(err, "parse minor number")
+			return nil, fmt.Errorf("invalid minor number: %w", err)
 		}
 		rule.meta.minor = int64(val)
 	}
 
 	// Parse the access permissions.
-	rule.perms = configs.DevicePermissions(perms)
+	rule.perms = devices.Permissions(perms)
 	if !rule.perms.IsValid() || rule.perms.IsEmpty() {
-		// Should never happen!
-		return nil, errors.Errorf("parse access mode: contained unknown modes or is empty: %q", perms)
+		return nil, fmt.Errorf("parse access mode: contained unknown modes or is empty: %q", perms)
 	}
 	return &rule, nil
 }
 
-func (e *Emulator) addRule(rule deviceRule) error {
+func (e *Emulator) addRule(rule deviceRule) error { //nolint:unparam
 	if e.rules == nil {
-		e.rules = make(map[deviceMeta]configs.DevicePermissions)
+		e.rules = make(map[deviceMeta]devices.Permissions)
 	}
 
 	// Merge with any pre-existing permissions.
@@ -169,9 +166,9 @@ func (e *Emulator) rmRule(rule deviceRule) error {
 	// to mention it'd be really slow (the kernel side is implemented as a
 	// linked-list of exceptions).
 	for _, partialMeta := range []deviceMeta{
-		{node: rule.meta.node, major: configs.Wildcard, minor: rule.meta.minor},
-		{node: rule.meta.node, major: rule.meta.major, minor: configs.Wildcard},
-		{node: rule.meta.node, major: configs.Wildcard, minor: configs.Wildcard},
+		{node: rule.meta.node, major: devices.Wildcard, minor: rule.meta.minor},
+		{node: rule.meta.node, major: rule.meta.major, minor: devices.Wildcard},
+		{node: rule.meta.node, major: devices.Wildcard, minor: devices.Wildcard},
 	} {
 		// This wildcard rule is equivalent to the requested rule, so skip it.
 		if rule.meta == partialMeta {
@@ -180,7 +177,7 @@ func (e *Emulator) rmRule(rule deviceRule) error {
 		// Only give an error if the set of permissions overlap.
 		partialPerms := e.rules[partialMeta]
 		if !partialPerms.Intersection(rule.perms).IsEmpty() {
-			return errors.Errorf("requested rule [%v %v] not supported by devices cgroupv1 (cannot punch hole in existing wildcard rule [%v %v])", rule.meta, rule.perms, partialMeta, partialPerms)
+			return fmt.Errorf("requested rule [%v %v] not supported by devices cgroupv1 (cannot punch hole in existing wildcard rule [%v %v])", rule.meta, rule.perms, partialMeta, partialPerms)
 		}
 	}
 
@@ -202,7 +199,7 @@ func (e *Emulator) rmRule(rule deviceRule) error {
 func (e *Emulator) allow(rule *deviceRule) error {
 	// This cgroup is configured as a black-list. Reset the entire emulator,
 	// and put is into black-list mode.
-	if rule == nil || rule.meta.node == configs.WildcardDevice {
+	if rule == nil || rule.meta.node == devices.WildcardDevice {
 		*e = Emulator{
 			defaultAllow: true,
 			rules:        nil,
@@ -212,9 +209,9 @@ func (e *Emulator) allow(rule *deviceRule) error {
 
 	var err error
 	if e.defaultAllow {
-		err = errors.Wrap(e.rmRule(*rule), "remove 'deny' exception")
+		err = wrapErr(e.rmRule(*rule), "unable to remove 'deny' exception")
 	} else {
-		err = errors.Wrap(e.addRule(*rule), "add 'allow' exception")
+		err = wrapErr(e.addRule(*rule), "unable to add 'allow' exception")
 	}
 	return err
 }
@@ -222,7 +219,7 @@ func (e *Emulator) allow(rule *deviceRule) error {
 func (e *Emulator) deny(rule *deviceRule) error {
 	// This cgroup is configured as a white-list. Reset the entire emulator,
 	// and put is into white-list mode.
-	if rule == nil || rule.meta.node == configs.WildcardDevice {
+	if rule == nil || rule.meta.node == devices.WildcardDevice {
 		*e = Emulator{
 			defaultAllow: false,
 			rules:        nil,
@@ -232,16 +229,16 @@ func (e *Emulator) deny(rule *deviceRule) error {
 
 	var err error
 	if e.defaultAllow {
-		err = errors.Wrap(e.addRule(*rule), "add 'deny' exception")
+		err = wrapErr(e.addRule(*rule), "unable to add 'deny' exception")
 	} else {
-		err = errors.Wrap(e.rmRule(*rule), "remove 'allow' exception")
+		err = wrapErr(e.rmRule(*rule), "unable to remove 'allow' exception")
 	}
 	return err
 }
 
-func (e *Emulator) Apply(rule configs.DeviceRule) error {
+func (e *Emulator) Apply(rule devices.Rule) error {
 	if !rule.Type.CanCgroup() {
-		return errors.Errorf("cannot add rule [%#v] with non-cgroup type %q", rule, rule.Type)
+		return fmt.Errorf("cannot add rule [%#v] with non-cgroup type %q", rule, rule.Type)
 	}
 
 	innerRule := &deviceRule{
@@ -252,15 +249,15 @@ func (e *Emulator) Apply(rule configs.DeviceRule) error {
 		},
 		perms: rule.Permissions,
 	}
-	if innerRule.meta.node == configs.WildcardDevice {
+	if innerRule.meta.node == devices.WildcardDevice {
 		innerRule = nil
 	}
 
 	if rule.Allow {
 		return e.allow(innerRule)
-	} else {
-		return e.deny(innerRule)
 	}
+
+	return e.deny(innerRule)
 }
 
 // EmulatorFromList takes a reader to a "devices.list"-like source, and returns
@@ -283,17 +280,17 @@ func EmulatorFromList(list io.Reader) (*Emulator, error) {
 		line := s.Text()
 		deviceRule, err := parseLine(line)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing line %q", line)
+			return nil, fmt.Errorf("error parsing line %q: %w", line, err)
 		}
 		// "devices.list" is an allow list. Note that this means that in
 		// black-list mode, we have no idea what rules are in play. As a
 		// result, we need to be very careful in Transition().
 		if err := e.allow(deviceRule); err != nil {
-			return nil, errors.Wrapf(err, "adding devices.list rule")
+			return nil, fmt.Errorf("error adding devices.list rule: %w", err)
 		}
 	}
 	if err := s.Err(); err != nil {
-		return nil, errors.Wrap(err, "reading devices.list lines")
+		return nil, fmt.Errorf("error reading devices.list lines: %w", err)
 	}
 	return e, nil
 }
@@ -305,10 +302,10 @@ func EmulatorFromList(list io.Reader) (*Emulator, error) {
 // necessary.
 //
 // This function is the sole reason for all of Emulator -- to allow us
-// to figure out how to update a containers' cgroups without causing spurrious
+// to figure out how to update a containers' cgroups without causing spurious
 // device errors (if possible).
-func (source *Emulator) Transition(target *Emulator) ([]*configs.DeviceRule, error) {
-	var transitionRules []*configs.DeviceRule
+func (source *Emulator) Transition(target *Emulator) ([]*devices.Rule, error) {
+	var transitionRules []*devices.Rule
 	oldRules := source.rules
 
 	// If the default policy doesn't match, we need to include a "disruptive"
@@ -319,11 +316,11 @@ func (source *Emulator) Transition(target *Emulator) ([]*configs.DeviceRule, err
 	// deny rules are in place in a black-list cgroup. Thus if the source is a
 	// black-list we also have to include a disruptive rule.
 	if source.IsBlacklist() || source.defaultAllow != target.defaultAllow {
-		transitionRules = append(transitionRules, &configs.DeviceRule{
+		transitionRules = append(transitionRules, &devices.Rule{
 			Type:        'a',
 			Major:       -1,
 			Minor:       -1,
-			Permissions: configs.DevicePermissions("rwm"),
+			Permissions: devices.Permissions("rwm"),
 			Allow:       target.defaultAllow,
 		})
 		// The old rules are only relevant if we aren't starting out with a
@@ -342,7 +339,7 @@ func (source *Emulator) Transition(target *Emulator) ([]*configs.DeviceRule, err
 		newPerms := target.rules[meta]
 		droppedPerms := oldPerms.Difference(newPerms)
 		if !droppedPerms.IsEmpty() {
-			transitionRules = append(transitionRules, &configs.DeviceRule{
+			transitionRules = append(transitionRules, &devices.Rule{
 				Type:        meta.node,
 				Major:       meta.major,
 				Minor:       meta.minor,
@@ -360,7 +357,7 @@ func (source *Emulator) Transition(target *Emulator) ([]*configs.DeviceRule, err
 		oldPerms := oldRules[meta]
 		gainedPerms := newPerms.Difference(oldPerms)
 		if !gainedPerms.IsEmpty() {
-			transitionRules = append(transitionRules, &configs.DeviceRule{
+			transitionRules = append(transitionRules, &devices.Rule{
 				Type:        meta.node,
 				Major:       meta.major,
 				Minor:       meta.minor,
@@ -370,4 +367,20 @@ func (source *Emulator) Transition(target *Emulator) ([]*configs.DeviceRule, err
 		}
 	}
 	return transitionRules, nil
+}
+
+// Rules returns the minimum set of rules necessary to convert a *deny-all*
+// cgroup to the emulated filter state (note that this is not the same as a
+// default cgroupv1 cgroup -- which is allow-all). This is effectively just a
+// wrapper around Transition() with the source emulator being an empty cgroup.
+func (e *Emulator) Rules() ([]*devices.Rule, error) {
+	defaultCgroup := &Emulator{defaultAllow: false}
+	return defaultCgroup.Transition(e)
+}
+
+func wrapErr(err error, text string) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf(text+": %w", err)
 }

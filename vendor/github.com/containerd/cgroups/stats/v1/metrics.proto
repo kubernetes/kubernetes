@@ -12,6 +12,8 @@ message Metrics {
 	BlkIOStat blkio = 5;
 	RdmaStat rdma = 6;
 	repeated NetworkStat network = 7;
+	CgroupStats cgroup_stats = 8;
+	MemoryOomControl memory_oom_control = 9;
 }
 
 message HugetlbStat {
@@ -93,6 +95,12 @@ message MemoryEntry {
 	uint64 failcnt = 4;
 }
 
+message MemoryOomControl {
+	uint64 oom_kill_disable = 1;
+	uint64 under_oom = 2;
+	uint64 oom_kill = 3;
+}
+
 message BlkIOStat {
 	repeated BlkIOEntry io_service_bytes_recursive = 1;
 	repeated BlkIOEntry io_serviced_recursive = 2;
@@ -133,4 +141,18 @@ message NetworkStat {
 	uint64 tx_packets = 7;
 	uint64 tx_errors = 8;
 	uint64 tx_dropped = 9;
+}
+
+// CgroupStats exports per-cgroup statistics.
+message CgroupStats {
+	// number of tasks sleeping
+	uint64 nr_sleeping = 1;
+	// number of tasks running
+	uint64 nr_running = 2;
+	// number of tasks in stopped state
+	uint64 nr_stopped = 3;
+	// number of tasks in uninterruptible state
+	uint64 nr_uninterruptible = 4;
+	// number of tasks waiting on IO
+	uint64 nr_io_wait = 5;
 }

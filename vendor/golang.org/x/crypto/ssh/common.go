@@ -27,7 +27,7 @@ const (
 // supportedCiphers lists ciphers we support but might not recommend.
 var supportedCiphers = []string{
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"arcfour256", "arcfour128", "arcfour",
 	aes128cbcID,
@@ -36,7 +36,7 @@ var supportedCiphers = []string{
 
 // preferredCiphers specifies the default preference for ciphers.
 var preferredCiphers = []string{
-	"aes128-gcm@openssh.com",
+	"aes128-gcm@openssh.com", gcm256CipherID,
 	chacha20Poly1305ID,
 	"aes128-ctr", "aes192-ctr", "aes256-ctr",
 }
@@ -44,11 +44,12 @@ var preferredCiphers = []string{
 // supportedKexAlgos specifies the supported key-exchange algorithms in
 // preference order.
 var supportedKexAlgos = []string{
-	kexAlgoCurve25519SHA256,
+	kexAlgoCurve25519SHA256, kexAlgoCurve25519SHA256LibSSH,
 	// P384 and P521 are not constant-time yet, but since we don't
 	// reuse ephemeral keys, using them for ECDH should be OK.
 	kexAlgoECDH256, kexAlgoECDH384, kexAlgoECDH521,
-	kexAlgoDH14SHA1, kexAlgoDH1SHA1,
+	kexAlgoDH14SHA256, kexAlgoDH16SHA512, kexAlgoDH14SHA1,
+	kexAlgoDH1SHA1,
 }
 
 // serverForbiddenKexAlgos contains key exchange algorithms, that are forbidden
@@ -58,21 +59,24 @@ var serverForbiddenKexAlgos = map[string]struct{}{
 	kexAlgoDHGEXSHA256: {}, // server half implementation is only minimal to satisfy the automated tests
 }
 
-// preferredKexAlgos specifies the default preference for key-exchange algorithms
-// in preference order.
+// preferredKexAlgos specifies the default preference for key-exchange
+// algorithms in preference order. The diffie-hellman-group16-sha512 algorithm
+// is disabled by default because it is a bit slower than the others.
 var preferredKexAlgos = []string{
-	kexAlgoCurve25519SHA256,
+	kexAlgoCurve25519SHA256, kexAlgoCurve25519SHA256LibSSH,
 	kexAlgoECDH256, kexAlgoECDH384, kexAlgoECDH521,
-	kexAlgoDH14SHA1,
+	kexAlgoDH14SHA256, kexAlgoDH14SHA1,
 }
 
 // supportedHostKeyAlgos specifies the supported host-key algorithms (i.e. methods
 // of authenticating servers) in preference order.
 var supportedHostKeyAlgos = []string{
+	CertAlgoRSASHA256v01, CertAlgoRSASHA512v01,
 	CertAlgoRSAv01, CertAlgoDSAv01, CertAlgoECDSA256v01,
 	CertAlgoECDSA384v01, CertAlgoECDSA521v01, CertAlgoED25519v01,
 
 	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
+	KeyAlgoRSASHA256, KeyAlgoRSASHA512,
 	KeyAlgoRSA, KeyAlgoDSA,
 
 	KeyAlgoED25519,
@@ -82,24 +86,65 @@ var supportedHostKeyAlgos = []string{
 // This is based on RFC 4253, section 6.4, but with hmac-md5 variants removed
 // because they have reached the end of their useful life.
 var supportedMACs = []string{
-	"hmac-sha2-256-etm@openssh.com", "hmac-sha2-256", "hmac-sha1", "hmac-sha1-96",
+	"hmac-sha2-256-etm@openssh.com", "hmac-sha2-512-etm@openssh.com", "hmac-sha2-256", "hmac-sha2-512", "hmac-sha1", "hmac-sha1-96",
 }
 
 var supportedCompressions = []string{compressionNone}
 
-// hashFuncs keeps the mapping of supported algorithms to their respective
-// hashes needed for signature verification.
+// hashFuncs keeps the mapping of supported signature algorithms to their
+// respective hashes needed for signing and verification.
 var hashFuncs = map[string]crypto.Hash{
-	KeyAlgoRSA:          crypto.SHA1,
-	KeyAlgoDSA:          crypto.SHA1,
-	KeyAlgoECDSA256:     crypto.SHA256,
-	KeyAlgoECDSA384:     crypto.SHA384,
-	KeyAlgoECDSA521:     crypto.SHA512,
-	CertAlgoRSAv01:      crypto.SHA1,
-	CertAlgoDSAv01:      crypto.SHA1,
-	CertAlgoECDSA256v01: crypto.SHA256,
-	CertAlgoECDSA384v01: crypto.SHA384,
-	CertAlgoECDSA521v01: crypto.SHA512,
+	KeyAlgoRSA:       crypto.SHA1,
+	KeyAlgoRSASHA256: crypto.SHA256,
+	KeyAlgoRSASHA512: crypto.SHA512,
+	KeyAlgoDSA:       crypto.SHA1,
+	KeyAlgoECDSA256:  crypto.SHA256,
+	KeyAlgoECDSA384:  crypto.SHA384,
+	KeyAlgoECDSA521:  crypto.SHA512,
+	// KeyAlgoED25519 doesn't pre-hash.
+	KeyAlgoSKECDSA256: crypto.SHA256,
+	KeyAlgoSKED25519:  crypto.SHA256,
+}
+
+// algorithmsForKeyFormat returns the supported signature algorithms for a given
+// public key format (PublicKey.Type), in order of preference. See RFC 8332,
+// Section 2. See also the note in sendKexInit on backwards compatibility.
+func algorithmsForKeyFormat(keyFormat string) []string {
+	switch keyFormat {
+	case KeyAlgoRSA:
+		return []string{KeyAlgoRSASHA256, KeyAlgoRSASHA512, KeyAlgoRSA}
+	case CertAlgoRSAv01:
+		return []string{CertAlgoRSASHA256v01, CertAlgoRSASHA512v01, CertAlgoRSAv01}
+	default:
+		return []string{keyFormat}
+	}
+}
+
+// isRSA returns whether algo is a supported RSA algorithm, including certificate
+// algorithms.
+func isRSA(algo string) bool {
+	algos := algorithmsForKeyFormat(KeyAlgoRSA)
+	return contains(algos, underlyingAlgo(algo))
+}
+
+func isRSACert(algo string) bool {
+	_, ok := certKeyAlgoNames[algo]
+	if !ok {
+		return false
+	}
+	return isRSA(algo)
+}
+
+// supportedPubKeyAuthAlgos specifies the supported client public key
+// authentication algorithms. Note that this doesn't include certificate types
+// since those use the underlying algorithm. This list is sent to the client if
+// it supports the server-sig-algs extension. Order is irrelevant.
+var supportedPubKeyAuthAlgos = []string{
+	KeyAlgoED25519,
+	KeyAlgoSKED25519, KeyAlgoSKECDSA256,
+	KeyAlgoECDSA256, KeyAlgoECDSA384, KeyAlgoECDSA521,
+	KeyAlgoRSASHA256, KeyAlgoRSASHA512, KeyAlgoRSA,
+	KeyAlgoDSA,
 }
 
 // unexpectedMessageError results when the SSH message that we received didn't
@@ -133,17 +178,23 @@ type directionAlgorithms struct {
 
 // rekeyBytes returns a rekeying intervals in bytes.
 func (a *directionAlgorithms) rekeyBytes() int64 {
-	// According to RFC4344 block ciphers should rekey after
+	// According to RFC 4344 block ciphers should rekey after
 	// 2^(BLOCKSIZE/4) blocks. For all AES flavors BLOCKSIZE is
 	// 128.
 	switch a.Cipher {
-	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcmCipherID, aes128cbcID:
+	case "aes128-ctr", "aes192-ctr", "aes256-ctr", gcm128CipherID, gcm256CipherID, aes128cbcID:
 		return 16 * (1 << 32)
 
 	}
 
-	// For others, stick with RFC4253 recommendation to rekey after 1 Gb of data.
+	// For others, stick with RFC 4253 recommendation to rekey after 1 Gb of data.
 	return 1 << 30
+}
+
+var aeadCiphers = map[string]bool{
+	gcm128CipherID:     true,
+	gcm256CipherID:     true,
+	chacha20Poly1305ID: true,
 }
 
 type algorithms struct {
@@ -181,14 +232,18 @@ func findAgreedAlgorithms(isClient bool, clientKexInit, serverKexInit *kexInitMs
 		return
 	}
 
-	ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer)
-	if err != nil {
-		return
+	if !aeadCiphers[ctos.Cipher] {
+		ctos.MAC, err = findCommon("client to server MAC", clientKexInit.MACsClientServer, serverKexInit.MACsClientServer)
+		if err != nil {
+			return
+		}
 	}
 
-	stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient)
-	if err != nil {
-		return
+	if !aeadCiphers[stoc.Cipher] {
+		stoc.MAC, err = findCommon("server to client MAC", clientKexInit.MACsServerClient, serverKexInit.MACsServerClient)
+		if err != nil {
+			return
+		}
 	}
 
 	ctos.Compression, err = findCommon("client to server compression", clientKexInit.CompressionClientServer, serverKexInit.CompressionClientServer)
@@ -221,16 +276,16 @@ type Config struct {
 	// unspecified, a size suitable for the chosen cipher is used.
 	RekeyThreshold uint64
 
-	// The allowed key exchanges algorithms. If unspecified then a
-	// default set of algorithms is used.
+	// The allowed key exchanges algorithms. If unspecified then a default set
+	// of algorithms is used. Unsupported values are silently ignored.
 	KeyExchanges []string
 
-	// The allowed cipher algorithms. If unspecified then a sensible
-	// default is used.
+	// The allowed cipher algorithms. If unspecified then a sensible default is
+	// used. Unsupported values are silently ignored.
 	Ciphers []string
 
-	// The allowed MAC algorithms. If unspecified then a sensible default
-	// is used.
+	// The allowed MAC algorithms. If unspecified then a sensible default is
+	// used. Unsupported values are silently ignored.
 	MACs []string
 }
 
@@ -247,7 +302,7 @@ func (c *Config) SetDefaults() {
 	var ciphers []string
 	for _, c := range c.Ciphers {
 		if cipherModes[c] != nil {
-			// reject the cipher if we have no cipherModes definition
+			// Ignore the cipher if we have no cipherModes definition.
 			ciphers = append(ciphers, c)
 		}
 	}
@@ -256,10 +311,26 @@ func (c *Config) SetDefaults() {
 	if c.KeyExchanges == nil {
 		c.KeyExchanges = preferredKexAlgos
 	}
+	var kexs []string
+	for _, k := range c.KeyExchanges {
+		if kexAlgoMap[k] != nil {
+			// Ignore the KEX if we have no kexAlgoMap definition.
+			kexs = append(kexs, k)
+		}
+	}
+	c.KeyExchanges = kexs
 
 	if c.MACs == nil {
 		c.MACs = supportedMACs
 	}
+	var macs []string
+	for _, m := range c.MACs {
+		if macModes[m] != nil {
+			// Ignore the MAC if we have no macModes definition.
+			macs = append(macs, m)
+		}
+	}
+	c.MACs = macs
 
 	if c.RekeyThreshold == 0 {
 		// cipher specific default
@@ -272,8 +343,9 @@ func (c *Config) SetDefaults() {
 }
 
 // buildDataSignedForAuth returns the data that is signed in order to prove
-// possession of a private key. See RFC 4252, section 7.
-func buildDataSignedForAuth(sessionID []byte, req userAuthRequestMsg, algo, pubKey []byte) []byte {
+// possession of a private key. See RFC 4252, section 7. algo is the advertised
+// algorithm, and may be a certificate type.
+func buildDataSignedForAuth(sessionID []byte, req userAuthRequestMsg, algo string, pubKey []byte) []byte {
 	data := struct {
 		Session []byte
 		Type    byte
@@ -281,7 +353,7 @@ func buildDataSignedForAuth(sessionID []byte, req userAuthRequestMsg, algo, pubK
 		Service string
 		Method  string
 		Sign    bool
-		Algo    []byte
+		Algo    string
 		PubKey  []byte
 	}{
 		sessionID,

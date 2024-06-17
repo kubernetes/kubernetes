@@ -3,6 +3,7 @@ package dbus
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -25,6 +26,27 @@ var (
 		[]interface{}{"Object does not implement the interface"},
 	}
 )
+
+func MakeNoObjectError(path ObjectPath) Error {
+	return Error{
+		"org.freedesktop.DBus.Error.NoSuchObject",
+		[]interface{}{fmt.Sprintf("No such object '%s'", string(path))},
+	}
+}
+
+func MakeUnknownMethodError(methodName string) Error {
+	return Error{
+		"org.freedesktop.DBus.Error.UnknownMethod",
+		[]interface{}{fmt.Sprintf("Unknown / invalid method '%s'", methodName)},
+	}
+}
+
+func MakeUnknownInterfaceError(ifaceName string) Error {
+	return Error{
+		"org.freedesktop.DBus.Error.UnknownInterface",
+		[]interface{}{fmt.Sprintf("Object does not implement the interface '%s'", ifaceName)},
+	}
+}
 
 func MakeFailedError(err error) *Error {
 	return &Error{
@@ -63,6 +85,22 @@ func getMethods(in interface{}, mapping map[string]string) map[string]reflect.Va
 			methtype.PkgPath != "" {
 			continue
 		}
+		// map names while building table
+		methods[computeMethodName(methtype.Name, mapping)] = method
+	}
+	return methods
+}
+
+func getAllMethods(in interface{}, mapping map[string]string) map[string]reflect.Value {
+	if in == nil {
+		return nil
+	}
+	methods := make(map[string]reflect.Value)
+	val := reflect.ValueOf(in)
+	typ := val.Type()
+	for i := 0; i < typ.NumMethod(); i++ {
+		methtype := typ.Method(i)
+		method := val.Method(i)
 		// map names while building table
 		methods[computeMethodName(methtype.Name, mapping)] = method
 	}
@@ -112,6 +150,11 @@ func (conn *Conn) handleCall(msg *Message) {
 	ifaceName, _ := msg.Headers[FieldInterface].value.(string)
 	sender, hasSender := msg.Headers[FieldSender].value.(string)
 	serial := msg.serial
+
+	if len(name) == 0 {
+		conn.sendError(ErrMsgUnknownMethod, sender, serial)
+	}
+
 	if ifaceName == "org.freedesktop.DBus.Peer" {
 		switch name {
 		case "Ping":
@@ -119,29 +162,26 @@ func (conn *Conn) handleCall(msg *Message) {
 		case "GetMachineId":
 			conn.sendReply(sender, serial, conn.uuid)
 		default:
-			conn.sendError(ErrMsgUnknownMethod, sender, serial)
+			conn.sendError(MakeUnknownMethodError(name), sender, serial)
 		}
 		return
-	}
-	if len(name) == 0 {
-		conn.sendError(ErrMsgUnknownMethod, sender, serial)
 	}
 
 	object, ok := conn.handler.LookupObject(path)
 	if !ok {
-		conn.sendError(ErrMsgNoObject, sender, serial)
+		conn.sendError(MakeNoObjectError(path), sender, serial)
 		return
 	}
 
 	iface, exists := object.LookupInterface(ifaceName)
 	if !exists {
-		conn.sendError(ErrMsgUnknownInterface, sender, serial)
+		conn.sendError(MakeUnknownInterfaceError(ifaceName), sender, serial)
 		return
 	}
 
 	m, exists := iface.LookupMethod(name)
 	if !exists {
-		conn.sendError(ErrMsgUnknownMethod, sender, serial)
+		conn.sendError(MakeUnknownMethodError(name), sender, serial)
 		return
 	}
 	args, err := conn.decodeArguments(m, sender, msg)
@@ -159,7 +199,6 @@ func (conn *Conn) handleCall(msg *Message) {
 	if msg.Flags&FlagNoReplyExpected == 0 {
 		reply := new(Message)
 		reply.Type = TypeMethodReply
-		reply.serial = conn.getSerial()
 		reply.Headers = make(map[HeaderField]Variant)
 		if hasSender {
 			reply.Headers[FieldDestination] = msg.Headers[FieldSender]
@@ -171,31 +210,25 @@ func (conn *Conn) handleCall(msg *Message) {
 		}
 		reply.Headers[FieldSignature] = MakeVariant(SignatureOf(reply.Body...))
 
-		conn.sendMessageAndIfClosed(reply, nil)
+		if err := reply.IsValid(); err != nil {
+			fmt.Fprintf(os.Stderr, "dbus: dropping invalid reply to %s.%s on obj %s: %s\n", ifaceName, name, path, err)
+		} else {
+			conn.sendMessageAndIfClosed(reply, nil)
+		}
 	}
 }
 
 // Emit emits the given signal on the message bus. The name parameter must be
 // formatted as "interface.member", e.g., "org.freedesktop.DBus.NameLost".
 func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) error {
-	if !path.IsValid() {
-		return errors.New("dbus: invalid object path")
-	}
 	i := strings.LastIndex(name, ".")
 	if i == -1 {
 		return errors.New("dbus: invalid method name")
 	}
 	iface := name[:i]
 	member := name[i+1:]
-	if !isValidMember(member) {
-		return errors.New("dbus: invalid method name")
-	}
-	if !isValidInterface(iface) {
-		return errors.New("dbus: invalid interface name")
-	}
 	msg := new(Message)
 	msg.Type = TypeSignal
-	msg.serial = conn.getSerial()
 	msg.Headers = make(map[HeaderField]Variant)
 	msg.Headers[FieldInterface] = MakeVariant(iface)
 	msg.Headers[FieldMember] = MakeVariant(member)
@@ -203,6 +236,9 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 	msg.Body = values
 	if len(values) > 0 {
 		msg.Headers[FieldSignature] = MakeVariant(SignatureOf(values...))
+	}
+	if err := msg.IsValid(); err != nil {
+		return err
 	}
 
 	var closed bool
@@ -245,6 +281,18 @@ func (conn *Conn) Emit(path ObjectPath, name string, values ...interface{}) erro
 // Export returns an error if path is not a valid path name.
 func (conn *Conn) Export(v interface{}, path ObjectPath, iface string) error {
 	return conn.ExportWithMap(v, nil, path, iface)
+}
+
+// ExportAll registers all exported methods defined by the given object on
+// the message bus.
+//
+// Unlike Export there is no requirement to have the last parameter as type
+// *Error. If you want to be able to return error then you can append an error
+// type parameter to your method signature. If the error returned is not nil,
+// it is sent back to the caller as an error. Otherwise, a method reply is
+// sent with the other return values as its body.
+func (conn *Conn) ExportAll(v interface{}, path ObjectPath, iface string) error {
+	return conn.export(getAllMethods(v, nil), path, iface, false)
 }
 
 // ExportWithMap works exactly like Export but provides the ability to remap
@@ -299,19 +347,22 @@ func (conn *Conn) ExportSubtreeMethodTable(methods map[string]interface{}, path 
 }
 
 func (conn *Conn) exportMethodTable(methods map[string]interface{}, path ObjectPath, iface string, includeSubtree bool) error {
-	out := make(map[string]reflect.Value)
-	for name, method := range methods {
-		rval := reflect.ValueOf(method)
-		if rval.Kind() != reflect.Func {
-			continue
+	var out map[string]reflect.Value
+	if methods != nil {
+		out = make(map[string]reflect.Value)
+		for name, method := range methods {
+			rval := reflect.ValueOf(method)
+			if rval.Kind() != reflect.Func {
+				continue
+			}
+			t := rval.Type()
+			// only track valid methods must return *Error as last arg
+			if t.NumOut() == 0 ||
+				t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) {
+				continue
+			}
+			out[name] = rval
 		}
-		t := rval.Type()
-		// only track valid methods must return *Error as last arg
-		if t.NumOut() == 0 ||
-			t.Out(t.NumOut()-1) != reflect.TypeOf(&ErrMsgInvalidArg) {
-			continue
-		}
-		out[name] = rval
 	}
 	return conn.export(out, path, iface, includeSubtree)
 }
@@ -327,12 +378,12 @@ func (conn *Conn) unexport(h *defaultHandler, path ObjectPath, iface string) err
 	return nil
 }
 
-// exportWithMap is the worker function for all exports/registrations.
+// export is the worker function for all exports/registrations.
 func (conn *Conn) export(methods map[string]reflect.Value, path ObjectPath, iface string, includeSubtree bool) error {
 	h, ok := conn.handler.(*defaultHandler)
 	if !ok {
 		return fmt.Errorf(
-			`dbus: export only allowed on the default hander handler have %T"`,
+			`dbus: export only allowed on the default handler. Received: %T"`,
 			conn.handler)
 	}
 

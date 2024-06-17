@@ -18,18 +18,18 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -53,7 +53,7 @@ func Example_view() {
 		expectedConfig: expectedConfig,
 	}
 
-	output := test.run(nil)
+	output := test.run(&testing.T{})
 	fmt.Printf("%v", output)
 	// Output:
 	// apiVersion: v1
@@ -261,10 +261,10 @@ func TestAdditionalAuth(t *testing.T) {
 }
 
 func TestEmbedClientCert(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(fakeCertFile.Name())
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientCertificateData = fakeData
@@ -279,11 +279,96 @@ func TestEmbedClientCert(t *testing.T) {
 	test.run(t)
 }
 
-func TestEmbedClientKey(t *testing.T) {
-	fakeKeyFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(fakeKeyFile.Name())
+func TestExecPlugin(t *testing.T) {
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	fakeData := []byte("fake-data")
-	ioutil.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
+	err := os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.Exec = &clientcmdapi.ExecConfig{
+		Command: "example-client-go-exec-plugin",
+		Args:    []string{"arg1", "arg2"},
+		Env: []clientcmdapi.ExecEnvVar{
+			{
+				Name:  "FOO",
+				Value: "bar",
+			},
+		},
+		APIVersion:         "client.authentication.k8s.io/v1",
+		ProvideClusterInfo: false,
+		InteractiveMode:    "Never",
+	}
+	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
+
+	test := configCommandTest{
+		args: []string{
+			"set-credentials",
+			"cred-exec-user",
+			"--exec-api-version=client.authentication.k8s.io/v1",
+			"--exec-command=example-client-go-exec-plugin",
+			"--exec-arg=arg1,arg2",
+			"--exec-env=FOO=bar",
+			"--exec-interactive-mode=Never",
+		},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestExecPluginWithProveClusterInfo(t *testing.T) {
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
+	fakeData := []byte("fake-data")
+	err := os.WriteFile(fakeCertFile.Name(), fakeData, 0600)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	expectedConfig := newRedFederalCowHammerConfig()
+	authInfo := clientcmdapi.NewAuthInfo()
+	authInfo.Exec = &clientcmdapi.ExecConfig{
+		Command: "example-client-go-exec-plugin",
+		Args:    []string{"arg1", "arg2"},
+		Env: []clientcmdapi.ExecEnvVar{
+			{
+				Name:  "FOO",
+				Value: "bar",
+			},
+		},
+		APIVersion:         "client.authentication.k8s.io/v1",
+		ProvideClusterInfo: true,
+		InteractiveMode:    "Always",
+	}
+	expectedConfig.AuthInfos["cred-exec-user"] = authInfo
+
+	test := configCommandTest{
+		args: []string{
+			"set-credentials",
+			"cred-exec-user",
+			"--exec-api-version=client.authentication.k8s.io/v1",
+			"--exec-command=example-client-go-exec-plugin",
+			"--exec-arg=arg1,arg2",
+			"--exec-env=FOO=bar",
+			"--exec-interactive-mode=Always",
+			"--exec-provide-cluster-info=true",
+		},
+		startingConfig: newRedFederalCowHammerConfig(),
+		expectedConfig: expectedConfig,
+	}
+
+	test.run(t)
+}
+
+func TestEmbedClientKey(t *testing.T) {
+	fakeKeyFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeKeyFile)
+	fakeData := []byte("fake-data")
+	os.WriteFile(fakeKeyFile.Name(), fakeData, 0600)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
 	authInfo.ClientKeyData = fakeData
@@ -326,11 +411,11 @@ func TestEmbedNoKeyOrCertDisallowed(t *testing.T) {
 }
 
 func TestEmptyTokenAndCertAllowed(t *testing.T) {
-	fakeCertFile, _ := ioutil.TempFile("", "cert-file")
-	defer os.Remove(fakeCertFile.Name())
+	fakeCertFile, _ := os.CreateTemp(os.TempDir(), "cert-file")
+	defer utiltesting.CloseAndRemove(t, fakeCertFile)
 	expectedConfig := newRedFederalCowHammerConfig()
 	authInfo := clientcmdapi.NewAuthInfo()
-	authInfo.ClientCertificate = path.Base(fakeCertFile.Name())
+	authInfo.ClientCertificate = filepath.Base(fakeCertFile.Name())
 	expectedConfig.AuthInfos["another-user"] = authInfo
 
 	test := configCommandTest{
@@ -569,13 +654,13 @@ func TestUnsetBytes(t *testing.T) {
 }
 
 func TestCAClearsInsecure(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile("", "ca-file")
-	defer os.Remove(fakeCAFile.Name())
+	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "ca-file")
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	clusterInfoWithInsecure := clientcmdapi.NewCluster()
 	clusterInfoWithInsecure.InsecureSkipTLSVerify = true
 
 	clusterInfoWithCA := clientcmdapi.NewCluster()
-	clusterInfoWithCA.CertificateAuthority = path.Base(fakeCAFile.Name())
+	clusterInfoWithCA.CertificateAuthority = filepath.Base(fakeCAFile.Name())
 
 	startingConfig := newRedFederalCowHammerConfig()
 	startingConfig.Clusters["another-cluster"] = clusterInfoWithInsecure
@@ -638,10 +723,10 @@ func TestInsecureClearsCA(t *testing.T) {
 }
 
 func TestCADataClearsCA(t *testing.T) {
-	fakeCAFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(fakeCAFile.Name())
+	fakeCAFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeCAFile)
 	fakeData := []byte("cadata")
-	ioutil.WriteFile(fakeCAFile.Name(), fakeData, 0600)
+	os.WriteFile(fakeCAFile.Name(), fakeData, 0600)
 
 	clusterInfoWithCAData := clientcmdapi.NewCluster()
 	clusterInfoWithCAData.CertificateAuthorityData = fakeData
@@ -852,8 +937,8 @@ func TestToBool(t *testing.T) {
 }
 
 func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *testing.T) (string, clientcmdapi.Config) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
-	defer os.Remove(fakeKubeFile.Name())
+	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err := clientcmd.WriteToFile(startingConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -863,8 +948,8 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config, t *tes
 	argsToUse = append(argsToUse, "--kubeconfig="+fakeKubeFile.Name())
 	argsToUse = append(argsToUse, args...)
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdConfig(cmdutil.NewFactory(genericclioptions.NewTestConfigFlags()), clientcmd.NewDefaultPathOptions(), streams)
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdConfig(clientcmd.NewDefaultPathOptions(), streams)
 	// "context" is a global flag, inherited from base kubectl command in the real world
 	cmd.PersistentFlags().String("context", "", "The name of the kubeconfig context to use")
 	cmd.SetArgs(argsToUse)
@@ -897,7 +982,7 @@ func (test configCommandTest) run(t *testing.T) string {
 	testClearLocationOfOrigin(&actualConfig)
 
 	if !apiequality.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
-		t.Errorf("diff: %v", diff.ObjectDiff(test.expectedConfig, actualConfig))
+		t.Errorf("diff: %v", cmp.Diff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
 
@@ -921,7 +1006,7 @@ func testClearLocationOfOrigin(config *clientcmdapi.Config) {
 }
 func testSetNilMapsToEmpties(curr reflect.Value) {
 	actualCurrValue := curr
-	if curr.Kind() == reflect.Ptr {
+	if curr.Kind() == reflect.Pointer {
 		actualCurrValue = curr.Elem()
 	}
 

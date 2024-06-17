@@ -46,8 +46,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
-		&PodSecurityPolicy{},
-		&PodSecurityPolicyList{},
 		&Eviction{},
 	)
 	// Add the watch version that applies

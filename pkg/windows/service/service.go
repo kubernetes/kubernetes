@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -29,10 +30,6 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-var (
-	service *handler
-)
-
 type handler struct {
 	tosvc   chan bool
 	fromsvc chan error
@@ -47,7 +44,6 @@ func InitService(serviceName string) error {
 		fromsvc: make(chan error),
 	}
 
-	service = h
 	var err error
 	go func() {
 		err = svc.Run(serviceName, h)
@@ -95,7 +91,7 @@ Loop:
 				// As per https://docs.microsoft.com/en-us/windows/desktop/services/service-control-handler-function
 				s <- svc.Status{State: svc.StopPending}
 
-				// If we cannot exit gracefully, we really only can exit our process, so atleast the
+				// If we cannot exit gracefully, we really only can exit our process, so at least the
 				// service manager will think that we gracefully exited. At the time of writing this comment this is
 				// needed for applications that do not use signals (e.g. kube-proxy)
 				if !graceful {

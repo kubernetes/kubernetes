@@ -30,8 +30,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -45,6 +46,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 	)
 
 	f := framework.NewDefaultFramework("pv")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -52,15 +54,16 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 
 	ginkgo.Describe("When pod refers to non-existent ephemeral storage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
-			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
+			testSource := testSource
+			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func(ctx context.Context) {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
-				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 
 				// Allow it to sleep for 30 seconds
 				time.Sleep(30 * time.Second)
 				framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod))
 			})
 		}
 	})

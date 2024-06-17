@@ -17,7 +17,9 @@ limitations under the License.
 package types
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // PodConditionsByKubelet is the list of pod conditions owned by kubelet
@@ -25,7 +27,6 @@ var PodConditionsByKubelet = []v1.PodConditionType{
 	v1.PodScheduled,
 	v1.PodReady,
 	v1.PodInitialized,
-	v1.PodReasonUnschedulable,
 	v1.ContainersReady,
 }
 
@@ -33,6 +34,21 @@ var PodConditionsByKubelet = []v1.PodConditionType{
 func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 	for _, c := range PodConditionsByKubelet {
 		if c == conditionType {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodReadyToStartContainersCondition) {
+		if conditionType == v1.PodReadyToStartContainers {
+			return true
+		}
+	}
+	return false
+}
+
+// PodConditionSharedByKubelet returns if the pod condition type is shared by kubelet
+func PodConditionSharedByKubelet(conditionType v1.PodConditionType) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if conditionType == v1.DisruptionTarget {
 			return true
 		}
 	}

@@ -40,7 +40,7 @@ func (rt *extractRT) RoundTrip(req *http.Request) (*http.Response, error) {
 func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []string) (*websocket.Conn, error) {
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create tls config: %v", err)
+		return nil, fmt.Errorf("Failed to create tls config: %w", err)
 	}
 	if url.Scheme == "https" {
 		url.Scheme = "wss"
@@ -49,11 +49,11 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 	}
 	headers, err := headersForConfig(config, url)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load http headers: %v", err)
+		return nil, fmt.Errorf("Failed to load http headers: %w", err)
 	}
 	cfg, err := websocket.NewConfig(url.String(), "http://localhost")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create websocket config: %v", err)
+		return nil, fmt.Errorf("Failed to create websocket config: %w", err)
 	}
 	cfg.Header = headers
 	cfg.TlsConfig = tlsConfig

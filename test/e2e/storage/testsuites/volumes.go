@@ -16,64 +16,41 @@ limitations under the License.
 
 // This test checks that various VolumeSources are working.
 
-// test/e2e/common/volumes.go duplicates the GlusterFS test from this file.  Any changes made to this
-// test should be made there as well.
-
 package testsuites
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type volumesTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
-var _ TestSuite = &volumesTestSuite{}
+var _ storageframework.TestSuite = &volumesTestSuite{}
 
-// InitVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
-func InitVolumesTestSuite() TestSuite {
+// InitCustomVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomVolumesTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &volumesTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "volumes",
-			TestPatterns: []testpatterns.TestPattern{
-				// Default fsType
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				// ext3
-				testpatterns.Ext3InlineVolume,
-				testpatterns.Ext3PreprovisionedPV,
-				testpatterns.Ext3DynamicPV,
-				// ext4
-				testpatterns.Ext4InlineVolume,
-				testpatterns.Ext4PreprovisionedPV,
-				testpatterns.Ext4DynamicPV,
-				// xfs
-				testpatterns.XfsInlineVolume,
-				testpatterns.XfsPreprovisionedPV,
-				testpatterns.XfsDynamicPV,
-				// ntfs
-				testpatterns.NtfsInlineVolume,
-				testpatterns.NtfsPreprovisionedPV,
-				testpatterns.NtfsDynamicPV,
-				// block volumes
-				testpatterns.BlockVolModePreprovisionedPV,
-				testpatterns.BlockVolModeDynamicPV,
-			},
+		tsInfo: storageframework.TestSuiteInfo{
+			Name:         "volumes",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -81,83 +58,105 @@ func InitVolumesTestSuite() TestSuite {
 	}
 }
 
-func (t *volumesTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitVolumesTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		// Default fsType
+		storageframework.DefaultFsInlineVolume,
+		storageframework.DefaultFsPreprovisionedPV,
+		storageframework.DefaultFsDynamicPV,
+		// ext3
+		storageframework.Ext3InlineVolume,
+		storageframework.Ext3PreprovisionedPV,
+		storageframework.Ext3DynamicPV,
+		// ext4
+		storageframework.Ext4InlineVolume,
+		storageframework.Ext4PreprovisionedPV,
+		storageframework.Ext4DynamicPV,
+		// xfs
+		storageframework.XfsInlineVolume,
+		storageframework.XfsPreprovisionedPV,
+		storageframework.XfsDynamicPV,
+		// ntfs
+		storageframework.NtfsInlineVolume,
+		storageframework.NtfsPreprovisionedPV,
+		storageframework.NtfsDynamicPV,
+		// block volumes
+		storageframework.BlockVolModePreprovisionedPV,
+		storageframework.BlockVolModeDynamicPV,
+	}
+	return InitCustomVolumesTestSuite(patterns)
+}
+
+func (t *volumesTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	if pattern.VolMode == v1.PersistentVolumeBlock {
+		skipTestIfBlockNotSupported(driver)
+	}
 }
 
-func skipExecTest(driver TestDriver) {
+func skipExecTest(driver storageframework.TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapExec] {
+	if !dInfo.Capabilities[storageframework.CapExec] {
 		e2eskipper.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
 	}
 }
 
-func skipTestIfBlockNotSupported(driver TestDriver) {
+func skipTestIfBlockNotSupported(driver storageframework.TestDriver) {
 	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapBlock] {
+	if !dInfo.Capabilities[storageframework.CapBlock] {
 		e2eskipper.Skipf("Driver %q does not provide raw block - skipping", dInfo.Name)
 	}
 }
 
-func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
-		driverCleanup func()
+		config *storageframework.PerTestConfig
 
-		resource *VolumeResource
+		resource *storageframework.VolumeResource
 
 		migrationCheck *migrationOpCheck
 	}
 	var dInfo = driver.GetDriverInfo()
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("volume")
+	f := framework.NewFrameworkWithCustomTimeouts("volume", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	init := func() {
+	init := func(ctx context.Context) {
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
+		l.config = driver.PrepareTest(ctx, f)
+		l.migrationCheck = newMigrationOpCheck(ctx, f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(ctx, driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
 			e2eskipper.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
 	}
 
-	cleanup := func() {
+	cleanup := func(ctx context.Context) {
 		var errs []error
 		if l.resource != nil {
-			errs = append(errs, l.resource.CleanupResource())
+			errs = append(errs, l.resource.CleanupResource(ctx))
 			l.resource = nil
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
-		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
-		l.migrationCheck.validateMigrationVolumeOpCounts()
+		l.migrationCheck.validateMigrationVolumeOpCounts(ctx)
 	}
 
-	ginkgo.It("should store data", func() {
-		if pattern.VolMode == v1.PersistentVolumeBlock {
-			skipTestIfBlockNotSupported(driver)
-		}
-
-		init()
-		defer func() {
-			e2evolume.TestServerCleanup(f, convertTestConfig(l.config))
-			cleanup()
-		}()
+	ginkgo.It("should store data", func(ctx context.Context) {
+		init(ctx)
+		ginkgo.DeferCleanup(e2evolume.TestServerCleanup, f, storageframework.ConvertTestConfig(l.config))
+		ginkgo.DeferCleanup(cleanup)
 
 		tests := []e2evolume.Test{
 			{
@@ -169,9 +168,9 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 					dInfo.Name, f.Namespace.Name),
 			},
 		}
-		config := convertTestConfig(l.config)
+		config := storageframework.ConvertTestConfig(l.config)
 		var fsGroup *int64
-		if framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
+		if framework.NodeOSDistroIs("windows") && dInfo.Capabilities[storageframework.CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
@@ -179,9 +178,9 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		e2evolume.InjectContent(f, config, fsGroup, pattern.FsType, tests)
-		if driver.GetDriverInfo().Capabilities[CapPersistence] {
-			e2evolume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
+		e2evolume.InjectContent(ctx, f, config, fsGroup, pattern.FsType, tests)
+		if driver.GetDriverInfo().Capabilities[storageframework.CapPersistence] {
+			e2evolume.TestVolumeClient(ctx, f, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}
@@ -189,21 +188,22 @@ func (t *volumesTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 
 	// Exec works only on filesystem volumes
 	if pattern.VolMode != v1.PersistentVolumeBlock {
-		ginkgo.It("should allow exec of files on the volume", func() {
+		ginkgo.It("should allow exec of files on the volume", func(ctx context.Context) {
 			skipExecTest(driver)
-			init()
-			defer cleanup()
+			init(ctx)
+			ginkgo.DeferCleanup(cleanup)
 
-			testScriptInPod(f, string(pattern.VolType), l.resource.VolSource, l.config)
+			testScriptInPod(ctx, f, string(pattern.VolType), l.resource.VolSource, l.config)
 		})
 	}
 }
 
 func testScriptInPod(
+	ctx context.Context,
 	f *framework.Framework,
 	volumeType string,
 	source *v1.VolumeSource,
-	config *PerTestConfig) {
+	config *storageframework.PerTestConfig) {
 
 	const (
 		volPath = "/vol1"
@@ -227,7 +227,7 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   e2evolume.GetTestImage(imageutils.GetE2EImage(imageutils.Nginx)),
+					Image:   e2epod.GetTestImage(imageutils.Nginx),
 					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -248,10 +248,10 @@ func testScriptInPod(
 	}
 	e2epod.SetNodeSelection(&pod.Spec, config.ClientNodeSelection)
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
-	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
+	e2eoutput.TestContainerOutput(ctx, f, "exec-volume-test", pod, 0, []string{fileName})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }
 

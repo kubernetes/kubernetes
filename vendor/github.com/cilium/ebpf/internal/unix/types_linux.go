@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package unix
@@ -9,20 +10,37 @@ import (
 )
 
 const (
-	ENOENT                   = linux.ENOENT
-	EEXIST                   = linux.EEXIST
-	EAGAIN                   = linux.EAGAIN
-	ENOSPC                   = linux.ENOSPC
-	EINVAL                   = linux.EINVAL
-	EPOLLIN                  = linux.EPOLLIN
-	EINTR                    = linux.EINTR
-	EPERM                    = linux.EPERM
-	ESRCH                    = linux.ESRCH
-	ENODEV                   = linux.ENODEV
+	ENOENT  = linux.ENOENT
+	EEXIST  = linux.EEXIST
+	EAGAIN  = linux.EAGAIN
+	ENOSPC  = linux.ENOSPC
+	EINVAL  = linux.EINVAL
+	EPOLLIN = linux.EPOLLIN
+	EINTR   = linux.EINTR
+	EPERM   = linux.EPERM
+	ESRCH   = linux.ESRCH
+	ENODEV  = linux.ENODEV
+	EBADF   = linux.EBADF
+	E2BIG   = linux.E2BIG
+	EFAULT  = linux.EFAULT
+	EACCES  = linux.EACCES
+	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
+	ENOTSUPP = syscall.Errno(0x20c)
+
+	BPF_F_NO_PREALLOC        = linux.BPF_F_NO_PREALLOC
+	BPF_F_NUMA_NODE          = linux.BPF_F_NUMA_NODE
+	BPF_F_RDONLY             = linux.BPF_F_RDONLY
+	BPF_F_WRONLY             = linux.BPF_F_WRONLY
 	BPF_F_RDONLY_PROG        = linux.BPF_F_RDONLY_PROG
 	BPF_F_WRONLY_PROG        = linux.BPF_F_WRONLY_PROG
+	BPF_F_SLEEPABLE          = linux.BPF_F_SLEEPABLE
+	BPF_F_MMAPABLE           = linux.BPF_F_MMAPABLE
+	BPF_F_INNER_MAP          = linux.BPF_F_INNER_MAP
 	BPF_OBJ_NAME_LEN         = linux.BPF_OBJ_NAME_LEN
 	BPF_TAG_SIZE             = linux.BPF_TAG_SIZE
+	BPF_RINGBUF_BUSY_BIT     = linux.BPF_RINGBUF_BUSY_BIT
+	BPF_RINGBUF_DISCARD_BIT  = linux.BPF_RINGBUF_DISCARD_BIT
+	BPF_RINGBUF_HDR_SZ       = linux.BPF_RINGBUF_HDR_SZ
 	SYS_BPF                  = linux.SYS_BPF
 	F_DUPFD_CLOEXEC          = linux.F_DUPFD_CLOEXEC
 	EPOLL_CTL_ADD            = linux.EPOLL_CTL_ADD
@@ -32,25 +50,35 @@ const (
 	PROT_READ                = linux.PROT_READ
 	PROT_WRITE               = linux.PROT_WRITE
 	MAP_SHARED               = linux.MAP_SHARED
+	PERF_ATTR_SIZE_VER1      = linux.PERF_ATTR_SIZE_VER1
 	PERF_TYPE_SOFTWARE       = linux.PERF_TYPE_SOFTWARE
+	PERF_TYPE_TRACEPOINT     = linux.PERF_TYPE_TRACEPOINT
 	PERF_COUNT_SW_BPF_OUTPUT = linux.PERF_COUNT_SW_BPF_OUTPUT
+	PERF_EVENT_IOC_DISABLE   = linux.PERF_EVENT_IOC_DISABLE
+	PERF_EVENT_IOC_ENABLE    = linux.PERF_EVENT_IOC_ENABLE
+	PERF_EVENT_IOC_SET_BPF   = linux.PERF_EVENT_IOC_SET_BPF
 	PerfBitWatermark         = linux.PerfBitWatermark
 	PERF_SAMPLE_RAW          = linux.PERF_SAMPLE_RAW
 	PERF_FLAG_FD_CLOEXEC     = linux.PERF_FLAG_FD_CLOEXEC
 	RLIM_INFINITY            = linux.RLIM_INFINITY
 	RLIMIT_MEMLOCK           = linux.RLIMIT_MEMLOCK
+	BPF_STATS_RUN_TIME       = linux.BPF_STATS_RUN_TIME
+	PERF_RECORD_LOST         = linux.PERF_RECORD_LOST
+	PERF_RECORD_SAMPLE       = linux.PERF_RECORD_SAMPLE
+	AT_FDCWD                 = linux.AT_FDCWD
+	RENAME_NOREPLACE         = linux.RENAME_NOREPLACE
+	SO_ATTACH_BPF            = linux.SO_ATTACH_BPF
+	SO_DETACH_BPF            = linux.SO_DETACH_BPF
+	SOL_SOCKET               = linux.SOL_SOCKET
 )
 
 // Statfs_t is a wrapper
 type Statfs_t = linux.Statfs_t
 
+type Stat_t = linux.Stat_t
+
 // Rlimit is a wrapper
 type Rlimit = linux.Rlimit
-
-// Setrlimit is a wrapper
-func Setrlimit(resource int, rlim *Rlimit) (err error) {
-	return linux.Setrlimit(resource, rlim)
-}
 
 // Syscall is a wrapper
 func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno) {
@@ -60,6 +88,11 @@ func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno) {
 // FcntlInt is a wrapper
 func FcntlInt(fd uintptr, cmd, arg int) (int, error) {
 	return linux.FcntlInt(fd, cmd, arg)
+}
+
+// IoctlSetInt is a wrapper
+func IoctlSetInt(fd int, req uint, value int) error {
+	return linux.IoctlSetInt(fd, req, value)
 }
 
 // Statfs is a wrapper
@@ -147,4 +180,31 @@ func Gettid() int {
 // Tgkill is a wrapper
 func Tgkill(tgid int, tid int, sig syscall.Signal) (err error) {
 	return linux.Tgkill(tgid, tid, sig)
+}
+
+// BytePtrFromString is a wrapper
+func BytePtrFromString(s string) (*byte, error) {
+	return linux.BytePtrFromString(s)
+}
+
+// ByteSliceToString is a wrapper
+func ByteSliceToString(s []byte) string {
+	return linux.ByteSliceToString(s)
+}
+
+// Renameat2 is a wrapper
+func Renameat2(olddirfd int, oldpath string, newdirfd int, newpath string, flags uint) error {
+	return linux.Renameat2(olddirfd, oldpath, newdirfd, newpath, flags)
+}
+
+func Prlimit(pid, resource int, new, old *Rlimit) error {
+	return linux.Prlimit(pid, resource, new, old)
+}
+
+func Open(path string, mode int, perm uint32) (int, error) {
+	return linux.Open(path, mode, perm)
+}
+
+func Fstat(fd int, stat *Stat_t) error {
+	return linux.Fstat(fd, stat)
 }

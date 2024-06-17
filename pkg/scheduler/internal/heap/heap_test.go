@@ -32,6 +32,26 @@ type testHeapObject struct {
 	val  interface{}
 }
 
+type testMetricRecorder int
+
+func (tmr *testMetricRecorder) Inc() {
+	if tmr != nil {
+		*tmr++
+	}
+}
+
+func (tmr *testMetricRecorder) Dec() {
+	if tmr != nil {
+		*tmr--
+	}
+}
+
+func (tmr *testMetricRecorder) Clear() {
+	if tmr != nil {
+		*tmr = 0
+	}
+}
+
 func mkHeapObj(name string, val interface{}) testHeapObject {
 	return testHeapObject{name: name, val: val}
 }
@@ -48,8 +68,18 @@ func TestHeapBasic(t *testing.T) {
 	const amount = 500
 	var i int
 
+	// empty queue
+	if item := h.Peek(); item != nil {
+		t.Errorf("expected nil object but got %v", item)
+	}
+
 	for i = amount; i > 0; i-- {
 		h.Add(mkHeapObj(string([]rune{'a', rune(i)}), i))
+		// Retrieve head without removing it
+		head := h.Peek()
+		if e, a := i, head.(testHeapObject).val; a != e {
+			t.Errorf("expected %d, got %d", e, a)
+		}
 	}
 
 	// Make sure that the numbers are popped in ascending order.
@@ -90,42 +120,6 @@ func TestHeap_Add(t *testing.T) {
 	}
 	item, err = h.Pop()
 	if e, a := 30, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-}
-
-// TestHeap_AddIfNotPresent tests Heap.AddIfNotPresent and ensures that heap
-// invariant is preserved after adding items.
-func TestHeap_AddIfNotPresent(t *testing.T) {
-	h := New(testHeapObjectKeyFunc, compareInts)
-	h.AddIfNotPresent(mkHeapObj("foo", 10))
-	h.AddIfNotPresent(mkHeapObj("bar", 1))
-	h.AddIfNotPresent(mkHeapObj("baz", 11))
-	h.AddIfNotPresent(mkHeapObj("zab", 30))
-	h.AddIfNotPresent(mkHeapObj("foo", 13)) // This is not added.
-
-	if len := len(h.data.items); len != 4 {
-		t.Errorf("unexpected number of items: %d", len)
-	}
-	if val := h.data.items["foo"].obj.(testHeapObject).val; val != 10 {
-		t.Errorf("unexpected value: %d", val)
-	}
-	item, err := h.Pop()
-	if e, a := 1, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 10, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	// bar is already popped. Let's add another one.
-	h.AddIfNotPresent(mkHeapObj("bar", 14))
-	item, err = h.Pop()
-	if e, a := 11, item.(testHeapObject).val; err != nil || a != e {
-		t.Fatalf("expected %d, got %d", e, a)
-	}
-	item, err = h.Pop()
-	if e, a := 14, item.(testHeapObject).val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
@@ -215,7 +209,7 @@ func TestHeap_Get(t *testing.T) {
 	}
 	// Get non-existing object.
 	_, exists, err = h.Get(mkHeapObj("non-existing", 0))
-	if err != nil || exists == true {
+	if err != nil || exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }
@@ -229,12 +223,12 @@ func TestHeap_GetByKey(t *testing.T) {
 	h.Add(mkHeapObj("baz", 11))
 
 	obj, exists, err := h.GetByKey("baz")
-	if err != nil || exists == false || obj.(testHeapObject).val != 11 {
+	if err != nil || !exists || obj.(testHeapObject).val != 11 {
 		t.Fatalf("unexpected error in getting element")
 	}
 	// Get non-existing object.
 	_, exists, err = h.GetByKey("non-existing")
-	if err != nil || exists == true {
+	if err != nil || exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }
@@ -267,5 +261,35 @@ func TestHeap_List(t *testing.T) {
 		if !ok || v != heapObj.val {
 			t.Errorf("unexpected item in the list: %v", heapObj)
 		}
+	}
+}
+
+func TestHeapWithRecorder(t *testing.T) {
+	metricRecorder := new(testMetricRecorder)
+	h := NewWithRecorder(testHeapObjectKeyFunc, compareInts, metricRecorder)
+	h.Add(mkHeapObj("foo", 10))
+	h.Add(mkHeapObj("bar", 1))
+	h.Add(mkHeapObj("baz", 100))
+	h.Add(mkHeapObj("qux", 11))
+
+	if *metricRecorder != 4 {
+		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
+	}
+	if err := h.Delete(mkHeapObj("bar", 1)); err != nil {
+		t.Fatal(err)
+	}
+	if *metricRecorder != 3 {
+		t.Errorf("expected count to be 3 but got %d", *metricRecorder)
+	}
+	if _, err := h.Pop(); err != nil {
+		t.Fatal(err)
+	}
+	if *metricRecorder != 2 {
+		t.Errorf("expected count to be 2 but got %d", *metricRecorder)
+	}
+
+	h.metricRecorder.Clear()
+	if *metricRecorder != 0 {
+		t.Errorf("expected count to be 0 but got %d", *metricRecorder)
 	}
 }

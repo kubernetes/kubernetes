@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	authorizationapi "k8s.io/api/authorization/v1"
@@ -28,13 +29,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-// Inject into master an authorizer that uses user info.
+// Inject into control plane an authorizer that uses user info.
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 
@@ -49,19 +50,24 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "alice",
+			Name:   "alice",
+			UID:    "alice",
+			Groups: []string{user.AllAuthenticated},
 		},
 	}, true, nil
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	tCtx := ktesting.Init(t)
+	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -123,7 +129,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
+		response, err := clientset.AuthorizationV1().SubjectAccessReviews().Create(tCtx, test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -145,18 +151,33 @@ func TestSubjectAccessReview(t *testing.T) {
 }
 
 func TestSelfSubjectAccessReview(t *testing.T) {
-	username := "alice"
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-		return &authenticator.Response{
-			User: &user.DefaultInfo{Name: username},
-		}, true, nil
-	})
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
+	tCtx := ktesting.Init(t)
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	var mutex sync.Mutex
+
+	username := "alice"
+	authenticatorFunc := func(req *http.Request) (*authenticator.Response, bool, error) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		return &authenticator.Response{
+			User: &user.DefaultInfo{
+				Name:   username,
+				UID:    username,
+				Groups: []string{user.AllAuthenticated},
+			},
+		}, true, nil
+	}
+
+	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(authenticatorFunc)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -205,9 +226,11 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		mutex.Lock()
 		username = test.username
+		mutex.Unlock()
 
-		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
+		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(tCtx, test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -229,13 +252,16 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	tCtx := ktesting.Init(t)
+	clientset, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.ControlPlane.Generic.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -325,7 +351,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.AuthorizationV1().LocalSubjectAccessReviews(test.namespace).Create(context.TODO(), test.sar, metav1.CreateOptions{})
+		response, err := clientset.AuthorizationV1().LocalSubjectAccessReviews(test.namespace).Create(tCtx, test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 

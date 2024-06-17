@@ -18,8 +18,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,42 +32,228 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1beta1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+
+	klog "k8s.io/klog/v2"
 )
 
-// transformObject takes the object as returned by storage and ensures it is in
-// the client's desired form, as well as ensuring any API level fields like self-link
-// are properly set.
-func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
-	if co, ok := obj.(runtime.CacheableObject); ok {
-		if mediaType.Convert != nil {
-			// Non-nil mediaType.Convert means that some conversion of the object
-			// has to happen. Currently conversion may potentially modify the
-			// object or assume something about it (e.g. asTable operates on
-			// reflection, which won't work for any wrapper).
-			// To ensure it will work correctly, let's operate on base objects
-			// and not cache it for now.
-			//
-			// TODO: Long-term, transformObject should be changed so that it
-			// implements runtime.Encoder interface.
-			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req)
-		}
-	}
-	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
+// watchEmbeddedEncoder performs encoding of the embedded object.
+//
+// NOTE: watchEmbeddedEncoder is NOT thread-safe.
+type watchEmbeddedEncoder struct {
+	encoder runtime.Encoder
+
+	ctx context.Context
+
+	// target, if non-nil, configures transformation type.
+	// The other options are ignored if target is nil.
+	target       *schema.GroupVersionKind
+	tableOptions *metav1.TableOptions
+	scope        *RequestScope
+
+	// identifier of the encoder, computed lazily
+	identifier runtime.Identifier
 }
 
-func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+func newWatchEmbeddedEncoder(ctx context.Context, encoder runtime.Encoder, target *schema.GroupVersionKind, tableOptions *metav1.TableOptions, scope *RequestScope) *watchEmbeddedEncoder {
+	return &watchEmbeddedEncoder{
+		encoder:      encoder,
+		ctx:          ctx,
+		target:       target,
+		tableOptions: tableOptions,
+		scope:        scope,
+	}
+}
+
+// Encode implements runtime.Encoder interface.
+func (e *watchEmbeddedEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(e.Identifier(), e.doEncode, w)
+	}
+	return e.doEncode(obj, w)
+}
+
+func (e *watchEmbeddedEncoder) doEncode(obj runtime.Object, w io.Writer) error {
+	result, err := doTransformObject(e.ctx, obj, e.tableOptions, e.target, e.scope)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
+		result = obj
+	}
+
+	// When we are tranforming to a table, use the original table options when
+	// we should print headers only on the first object - headers should be
+	// omitted on subsequent events.
+	if e.tableOptions != nil && !e.tableOptions.NoHeaders {
+		e.tableOptions.NoHeaders = true
+		// With options change, we should recompute the identifier.
+		// Clearing this will trigger lazy recompute when needed.
+		e.identifier = ""
+	}
+
+	return e.encoder.Encode(result, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (e *watchEmbeddedEncoder) Identifier() runtime.Identifier {
+	if e.identifier == "" {
+		e.identifier = e.embeddedIdentifier()
+	}
+	return e.identifier
+}
+
+type watchEmbeddedEncoderIdentifier struct {
+	Name      string              `json:"name,omitempty"`
+	Encoder   string              `json:"encoder,omitempty"`
+	Target    string              `json:"target,omitempty"`
+	Options   metav1.TableOptions `json:"options,omitempty"`
+	NoHeaders bool                `json:"noHeaders,omitempty"`
+}
+
+func (e *watchEmbeddedEncoder) embeddedIdentifier() runtime.Identifier {
+	if e.target == nil {
+		// If no conversion is performed, we effective only use
+		// the embedded identifier.
+		return e.encoder.Identifier()
+	}
+	identifier := watchEmbeddedEncoderIdentifier{
+		Name:    "watch-embedded",
+		Encoder: string(e.encoder.Identifier()),
+		Target:  e.target.String(),
+	}
+	if e.target.Kind == "Table" && e.tableOptions != nil {
+		identifier.Options = *e.tableOptions
+		identifier.NoHeaders = e.tableOptions.NoHeaders
+	}
+
+	result, err := json.Marshal(identifier)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for watchEmbeddedEncoder: %v", err)
+	}
+	return runtime.Identifier(result)
+}
+
+// watchEncoder performs encoding of the watch events.
+//
+// NOTE: watchEncoder is NOT thread-safe.
+type watchEncoder struct {
+	ctx             context.Context
+	kind            schema.GroupVersionKind
+	embeddedEncoder runtime.Encoder
+	encoder         runtime.Encoder
+	framer          io.Writer
+
+	buffer      runtime.Splice
+	eventBuffer runtime.Splice
+
+	currentEmbeddedIdentifier runtime.Identifier
+	identifiers               map[watch.EventType]runtime.Identifier
+}
+
+func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
+	return &watchEncoder{
+		ctx:             ctx,
+		kind:            kind,
+		embeddedEncoder: embeddedEncoder,
+		encoder:         encoder,
+		framer:          framer,
+		buffer:          runtime.NewSpliceBuffer(),
+		eventBuffer:     runtime.NewSpliceBuffer(),
+	}
+}
+
+// Encode encodes a given watch event.
+// NOTE: if events object is implementing the CacheableObject interface,
+//
+//	the serialized version is cached in that object [not the event itself].
+func (e *watchEncoder) Encode(event watch.Event) error {
+	encodeFunc := func(obj runtime.Object, w io.Writer) error {
+		return e.doEncode(obj, event, w)
+	}
+	if co, ok := event.Object.(runtime.CacheableObject); ok {
+		return co.CacheEncode(e.identifier(event.Type), encodeFunc, e.framer)
+	}
+	return encodeFunc(event.Object, e.framer)
+}
+
+func (e *watchEncoder) doEncode(obj runtime.Object, event watch.Event, w io.Writer) error {
+	defer e.buffer.Reset()
+
+	if err := e.embeddedEncoder.Encode(obj, e.buffer); err != nil {
+		return fmt.Errorf("unable to encode watch object %T: %v", obj, err)
+	}
+
+	// ContentType is not required here because we are defaulting to the serializer type.
+	outEvent := &metav1.WatchEvent{
+		Type:   string(event.Type),
+		Object: runtime.RawExtension{Raw: e.buffer.Bytes()},
+	}
+	metrics.WatchEventsSizes.WithContext(e.ctx).WithLabelValues(e.kind.Group, e.kind.Version, e.kind.Kind).Observe(float64(len(outEvent.Object.Raw)))
+
+	defer e.eventBuffer.Reset()
+	if err := e.encoder.Encode(outEvent, e.eventBuffer); err != nil {
+		return fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e)
+	}
+
+	_, err := w.Write(e.eventBuffer.Bytes())
+	return err
+}
+
+type watchEncoderIdentifier struct {
+	Name            string `json:"name,omitempty"`
+	EmbeddedEncoder string `json:"embeddedEncoder,omitempty"`
+	Encoder         string `json:"encoder,omitempty"`
+	EventType       string `json:"eventType,omitempty"`
+}
+
+func (e *watchEncoder) identifier(eventType watch.EventType) runtime.Identifier {
+	// We need to take into account that in embeddedEncoder includes table
+	// transformer, then its identifier is dynamic. As a result, whenever
+	// the identifier of embeddedEncoder changes, we need to invalidate the
+	// whole identifiers cache.
+	// TODO(wojtek-t): Can we optimize it somehow?
+	if e.currentEmbeddedIdentifier != e.embeddedEncoder.Identifier() {
+		e.currentEmbeddedIdentifier = e.embeddedEncoder.Identifier()
+		e.identifiers = map[watch.EventType]runtime.Identifier{}
+	}
+	if _, ok := e.identifiers[eventType]; !ok {
+		e.identifiers[eventType] = e.typeIdentifier(eventType)
+	}
+	return e.identifiers[eventType]
+}
+
+func (e *watchEncoder) typeIdentifier(eventType watch.EventType) runtime.Identifier {
+	// The eventType is a non-standard pattern. This is coming from the fact
+	// that we're effectively serializing the whole watch event, but storing
+	// it in serializations of the Object within the watch event.
+	identifier := watchEncoderIdentifier{
+		Name:            "watch",
+		EmbeddedEncoder: string(e.embeddedEncoder.Identifier()),
+		Encoder:         string(e.encoder.Identifier()),
+		EventType:       string(eventType),
+	}
+
+	result, err := json.Marshal(identifier)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for watchEncoder: %v", err)
+	}
+	return runtime.Identifier(result)
+}
+
+// doTransformResponseObject is used for handling all requests, including watch.
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, target *schema.GroupVersionKind, scope *RequestScope) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
-		return nil, err
-	}
 
-	switch target := mediaType.Convert; {
+	switch {
 	case target == nil:
+		// If we ever change that from a no-op, the identifier of
+		// the watchEmbeddedEncoder has to be adjusted accordingly.
 		return obj, nil
 
 	case target.Kind == "PartialObjectMetadata":
@@ -122,19 +311,36 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 
 // transformResponseObject takes an object loaded from storage and performs any necessary transformations.
 // Will write the complete response object.
-func transformResponseObject(ctx context.Context, scope *RequestScope, trace *utiltrace.Trace, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
+// transformResponseObject is used only for handling non-streaming requests.
+func transformResponseObject(ctx context.Context, scope *RequestScope, req *http.Request, w http.ResponseWriter, statusCode int, mediaType negotiation.MediaTypeOptions, result runtime.Object) {
 	options, err := optionsForTransform(mediaType, req)
 	if err != nil {
 		scope.err(err, w, req)
 		return
 	}
-	obj, err := transformObject(ctx, result, options, mediaType, scope, req)
+
+	// ensure that for empty lists we don't return <nil> items.
+	// This is safe to modify without deep-copying the object, as
+	// List objects themselves are never cached.
+	if meta.IsListType(result) && meta.LenList(result) == 0 {
+		if err := meta.SetList(result, []runtime.Object{}); err != nil {
+			scope.err(err, w, req)
+			return
+		}
+	}
+
+	var obj runtime.Object
+	do := func() {
+		obj, err = doTransformObject(ctx, result, options, mediaType.Convert, scope)
+	}
+	endpointsrequest.TrackTransformResponseObjectLatency(ctx, do)
+
 	if err != nil {
 		scope.err(err, w, req)
 		return
 	}
 	kind, serializer, _ := targetEncodingForTransform(scope, mediaType, req)
-	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(serializer, scope, kind.GroupVersion(), w, req, statusCode, obj, false)
 }
 
 // errNotAcceptable indicates Accept negotiation has failed
@@ -244,9 +450,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	case groupVersion == metav1.SchemeGroupVersion:
@@ -264,9 +470,9 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 		if err != nil {
 			return nil, err
 		}
-		list.SelfLink = li.GetSelfLink()
 		list.ResourceVersion = li.GetResourceVersion()
 		list.Continue = li.GetContinue()
+		list.RemainingItemCount = li.GetRemainingItemCount()
 		return list, nil
 
 	default:

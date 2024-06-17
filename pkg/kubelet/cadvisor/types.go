@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=types.go -destination=testing/cadvisor_mock.go -package=testing Interface
 package cadvisor
 
 import (
-	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 )
@@ -25,11 +25,8 @@ import (
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
 type Interface interface {
 	Start() error
-	DockerContainer(name string, req *cadvisorapi.ContainerInfoRequest) (cadvisorapi.ContainerInfo, error)
-	ContainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
 	ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
 	GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error)
-	SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error)
 	MachineInfo() (*cadvisorapi.MachineInfo, error)
 
 	VersionInfo() (*cadvisorapi.VersionInfo, error)
@@ -40,8 +37,9 @@ type Interface interface {
 	// Returns usage information about the root filesystem.
 	RootFsInfo() (cadvisorapiv2.FsInfo, error)
 
-	// Get events streamed through passedChannel that fit the request.
-	WatchEvents(request *events.Request) (*events.EventChannel, error)
+	// Returns usage information about the writeable layer.
+	// KEP 4191 can separate the image filesystem
+	ContainerFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Get filesystem information for the filesystem that contains the given file.
 	GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error)
@@ -51,4 +49,6 @@ type Interface interface {
 type ImageFsInfoProvider interface {
 	// ImageFsInfoLabel returns the label cAdvisor should use to find the filesystem holding container images.
 	ImageFsInfoLabel() (string, error)
+	// In split image filesystem this will be different from ImageFsInfoLabel
+	ContainerFsInfoLabel() (string, error)
 }

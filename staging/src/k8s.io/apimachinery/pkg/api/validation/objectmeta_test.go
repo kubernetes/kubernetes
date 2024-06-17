@@ -163,34 +163,34 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			ownerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind1",
 					Name:       "name",
 					UID:        "1",
 					Controller: &falseVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind2",
 					Name:       "name",
 					UID:        "2",
 					Controller: &trueVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind3",
 					Name:       "name",
 					UID:        "3",
 					Controller: &trueVar,
 				},
 				{
 					APIVersion: "customresourceVersion",
-					Kind:       "customresourceKind",
+					Kind:       "customresourceKind4",
 					Name:       "name",
 					UID:        "4",
 				},
 			},
 			expectError:          true,
-			expectedErrorMessage: "Only one reference can have Controller set to true",
+			expectedErrorMessage: "Only one reference can have Controller set to true. Found \"true\" in references for customresourceKind2/name and customresourceKind3/name",
 		},
 	}
 
@@ -452,10 +452,10 @@ func TestValidateAnnotations(t *testing.T) {
 		{"1234/5678": "bar"},
 		{"1.2.3.4/5678": "bar"},
 		{"UpperCase123": "bar"},
-		{"a": strings.Repeat("b", totalAnnotationSizeLimitB-1)},
+		{"a": strings.Repeat("b", TotalAnnotationSizeLimitB-1)},
 		{
-			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2-1),
-			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2-1),
+			"a": strings.Repeat("b", TotalAnnotationSizeLimitB/2-1),
+			"c": strings.Repeat("d", TotalAnnotationSizeLimitB/2-1),
 		},
 	}
 	for i := range successCases {
@@ -485,10 +485,10 @@ func TestValidateAnnotations(t *testing.T) {
 		}
 	}
 	totalSizeErrorCases := []map[string]string{
-		{"a": strings.Repeat("b", totalAnnotationSizeLimitB)},
+		{"a": strings.Repeat("b", TotalAnnotationSizeLimitB)},
 		{
-			"a": strings.Repeat("b", totalAnnotationSizeLimitB/2),
-			"c": strings.Repeat("d", totalAnnotationSizeLimitB/2),
+			"a": strings.Repeat("b", TotalAnnotationSizeLimitB/2),
+			"c": strings.Repeat("d", TotalAnnotationSizeLimitB/2),
 		},
 	}
 	for i := range totalSizeErrorCases {

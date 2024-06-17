@@ -21,11 +21,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -61,7 +60,6 @@ func TestAdmit(t *testing.T) {
 		resource       schema.GroupVersionResource
 		object         runtime.Object
 		expectedObject runtime.Object
-		featureEnabled bool
 		namespace      string
 	}{
 		{
@@ -69,7 +67,6 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claimWithFinalizer,
-			true,
 			claim.Namespace,
 		},
 		{
@@ -77,23 +74,13 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claimWithFinalizer,
 			claimWithFinalizer,
-			true,
 			claimWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-			claim,
-			claim,
-			false,
-			claim.Namespace,
 		},
 		{
 			"create -> add finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pv,
 			pvWithFinalizer,
-			true,
 			pv.Namespace,
 		},
 		{
@@ -101,23 +88,13 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pvWithFinalizer,
 			pvWithFinalizer,
-			true,
 			pvWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumes"),
-			pv,
-			pv,
-			false,
-			pv.Namespace,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := newPlugin()
-			ctrl.storageObjectInUseProtection = test.featureEnabled
 
 			obj := test.object.DeepCopyObject()
 			attrs := admission.NewAttributesRecord(
@@ -139,7 +116,7 @@ func TestAdmit(t *testing.T) {
 				t.Errorf("Test %q: got unexpected error: %v", test.name, err)
 			}
 			if !reflect.DeepEqual(test.expectedObject, obj) {
-				t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedObject), spew.Sdump(obj))
+				t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, dump.Pretty(test.expectedObject), dump.Pretty(obj))
 			}
 		})
 	}

@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
-
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -38,7 +36,7 @@ type LogfFn func(format string, args ...interface{})
 
 func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
-		logf(spew.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
+		logf("New ReplicaSet %q of Deployment %q:\n%s", newRS.Name, deployment.Name, dump.Pretty(*newRS))
 	} else {
 		logf("New ReplicaSet of Deployment %q is nil.", deployment.Name)
 	}
@@ -46,7 +44,7 @@ func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.R
 		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf(spew.Sprintf("%+v", *allOldRSs[i]))
+		logf(dump.Pretty(*allOldRSs[i]))
 	}
 }
 
@@ -66,7 +64,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsL
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
-		logf(spew.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
+		logf("Pod %q is %s:\n%s", pod.Name, availability, dump.Pretty(pod))
 	}
 }
 
@@ -107,7 +105,7 @@ func waitForDeploymentCompleteMaybeCheckRolling(c clientset.Interface, d *apps.D
 		return false, nil
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("%s", reason)
 	}
 	if err != nil {
@@ -118,7 +116,7 @@ func waitForDeploymentCompleteMaybeCheckRolling(c clientset.Interface, d *apps.D
 
 func checkRollingUpdateStatus(c clientset.Interface, deployment *apps.Deployment, logf LogfFn) (string, error) {
 	var reason string
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.AppsV1())
+	oldRSs, allOldRSs, newRS, err := GetAllReplicaSets(deployment, c)
 	if err != nil {
 		return "", err
 	}
@@ -153,6 +151,40 @@ func checkRollingUpdateStatus(c clientset.Interface, deployment *apps.Deployment
 	return "", nil
 }
 
+// GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
+// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
+// The third returned value is the new replica set, and it may be nil if it doesn't exist yet.
+func GetAllReplicaSets(deployment *apps.Deployment, c clientset.Interface) ([]*apps.ReplicaSet, []*apps.ReplicaSet, *apps.ReplicaSet, error) {
+	rsList, err := deploymentutil.ListReplicaSets(deployment, deploymentutil.RsListFromClient(c.AppsV1()))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	oldRSes, allOldRSes := deploymentutil.FindOldReplicaSets(deployment, rsList)
+	newRS := deploymentutil.FindNewReplicaSet(deployment, rsList)
+	return oldRSes, allOldRSes, newRS, nil
+}
+
+// GetOldReplicaSets returns the old replica sets targeted by the given Deployment; get PodList and ReplicaSetList from client interface.
+// Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
+func GetOldReplicaSets(deployment *apps.Deployment, c clientset.Interface) ([]*apps.ReplicaSet, []*apps.ReplicaSet, error) {
+	rsList, err := deploymentutil.ListReplicaSets(deployment, deploymentutil.RsListFromClient(c.AppsV1()))
+	if err != nil {
+		return nil, nil, err
+	}
+	oldRSes, allOldRSes := deploymentutil.FindOldReplicaSets(deployment, rsList)
+	return oldRSes, allOldRSes, nil
+}
+
+// GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
+// Returns nil if the new replica set doesn't exist yet.
+func GetNewReplicaSet(deployment *apps.Deployment, c clientset.Interface) (*apps.ReplicaSet, error) {
+	rsList, err := deploymentutil.ListReplicaSets(deployment, deploymentutil.RsListFromClient(c.AppsV1()))
+	if err != nil {
+		return nil, err
+	}
+	return deploymentutil.FindNewReplicaSet(deployment, rsList), nil
+}
+
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
 // Rolling update strategy should not be broken during a rolling update.
 func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *apps.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
@@ -181,7 +213,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 			return false, err
 		}
 		// The new ReplicaSet needs to be non-nil and contain the pod-template-hash label
-		newRS, err = deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+		newRS, err = GetNewReplicaSet(deployment, c)
 		if err != nil {
 			return false, err
 		}
@@ -192,7 +224,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 		}
 		return true, nil
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		LogReplicaSetsOfDeployment(deployment, nil, newRS, logf)
 		err = fmt.Errorf(reason)
 	}
@@ -201,7 +233,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	}
 	if err != nil {
 		if deployment == nil {
-			return errors.Wrapf(err, "error creating new replica set for deployment %q ", deploymentName)
+			return fmt.Errorf("error creating new replica set for deployment %q: %w", deploymentName, err)
 		}
 		deploymentImage := ""
 		if len(deployment.Spec.Template.Spec.Containers) > 0 {
@@ -224,7 +256,7 @@ func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, 
 	}
 
 	// Check revision of the new replica set of this deployment
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+	newRS, err := GetNewReplicaSet(deployment, c)
 	if err != nil {
 		return fmt.Errorf("unable to get new replicaset of deployment %s during revision check: %v", deploymentName, err)
 	}
@@ -284,7 +316,7 @@ func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, 
 		updateErr = err
 		return false, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("couldn't apply the provided updated to deployment %q: %v", name, updateErr)
 	}
 	return deployment, pollErr
@@ -343,9 +375,9 @@ func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, r
 		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
 		return cond != nil && cond.Reason == reason, nil
 	})
-	if pollErr == wait.ErrWaitTimeout {
+	if wait.Interrupted(pollErr) {
 		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason, latest deployment conditions: %+v", deployment.Name, deployment.Status.Conditions)
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.AppsV1())
+		_, allOldRSs, newRS, err := GetAllReplicaSets(deployment, c)
 		if err == nil {
 			LogReplicaSetsOfDeployment(deployment, allOldRSs, newRS, logf)
 			LogPodsOfDeployment(c, deployment, append(allOldRSs, newRS), logf)

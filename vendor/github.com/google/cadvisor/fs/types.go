@@ -22,6 +22,7 @@ type Context struct {
 	// docker root directory.
 	Docker DockerContext
 	Crio   CrioContext
+	Podman PodmanContext
 }
 
 type DockerContext struct {
@@ -30,8 +31,16 @@ type DockerContext struct {
 	DriverStatus map[string]string
 }
 
+type PodmanContext struct {
+	Root         string
+	Driver       string
+	DriverStatus map[string]string
+}
+
 type CrioContext struct {
-	Root string
+	Root       string
+	ImageStore string
+	Driver     string
 }
 
 type DeviceInfo struct {
@@ -50,6 +59,7 @@ const (
 	ZFS          FsType = "zfs"
 	DeviceMapper FsType = "devicemapper"
 	VFS          FsType = "vfs"
+	NFS          FsType = "nfs"
 )
 
 type Fs struct {
@@ -77,6 +87,8 @@ type DiskStats struct {
 	IoInProgress    uint64
 	IoTime          uint64
 	WeightedIoTime  uint64
+	Major           uint64
+	Minor           uint64
 }
 
 type UsageInfo struct {
@@ -84,8 +96,13 @@ type UsageInfo struct {
 	Inodes uint64
 }
 
-// ErrNoSuchDevice is the error indicating the requested device does not exist.
-var ErrNoSuchDevice = errors.New("cadvisor: no such device")
+var (
+	// ErrNoSuchDevice is the error indicating the requested device does not exist.
+	ErrNoSuchDevice = errors.New("cadvisor: no such device")
+
+	// ErrDeviceNotInPartitionsMap is the error resulting if a device could not be found in the partitions map.
+	ErrDeviceNotInPartitionsMap = errors.New("could not find device in cached partitions map")
+)
 
 type FsInfo interface {
 	// Returns capacity and free space, in bytes, of all the ext2, ext3, ext4 filesystems on the host.

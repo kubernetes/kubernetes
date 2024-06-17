@@ -20,9 +20,7 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utiltrace "k8s.io/utils/trace"
 )
 
 // The key type is unexported to prevent collisions
@@ -34,15 +32,6 @@ const (
 
 	// userKey is the context key for the request user.
 	userKey
-
-	// auditKey is the context key for the audit event.
-	auditKey
-
-	// audiencesKey is the context key for request audiences.
-	audiencesKey
-
-	// traceKey is the context key for nested tracing.
-	traceKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -86,29 +75,4 @@ func WithUser(parent context.Context, user user.Info) context.Context {
 func UserFrom(ctx context.Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
-}
-
-// WithAuditEvent returns set audit event struct.
-func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
-	return WithValue(parent, auditKey, ev)
-}
-
-// AuditEventFrom returns the audit event struct on the ctx
-func AuditEventFrom(ctx context.Context) *audit.Event {
-	ev, _ := ctx.Value(auditKey).(*audit.Event)
-	return ev
-}
-
-// TraceFrom returns the value of the trace key on the ctx
-func TraceFrom(ctx context.Context) (*utiltrace.Trace, bool) {
-	trace, ok := ctx.Value(traceKey).(*utiltrace.Trace)
-	return trace, ok
-}
-
-// WithTrace returns a new trace using the provided msg and fields, nested within any trace already in the
-// provided context. Also returns a context containing the new trace
-func WithTrace(ctx context.Context, msg string, fields ...utiltrace.Field) (context.Context, *utiltrace.Trace) {
-	parent, _ := TraceFrom(ctx) // ignore ok since Nest can be called with a nil receiver to create root traces
-	trace := parent.Nest(msg, fields...)
-	return context.WithValue(ctx, traceKey, trace), trace
 }

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -23,6 +24,9 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	netutils "k8s.io/utils/net"
 
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -44,7 +48,7 @@ func (h *netlinkHandle) EnsureAddressBind(address, devName string) (exist bool, 
 	if err != nil {
 		return false, fmt.Errorf("error get interface: %s, err: %v", devName, err)
 	}
-	addr := net.ParseIP(address)
+	addr := netutils.ParseIPSloppy(address)
 	if addr == nil {
 		return false, fmt.Errorf("error parse ip address: %s", address)
 	}
@@ -64,7 +68,7 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	if err != nil {
 		return fmt.Errorf("error get interface: %s, err: %v", devName, err)
 	}
-	addr := net.ParseIP(address)
+	addr := netutils.ParseIPSloppy(address)
 	if addr == nil {
 		return fmt.Errorf("error parse ip address: %s", address)
 	}
@@ -123,72 +127,68 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 	return ips, nil
 }
 
-// GetLocalAddresses lists all LOCAL type IP addresses from host based on filter device.
-// If dev is not specified, it's equivalent to exec:
-// $ ip route show table local type local proto kernel
-// 10.0.0.1 dev kube-ipvs0  scope host  src 10.0.0.1
-// 10.0.0.10 dev kube-ipvs0  scope host  src 10.0.0.10
-// 10.0.0.252 dev kube-ipvs0  scope host  src 10.0.0.252
-// 100.106.89.164 dev eth0  scope host  src 100.106.89.164
-// 127.0.0.0/8 dev lo  scope host  src 127.0.0.1
-// 127.0.0.1 dev lo  scope host  src 127.0.0.1
-// 172.17.0.1 dev docker0  scope host  src 172.17.0.1
-// 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
-// Then cut the unique src IP fields,
-// --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 172.17.0.1, 192.168.122.1]
-
-// If dev is specified, it's equivalent to exec:
-// $ ip route show table local type local proto kernel dev kube-ipvs0
-// 10.0.0.1  scope host  src 10.0.0.1
-// 10.0.0.10  scope host  src 10.0.0.10
-// Then cut the unique src IP fields,
-// --> result set: [10.0.0.1, 10.0.0.10]
-
-// If filterDev is specified, the result will discard route of specified device and cut src from other routes.
-func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
-	chosenLinkIndex, filterLinkIndex := -1, -1
-	if dev != "" {
-		link, err := h.LinkByName(dev)
-		if err != nil {
-			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
-		}
-		chosenLinkIndex = link.Attrs().Index
-	} else if filterDev != "" {
-		link, err := h.LinkByName(filterDev)
-		if err != nil {
-			return nil, fmt.Errorf("error get filter device %s, err: %v", filterDev, err)
-		}
-		filterLinkIndex = link.Attrs().Index
-	}
-
-	routeFilter := &netlink.Route{
-		Table:    unix.RT_TABLE_LOCAL,
-		Type:     unix.RTN_LOCAL,
-		Protocol: unix.RTPROT_KERNEL,
-	}
-	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
-
-	// find chosen device
-	if chosenLinkIndex != -1 {
-		routeFilter.LinkIndex = chosenLinkIndex
-		filterMask |= netlink.RT_FILTER_OIF
-	}
-	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
+// GetAllLocalAddresses return all local addresses on the node.
+// Only the addresses of the current family are returned.
+// IPv6 link-local and loopback addresses are excluded.
+func (h *netlinkHandle) GetAllLocalAddresses() (sets.Set[string], error) {
+	addr, err := net.InterfaceAddrs()
 	if err != nil {
-		return nil, fmt.Errorf("error list route table, err: %v", err)
+		return nil, fmt.Errorf("Could not get addresses: %v", err)
 	}
-	res := sets.NewString()
-	for _, route := range routes {
-		if route.LinkIndex == filterLinkIndex {
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
+}
+
+// GetLocalAddresses return all local addresses for an interface.
+// Only the addresses of the current family are returned.
+// IPv6 link-local and loopback addresses are excluded.
+func (h *netlinkHandle) GetLocalAddresses(dev string) (sets.Set[string], error) {
+	ifi, err := net.InterfaceByName(dev)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get interface %s: %v", dev, err)
+	}
+	addr, err := ifi.Addrs()
+	if err != nil {
+		return nil, fmt.Errorf("Can't get addresses from %s: %v", ifi.Name, err)
+	}
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
+}
+
+func (h *netlinkHandle) isValidForSet(ip net.IP) bool {
+	if h.isIPv6 != netutils.IsIPv6(ip) {
+		return false
+	}
+	if h.isIPv6 && ip.IsLinkLocalUnicast() {
+		return false
+	}
+	if ip.IsLoopback() {
+		return false
+	}
+	return true
+}
+
+// GetAllLocalAddressesExcept return all local addresses on the node,
+// except from the passed dev.  This is not the same as to take the
+// diff between GetAllLocalAddresses and GetLocalAddresses since an
+// address can be assigned to many interfaces. This problem raised
+// https://github.com/kubernetes/kubernetes/issues/114815
+func (h *netlinkHandle) GetAllLocalAddressesExcept(dev string) (sets.Set[string], error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	var addr []net.Addr
+	for _, iface := range ifaces {
+		if iface.Name == dev {
 			continue
 		}
-		if h.isIPv6 {
-			if route.Dst.IP.To4() == nil && !route.Dst.IP.IsLinkLocalUnicast() {
-				res.Insert(route.Dst.IP.String())
-			}
-		} else if route.Src != nil {
-			res.Insert(route.Src.String())
+		ifadr, err := iface.Addrs()
+		if err != nil {
+			// This may happen if the interface was deleted. Ignore
+			// but log the error.
+			klog.ErrorS(err, "Reading addresses", "interface", iface.Name)
+			continue
 		}
+		addr = append(addr, ifadr...)
 	}
-	return res, nil
+	return proxyutil.AddressSet(h.isValidForSet, addr), nil
 }

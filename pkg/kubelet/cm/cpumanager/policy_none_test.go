@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/utils/cpuset"
 )
 
 func TestNonePolicyName(t *testing.T) {
@@ -28,8 +28,7 @@ func TestNonePolicyName(t *testing.T) {
 
 	policyName := policy.Name()
 	if policyName != "none" {
-		t.Errorf("NonePolicy Name() error. expected: none, returned: %v",
-			policyName)
+		t.Errorf("NonePolicy Name() error. expected: none, returned: %v", policyName)
 	}
 }
 
@@ -38,7 +37,7 @@ func TestNonePolicyAllocate(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -55,7 +54,7 @@ func TestNonePolicyRemove(t *testing.T) {
 
 	st := &mockState{
 		assignments:   state.ContainerCPUAssignments{},
-		defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+		defaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 	}
 
 	testPod := makePod("fakePod", "fakeContainer", "1000m", "1000m")
@@ -64,5 +63,43 @@ func TestNonePolicyRemove(t *testing.T) {
 	err := policy.RemoveContainer(st, string(testPod.UID), container.Name)
 	if err != nil {
 		t.Errorf("NonePolicy RemoveContainer() error. expected no error but got %v", err)
+	}
+}
+
+func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
+	// any random topology is fine
+
+	var cpuIDs []int
+	for cpuID := range topoSingleSocketHT.CPUDetails {
+		cpuIDs = append(cpuIDs, cpuID)
+	}
+
+	policy := &nonePolicy{}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.New(cpuIDs...),
+	}
+
+	cpus := policy.GetAllocatableCPUs(st)
+	if cpus.Size() != 0 {
+		t.Errorf("NonePolicy GetAllocatableCPUs() error. expected empty set, returned: %v", cpus)
+	}
+}
+
+func TestNonePolicyOptions(t *testing.T) {
+	var err error
+
+	_, err = NewNonePolicy(nil)
+	if err != nil {
+		t.Errorf("NewNonePolicy with nil options failure. expected no error but got: %v", err)
+	}
+
+	opts := map[string]string{
+		FullPCPUsOnlyOption: "true",
+	}
+	_, err = NewNonePolicy(opts)
+	if err == nil {
+		t.Errorf("NewNonePolicy with (any) options failure. expected error but got none")
 	}
 }

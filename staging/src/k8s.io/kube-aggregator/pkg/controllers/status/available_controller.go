@@ -19,7 +19,6 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -33,16 +32,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/egressselector"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -51,6 +48,9 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
+
+// making sure we only register metrics once into legacy registry
+var registerIntoLegacyRegistryOnce sync.Once
 
 type certKeyFunc func() ([]byte, []byte)
 
@@ -73,19 +73,22 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	// dialContext specifies the dial function for creating unencrypted TCP connections.
-	dialContext                func(ctx context.Context, network, address string) (net.Conn, error)
+	// proxyTransportDial specifies the dial function for creating unencrypted TCP connections.
+	proxyTransportDial         *transport.DialHolder
 	proxyCurrentCertKeyContent certKeyFunc
 	serviceResolver            ServiceResolver
 
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// map from service-namespace -> service-name -> apiservice names
 	cache map[string]map[string][]string
 	// this lock protects operations on the above cache
 	cacheLock sync.RWMutex
+
+	// metrics registered into legacy registry
+	metrics *availabilityMetrics
 }
 
 // NewAvailableConditionController returns a new AvailableConditionController.
@@ -94,66 +97,65 @@ func NewAvailableConditionController(
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
-	proxyTransport *http.Transport,
+	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
-	egressSelector *egressselector.EgressSelector,
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
 		apiServiceLister: apiServiceInformer.Lister(),
-		apiServiceSynced: apiServiceInformer.Informer().HasSynced,
 		serviceLister:    serviceInformer.Lister(),
-		servicesSynced:   serviceInformer.Informer().HasSynced,
 		endpointsLister:  endpointsInformer.Lister(),
-		endpointsSynced:  endpointsInformer.Informer().HasSynced,
 		serviceResolver:  serviceResolver,
-		queue: workqueue.NewNamedRateLimitingQueue(
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
-			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
-			"AvailableConditionController"),
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 30*time.Second),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "AvailableConditionController"},
+		),
+		proxyTransportDial:         proxyTransportDial,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
-	}
-
-	if egressSelector != nil {
-		networkContext := egressselector.Cluster.AsNetworkContext()
-		var egressDialer utilnet.DialFunc
-		egressDialer, err := egressSelector.Lookup(networkContext)
-		if err != nil {
-			return nil, err
-		}
-		c.dialContext = egressDialer
-	} else if proxyTransport != nil && proxyTransport.DialContext != nil {
-		c.dialContext = proxyTransport.DialContext
+		metrics:                    newAvailabilityMetrics(),
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
 	// allows us to detect health in a more timely fashion when network connectivity to
 	// nodes is snipped, but the network still attempts to route there.  See
 	// https://github.com/openshift/origin/issues/17159#issuecomment-341798063
-	apiServiceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	apiServiceHandler, _ := apiServiceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addAPIService,
 			UpdateFunc: c.updateAPIService,
 			DeleteFunc: c.deleteAPIService,
 		},
 		30*time.Second)
+	c.apiServiceSynced = apiServiceHandler.HasSynced
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	serviceHandler, _ := serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addService,
 		UpdateFunc: c.updateService,
 		DeleteFunc: c.deleteService,
 	})
+	c.servicesSynced = serviceHandler.HasSynced
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	endpointsHandler, _ := endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addEndpoints,
 		UpdateFunc: c.updateEndpoints,
 		DeleteFunc: c.deleteEndpoints,
 	})
+	c.endpointsSynced = endpointsHandler.HasSynced
 
 	c.syncFn = c.sync
+
+	// TODO: decouple from legacyregistry
+	var err error
+	registerIntoLegacyRegistryOnce.Do(func() {
+		err = c.metrics.Register(legacyregistry.Register, legacyregistry.CustomRegister)
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return c, nil
 }
@@ -161,6 +163,7 @@ func NewAvailableConditionController(
 func (c *AvailableConditionController) sync(key string) error {
 	originalAPIService, err := c.apiServiceLister.Get(key)
 	if apierrors.IsNotFound(err) {
+		c.metrics.ForgetAPIService(key)
 		return nil
 	}
 	if err != nil {
@@ -170,22 +173,20 @@ func (c *AvailableConditionController) sync(key string) error {
 	// if a particular transport was specified, use that otherwise build one
 	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
 	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
-	restConfig := &rest.Config{
-		TLSClientConfig: rest.TLSClientConfig{
+	transportConfig := &transport.Config{
+		TLS: transport.TLSConfig{
 			Insecure: true,
 		},
+		DialHolder: c.proxyTransportDial,
 	}
 
 	if c.proxyCurrentCertKeyContent != nil {
 		proxyClientCert, proxyClientKey := c.proxyCurrentCertKeyContent()
 
-		restConfig.TLSClientConfig.CertData = proxyClientCert
-		restConfig.TLSClientConfig.KeyData = proxyClientKey
+		transportConfig.TLS.CertData = proxyClientCert
+		transportConfig.TLS.KeyData = proxyClientKey
 	}
-	if c.dialContext != nil {
-		restConfig.Dial = c.dialContext
-	}
-	restTransport, err := rest.TransportFor(restConfig)
+	restTransport, err := transport.New(transportConfig)
 	if err != nil {
 		return err
 	}
@@ -193,6 +194,9 @@ func (c *AvailableConditionController) sync(key string) error {
 		Transport: restTransport,
 		// the request should happen quickly.
 		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	apiService := originalAPIService.DeepCopy()
@@ -206,7 +210,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	// local API services are always considered available
 	if apiService.Spec.Service == nil {
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, apiregistrationv1apihelper.NewLocalAvailableAPIServiceCondition())
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 		return err
 	}
 
@@ -216,14 +220,14 @@ func (c *AvailableConditionController) sync(key string) error {
 		availableCondition.Reason = "ServiceNotFound"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q is not present", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 		return err
 	} else if err != nil {
 		availableCondition.Status = apiregistrationv1.ConditionUnknown
 		availableCondition.Reason = "ServiceAccessError"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 		return err
 	}
 
@@ -244,7 +248,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "ServicePortError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, *apiService.Spec.Service.Port)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		}
 
@@ -254,14 +258,14 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "EndpointsNotFound"
 			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		} else if err != nil {
 			availableCondition.Status = apiregistrationv1.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		}
 		hasActiveEndpoints := false
@@ -282,7 +286,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "MissingEndpoints"
 			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
 			return err
 		}
 	}
@@ -360,7 +364,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "FailedDiscoveryCheck"
 			availableCondition.Message = lastError.Error()
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, updateErr := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, updateErr := c.updateAPIServiceStatus(originalAPIService, apiService)
 			if updateErr != nil {
 				return updateErr
 			}
@@ -373,42 +377,62 @@ func (c *AvailableConditionController) sync(key string) error {
 	availableCondition.Reason = "Passed"
 	availableCondition.Message = "all checks passed"
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-	_, err = updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+	_, err = c.updateAPIServiceStatus(originalAPIService, apiService)
 	return err
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
 // apiservices. Doing that means we don't want to quickly issue no-op updates.
-func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
 	// update this metric on every sync operation to reflect the actual state
-	setUnavailableGauge(newAPIService)
+	c.setUnavailableGauge(newAPIService)
 
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
 	}
 
-	newAPIService, err := client.APIServices().UpdateStatus(context.TODO(), newAPIService, metav1.UpdateOptions{})
+	orig := apiregistrationv1apihelper.GetAPIServiceConditionByType(originalAPIService, apiregistrationv1.Available)
+	now := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available)
+	unknown := apiregistrationv1.APIServiceCondition{
+		Type:   apiregistrationv1.Available,
+		Status: apiregistrationv1.ConditionUnknown,
+	}
+	if orig == nil {
+		orig = &unknown
+	}
+	if now == nil {
+		now = &unknown
+	}
+	if *orig != *now {
+		klog.V(2).InfoS("changing APIService availability", "name", newAPIService.Name, "oldStatus", orig.Status, "newStatus", now.Status, "message", now.Message, "reason", now.Reason)
+	}
+
+	newAPIService, err := c.apiServiceClient.APIServices().UpdateStatus(context.TODO(), newAPIService, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	setUnavailableCounter(originalAPIService, newAPIService)
+	c.setUnavailableCounter(originalAPIService, newAPIService)
 	return newAPIService, nil
 }
 
 // Run starts the AvailableConditionController loop which manages the availability condition of API services.
-func (c *AvailableConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting AvailableConditionController")
-	defer klog.Infof("Shutting down AvailableConditionController")
+	klog.Info("Starting AvailableConditionController")
+	defer klog.Info("Shutting down AvailableConditionController")
 
+	// This waits not just for the informers to sync, but for our handlers
+	// to be called; since the handlers are three different ways of
+	// enqueueing the same thing, waiting for this permits the queue to
+	// maximally de-duplicate the entries.
 	if !controllers.WaitForCacheSync("AvailableConditionController", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -428,7 +452,7 @@ func (c *AvailableConditionController) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true
@@ -577,17 +601,17 @@ func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
 }
 
 // setUnavailableGauge set the metrics so that it reflect the current state base on availability of the given service
-func setUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
+func (c *AvailableConditionController) setUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
 	if apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available) {
-		unavailableGauge.WithLabelValues(newAPIService.Name).Set(0.0)
+		c.metrics.SetAPIServiceAvailable(newAPIService.Name)
 		return
 	}
 
-	unavailableGauge.WithLabelValues(newAPIService.Name).Set(1.0)
+	c.metrics.SetAPIServiceUnavailable(newAPIService.Name)
 }
 
 // setUnavailableCounter increases the metrics only if the given service is unavailable and its APIServiceCondition has changed
-func setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
+func (c *AvailableConditionController) setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
 	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
 	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
 	statusChanged := isAvailable != wasAvailable
@@ -597,6 +621,6 @@ func setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.
 		if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
 			reason = newCondition.Reason
 		}
-		unavailableCounter.WithLabelValues(newAPIService.Name, reason).Inc()
+		c.metrics.UnavailableCounter(newAPIService.Name, reason).Inc()
 	}
 }

@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -18,9 +19,15 @@ limitations under the License.
 
 package cm
 
-import "fmt"
+import (
+	"errors"
+
+	v1 "k8s.io/api/core/v1"
+)
 
 type unsupportedCgroupManager struct{}
+
+var errNotSupported = errors.New("Cgroup Manager is not supported in this build")
 
 // Make sure that unsupportedCgroupManager implements the CgroupManager interface
 var _ CgroupManager = &unsupportedCgroupManager{}
@@ -38,6 +45,10 @@ func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
 	return ""
 }
 
+func (m *unsupportedCgroupManager) Validate(_ CgroupName) error {
+	return errNotSupported
+}
+
 func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
 	return false
 }
@@ -51,11 +62,11 @@ func (m *unsupportedCgroupManager) Update(_ *CgroupConfig) error {
 }
 
 func (m *unsupportedCgroupManager) Create(_ *CgroupConfig) error {
-	return fmt.Errorf("Cgroup Manager is not supported in this build")
+	return errNotSupported
 }
 
-func (m *unsupportedCgroupManager) GetResourceStats(name CgroupName) (*ResourceStats, error) {
-	return nil, fmt.Errorf("Cgroup Manager is not supported in this build")
+func (m *unsupportedCgroupManager) MemoryUsage(_ CgroupName) (int64, error) {
+	return -1, errNotSupported
 }
 
 func (m *unsupportedCgroupManager) Pids(_ CgroupName) []int {
@@ -68,6 +79,14 @@ func (m *unsupportedCgroupManager) CgroupName(name string) CgroupName {
 
 func (m *unsupportedCgroupManager) ReduceCPULimits(cgroupName CgroupName) error {
 	return nil
+}
+
+func (m *unsupportedCgroupManager) GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error) {
+	return nil, errNotSupported
+}
+
+func (m *unsupportedCgroupManager) SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error {
+	return errNotSupported
 }
 
 var RootCgroupName = CgroupName([]string{})

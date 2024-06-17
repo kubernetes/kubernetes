@@ -19,7 +19,9 @@ package app
 import (
 	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
@@ -27,11 +29,19 @@ import (
 
 // createCloudProvider helps consolidate what is needed for cloud providers, we explicitly list the things
 // that the cloud providers need as parameters, so we can control
-func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
+func createCloudProvider(logger klog.Logger, cloudProvider string, externalCloudVolumePlugin string, cloudConfigFile string,
 	allowUntaggedCloud bool, sharedInformers informers.SharedInformerFactory) (cloudprovider.Interface, ControllerLoopMode, error) {
 	var cloud cloudprovider.Interface
 	var loopMode ControllerLoopMode
 	var err error
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+		cloudprovider.DisableWarningForProvider(cloudProvider)
+		return nil, ExternalLoops, fmt.Errorf(
+			"cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider",
+			cloudProvider)
+	}
+
 	if cloudprovider.IsExternal(cloudProvider) {
 		loopMode = ExternalLoops
 		if externalCloudVolumePlugin == "" {
@@ -52,7 +62,7 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 
 	if cloud != nil && !cloud.HasClusterID() {
 		if allowUntaggedCloud {
-			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+			logger.Info("Warning: detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			return nil, loopMode, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}

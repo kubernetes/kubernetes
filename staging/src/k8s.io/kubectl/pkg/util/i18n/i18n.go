@@ -19,16 +19,20 @@ package i18n
 import (
 	"archive/zip"
 	"bytes"
+	"embed"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
-	"k8s.io/kubectl/pkg/generated"
+	"github.com/chai2010/gettext-go"
 
-	"github.com/chai2010/gettext-go/gettext"
 	"k8s.io/klog/v2"
 )
+
+//go:embed translations
+var translations embed.FS
 
 var knownTranslations = map[string][]string{
 	"kubectl": {
@@ -41,12 +45,63 @@ var knownTranslations = map[string][]string{
 		"it_IT",
 		"de_DE",
 		"ko_KR",
+		"pt_BR",
 	},
 	// only used for unit tests.
 	"test": {
 		"default",
 		"en_US",
 	},
+}
+
+var (
+	lazyLoadTranslationsOnce sync.Once
+	LoadTranslationsFunc     = func() error {
+		return LoadTranslations("kubectl", nil)
+	}
+	translationsLoaded bool
+)
+
+// SetLoadTranslationsFunc sets the function called to lazy load translations.
+// It must be called in an init() func that occurs BEFORE any i18n.T() calls are made by any package. You can
+// accomplish this by creating a separate package containing your init() func, and then importing that package BEFORE
+// any other packages that call i18n.T().
+//
+// Example Usage:
+//
+//	package myi18n
+//
+//	import "k8s.io/kubectl/pkg/util/i18n"
+//
+//	func init() {
+//		if err := i18n.SetLoadTranslationsFunc(loadCustomTranslations); err != nil {
+//			panic(err)
+//		}
+//	}
+//
+//	func loadCustomTranslations() error {
+//		// Load your custom translations here...
+//	}
+//
+// And then in your main or root command package, import your custom package like this:
+//
+//	import (
+//		// Other imports that don't need i18n...
+//		_ "example.com/myapp/myi18n"
+//		// Other imports that do need i18n...
+//	)
+func SetLoadTranslationsFunc(f func() error) error {
+	if translationsLoaded {
+		return errors.New("translations have already been loaded")
+	}
+	LoadTranslationsFunc = func() error {
+		if err := f(); err != nil {
+			return err
+		}
+		translationsLoaded = true
+		return nil
+	}
+	return nil
 }
 
 func loadSystemLanguage() string {
@@ -111,7 +166,7 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 		if err != nil {
 			return err
 		}
-		data, err := generated.Asset(filename)
+		data, err := translations.ReadFile(filename)
 		if err != nil {
 			return err
 		}
@@ -122,16 +177,29 @@ func LoadTranslations(root string, getLanguageFn func() string) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
-	gettext.BindTextdomain("k8s", root+".zip", buf.Bytes())
-	gettext.Textdomain("k8s")
-	gettext.SetLocale(langStr)
+	gettext.BindLocale(gettext.New("k8s", root+".zip", buf.Bytes()))
+	gettext.SetDomain("k8s")
+	gettext.SetLanguage(langStr)
+	translationsLoaded = true
 	return nil
+}
+
+func lazyLoadTranslations() {
+	lazyLoadTranslationsOnce.Do(func() {
+		if translationsLoaded {
+			return
+		}
+		if err := LoadTranslationsFunc(); err != nil {
+			klog.Warning("Failed to load translations")
+		}
+	})
 }
 
 // T translates a string, possibly substituting arguments into it along
 // the way. If len(args) is > 0, args1 is assumed to be the plural value
 // and plural translation is used.
 func T(defaultValue string, args ...int) string {
+	lazyLoadTranslations()
 	if len(args) == 0 {
 		return gettext.PGettext("", defaultValue)
 	}

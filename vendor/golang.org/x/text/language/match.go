@@ -434,7 +434,7 @@ func newMatcher(supported []Tag, options []MatchOption) *matcher {
 	// (their canonicalization simply substitutes a different language code, but
 	// nothing else), the match confidence is Exact, otherwise it is High.
 	for i, lm := range language.AliasMap {
-		// If deprecated codes match and there is no fiddling with the script or
+		// If deprecated codes match and there is no fiddling with the script
 		// or region, we consider it an exact match.
 		conf := Exact
 		if language.AliasTypes[i] != language.Macro {
@@ -545,7 +545,7 @@ type bestMatch struct {
 // match as the preferred match.
 //
 // If pin is true and have and tag are a strong match, it will henceforth only
-// consider matches for this language. This corresponds to the nothing that most
+// consider matches for this language. This corresponds to the idea that most
 // users have a strong preference for the first defined language. A user can
 // still prefer a second language over a dialect of the preferred language by
 // explicitly specifying dialects, e.g. "en, nl, en-GB". In this case pin should

@@ -22,12 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	certapi "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/utils/ptr"
 )
 
 func TestStrategyCreate(t *testing.T) {
@@ -112,15 +113,33 @@ func TestStrategyCreate(t *testing.T) {
 			},
 			expectedObj: &certapi.CertificateSigningRequest{
 				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
-			}},
+			},
+		},
+		"expirationSeconds set": {
+			ctx: genericapirequest.NewContext(),
+			obj: &certapi.CertificateSigningRequest{
+				Spec: certapi.CertificateSigningRequestSpec{
+					ExpirationSeconds: ptr.To[int32](1234),
+				},
+			},
+			expectedObj: &certapi.CertificateSigningRequest{
+				Spec: certapi.CertificateSigningRequestSpec{
+					ExpirationSeconds: ptr.To[int32](1234),
+				},
+				Status: certapi.CertificateSigningRequestStatus{Conditions: []certapi.CertificateSigningRequestCondition{}},
+			},
+		},
 	}
 
 	for k, tc := range tests {
-		obj := tc.obj
-		Strategy.PrepareForCreate(tc.ctx, obj)
-		if !reflect.DeepEqual(obj, tc.expectedObj) {
-			t.Errorf("%s: object diff: %s", k, diff.ObjectDiff(obj, tc.expectedObj))
-		}
+		tc := tc
+		t.Run(k, func(t *testing.T) {
+			obj := tc.obj
+			Strategy.PrepareForCreate(tc.ctx, obj)
+			if !reflect.DeepEqual(obj, tc.expectedObj) {
+				t.Errorf("object diff: %s", cmp.Diff(obj, tc.expectedObj))
+			}
+		})
 	}
 }
 
@@ -133,19 +152,16 @@ func TestStatusUpdate(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name         string
-		newObj       *certapi.CertificateSigningRequest
-		oldObj       *certapi.CertificateSigningRequest
-		expectedObjs map[string]*certapi.CertificateSigningRequest
+		name        string
+		newObj      *certapi.CertificateSigningRequest
+		oldObj      *certapi.CertificateSigningRequest
+		expectedObj *certapi.CertificateSigningRequest
 	}{
 		{
-			name:   "no-op",
-			newObj: &certapi.CertificateSigningRequest{},
-			oldObj: &certapi.CertificateSigningRequest{},
-			expectedObjs: map[string]*certapi.CertificateSigningRequest{
-				"v1":      {},
-				"v1beta1": {},
-			},
+			name:        "no-op",
+			newObj:      &certapi.CertificateSigningRequest{},
+			oldObj:      &certapi.CertificateSigningRequest{},
+			expectedObj: &certapi.CertificateSigningRequest{},
 		},
 		{
 			name: "adding failed condition to existing approved/denied conditions",
@@ -170,29 +186,15 @@ func TestStatusUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedObjs: map[string]*certapi.CertificateSigningRequest{
+			expectedObj: &certapi.CertificateSigningRequest{
 				// preserve existing Approved/Denied conditions
-				"v1": {
-					Status: certapi.CertificateSigningRequestStatus{
-						Conditions: []certapi.CertificateSigningRequestCondition{
-							{Type: certapi.CertificateFailed, LastUpdateTime: now, LastTransitionTime: now},
-							{Type: certapi.CertificateDenied, LastUpdateTime: now, LastTransitionTime: later, Reason: "because1"},
-							{Type: certapi.CertificateApproved, LastUpdateTime: now, LastTransitionTime: later, Reason: "because2"},
-							{Type: certapi.CertificateDenied, LastUpdateTime: later, LastTransitionTime: later, Reason: "because3"},
-							{Type: certapi.CertificateApproved, LastUpdateTime: later, LastTransitionTime: later, Reason: "because4"},
-						},
-					},
-				},
-				// preserve existing Approved/Denied conditions
-				"v1beta1": {
-					Status: certapi.CertificateSigningRequestStatus{
-						Conditions: []certapi.CertificateSigningRequestCondition{
-							{Type: certapi.CertificateFailed, LastUpdateTime: now, LastTransitionTime: now},
-							{Type: certapi.CertificateDenied, LastUpdateTime: now, LastTransitionTime: later, Reason: "because1"},
-							{Type: certapi.CertificateApproved, LastUpdateTime: now, LastTransitionTime: later, Reason: "because2"},
-							{Type: certapi.CertificateDenied, LastUpdateTime: later, LastTransitionTime: later, Reason: "because3"},
-							{Type: certapi.CertificateApproved, LastUpdateTime: later, LastTransitionTime: later, Reason: "because4"},
-						},
+				Status: certapi.CertificateSigningRequestStatus{
+					Conditions: []certapi.CertificateSigningRequestCondition{
+						{Type: certapi.CertificateFailed, LastUpdateTime: now, LastTransitionTime: now},
+						{Type: certapi.CertificateDenied, LastUpdateTime: now, LastTransitionTime: later, Reason: "because1"},
+						{Type: certapi.CertificateApproved, LastUpdateTime: now, LastTransitionTime: later, Reason: "because2"},
+						{Type: certapi.CertificateDenied, LastUpdateTime: later, LastTransitionTime: later, Reason: "because3"},
+						{Type: certapi.CertificateApproved, LastUpdateTime: later, LastTransitionTime: later, Reason: "because4"},
 					},
 				},
 			},
@@ -207,33 +209,24 @@ func TestStatusUpdate(t *testing.T) {
 				},
 			},
 			oldObj: &certapi.CertificateSigningRequest{},
-			expectedObjs: map[string]*certapi.CertificateSigningRequest{
+			expectedObj: &certapi.CertificateSigningRequest{
 				// preserved submitted conditions if existing Approved/Denied conditions could not be copied over (will fail validation)
-				"v1": {
-					Status: certapi.CertificateSigningRequestStatus{
-						Conditions: []certapi.CertificateSigningRequestCondition{
-							{Type: certapi.CertificateApproved, LastUpdateTime: now, LastTransitionTime: now},
-						},
+				Status: certapi.CertificateSigningRequestStatus{
+					Conditions: []certapi.CertificateSigningRequestCondition{
+						{Type: certapi.CertificateApproved, LastUpdateTime: now, LastTransitionTime: now},
 					},
-				},
-				// reset conditions to existing conditions if Approved/Denied conditions could not be copied over
-				"v1beta1": {
-					Status: certapi.CertificateSigningRequestStatus{},
 				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		for _, version := range []string{"v1", "v1beta1"} {
-			t.Run(tt.name+"_"+version, func(t *testing.T) {
-				ctx := genericapirequest.WithRequestInfo(context.TODO(), &genericapirequest.RequestInfo{APIGroup: "certificates.k8s.io", APIVersion: version})
-				obj := tt.newObj.DeepCopy()
-				StatusStrategy.PrepareForUpdate(ctx, obj, tt.oldObj.DeepCopy())
-				if !reflect.DeepEqual(obj, tt.expectedObjs[version]) {
-					t.Errorf("object diff: %s", diff.ObjectDiff(obj, tt.expectedObjs[version]))
-				}
-			})
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			obj := tt.newObj.DeepCopy()
+			StatusStrategy.PrepareForUpdate(context.TODO(), obj, tt.oldObj.DeepCopy())
+			if !reflect.DeepEqual(obj, tt.expectedObj) {
+				t.Errorf("object diff: %s", cmp.Diff(obj, tt.expectedObj))
+			}
+		})
 	}
 }

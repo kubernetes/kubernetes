@@ -33,14 +33,14 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against limit ranges.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
-		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
-		DefaultQualifiedResource: api.Resource("limitranges"),
+		NewFunc:                   func() runtime.Object { return &api.LimitRange{} },
+		NewListFunc:               func() runtime.Object { return &api.LimitRangeList{} },
+		DefaultQualifiedResource:  api.Resource("limitranges"),
+		SingularQualifiedResource: api.Resource("limitrange"),
 
 		CreateStrategy: limitrange.Strategy,
 		UpdateStrategy: limitrange.Strategy,
 		DeleteStrategy: limitrange.Strategy,
-		ExportStrategy: limitrange.Strategy,
 
 		// TODO: define table converter that exposes more than name/creation timestamp
 		TableConvertor: rest.NewDefaultTableConvertor(api.Resource("limitranges")),

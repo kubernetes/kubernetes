@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -22,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -41,6 +42,7 @@ func TestMakeMounts(t *testing.T) {
 	testCases := map[string]struct {
 		container      v1.Container
 		podVolumes     kubecontainer.VolumeMap
+		supportsRRO    bool
 		expectErr      bool
 		expectedErrMsg string
 		expectedMounts []kubecontainer.Mount
@@ -249,7 +251,7 @@ func TestMakeMounts(t *testing.T) {
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {

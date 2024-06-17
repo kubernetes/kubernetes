@@ -13,7 +13,6 @@
 // See https://http2.github.io/ for more information on HTTP/2.
 //
 // See https://http2.golang.org/ for a test server running this code.
-//
 package http2 // import "golang.org/x/net/http2"
 
 import (
@@ -56,14 +55,14 @@ const (
 	ClientPreface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
 	// SETTINGS_MAX_FRAME_SIZE default
-	// http://http2.github.io/http2-spec/#rfc.section.6.5.2
+	// https://httpwg.org/specs/rfc7540.html#rfc.section.6.5.2
 	initialMaxFrameSize = 16384
 
 	// NextProtoTLS is the NPN/ALPN protocol negotiated during
 	// HTTP/2's TLS setup.
 	NextProtoTLS = "h2"
 
-	// http://http2.github.io/http2-spec/#SettingValues
+	// https://httpwg.org/specs/rfc7540.html#SettingValues
 	initialHeaderTableSize = 4096
 
 	initialWindowSize = 65535 // 6.9.2 Initial Flow Control Window Size
@@ -112,7 +111,7 @@ func (st streamState) String() string {
 // Setting is a setting parameter: which setting it is, and its value.
 type Setting struct {
 	// ID is which setting is being set.
-	// See http://http2.github.io/http2-spec/#SettingValues
+	// See https://httpwg.org/specs/rfc7540.html#SettingFormat
 	ID SettingID
 
 	// Val is the value.
@@ -144,7 +143,7 @@ func (s Setting) Valid() error {
 }
 
 // A SettingID is an HTTP/2 setting as defined in
-// http://http2.github.io/http2-spec/#iana-settings
+// https://httpwg.org/specs/rfc7540.html#iana-settings
 type SettingID uint16
 
 const (
@@ -176,10 +175,11 @@ func (s SettingID) String() string {
 // name (key). See httpguts.ValidHeaderName for the base rules.
 //
 // Further, http2 says:
-//   "Just as in HTTP/1.x, header field names are strings of ASCII
-//   characters that are compared in a case-insensitive
-//   fashion. However, header field names MUST be converted to
-//   lowercase prior to their encoding in HTTP/2. "
+//
+//	"Just as in HTTP/1.x, header field names are strings of ASCII
+//	characters that are compared in a case-insensitive
+//	fashion. However, header field names MUST be converted to
+//	lowercase prior to their encoding in HTTP/2. "
 func validWireHeaderFieldName(v string) bool {
 	if len(v) == 0 {
 		return false
@@ -241,6 +241,7 @@ func (cw closeWaiter) Wait() {
 // Its buffered writer is lazily allocated as needed, to minimize
 // idle memory usage with many connections.
 type bufferedWriter struct {
+	_  incomparable
 	w  io.Writer     // immutable
 	bw *bufio.Writer // non-nil when data is buffered
 }
@@ -313,6 +314,7 @@ func bodyAllowedForStatus(status int) bool {
 }
 
 type httpError struct {
+	_       incomparable
 	msg     string
 	timeout bool
 }
@@ -363,8 +365,8 @@ func (s *sorter) SortStrings(ss []string) {
 // validPseudoPath reports whether v is a valid :path pseudo-header
 // value. It must be either:
 //
-//     *) a non-empty string starting with '/'
-//     *) the string '*', for OPTIONS requests.
+//   - a non-empty string starting with '/'
+//   - the string '*', for OPTIONS requests.
 //
 // For now this is only used a quick check for deciding when to clean
 // up Opaque URLs before sending requests from the Transport.
@@ -376,3 +378,8 @@ func (s *sorter) SortStrings(ss []string) {
 func validPseudoPath(v string) bool {
 	return (len(v) > 0 && v[0] == '/') || v == "*"
 }
+
+// incomparable is a zero-width, non-comparable type. Adding it to a struct
+// makes that struct also non-comparable, and generally doesn't add
+// any size (as long as it's first).
+type incomparable [0]func()

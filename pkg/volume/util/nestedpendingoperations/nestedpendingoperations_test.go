@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
@@ -118,7 +118,7 @@ func Test_NestedPendingOperations_Positive_SecondOpAfterFirstCompletes(t *testin
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -150,7 +150,7 @@ func Test_NestedPendingOperations_Positive_SecondOpAfterFirstCompletesWithExpBac
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateCallbackFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -242,7 +242,7 @@ func Test_NestedPendingOperations_Negative_SecondOpBeforeFirstCompletes(t *testi
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -309,7 +309,7 @@ func Test_NestedPendingOperations_Negative_SecondSubOpBeforeFirstCompletes2(t *t
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := volumetypes.UniquePodName("operation-podname")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, operationPodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -334,7 +334,7 @@ func Test_NestedPendingOperations_Negative_SecondSubOpBeforeFirstCompletes(t *te
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := volumetypes.UniquePodName("operation-podname")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, operationPodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -358,7 +358,7 @@ func Test_NestedPendingOperations_Negative_SecondOpBeforeFirstCompletesWithExpBa
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -382,7 +382,7 @@ func Test_NestedPendingOperations_Positive_ThirdOpAfterFirstCompletes(t *testing
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -426,7 +426,7 @@ func Test_NestedPendingOperations_Positive_ThirdOpAfterFirstCompletesWithExpBack
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -509,7 +509,7 @@ func Test_NestedPendingOperations_Positive_Wait(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err != nil {
@@ -538,7 +538,7 @@ func Test_NestedPendingOperations_Positive_WaitWithExpBackoff(t *testing.T) {
 	// Arrange
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
 	volumeName := v1.UniqueVolumeName("volume-name")
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err := grm.Run(volumeName, EmptyUniquePodName, EmptyNodeName, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err != nil {
@@ -710,9 +710,9 @@ func Test_NestedPendingOperations_Positive_Issue_88355(t *testing.T) {
 	)
 
 	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
-	opZContinueCh := make(chan interface{}, 0 /* bufferSize */)
-	op1ContinueCh := make(chan interface{}, 0 /* bufferSize */)
-	op2ContinueCh := make(chan interface{}, 0 /* bufferSize */)
+	opZContinueCh := make(chan interface{})
+	op1ContinueCh := make(chan interface{})
+	op2ContinueCh := make(chan interface{})
 	operationZ := generateWaitFunc(opZContinueCh)
 	operation1 := generateWaitFunc(op1ContinueCh)
 	operation2 := generateWaitWithErrorFunc(op2ContinueCh)
@@ -772,7 +772,7 @@ func testConcurrentOperationsPositive(
 
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName1, podName1, nodeName1 /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -802,7 +802,7 @@ func testConcurrentOperationsNegative(
 
 	// Arrange
 	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
-	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
+	operation1DoneCh := make(chan interface{})
 	operation1 := generateWaitFunc(operation1DoneCh)
 	err1 := grm.Run(volumeName1, podName1, nodeName1 /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1})
 	if err1 != nil {
@@ -824,36 +824,38 @@ func testConcurrentOperationsNegative(
 
 /* END concurrent operations tests */
 
-func generateCallbackFunc(done chan<- interface{}) func() (error, error) {
-	return func() (error, error) {
+func generateCallbackFunc(done chan<- interface{}) func() volumetypes.OperationContext {
+	return func() volumetypes.OperationContext {
 		done <- true
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 }
 
-func generateWaitFunc(done <-chan interface{}) func() (error, error) {
-	return func() (error, error) {
+func generateWaitFunc(done <-chan interface{}) func() volumetypes.OperationContext {
+	return func() volumetypes.OperationContext {
 		<-done
-		return nil, nil
+		return volumetypes.NewOperationContext(nil, nil, false)
 	}
 }
 
-func panicFunc() (error, error) {
+func panicFunc() volumetypes.OperationContext {
 	panic("testing panic")
 }
 
-func errorFunc() (error, error) {
-	return fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2")
+func errorFunc() volumetypes.OperationContext {
+	return volumetypes.NewOperationContext(fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2"), false)
 }
 
-func generateWaitWithErrorFunc(done <-chan interface{}) func() (error, error) {
-	return func() (error, error) {
+func generateWaitWithErrorFunc(done <-chan interface{}) func() volumetypes.OperationContext {
+	return func() volumetypes.OperationContext {
 		<-done
-		return fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2")
+		return volumetypes.NewOperationContext(fmt.Errorf("placeholder1"), fmt.Errorf("placeholder2"), false)
 	}
 }
 
-func noopFunc() (error, error) { return nil, nil }
+func noopFunc() volumetypes.OperationContext {
+	return volumetypes.NewOperationContext(nil, nil, false)
+}
 
 func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {
 	backoff := wait.Backoff{
@@ -876,4 +878,141 @@ func waitChannelWithTimeout(ch <-chan interface{}, timeout time.Duration) error 
 	case <-timer.C:
 		return fmt.Errorf("timeout after %v", timeout)
 	}
+}
+
+func Test_NestedPendingOperations_OperationExists_PendingFirst(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := v1.UniqueVolumeName("test-volume")
+	podName1 := volumetypes.UniquePodName("pod1")
+	podName2 := volumetypes.UniquePodName("pod2")
+	podName3 := volumetypes.UniquePodName("pod3")
+	podName4 := EmptyUniquePodName
+	nodeName := EmptyNodeName
+
+	// delay after an operation is signaled to finish to ensure it actually
+	// finishes before running the next operation.
+	delay := 50 * time.Millisecond
+
+	// fake operation1 for pod1 failed
+	operation1DoneCh := make(chan interface{})
+	operation1 := generateWaitWithErrorFunc(operation1DoneCh)
+	err1 := grm.Run(volumeName, podName1, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1, OperationName: "umount"})
+	if err1 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err1)
+	}
+
+	// fake operation2 for pod2 fails
+	operation2DoneCh := make(chan interface{})
+	operation2 := generateWaitWithErrorFunc(operation2DoneCh)
+	err2 := grm.Run(volumeName, podName2, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation2, OperationName: "umount"})
+	if err2 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err2)
+	}
+
+	// fake operation3 for pod3 pending
+	operation3DoneCh := make(chan interface{})
+	operation3 := generateWaitFunc(operation3DoneCh)
+	defer func() {
+		close(operation3DoneCh)
+	}()
+	err3 := grm.Run(volumeName, podName3, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation3, OperationName: "umount"})
+	if err3 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err3)
+	}
+
+	operation1DoneCh <- true
+	operation2DoneCh <- true
+	time.Sleep(delay)
+
+	// fake operation4 for EmptyUniquePodName should be rejected as operation3 is still pending
+	operation4DoneCh := make(chan interface{})
+	operation4 := generateWaitFunc(operation4DoneCh)
+	defer func() {
+		close(operation4DoneCh)
+	}()
+	err4 := grm.Run(volumeName, podName4, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation4, OperationName: "mount"})
+
+	// Assert
+	if err4 == nil {
+		t.Errorf("NestedPendingOperations did not fail. Expected an operation to already exist")
+	}
+	if !IsAlreadyExists(err4) {
+		t.Errorf("NestedPendingOperations did not return alreadyExistsError, got: %v", err4)
+	}
+}
+
+func Test_NestedPendingOperations_OperationExists_ExactMatchFirstNoPending(t *testing.T) {
+	// Arrange
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	volumeName := v1.UniqueVolumeName("test-volume")
+	podName1 := volumetypes.UniquePodName("pod1")
+	podName2 := volumetypes.UniquePodName("pod2")
+	podName3 := volumetypes.UniquePodName("pod3")
+	podName4 := EmptyUniquePodName
+	nodeName := EmptyNodeName
+
+	// delay after an operation is signaled to finish to ensure it actually
+	// finishes before running the next operation.
+	delay := 50 * time.Millisecond
+	backoffDelay := 500 * time.Millisecond
+
+	// fake operation1 for pod1 fails
+	operation1DoneCh := make(chan interface{})
+	operation1 := generateWaitWithErrorFunc(operation1DoneCh)
+	err1 := grm.Run(volumeName, podName1, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation1, OperationName: "umount"})
+	if err1 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err1)
+	}
+
+	// fake operation2 for pod2 fails
+	operation2DoneCh := make(chan interface{})
+	operation2 := generateWaitWithErrorFunc(operation2DoneCh)
+	err2 := grm.Run(volumeName, podName2, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation2, OperationName: "umount"})
+	if err2 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err2)
+	}
+
+	// fake operation3 for pod3 fails
+	operation3DoneCh := make(chan interface{})
+	operation3 := generateWaitWithErrorFunc(operation3DoneCh)
+	err3 := grm.Run(volumeName, podName3, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation3, OperationName: "umount"})
+	if err3 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err3)
+	}
+
+	operation1DoneCh <- true
+	operation2DoneCh <- true
+	operation3DoneCh <- true
+	time.Sleep(delay)
+
+	// fake operation4 with EmptyUniquePodName fails
+	operation4DoneCh := make(chan interface{})
+	operation4 := generateWaitWithErrorFunc(operation4DoneCh)
+	err4 := grm.Run(volumeName, podName4, nodeName /* nodeName */, volumetypes.GeneratedOperations{OperationFunc: operation4, OperationName: "mount"})
+	if err4 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err4)
+	}
+
+	operation4DoneCh <- true
+
+	// operation for pod2 retry
+	time.Sleep(backoffDelay)
+	operation5 := noopFunc
+	err5 := grm.Run(volumeName, podName2, nodeName, volumetypes.GeneratedOperations{OperationFunc: operation5, OperationName: "umount"})
+	if err5 != nil {
+		t.Errorf("NestedPendingOperations failed. Expected: <no error> Actual: <%v>", err5)
+	}
+	time.Sleep(delay)
+
+	// Assert
+	// Operation5 will override operation2, since we successfully finished unmount operation on pod2, it should be removed from operations array
+	grm.(*nestedPendingOperations).lock.Lock()
+	defer grm.(*nestedPendingOperations).lock.Unlock()
+	for _, op := range grm.(*nestedPendingOperations).operations {
+		if op.key.podName == podName2 {
+			t.Errorf("NestedPendingOperations failed. Operation for pod2 should be removed")
+		}
+	}
+
 }

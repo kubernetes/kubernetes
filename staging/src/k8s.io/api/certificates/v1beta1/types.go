@@ -36,18 +36,17 @@ type CertificateSigningRequest struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The certificate request itself and any additional information.
-	// +optional
-	Spec CertificateSigningRequestSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	// spec contains the certificate request, and is immutable after creation.
+	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
+	// Other fields are derived by Kubernetes and cannot be modified by users.
+	Spec CertificateSigningRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// Derived information about the request.
 	// +optional
 	Status CertificateSigningRequestStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
-// This information is immutable after the request is created. Only the Request
-// and Usages fields can be set on creation, other fields are derived by
-// Kubernetes and cannot be modified by users.
+// CertificateSigningRequestSpec contains the certificate request.
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	// +listType=atomic
@@ -66,10 +65,34 @@ type CertificateSigningRequestSpec struct {
 	// +optional
 	SignerName *string `json:"signerName,omitempty" protobuf:"bytes,7,opt,name=signerName"`
 
+	// expirationSeconds is the requested duration of validity of the issued
+	// certificate. The certificate signer may issue a certificate with a different
+	// validity duration so a client must check the delta between the notBefore and
+	// and notAfter fields in the issued certificate to determine the actual duration.
+	//
+	// The v1.22+ in-tree implementations of the well-known Kubernetes signers will
+	// honor this field as long as the requested duration is not greater than the
+	// maximum duration they will honor per the --cluster-signing-duration CLI
+	// flag to the Kubernetes controller manager.
+	//
+	// Certificate signers may not honor this field for various reasons:
+	//
+	//   1. Old signer that is unaware of the field (such as the in-tree
+	//      implementations prior to v1.22)
+	//   2. Signer whose configured maximum is shorter than the requested duration
+	//   3. Signer whose configured minimum is longer than the requested duration
+	//
+	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	//
+	// +optional
+	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,8,opt,name=expirationSeconds"`
+
 	// allowedUsages specifies a set of usage contexts the key will be
 	// valid for.
-	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	// See:
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	//
 	// Valid values are:
 	//  "signing",
 	//  "digital signature",
@@ -208,8 +231,10 @@ type CertificateSigningRequestList struct {
 }
 
 // KeyUsages specifies valid usage contexts for keys.
-// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+// See:
+//
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 type KeyUsage string
 
 const (

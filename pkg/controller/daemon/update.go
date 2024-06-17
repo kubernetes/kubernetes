@@ -26,12 +26,12 @@ import (
 	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -39,53 +39,261 @@ import (
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
-// rollingUpdate deletes old daemon set pods making sure that no more than
-// ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable pods are unavailable
-func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+// rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
+// remaining within the constraints imposed by the update strategy.
+func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
+	logger := klog.FromContext(ctx)
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, false)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
-
-	_, oldPods := dsc.getAllDaemonSetPods(ds, nodeToDaemonPods, hash)
-	maxUnavailable, numUnavailable, err := dsc.getUnavailableNumbers(ds, nodeList, nodeToDaemonPods)
+	maxSurge, maxUnavailable, desiredNumberScheduled, err := dsc.updatedDesiredNodeCounts(ctx, ds, nodeList, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
-	oldAvailablePods, oldUnavailablePods := util.SplitByAvailablePods(ds.Spec.MinReadySeconds, oldPods)
 
-	// for oldPods delete all not running pods
-	var oldPodsToDelete []string
-	klog.V(4).Infof("Marking all unavailable old pods for deletion")
-	for _, pod := range oldUnavailablePods {
-		// Skip terminating pods. We won't delete them again
+	now := dsc.failedPodsBackoff.Clock.Now()
+
+	// When not surging, we delete just enough pods to stay under the maxUnavailable limit, if any
+	// are necessary, and let the core loop create new instances on those nodes.
+	//
+	// Assumptions:
+	// * Expect manage loop to allow no more than one pod per node
+	// * Expect manage loop will create new pods
+	// * Expect manage loop will handle failed pods
+	// * Deleted pods do not count as unavailable so that updates make progress when nodes are down
+	// Invariants:
+	// * The number of new pods that are unavailable must be less than maxUnavailable
+	// * A node with an available old pod is a candidate for deletion if it does not violate other invariants
+	//
+	if maxSurge == 0 {
+		var numUnavailable int
+		var allowedReplacementPods []string
+		var candidatePodsToDelete []string
+		for nodeName, pods := range nodeToDaemonPods {
+			newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
+			if !ok {
+				// let the manage loop clean up this node, and treat it as an unavailable node
+				logger.V(3).Info("DaemonSet has excess pods on node, skipping to allow the core loop to process", "daemonset", klog.KObj(ds), "node", klog.KRef("", nodeName))
+				numUnavailable++
+				continue
+			}
+			switch {
+			case oldPod == nil && newPod == nil, oldPod != nil && newPod != nil:
+				// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
+				numUnavailable++
+			case newPod != nil:
+				// this pod is up to date, check its availability
+				if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+					// an unavailable new pod is counted against maxUnavailable
+					numUnavailable++
+				}
+			default:
+				// this pod is old, it is an update candidate
+				switch {
+				case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
+					// the old pod isn't available, so it needs to be replaced
+					logger.V(5).Info("DaemonSet pod on node is out of date and not available, allowing replacement", "daemonset", klog.KObj(ds), "pod", klog.KObj(oldPod), "node", klog.KRef("", nodeName))
+					// record the replacement
+					if allowedReplacementPods == nil {
+						allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
+					}
+					allowedReplacementPods = append(allowedReplacementPods, oldPod.Name)
+					numUnavailable++
+				case numUnavailable >= maxUnavailable:
+					// no point considering any other candidates
+					continue
+				default:
+					logger.V(5).Info("DaemonSet pod on node is out of date, this is a candidate to replace", "daemonset", klog.KObj(ds), "pod", klog.KObj(oldPod), "node", klog.KRef("", nodeName))
+					// record the candidate
+					if candidatePodsToDelete == nil {
+						candidatePodsToDelete = make([]string, 0, maxUnavailable)
+					}
+					candidatePodsToDelete = append(candidatePodsToDelete, oldPod.Name)
+				}
+			}
+		}
+
+		// use any of the candidates we can, including the allowedReplacemnntPods
+		logger.V(5).Info("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "replacements", len(allowedReplacementPods), "maxUnavailable", maxUnavailable, "numUnavailable", numUnavailable, "candidates", len(candidatePodsToDelete))
+		remainingUnavailable := maxUnavailable - numUnavailable
+		if remainingUnavailable < 0 {
+			remainingUnavailable = 0
+		}
+		if max := len(candidatePodsToDelete); remainingUnavailable > max {
+			remainingUnavailable = max
+		}
+		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
+
+		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
+	}
+
+	// When surging, we create new pods whenever an old pod is unavailable, and we can create up
+	// to maxSurge extra pods
+	//
+	// Assumptions:
+	// * Expect manage loop to allow no more than two pods per node, one old, one new
+	// * Expect manage loop will create new pods if there are no pods on node
+	// * Expect manage loop will handle failed pods
+	// * Deleted pods do not count as unavailable so that updates make progress when nodes are down
+	// Invariants:
+	// * A node with an unavailable old pod is a candidate for immediate new pod creation
+	// * An old available pod is deleted if a new pod is available
+	// * No more than maxSurge new pods are created for old available pods at any one time
+	//
+	var oldPodsToDelete []string          // these pods are already updated or unavailable on sunsetted node
+	var shouldNotRunPodsToDelete []string // candidate pods to be deleted on sunsetted nodes
+	var candidateNewNodes []string
+	var allowedNewNodes []string
+	var numSurge int
+	var numAvailable int
+
+	for nodeName, pods := range nodeToDaemonPods {
+		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
+		if !ok {
+			// let the manage loop clean up this node, and treat it as a surge node
+			logger.V(3).Info("DaemonSet has excess pods on node, skipping to allow the core loop to process", "daemonset", klog.KObj(ds), "node", klog.KRef("", nodeName))
+			numSurge++
+			continue
+		}
+
+		// first count availability for all the nodes (even the ones that we are sunsetting due to scheduling constraints)
+		if oldPod != nil {
+			if podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+				numAvailable++
+			}
+		} else if newPod != nil {
+			if podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+				numAvailable++
+			}
+		}
+
+		switch {
+		case oldPod == nil:
+			// we don't need to do anything to this node, the manage loop will handle it
+		case newPod == nil:
+			// this is a surge candidate
+			switch {
+			case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
+				node, err := dsc.nodeLister.Get(nodeName)
+				if err != nil {
+					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
+				}
+				if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); !shouldRun {
+					logger.V(5).Info("DaemonSet pod on node is not available and does not match scheduling constraints, remove old pod", "daemonset", klog.KObj(ds), "node", nodeName, "oldPod", klog.KObj(oldPod))
+					oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
+					continue
+				}
+				// the old pod isn't available, allow it to become a replacement
+				logger.V(5).Info("Pod on node is out of date and not available, allowing replacement", "daemonset", klog.KObj(ds), "pod", klog.KObj(oldPod), "node", klog.KRef("", nodeName))
+				// record the replacement
+				if allowedNewNodes == nil {
+					allowedNewNodes = make([]string, 0, len(nodeToDaemonPods))
+				}
+				allowedNewNodes = append(allowedNewNodes, nodeName)
+			default:
+				node, err := dsc.nodeLister.Get(nodeName)
+				if err != nil {
+					return fmt.Errorf("couldn't get node for nodeName %q: %v", nodeName, err)
+				}
+				if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); !shouldRun {
+					shouldNotRunPodsToDelete = append(shouldNotRunPodsToDelete, oldPod.Name)
+					continue
+				}
+				if numSurge >= maxSurge {
+					// no point considering any other candidates
+					continue
+				}
+				logger.V(5).Info("DaemonSet pod on node is out of date, this is a surge candidate", "daemonset", klog.KObj(ds), "pod", klog.KObj(oldPod), "node", klog.KRef("", nodeName))
+				// record the candidate
+				if candidateNewNodes == nil {
+					candidateNewNodes = make([]string, 0, maxSurge)
+				}
+				candidateNewNodes = append(candidateNewNodes, nodeName)
+			}
+		default:
+			// we have already surged onto this node, determine our state
+			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+				// we're waiting to go available here
+				numSurge++
+				continue
+			}
+			// we're available, delete the old pod
+			logger.V(5).Info("DaemonSet pod on node is available, remove old pod", "daemonset", klog.KObj(ds), "newPod", klog.KObj(newPod), "node", nodeName, "oldPod", klog.KObj(oldPod))
+			oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
+		}
+	}
+
+	// use any of the candidates we can, including the allowedNewNodes
+	logger.V(5).Info("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "replacements", len(allowedNewNodes), "maxSurge", maxSurge, "numSurge", numSurge, "candidates", len(candidateNewNodes))
+	remainingSurge := maxSurge - numSurge
+
+	// With maxSurge, the application owner expects 100% availability.
+	// When the scheduling constraint change from node A to node B, we do not want the application to stay
+	// without any available pods. Only delete a pod on node A when a pod on node B becomes available.
+	if deletablePodsNumber := numAvailable - desiredNumberScheduled; deletablePodsNumber > 0 {
+		if shouldNotRunPodsToDeleteNumber := len(shouldNotRunPodsToDelete); deletablePodsNumber > shouldNotRunPodsToDeleteNumber {
+			deletablePodsNumber = shouldNotRunPodsToDeleteNumber
+		}
+		for _, podToDeleteName := range shouldNotRunPodsToDelete[:deletablePodsNumber] {
+			podToDelete, err := dsc.podLister.Pods(ds.Namespace).Get(podToDeleteName)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					continue
+				}
+				return fmt.Errorf("couldn't get pod which should be deleted due to scheduling constraints %q: %v", podToDeleteName, err)
+			}
+			logger.V(5).Info("DaemonSet pod on node should be deleted due to scheduling constraints", "daemonset", klog.KObj(ds), "pod", klog.KObj(podToDelete), "node", podToDelete.Spec.NodeName)
+			oldPodsToDelete = append(oldPodsToDelete, podToDeleteName)
+		}
+	}
+
+	if remainingSurge < 0 {
+		remainingSurge = 0
+	}
+	if max := len(candidateNewNodes); remainingSurge > max {
+		remainingSurge = max
+	}
+	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
+
+	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
+}
+
+// findUpdatedPodsOnNode looks at non-deleted pods on a given node and returns true if there
+// is at most one of each old and new pods, or false if there are multiples. We can skip
+// processing the particular node in those scenarios and let the manage loop prune the
+// excess pods for our next time around.
+func findUpdatedPodsOnNode(ds *apps.DaemonSet, podsOnNode []*v1.Pod, hash string) (newPod, oldPod *v1.Pod, ok bool) {
+	for _, pod := range podsOnNode {
 		if pod.DeletionTimestamp != nil {
 			continue
 		}
-		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
-		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
-	}
-
-	klog.V(4).Infof("Marking old pods for deletion")
-	for _, pod := range oldAvailablePods {
-		if numUnavailable >= maxUnavailable {
-			klog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
-			break
+		generation, err := util.GetTemplateGeneration(ds)
+		if err != nil {
+			generation = nil
 		}
-		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
-		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
-		numUnavailable++
+		if util.IsPodUpdated(pod, hash, generation) {
+			if newPod != nil {
+				return nil, nil, false
+			}
+			newPod = pod
+		} else {
+			if oldPod != nil {
+				return nil, nil, false
+			}
+			oldPod = pod
+		}
 	}
-	return dsc.syncNodes(ds, oldPodsToDelete, []string{}, hash)
+	return newPod, oldPod, true
 }
 
 // constructHistory finds all histories controlled by the given DaemonSet, and
 // update current history revision number, or create current history if need to.
 // It also deduplicates current history, and adds missing unique labels to existing histories.
-func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
+func (dsc *DaemonSetsController) constructHistory(ctx context.Context, ds *apps.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
-	histories, err = dsc.controlledHistories(ds)
+	histories, err = dsc.controlledHistories(ctx, ds)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,7 +303,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
 			toUpdate := history.DeepCopy()
 			toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = toUpdate.Name
-			history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
+			history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -117,12 +325,12 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	switch len(currentHistories) {
 	case 0:
 		// Create a new history if the current one isn't found
-		cur, err = dsc.snapshot(ds, currRevision)
+		cur, err = dsc.snapshot(ctx, ds, currRevision)
 		if err != nil {
 			return nil, nil, err
 		}
 	default:
-		cur, err = dsc.dedupCurHistories(ds, currentHistories)
+		cur, err = dsc.dedupCurHistories(ctx, ds, currentHistories)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -130,7 +338,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 		if cur.Revision < currRevision {
 			toUpdate := cur.DeepCopy()
 			toUpdate.Revision = currRevision
-			_, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
+			_, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -139,8 +347,9 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	return cur, old, err
 }
 
-func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.ControllerRevision) error {
-	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+func (dsc *DaemonSetsController) cleanupHistory(ctx context.Context, ds *apps.DaemonSet, old []*apps.ControllerRevision) error {
+	// Include deleted terminal pods when maintaining history.
+	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds, true)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -171,7 +380,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 			continue
 		}
 		// Clean up
-		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(context.TODO(), history.Name, metav1.DeleteOptions{})
+		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, history.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -191,7 +400,7 @@ func maxRevision(histories []*apps.ControllerRevision) int64 {
 	return max
 }
 
-func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if len(curHistories) == 1 {
 		return curHistories[0], nil
 	}
@@ -203,31 +412,37 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 			maxRevision = cur.Revision
 		}
 	}
-	// Clean up duplicates and relabel pods
+	// Relabel pods before dedup
+	pods, err := dsc.getDaemonPods(ctx, ds)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods {
+		if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
+			patchRaw := map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]interface{}{
+						apps.DefaultDaemonSetUniqueLabelKey: keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey],
+					},
+				},
+			}
+			patchJSON, err := json.Marshal(patchRaw)
+			if err != nil {
+				return nil, err
+			}
+			_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patchJSON, metav1.PatchOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	// Clean up duplicates
 	for _, cur := range curHistories {
 		if cur.Name == keepCur.Name {
 			continue
 		}
-		// Relabel pods before dedup
-		pods, err := dsc.getDaemonPods(ds)
-		if err != nil {
-			return nil, err
-		}
-		for _, pod := range pods {
-			if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
-				toUpdate := pod.DeepCopy()
-				if toUpdate.Labels == nil {
-					toUpdate.Labels = make(map[string]string)
-				}
-				toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
 		// Remove duplicates
-		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(context.TODO(), cur.Name, metav1.DeleteOptions{})
+		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, cur.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +454,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) controlledHistories(ctx context.Context, ds *apps.DaemonSet) ([]*apps.ControllerRevision, error) {
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -247,14 +462,14 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 
 	// List all histories to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to the controller.
-	histories, err := dsc.historyLister.List(labels.Everything())
+	histories, err := dsc.historyLister.ControllerRevisions(ds.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +480,7 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 	})
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm := controller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimControllerRevisions(histories)
+	return cm.ClaimControllerRevisions(ctx, histories)
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
@@ -304,7 +519,7 @@ func getPatch(ds *apps.DaemonSet) ([]byte, error) {
 	return patch, err
 }
 
-func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) snapshot(ctx context.Context, ds *apps.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return nil, err
@@ -323,10 +538,11 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 		Revision: revision,
 	}
 
-	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(context.TODO(), history, metav1.CreateOptions{})
+	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(ctx, history, metav1.CreateOptions{})
 	if outerErr := err; errors.IsAlreadyExists(outerErr) {
+		logger := klog.FromContext(ctx)
 		// TODO: Is it okay to get from historyLister?
-		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
@@ -341,7 +557,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 
 		// Handle name collisions between different history
 		// Get the latest DaemonSet from the API server to make sure collision count is only increased when necessary
-		currDS, getErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+		currDS, getErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
@@ -353,74 +569,52 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 			currDS.Status.CollisionCount = new(int32)
 		}
 		*currDS.Status.CollisionCount++
-		_, updateErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).UpdateStatus(context.TODO(), currDS, metav1.UpdateOptions{})
+		_, updateErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).UpdateStatus(ctx, currDS, metav1.UpdateOptions{})
 		if updateErr != nil {
 			return nil, updateErr
 		}
-		klog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
+		logger.V(2).Info("Found a hash collision for DaemonSet - bumping collisionCount to resolve it", "daemonset", klog.KObj(ds), "collisionCount", *currDS.Status.CollisionCount)
 		return nil, outerErr
 	}
 	return history, err
 }
 
-func (dsc *DaemonSetsController) getAllDaemonSetPods(ds *apps.DaemonSet, nodeToDaemonPods map[string][]*v1.Pod, hash string) ([]*v1.Pod, []*v1.Pod) {
-	var newPods []*v1.Pod
-	var oldPods []*v1.Pod
-
-	for _, pods := range nodeToDaemonPods {
-		for _, pod := range pods {
-			// If the returned error is not nil we have a parse error.
-			// The controller handles this via the hash.
-			generation, err := util.GetTemplateGeneration(ds)
-			if err != nil {
-				generation = nil
-			}
-			if util.IsPodUpdated(pod, hash, generation) {
-				newPods = append(newPods, pod)
-			} else {
-				oldPods = append(oldPods, pod)
-			}
-		}
-	}
-	return newPods, oldPods
-}
-
-func (dsc *DaemonSetsController) getUnavailableNumbers(ds *apps.DaemonSet, nodeList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) (int, int, error) {
-	klog.V(4).Infof("Getting unavailable numbers")
-	var numUnavailable, desiredNumberScheduled int
+// updatedDesiredNodeCounts calculates the true number of allowed surge, unavailable or desired scheduled pods and
+// updates the nodeToDaemonPods array to include an empty array for every node that is not scheduled.
+func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) (int, int, int, error) {
+	var desiredNumberScheduled int
+	logger := klog.FromContext(ctx)
 	for i := range nodeList {
 		node := nodeList[i]
-		wantToRun, _, err := dsc.nodeShouldRunDaemonPod(node, ds)
-		if err != nil {
-			return -1, -1, err
-		}
+		wantToRun, _ := NodeShouldRunDaemonPod(node, ds)
 		if !wantToRun {
 			continue
 		}
 		desiredNumberScheduled++
-		daemonPods, exists := nodeToDaemonPods[node.Name]
-		if !exists {
-			numUnavailable++
-			continue
-		}
-		available := false
-		for _, pod := range daemonPods {
-			//for the purposes of update we ensure that the Pod is both available and not terminating
-			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) && pod.DeletionTimestamp == nil {
-				available = true
-				break
-			}
-		}
-		if !available {
-			numUnavailable++
+
+		if _, exists := nodeToDaemonPods[node.Name]; !exists {
+			nodeToDaemonPods[node.Name] = nil
 		}
 	}
-	maxUnavailable, err := intstrutil.GetValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, desiredNumberScheduled, true)
+
+	maxUnavailable, err := util.UnavailableCount(ds, desiredNumberScheduled)
 	if err != nil {
-		return -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
+		return -1, -1, -1, fmt.Errorf("invalid value for MaxUnavailable: %v", err)
 	}
-	klog.V(4).Infof(" DaemonSet %s/%s, maxUnavailable: %d, numUnavailable: %d", ds.Namespace, ds.Name, maxUnavailable, numUnavailable)
-	return maxUnavailable, numUnavailable, nil
+
+	maxSurge, err := util.SurgeCount(ds, desiredNumberScheduled)
+	if err != nil {
+		return -1, -1, -1, fmt.Errorf("invalid value for MaxSurge: %v", err)
+	}
+
+	// if the daemonset returned with an impossible configuration, obey the default of unavailable=1 (in the
+	// event the apiserver returns 0 for both surge and unavailability)
+	if desiredNumberScheduled > 0 && maxUnavailable == 0 && maxSurge == 0 {
+		logger.Info("DaemonSet is not configured for surge or unavailability, defaulting to accepting unavailability", "daemonset", klog.KObj(ds))
+		maxUnavailable = 1
+	}
+	logger.V(5).Info("DaemonSet with maxSurge and maxUnavailable", "daemonset", klog.KObj(ds), "maxSurge", maxSurge, "maxUnavailable", maxUnavailable)
+	return maxSurge, maxUnavailable, desiredNumberScheduled, nil
 }
 
 type historiesByRevision []*apps.ControllerRevision

@@ -3,12 +3,12 @@ kind: Pod
 metadata:
   name: kube-addon-manager
   namespace: kube-system
-  annotations:
-    seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
   labels:
     component: kube-addon-manager
 spec:
   securityContext:
+    seccompProfile:
+      type: RuntimeDefault
     runAsUser: {{runAsUser}}
     runAsGroup: {{runAsGroup}}
   priorityClassName: system-node-critical
@@ -23,11 +23,11 @@ spec:
         - all
     # When updating version also bump it in:
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: k8s.gcr.io/kube-addon-manager:v9.1.1
+    image: registry.k8s.io/addon-manager/kube-addon-manager:v9.1.7
     command:
     - /bin/bash
     - -c
-    - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    - exec /opt/kube-addons-main.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
         cpu: 5m

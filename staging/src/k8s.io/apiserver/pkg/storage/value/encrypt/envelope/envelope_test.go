@@ -18,7 +18,9 @@ package envelope
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -82,6 +84,7 @@ func TestEnvelopeCaching(t *testing.T) {
 		desc                     string
 		cacheSize                int
 		simulateKMSPluginFailure bool
+		expectedError            string
 	}{
 		{
 			desc:                     "positive cache size should withstand plugin failure",
@@ -89,26 +92,34 @@ func TestEnvelopeCaching(t *testing.T) {
 			simulateKMSPluginFailure: true,
 		},
 		{
-			desc:      "cache disabled size should not withstand plugin failure",
-			cacheSize: 0,
+			desc:                     "cache disabled size should not withstand plugin failure",
+			cacheSize:                0,
+			simulateKMSPluginFailure: true,
+			expectedError:            "Envelope service was disabled",
+		},
+		{
+			desc:                     "cache disabled, no plugin failure should succeed",
+			cacheSize:                0,
+			simulateKMSPluginFailure: false,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
 			envelopeService := newTestEnvelopeService()
-			envelopeTransformer, err := NewEnvelopeTransformer(envelopeService, tt.cacheSize, aestransformer.NewCBCTransformer)
-			if err != nil {
-				t.Fatalf("failed to initialize envelope transformer: %v", err)
+			cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+				return aestransformer.NewCBCTransformer(block), nil
 			}
-			context := value.DefaultContext([]byte(testContextText))
+			envelopeTransformer := NewEnvelopeTransformer(envelopeService, tt.cacheSize, cbcTransformer)
+			ctx := context.Background()
+			dataCtx := value.DefaultContext(testContextText)
 			originalText := []byte(testText)
 
-			transformedData, err := envelopeTransformer.TransformToStorage(originalText, context)
+			transformedData, err := envelopeTransformer.TransformToStorage(ctx, originalText, dataCtx)
 			if err != nil {
 				t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
 			}
-			untransformedData, _, err := envelopeTransformer.TransformFromStorage(transformedData, context)
+			untransformedData, _, err := envelopeTransformer.TransformFromStorage(ctx, transformedData, dataCtx)
 			if err != nil {
 				t.Fatalf("could not decrypt Envelope transformer's encrypted data even once: %v", err)
 			}
@@ -117,13 +128,21 @@ func TestEnvelopeCaching(t *testing.T) {
 			}
 
 			envelopeService.SetDisabledStatus(tt.simulateKMSPluginFailure)
-			// Subsequent read for the same data should work fine due to caching.
-			untransformedData, _, err = envelopeTransformer.TransformFromStorage(transformedData, context)
-			if err != nil {
-				t.Fatalf("could not decrypt Envelope transformer's encrypted data using just cache: %v", err)
-			}
-			if !bytes.Equal(untransformedData, originalText) {
-				t.Fatalf("envelopeTransformer transformed data incorrectly using cache. Got: %v, want %v", untransformedData, originalText)
+			untransformedData, _, err = envelopeTransformer.TransformFromStorage(ctx, transformedData, dataCtx)
+			if tt.expectedError != "" {
+				if err == nil {
+					t.Fatalf("expected error: %v, got nil", tt.expectedError)
+				}
+				if err.Error() != tt.expectedError {
+					t.Fatalf("expected error: %v, got: %v", tt.expectedError, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if !bytes.Equal(untransformedData, originalText) {
+					t.Fatalf("envelopeTransformer transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
+				}
 			}
 		})
 	}
@@ -131,11 +150,12 @@ func TestEnvelopeCaching(t *testing.T) {
 
 // Makes Envelope transformer hit cache limit, throws error if it misbehaves.
 func TestEnvelopeCacheLimit(t *testing.T) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
-	if err != nil {
-		t.Fatalf("failed to initialize envelope transformer: %v", err)
+	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+		return aestransformer.NewCBCTransformer(block), nil
 	}
-	context := value.DefaultContext([]byte(testContextText))
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, cbcTransformer)
+	ctx := context.Background()
+	dataCtx := value.DefaultContext(testContextText)
 
 	transformedOutputs := map[int][]byte{}
 
@@ -143,7 +163,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 	for i := 0; i < 2*testEnvelopeCacheSize; i++ {
 		numberText := []byte(strconv.Itoa(i))
 
-		res, err := envelopeTransformer.TransformToStorage(numberText, context)
+		res, err := envelopeTransformer.TransformToStorage(ctx, numberText, dataCtx)
 		transformedOutputs[i] = res
 		if err != nil {
 			t.Fatalf("envelopeTransformer: error while transforming data (%v) to storage: %s", numberText, err)
@@ -154,7 +174,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 	for i := 0; i < 2*testEnvelopeCacheSize; i++ {
 		numberText := []byte(strconv.Itoa(i))
 
-		output, _, err := envelopeTransformer.TransformFromStorage(transformedOutputs[i], context)
+		output, _, err := envelopeTransformer.TransformFromStorage(ctx, transformedOutputs[i], dataCtx)
 		if err != nil {
 			t.Fatalf("envelopeTransformer: error while transforming data (%v) from storage: %s", transformedOutputs[i], err)
 		}
@@ -166,10 +186,10 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 }
 
 func BenchmarkEnvelopeCBCRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
-	if err != nil {
-		b.Fatalf("failed to initialize envelope transformer: %v", err)
+	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+		return aestransformer.NewCBCTransformer(block), nil
 	}
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, cbcTransformer)
 	benchmarkRead(b, envelopeTransformer, 1024)
 }
 
@@ -184,10 +204,7 @@ func BenchmarkAESCBCRead(b *testing.B) {
 }
 
 func BenchmarkEnvelopeGCMRead(b *testing.B) {
-	envelopeTransformer, err := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
-	if err != nil {
-		b.Fatalf("failed to initialize envelope transformer: %v", err)
-	}
+	envelopeTransformer := NewEnvelopeTransformer(newTestEnvelopeService(), testEnvelopeCacheSize, aestransformer.NewGCMTransformer)
 	benchmarkRead(b, envelopeTransformer, 1024)
 }
 
@@ -197,22 +214,27 @@ func BenchmarkAESGCMRead(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	aesGCMTransformer := aestransformer.NewGCMTransformer(block)
+	aesGCMTransformer, err := aestransformer.NewGCMTransformer(block)
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	benchmarkRead(b, aesGCMTransformer, 1024)
 }
 
 func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int) {
-	context := value.DefaultContext([]byte(testContextText))
+	ctx := context.Background()
+	dataCtx := value.DefaultContext(testContextText)
 	v := bytes.Repeat([]byte("0123456789abcdef"), valueLength/16)
 
-	out, err := transformer.TransformToStorage(v, context)
+	out, err := transformer.TransformToStorage(ctx, v, dataCtx)
 	if err != nil {
 		b.Fatal(err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		from, stale, err := transformer.TransformFromStorage(out, context)
+		from, stale, err := transformer.TransformFromStorage(ctx, out, dataCtx)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -226,18 +248,19 @@ func benchmarkRead(b *testing.B, transformer value.Transformer, valueLength int)
 // remove after 1.13
 func TestBackwardsCompatibility(t *testing.T) {
 	envelopeService := newTestEnvelopeService()
-	envelopeTransformerInst, err := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, aestransformer.NewCBCTransformer)
-	if err != nil {
-		t.Fatalf("failed to initialize envelope transformer: %v", err)
+	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+		return aestransformer.NewCBCTransformer(block), nil
 	}
-	context := value.DefaultContext([]byte(testContextText))
+	envelopeTransformerInst := NewEnvelopeTransformer(envelopeService, testEnvelopeCacheSize, cbcTransformer)
+	ctx := context.Background()
+	dataCtx := value.DefaultContext(testContextText)
 	originalText := []byte(testText)
 
-	transformedData, err := oldTransformToStorage(envelopeTransformerInst.(*envelopeTransformer), originalText, context)
+	transformedData, err := oldTransformToStorage(ctx, envelopeTransformerInst.(*envelopeTransformer), originalText, dataCtx)
 	if err != nil {
 		t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
 	}
-	untransformedData, _, err := envelopeTransformerInst.TransformFromStorage(transformedData, context)
+	untransformedData, _, err := envelopeTransformerInst.TransformFromStorage(ctx, transformedData, dataCtx)
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data even once: %v", err)
 	}
@@ -247,7 +270,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 
 	envelopeService.SetDisabledStatus(true)
 	// Subsequent read for the same data should work fine due to caching.
-	untransformedData, _, err = envelopeTransformerInst.TransformFromStorage(transformedData, context)
+	untransformedData, _, err = envelopeTransformerInst.TransformFromStorage(ctx, transformedData, dataCtx)
 	if err != nil {
 		t.Fatalf("could not decrypt Envelope transformer's encrypted data using just cache: %v", err)
 	}
@@ -257,7 +280,7 @@ func TestBackwardsCompatibility(t *testing.T) {
 }
 
 // remove after 1.13
-func oldTransformToStorage(t *envelopeTransformer, data []byte, context value.Context) ([]byte, error) {
+func oldTransformToStorage(ctx context.Context, t *envelopeTransformer, data []byte, dataCtx value.Context) ([]byte, error) {
 	newKey, err := generateKey(32)
 	if err != nil {
 		return nil, err
@@ -282,7 +305,7 @@ func oldTransformToStorage(t *envelopeTransformer, data []byte, context value.Co
 
 	prefixedData := make([]byte, len(prefix), len(data)+len(prefix))
 	copy(prefixedData, prefix)
-	result, err := transformer.TransformToStorage(data, context)
+	result, err := transformer.TransformToStorage(ctx, data, dataCtx)
 	if err != nil {
 		return nil, err
 	}

@@ -30,12 +30,12 @@ rules:
 # https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/pkg/neg/controller.go#L339-L342
 # https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/pkg/neg/controller.go#L359-L361
 - apiGroups: [""]
-  resources: ["services"]
+  resources: ["services", "services/status"]
   verbs: ["update", "patch"]
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["get", "list", "watch"]
-# For now, GLBC annotates ingress resources with various state and statuses: 
+# For now, GLBC annotates ingress resources with various state and statuses:
 # https://github.com/kubernetes/ingress-gce/blob/50d49b077d9ab4362a02fae05f94e433cd3f08dc/pkg/controller/controller.go#L579
 # TODO(rramkumar1): Remove unnecessary `update` permission once statuses are propagated through `ingresses/status`
 - apiGroups: ["extensions", "networking.k8s.io"]
@@ -43,9 +43,12 @@ rules:
   verbs: ["update"]
 - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses/status"]
-  verbs: ["update"]
-# GLBC ensures that the `cloud.google.com/backendconfigs` CRD exists in a desired state:
-# https://github.com/kubernetes/ingress-gce/blob/4918eb2f0f484f09ac9e5a975907a9b16ed2b344/cmd/glbc/main.go#L93
+  verbs: ["update", "patch"]
+# GLBC ensures that the `cloud.google.com/backendconfigs` and `networking.gke.io/servicenetworkendpointgroups` CRD exists in a desired state:
+# https://github.com/kubernetes/ingress-gce/blob/5c3fcb5845e74b92ea8bd52929b15fc5c9fa7970/cmd/glbc/main.go#L108
+# https://github.com/kubernetes/ingress-gce/blob/5c3fcb5845e74b92ea8bd52929b15fc5c9fa7970/cmd/glbc/main.go#L133
+# GLBC creates and updates `networking.gke.io/GCPIngressParams`
+# https://github.com/kubernetes/ingress-gce/blob/7f0928629c85e7a54c6af9e6e490ac89d057461a/cmd/glbc/main.go#L151-L162
 # TODO(rramkumar1): https://github.com/kubernetes/ingress-gce/issues/744
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
@@ -53,3 +56,18 @@ rules:
 - apiGroups: ["cloud.google.com"]
   resources: ["backendconfigs"]
   verbs: ["get", "list", "watch", "update", "create", "patch"]
+- apiGroups: ["networking.gke.io"]
+  resources: ["servicenetworkendpointgroups","gcpingressparams"]
+  verbs: ["get", "list", "watch", "update", "create", "patch"]
+# GLBC creates and updates `networking.k8s.io/IngressClass`
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingressclasses"]
+  verbs: ["get", "list", "watch", "update", "create", "patch"]
+# GLBC uses leases for leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get","create","update"]
+ # GLBC uses endpoint slices
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get","list", "watch"]

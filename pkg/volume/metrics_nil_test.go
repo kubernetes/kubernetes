@@ -20,6 +20,14 @@ import (
 	"testing"
 )
 
+func TestMetricsNilSupportsMetrics(t *testing.T) {
+	metrics := &MetricsNil{}
+	supported := metrics.SupportsMetrics()
+	if supported {
+		t.Error("Expected no support for metrics")
+	}
+}
+
 func TestMetricsNilGetCapacity(t *testing.T) {
 	metrics := &MetricsNil{}
 	actual, err := metrics.GetMetrics()

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,9 +20,9 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/kubernetes/pkg/windows/service"
-
 	"github.com/spf13/pflag"
+
+	"k8s.io/kubernetes/pkg/windows/service"
 )
 
 const (
@@ -40,4 +41,6 @@ func (o *Options) addOSFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.config.Winkernel.SourceVip, "source-vip", o.config.Winkernel.SourceVip, "The IP address of the source VIP for non-DSR.")
 	fs.StringVar(&o.config.Winkernel.NetworkName, "network-name", o.config.Winkernel.NetworkName, "The name of the cluster network.")
 	fs.BoolVar(&o.config.Winkernel.EnableDSR, "enable-dsr", o.config.Winkernel.EnableDSR, "If true make kube-proxy apply DSR policies for service VIP")
+	fs.StringVar(&o.config.Winkernel.RootHnsEndpointName, "root-hnsendpoint-name", "cbr0", "The name of the hns endpoint name for root namespace attached to l2bridge")
+	fs.BoolVar(&o.config.Winkernel.ForwardHealthCheckVip, "forward-healthcheck-vip", o.config.Winkernel.ForwardHealthCheckVip, "If true forward service VIP for health check port")
 }

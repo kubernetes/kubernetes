@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,135 +17,343 @@ limitations under the License.
 package v1
 
 import (
-	gojson "encoding/json"
-	"time"
+	"bytes"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	"sigs.k8s.io/yaml"
+)
+
+const (
+	// SchedulerDefaultLockObjectNamespace defines default scheduler lock object namespace ("kube-system")
+	SchedulerDefaultLockObjectNamespace string = metav1.NamespaceSystem
+
+	// SchedulerDefaultLockObjectName defines default scheduler lock object name ("kube-scheduler")
+	SchedulerDefaultLockObjectName = "kube-scheduler"
+
+	// SchedulerDefaultProviderName defines the default provider names
+	SchedulerDefaultProviderName = "DefaultProvider"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Policy describes a struct for a policy resource used in api.
-type Policy struct {
+// KubeSchedulerConfiguration configures a scheduler
+type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
-	// Holds the information to configure the fit predicate functions
-	Predicates []PredicatePolicy `json:"predicates"`
-	// Holds the information to configure the priority functions
-	Priorities []PriorityPolicy `json:"priorities"`
-	// Holds the information to communicate with the extender(s)
-	Extenders []LegacyExtender `json:"extenders"`
-	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
-	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
-	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
 
-	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
-	// the configured predicates even after one or more of them fails.
-	// When the flag is set to false, scheduler skips checking the rest
-	// of the predicates after it finds one predicate that failed.
-	AlwaysCheckAllPredicates bool `json:"alwaysCheckAllPredicates"`
+	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
+	Parallelism *int32 `json:"parallelism,omitempty"`
+
+	// LeaderElection defines the configuration of leader election client.
+	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:"leaderElection"`
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
+
+	// DebuggingConfiguration holds configuration for Debugging related features
+	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
+	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored. It is overridden by profile level PercentageofNodesToScore.
+	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
+
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds,omitempty"`
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds,omitempty"`
+
+	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
+	// choose to be scheduled under a particular profile by setting its associated
+	// scheduler name. Pods that don't specify any scheduler name are scheduled
+	// with the "default-scheduler" profile, if present here.
+	// +listType=map
+	// +listMapKey=schedulerName
+	Profiles []KubeSchedulerProfile `json:"profiles,omitempty"`
+
+	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
+	// with the extender. These extenders are shared by all scheduler profiles.
+	// +listType=set
+	Extenders []Extender `json:"extenders,omitempty"`
+
+	// DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled,
+	// the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower
+	// failover with the benefit of lower memory overhead while waiting to become leader.
+	// Defaults to false.
+	DelayCacheUntilActive bool `json:"delayCacheUntilActive,omitempty"`
 }
 
-// PredicatePolicy describes a struct of a predicate policy.
-type PredicatePolicy struct {
-	// Identifier of the predicate policy
-	// For a custom predicate, the name can be user-defined
-	// For the Kubernetes provided predicates, the name is the identifier of the pre-defined predicate
+// DecodeNestedObjects decodes plugin args for known types.
+func (c *KubeSchedulerConfiguration) DecodeNestedObjects(d runtime.Decoder) error {
+	var strictDecodingErrs []error
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].decodeNestedObjects(d)
+			if err != nil {
+				decodingErr := fmt.Errorf("decoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+				if runtime.IsStrictDecodingError(err) {
+					strictDecodingErrs = append(strictDecodingErrs, decodingErr)
+				} else {
+					return decodingErr
+				}
+			}
+		}
+	}
+	if len(strictDecodingErrs) > 0 {
+		return runtime.NewStrictDecodingError(strictDecodingErrs)
+	}
+	return nil
+}
+
+// EncodeNestedObjects encodes plugin args.
+func (c *KubeSchedulerConfiguration) EncodeNestedObjects(e runtime.Encoder) error {
+	for i := range c.Profiles {
+		prof := &c.Profiles[i]
+		for j := range prof.PluginConfig {
+			err := prof.PluginConfig[j].encodeNestedObjects(e)
+			if err != nil {
+				return fmt.Errorf("encoding .profiles[%d].pluginConfig[%d]: %w", i, j, err)
+			}
+		}
+	}
+	return nil
+}
+
+// KubeSchedulerProfile is a scheduling profile.
+type KubeSchedulerProfile struct {
+	// SchedulerName is the name of the scheduler associated to this profile.
+	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
+	// is scheduled with this profile.
+	SchedulerName *string `json:"schedulerName,omitempty"`
+
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty,
+	// global PercentageOfNodesToScore will be used.
+	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
+
+	// Plugins specify the set of plugins that should be enabled or disabled.
+	// Enabled plugins are the ones that should be enabled in addition to the
+	// default plugins. Disabled plugins are any of the default plugins that
+	// should be disabled.
+	// When no enabled or disabled plugin is specified for an extension point,
+	// default plugins for that extension point will be used if there is any.
+	// If a QueueSort plugin is specified, the same QueueSort Plugin and
+	// PluginConfig must be specified for all profiles.
+	Plugins *Plugins `json:"plugins,omitempty"`
+
+	// PluginConfig is an optional set of custom plugin arguments for each plugin.
+	// Omitting config args for a plugin is equivalent to using the default config
+	// for that plugin.
+	// +listType=map
+	// +listMapKey=name
+	PluginConfig []PluginConfig `json:"pluginConfig,omitempty"`
+}
+
+// Plugins include multiple extension points. When specified, the list of plugins for
+// a particular extension point are the only ones enabled. If an extension point is
+// omitted from the config, then the default set of plugins is used for that extension point.
+// Enabled plugins are called in the order specified here, after default plugins. If they need to
+// be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
+type Plugins struct {
+	// PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.
+	PreEnqueue PluginSet `json:"preEnqueue,omitempty"`
+
+	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
+	QueueSort PluginSet `json:"queueSort,omitempty"`
+
+	// PreFilter is a list of plugins that should be invoked at "PreFilter" extension point of the scheduling framework.
+	PreFilter PluginSet `json:"preFilter,omitempty"`
+
+	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
+	Filter PluginSet `json:"filter,omitempty"`
+
+	// PostFilter is a list of plugins that are invoked after filtering phase, but only when no feasible nodes were found for the pod.
+	PostFilter PluginSet `json:"postFilter,omitempty"`
+
+	// PreScore is a list of plugins that are invoked before scoring.
+	PreScore PluginSet `json:"preScore,omitempty"`
+
+	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
+	Score PluginSet `json:"score,omitempty"`
+
+	// Reserve is a list of plugins invoked when reserving/unreserving resources
+	// after a node is assigned to run the pod.
+	Reserve PluginSet `json:"reserve,omitempty"`
+
+	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
+	Permit PluginSet `json:"permit,omitempty"`
+
+	// PreBind is a list of plugins that should be invoked before a pod is bound.
+	PreBind PluginSet `json:"preBind,omitempty"`
+
+	// Bind is a list of plugins that should be invoked at "Bind" extension point of the scheduling framework.
+	// The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.
+	Bind PluginSet `json:"bind,omitempty"`
+
+	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
+	PostBind PluginSet `json:"postBind,omitempty"`
+
+	// MultiPoint is a simplified config section to enable plugins for all valid extension points.
+	// Plugins enabled through MultiPoint will automatically register for every individual extension
+	// point the plugin has implemented. Disabling a plugin through MultiPoint disables that behavior.
+	// The same is true for disabling "*" through MultiPoint (no default plugins will be automatically registered).
+	// Plugins can still be disabled through their individual extension points.
+	//
+	// In terms of precedence, plugin config follows this basic hierarchy
+	//   1. Specific extension points
+	//   2. Explicitly configured MultiPoint plugins
+	//   3. The set of default plugins, as MultiPoint plugins
+	// This implies that a higher precedence plugin will run first and overwrite any settings within MultiPoint.
+	// Explicitly user-configured plugins also take a higher precedence over default plugins.
+	// Within this hierarchy, an Enabled setting takes precedence over Disabled. For example, if a plugin is
+	// set in both `multiPoint.Enabled` and `multiPoint.Disabled`, the plugin will be enabled. Similarly,
+	// including `multiPoint.Disabled = '*'` and `multiPoint.Enabled = pluginA` will still register that specific
+	// plugin through MultiPoint. This follows the same behavior as all other extension point configurations.
+	MultiPoint PluginSet `json:"multiPoint,omitempty"`
+}
+
+// PluginSet specifies enabled and disabled plugins for an extension point.
+// If an array is empty, missing, or nil, default plugins at that extension point will be used.
+type PluginSet struct {
+	// Enabled specifies plugins that should be enabled in addition to default plugins.
+	// If the default plugin is also configured in the scheduler config file, the weight of plugin will
+	// be overridden accordingly.
+	// These are called after default plugins and in the same order specified here.
+	// +listType=atomic
+	Enabled []Plugin `json:"enabled,omitempty"`
+	// Disabled specifies default plugins that should be disabled.
+	// When all default plugins need to be disabled, an array containing only one "*" should be provided.
+	// +listType=map
+	// +listMapKey=name
+	Disabled []Plugin `json:"disabled,omitempty"`
+}
+
+// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.
+type Plugin struct {
+	// Name defines the name of plugin
 	Name string `json:"name"`
-	// Holds the parameters to configure the given predicate
-	Argument *PredicateArgument `json:"argument"`
+	// Weight defines the weight of plugin, only used for Score plugins.
+	Weight *int32 `json:"weight,omitempty"`
 }
 
-// PriorityPolicy describes a struct of a priority policy.
-type PriorityPolicy struct {
-	// Identifier of the priority policy
-	// For a custom priority, the name can be user-defined
-	// For the Kubernetes provided priority functions, the name is the identifier of the pre-defined priority function
+// PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.
+// A plugin that is invoked at multiple extension points is initialized once. Args can have arbitrary structure.
+// It is up to the plugin to process these Args.
+type PluginConfig struct {
+	// Name defines the name of plugin being configured
 	Name string `json:"name"`
-	// The numeric multiplier for the node scores that the priority function generates
-	// The weight should be non-zero and can be a positive or a negative integer
-	Weight int64 `json:"weight"`
-	// Holds the parameters to configure the given priority function
-	Argument *PriorityArgument `json:"argument"`
+	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
+	Args runtime.RawExtension `json:"args,omitempty"`
 }
 
-// PredicateArgument represents the arguments to configure predicate functions in scheduler policy configuration.
-// Only one of its members may be specified
-type PredicateArgument struct {
-	// The predicate that provides affinity for pods belonging to a service
-	// It uses a label to identify nodes that belong to the same "group"
-	ServiceAffinity *ServiceAffinity `json:"serviceAffinity"`
-	// The predicate that checks whether a particular node has a certain label
-	// defined or not, regardless of value
-	LabelsPresence *LabelsPresence `json:"labelsPresence"`
+func (c *PluginConfig) decodeNestedObjects(d runtime.Decoder) error {
+	gvk := SchemeGroupVersion.WithKind(c.Name + "Args")
+	// dry-run to detect and skip out-of-tree plugin args.
+	if _, _, err := d.Decode(nil, &gvk, nil); runtime.IsNotRegisteredError(err) {
+		return nil
+	}
+
+	var strictDecodingErr error
+	obj, parsedGvk, err := d.Decode(c.Args.Raw, &gvk, nil)
+	if err != nil {
+		decodingArgsErr := fmt.Errorf("decoding args for plugin %s: %w", c.Name, err)
+		if obj != nil && runtime.IsStrictDecodingError(err) {
+			strictDecodingErr = runtime.NewStrictDecodingError([]error{decodingArgsErr})
+		} else {
+			return decodingArgsErr
+		}
+	}
+	if parsedGvk.GroupKind() != gvk.GroupKind() {
+		return fmt.Errorf("args for plugin %s were not of type %s, got %s", c.Name, gvk.GroupKind(), parsedGvk.GroupKind())
+	}
+	c.Args.Object = obj
+	return strictDecodingErr
 }
 
-// PriorityArgument represents the arguments to configure priority functions in scheduler policy configuration.
-// Only one of its members may be specified
-type PriorityArgument struct {
-	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
-	// It uses a label to identify nodes that belong to the same "group"
-	ServiceAntiAffinity *ServiceAntiAffinity `json:"serviceAntiAffinity"`
-	// The priority function that checks whether a particular node has a certain label
-	// defined or not, regardless of value
-	LabelPreference *LabelPreference `json:"labelPreference"`
-	// The RequestedToCapacityRatio priority function is parametrized with function shape.
-	RequestedToCapacityRatioArguments *RequestedToCapacityRatioArguments `json:"requestedToCapacityRatioArguments"`
+func (c *PluginConfig) encodeNestedObjects(e runtime.Encoder) error {
+	if c.Args.Object == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	err := e.Encode(c.Args.Object, &buf)
+	if err != nil {
+		return err
+	}
+	// The <e> encoder might be a YAML encoder, but the parent encoder expects
+	// JSON output, so we convert YAML back to JSON.
+	// This is a no-op if <e> produces JSON.
+	json, err := yaml.YAMLToJSON(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	c.Args.Raw = json
+	return nil
 }
 
-// ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
-type ServiceAffinity struct {
-	// The list of labels that identify node "groups"
-	// All of the labels should match for the node to be considered a fit for hosting the pod
-	Labels []string `json:"labels"`
-}
-
-// LabelsPresence holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
-type LabelsPresence struct {
-	// The list of labels that identify node "groups"
-	// All of the labels should be either present (or absent) for the node to be considered a fit for hosting the pod
-	Labels []string `json:"labels"`
-	// The boolean flag that indicates whether the labels should be present or absent from the node
-	Presence bool `json:"presence"`
-}
-
-// ServiceAntiAffinity holds the parameters that are used to configure the corresponding priority function
-type ServiceAntiAffinity struct {
-	// Used to identify node "groups"
-	Label string `json:"label"`
-}
-
-// LabelPreference holds the parameters that are used to configure the corresponding priority function
-type LabelPreference struct {
-	// Used to identify node "groups"
-	Label string `json:"label"`
-	// This is a boolean flag
-	// If true, higher priority is given to nodes that have the label
-	// If false, higher priority is given to nodes that do not have the label
-	Presence bool `json:"presence"`
-}
-
-// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function.
-type RequestedToCapacityRatioArguments struct {
-	// Array of point defining priority function shape.
-	Shape     []UtilizationShapePoint `json:"shape"`
-	Resources []ResourceSpec          `json:"resources,omitempty"`
-}
-
-// UtilizationShapePoint represents single point of priority function shape.
-type UtilizationShapePoint struct {
-	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int32 `json:"utilization"`
-	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int32 `json:"score"`
-}
-
-// ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
-type ResourceSpec struct {
-	// Name of the resource to be managed by RequestedToCapacityRatio function.
-	Name string `json:"name"`
-	// Weight of the resource.
+// Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// it is assumed that the extender chose not to provide that extension.
+type Extender struct {
+	// URLPrefix at which the extender is available
+	URLPrefix string `json:"urlPrefix"`
+	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
+	FilterVerb string `json:"filterVerb,omitempty"`
+	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
+	PreemptVerb string `json:"preemptVerb,omitempty"`
+	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
+	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
+	// The numeric multiplier for the node scores that the prioritize call generates.
+	// The weight should be a positive integer
 	Weight int64 `json:"weight,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
+	// can implement this function.
+	BindVerb string `json:"bindVerb,omitempty"`
+	// EnableHTTPS specifies whether https should be used to communicate with the extender
+	EnableHTTPS bool `json:"enableHTTPS,omitempty"`
+	// TLSConfig specifies the transport layer security config
+	TLSConfig *ExtenderTLSConfig `json:"tlsConfig,omitempty"`
+	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
+	// timeout is ignored, k8s/other extenders priorities are used to select the node.
+	HTTPTimeout metav1.Duration `json:"httpTimeout,omitempty"`
+	// NodeCacheCapable specifies that the extender is capable of caching node information,
+	// so the scheduler should only send minimal information about the eligible nodes
+	// assuming that the extender already cached full details of all nodes in the cluster
+	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
+	// ManagedResources is a list of extended resources that are managed by
+	// this extender.
+	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
+	//   (if the extender is the binder) phases iff the pod requests at least
+	//   one of the extended resources in this list. If empty or unspecified,
+	//   all pods will be sent to this extender.
+	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
+	//   will skip checking the resource in predicates.
+	// +optional
+	// +listType=atomic
+	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
+	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
+	// fail when the extender returns an error or is not reachable.
+	Ignorable bool `json:"ignorable,omitempty"`
 }
 
 // ExtenderManagedResource describes the arguments of extended resources
@@ -176,67 +384,14 @@ type ExtenderTLSConfig struct {
 
 	// CertData holds PEM-encoded bytes (typically read from a client certificate file).
 	// CertData takes precedence over CertFile
+	// +listType=atomic
 	CertData []byte `json:"certData,omitempty"`
 	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
 	// KeyData takes precedence over KeyFile
+	// +listType=atomic
 	KeyData []byte `json:"keyData,omitempty"`
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
+	// +listType=atomic
 	CAData []byte `json:"caData,omitempty"`
-}
-
-// LegacyExtender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
-// it is assumed that the extender chose not to provide that extension.
-type LegacyExtender struct {
-	// URLPrefix at which the extender is available
-	URLPrefix string `json:"urlPrefix"`
-	// Verb for the filter call, empty if not supported. This verb is appended to the URLPrefix when issuing the filter call to extender.
-	FilterVerb string `json:"filterVerb,omitempty"`
-	// Verb for the preempt call, empty if not supported. This verb is appended to the URLPrefix when issuing the preempt call to extender.
-	PreemptVerb string `json:"preemptVerb,omitempty"`
-	// Verb for the prioritize call, empty if not supported. This verb is appended to the URLPrefix when issuing the prioritize call to extender.
-	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
-	// The numeric multiplier for the node scores that the prioritize call generates.
-	// The weight should be a positive integer
-	Weight int64 `json:"weight,omitempty"`
-	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
-	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
-	// can implement this function.
-	BindVerb string `json:"bindVerb,omitempty"`
-	// EnableHTTPS specifies whether https should be used to communicate with the extender
-	EnableHTTPS bool `json:"enableHttps,omitempty"`
-	// TLSConfig specifies the transport layer security config
-	TLSConfig *ExtenderTLSConfig `json:"tlsConfig,omitempty"`
-	// HTTPTimeout specifies the timeout duration for a call to the extender. Filter timeout fails the scheduling of the pod. Prioritize
-	// timeout is ignored, k8s/other extenders priorities are used to select the node.
-	HTTPTimeout time.Duration `json:"httpTimeout,omitempty"`
-	// NodeCacheCapable specifies that the extender is capable of caching node information,
-	// so the scheduler should only send minimal information about the eligible nodes
-	// assuming that the extender already cached full details of all nodes in the cluster
-	NodeCacheCapable bool `json:"nodeCacheCapable,omitempty"`
-	// ManagedResources is a list of extended resources that are managed by
-	// this extender.
-	// - A pod will be sent to the extender on the Filter, Prioritize and Bind
-	//   (if the extender is the binder) phases iff the pod requests at least
-	//   one of the extended resources in this list. If empty or unspecified,
-	//   all pods will be sent to this extender.
-	// - If IgnoredByScheduler is set to true for a resource, kube-scheduler
-	//   will skip checking the resource in predicates.
-	// +optional
-	ManagedResources []ExtenderManagedResource `json:"managedResources,omitempty"`
-	// Ignorable specifies if the extender is ignorable, i.e. scheduling should not
-	// fail when the extender returns an error or is not reachable.
-	Ignorable bool `json:"ignorable,omitempty"`
-}
-
-// caseInsensitiveExtender is a type alias which lets us use the stdlib case-insensitive decoding
-// to preserve compatibility with incorrectly specified scheduler config fields:
-// * BindVerb, which originally did not specify a json tag, and required upper-case serialization in 1.7
-// * TLSConfig, which uses a struct not intended for serialization, and does not include any json tags
-type caseInsensitiveExtender *LegacyExtender
-
-// UnmarshalJSON implements the json.Unmarshaller interface.
-// This preserves compatibility with incorrect case-insensitive configuration fields.
-func (t *LegacyExtender) UnmarshalJSON(b []byte) error {
-	return gojson.Unmarshal(b, caseInsensitiveExtender(t))
 }

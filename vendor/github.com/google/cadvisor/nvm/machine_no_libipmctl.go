@@ -1,3 +1,4 @@
+//go:build !libipmctl || !cgo
 // +build !libipmctl !cgo
 
 // Copyright 2020 Google Inc. All Rights Reserved.
@@ -17,8 +18,9 @@
 package nvm
 
 import (
-	info "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog/v2"
+
+	info "github.com/google/cadvisor/info/v1"
 )
 
 // GetInfo returns information specific for non-volatile memory modules.
@@ -30,5 +32,5 @@ func GetInfo() (info.NVMInfo, error) {
 // Finalize un-initializes libipmctl. See https://github.com/google/cadvisor/issues/2457.
 // When libipmctl is not available it just logs that it's being called.
 func Finalize() {
-	klog.V(4).Info("libimpctl not available, doing nothing.")
+	klog.V(4).Info("libipmctl not available, doing nothing.")
 }

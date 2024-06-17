@@ -5,11 +5,13 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the following configurations:
-  * **macOS** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/docker-for-mac/).
+  * **macOS** Install Docker for Mac. See installation instructions [here](https://docs.docker.com/desktop/install/mac-install/).
      **Note**: You will want to set the Docker VM to have at least 8GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)).
   * **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.
   * **Windows with Docker Desktop WSL2 backend**  Install Docker according to the [instructions](https://docs.docker.com/docker-for-windows/wsl-tech-preview/). Be sure to store your sources in the local Linux file system, not the Windows remote mount at `/mnt/c`.
-  * **Remote Docker engine** Use a big machine in the cloud to build faster. This is a little trickier so look at the section later on.
+  
+  **Note**: You will need to check if Docker CLI plugin buildx is properly installed (`docker-buildx` file should be present in `~/.docker/cli-plugins`). You can install buildx according to the [instructions](https://github.com/docker/buildx/blob/master/README.md#installing).
+
 2. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
 
 You must install and configure Google Cloud SDK if you want to upload your release to Google Cloud Storage and may safely omit this otherwise.
@@ -35,7 +37,7 @@ The following scripts are found in the [`build/`](.) directory. Note that all sc
 
 ## Basic Flow
 
-The scripts directly under [`build/`](.) are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on [`build/build-image/Dockerfile`](build-image/Dockerfile) and after base image's `KUBE_BUILD_IMAGE_CROSS_TAG` from Dockerfile is replaced with one of those actual tags of the base image, like `v1.13.9-2`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container.
+The scripts directly under [`build/`](.) are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on [`build/build-image/Dockerfile`](build-image/Dockerfile) and after base image's `KUBE_BUILD_IMAGE_CROSS_TAG` from Dockerfile is replaced with one of those actual tags of the base image, like `v1.13.9-2`) and then execute the appropriate command in that container.  These scripts will both ensure that the right data is cached from run to run for incremental builds and will copy the results back out of the container. You can specify a different registry/name and version for `kube-cross` by setting `KUBE_CROSS_IMAGE` and `KUBE_CROSS_VERSION`, see [`common.sh`](common.sh) for more details.
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
@@ -45,52 +47,11 @@ There are 3 different containers instances that are run from this image.  The fi
 
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
 
-## Proxy Settings
-
-If you are behind a proxy and you are letting these scripts use `docker-machine` to set up your local VM for you on macOS, you need to export proxy settings for Kubernetes build, the following environment variables should be defined.
-
-```
-export KUBERNETES_HTTP_PROXY=http://username:password@proxyaddr:proxyport
-export KUBERNETES_HTTPS_PROXY=https://username:password@proxyaddr:proxyport
-```
-
-Optionally, you can specify addresses of no proxy for Kubernetes build, for example
-
-```
-export KUBERNETES_NO_PROXY=127.0.0.1
-```
-
-If you are using sudo to make Kubernetes build for example make quick-release, you need run `sudo -E make quick-release` to pass the environment variables.
-
-## Really Remote Docker Engine
-
-It is possible to use a Docker Engine that is running remotely (under your desk or in the cloud).  Docker must be configured to connect to that machine and the local rsync port must be forwarded (via SSH or nc) from localhost to the remote machine.
-
-To do this easily with GCE and `docker-machine`, do something like this:
-```
-# Create the remote docker machine on GCE.  This is a pretty beefy machine with SSD disk.
-KUBE_BUILD_VM=k8s-build
-KUBE_BUILD_GCE_PROJECT=<project>
-docker-machine create \
-  --driver=google \
-  --google-project=${KUBE_BUILD_GCE_PROJECT} \
-  --google-zone=us-west1-a \
-  --google-machine-type=n1-standard-8 \
-  --google-disk-size=50 \
-  --google-disk-type=pd-ssd \
-  ${KUBE_BUILD_VM}
-
-# Set up local docker to talk to that machine
-eval $(docker-machine env ${KUBE_BUILD_VM})
-
-# Pin down the port that rsync will be exposed on the remote machine
-export KUBE_RSYNC_PORT=8730
-
-# forward local 8730 to that machine so that rsync works
-docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT} -N &
-```
-
-Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to manage this VM.
+## Build artifacts
+The build system output all its products to a top level directory in the source repository named `_output`.
+These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
+If you intend to run a component with a docker image you will need to import it from this directory with
+the appropriate command (e.g. `docker import _output/release-images/amd64/kube-scheduler.tar k8s.io/kube-scheduler:$(git describe)`).
 
 ## Releasing
 
@@ -110,7 +71,7 @@ In addition, there are some other tar files that are created:
 When building final release tars, they are first staged into `_output/release-stage` before being tar'd up and put into `_output/release-tars`.
 
 ## Reproducibility
-`make release`, its variant `make quick-release`, and Bazel all provide a
+`make release` and its variant `make quick-release` provide a
 hermetic build environment which should provide some level of reproducibility
 for builds. `make` itself is **not** hermetic.
 
@@ -127,5 +88,3 @@ example, you could use the following one-liner:
 ```bash
 SOURCE_DATE_EPOCH=$(git show -s --format=format:%ct HEAD)
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/build/README.md?pixel)]()

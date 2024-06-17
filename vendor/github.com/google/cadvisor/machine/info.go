@@ -17,7 +17,7 @@ package machine
 import (
 	"bytes"
 	"flag"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -45,7 +45,7 @@ func getInfoFromFiles(filePaths string) string {
 		return ""
 	}
 	for _, file := range strings.Split(filePaths, ",") {
-		id, err := ioutil.ReadFile(file)
+		id, err := os.ReadFile(file)
 		if err == nil {
 			return strings.TrimSpace(string(id))
 		}
@@ -60,7 +60,7 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 		rootFs = "/rootfs"
 	}
 
-	cpuinfo, err := ioutil.ReadFile(filepath.Join(rootFs, "/proc/cpuinfo"))
+	cpuinfo, err := os.ReadFile(filepath.Join(rootFs, "/proc/cpuinfo"))
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +75,11 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 	}
 
 	memoryByType, err := GetMachineMemoryByType(memoryControllerPath)
+	if err != nil {
+		return nil, err
+	}
+
+	swapCapacity, err := GetMachineSwapCapacity()
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +126,14 @@ func Info(sysFs sysfs.SysFs, fsInfo fs.FsInfo, inHostNamespace bool) (*info.Mach
 
 	machineInfo := &info.MachineInfo{
 		Timestamp:        time.Now(),
+		CPUVendorID:      GetCPUVendorID(cpuinfo),
 		NumCores:         numCores,
 		NumPhysicalCores: GetPhysicalCores(cpuinfo),
 		NumSockets:       GetSockets(cpuinfo),
 		CpuFrequency:     clockSpeed,
 		MemoryCapacity:   memoryCapacity,
 		MemoryByType:     memoryByType,
+		SwapCapacity:     swapCapacity,
 		NVMInfo:          nvmInfo,
 		HugePages:        hugePagesInfo,
 		DiskMap:          diskMap,

@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build aix
+//go:build aix
 
 package cpu
-
-const cacheLineSize = 128
 
 const (
 	// getsystemcfg constants
@@ -15,12 +13,13 @@ const (
 	_IMPL_POWER9 = 0x20000
 )
 
-func init() {
+func archInit() {
 	impl := getsystemcfg(_SC_IMPL)
 	if impl&_IMPL_POWER8 != 0 {
 		PPC64.IsPOWER8 = true
 	}
 	if impl&_IMPL_POWER9 != 0 {
+		PPC64.IsPOWER8 = true
 		PPC64.IsPOWER9 = true
 	}
 

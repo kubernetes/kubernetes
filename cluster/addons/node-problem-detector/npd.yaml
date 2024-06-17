@@ -26,32 +26,30 @@ subjects:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: npd-v0.8.0
+  name: node-problem-detector
   namespace: kube-system
   labels:
-    k8s-app: node-problem-detector
-    version: v0.8.0
-    kubernetes.io/cluster-service: "true"
+    app.kubernetes.io/name: node-problem-detector
+    app.kubernetes.io/version: v0.8.19
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
-      k8s-app: node-problem-detector
-      version: v0.8.0
+      app.kubernetes.io/name: node-problem-detector
+      app.kubernetes.io/version: v0.8.19
   template:
     metadata:
       labels:
-        k8s-app: node-problem-detector
-        version: v0.8.0
-        kubernetes.io/cluster-service: "true"
+        app.kubernetes.io/name: node-problem-detector
+        app.kubernetes.io/version: v0.8.19
     spec:
       containers:
       - name: node-problem-detector
-        image: k8s.gcr.io/node-problem-detector:v0.8.0
+        image: registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.19
         command:
         - "/bin/sh"
         - "-c"
-        - "exec /node-problem-detector --logtostderr --config.system-log-monitor=/config/kernel-monitor.json,/config/docker-monitor.json,/config/systemd-monitor.json --config.custom-plugin-monitor=/config/kernel-monitor-counter.json,/config/systemd-monitor-counter.json --config.system-stats-monitor=/config/system-stats-monitor.json >>/var/log/node-problem-detector.log 2>&1"
+        - "exec /node-problem-detector --logtostderr --config.system-log-monitor=/config/kernel-monitor.json,/config/systemd-monitor.json --config.custom-plugin-monitor=/config/kernel-monitor-counter.json,/config/systemd-monitor-counter.json --config.system-stats-monitor=/config/system-stats-monitor.json >>/var/log/node-problem-detector.log 2>&1"
         securityContext:
           privileged: true
         resources:
@@ -69,6 +67,9 @@ spec:
         volumeMounts:
         - name: log
           mountPath: /var/log
+        - name: kmsg
+          mountPath: /dev/kmsg
+          readOnly: true
         - name: localtime
           mountPath: /etc/localtime
           readOnly: true
@@ -76,6 +77,9 @@ spec:
       - name: log
         hostPath:
           path: /var/log/
+      - name: kmsg
+        hostPath:
+          path: /dev/kmsg
       - name: localtime
         hostPath:
           path: /etc/localtime
@@ -84,5 +88,7 @@ spec:
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
+      - operator: "Exists"
+        effect: "NoSchedule"
       - key: "CriticalAddonsOnly"
         operator: "Exists"

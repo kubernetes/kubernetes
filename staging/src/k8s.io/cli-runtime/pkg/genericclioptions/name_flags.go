@@ -35,11 +35,13 @@ type NamePrintFlags struct {
 	Operation string
 }
 
+// Complete sets NamePrintFlags operation flag from successTemplate
 func (f *NamePrintFlags) Complete(successTemplate string) error {
 	f.Operation = fmt.Sprintf(successTemplate, f.Operation)
 	return nil
 }
 
+// AllowedFormats returns slice of string of allowed Name printing format
 func (f *NamePrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}

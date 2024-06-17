@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2019 The Kubernetes Authors.
 #
@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import fnmatch
 import os
 import sys
@@ -26,7 +24,7 @@ def get_gomod_dependencies(rootdir, components):
     all_dependencies = {}
     for component in components:
         with open(os.path.join(rootdir, component, "go.mod")) as f:
-            print(component + " dependencies")
+            print((component + " dependencies"))
             all_dependencies[component] = []
             lines = list(set(f))
             lines.sort()
@@ -36,7 +34,7 @@ def get_gomod_dependencies(rootdir, components):
                         continue
                     if ("k8s.io/" + dep + " =>") not in line:
                         continue
-                    print("\t"+dep)
+                    print(("\t"+dep))
                     if dep not in all_dependencies[component]:
                         all_dependencies[component].append(dep)
     return all_dependencies
@@ -45,7 +43,7 @@ def get_gomod_dependencies(rootdir, components):
 def get_rules_dependencies(rules_file):
     import yaml
     with open(rules_file) as f:
-        data = yaml.load(f)
+        data = yaml.safe_load(f)
     return data
 
 
@@ -62,7 +60,7 @@ def main():
     try:
         import yaml
     except ImportError:
-        print("Please install missing pyyaml module and re-run %s" % sys.argv[0])
+        print(("Please install missing pyyaml module and re-run %s" % sys.argv[0]))
         sys.exit(1)
     rules_dependencies = get_rules_dependencies(rootdir + rules_file)
 
@@ -81,12 +79,27 @@ def main():
             # And skip validation of publishing rules for it
             continue
 
+        for item in rule["branches"]:
+            if "dir" in item["source"]:
+                raise Exception("use of deprecated `dir` field in rules for `%s`" % (rule["destination"]))
+            if len(item["source"]["dirs"]) > 1:
+                raise Exception("cannot have more than one directory (`%s`) per source branch `%s` of `%s`" %
+                                (item["source"]["dirs"], item["source"]["branch"], rule["destination"])
+                                )
+            if not item["source"]["dirs"][0].endswith(rule["destination"]):
+                raise Exception("copy/paste error `%s` refers to `%s`" % (rule["destination"],item["source"]["dir"]))
+
         if branch["name"] != "master":
             raise Exception("cannot find master branch for destination %s" % rule["destination"])
         if branch["source"]["branch"] != "master":
             raise Exception("cannot find master source branch for destination %s" % rule["destination"])
 
-        print("processing : %s" % rule["destination"])
+        # we specify the go version for all master branches through `default-go-version`
+        # so ensure we don't specify explicit go version for master branch in rules
+        if "go" in branch:
+            raise Exception("go version must not be specified for master branch for destination %s" % rule["destination"])
+
+        print(("processing : %s" % rule["destination"]))
         if rule["destination"] not in gomod_dependencies:
             raise Exception("missing go.mod for %s" % rule["destination"])
         processed_repos.append(rule["destination"])
@@ -107,7 +120,7 @@ def main():
             if not found:
                 raise Exception("Please add %s as a dependency under destination %s in %s" % (dep, rule["destination"], rules_file))
             else:
-                print("  found dependency %s" % dep)
+                print(("  found dependency %s" % dep))
         extraDeps = set(processed_deps) - set(gomod_dependencies[rule["destination"]])
         if len(extraDeps) > 0:
             raise Exception("extra dependencies in rules for %s: %s" % (rule["destination"], ','.join(str(s) for s in extraDeps)))

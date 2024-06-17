@@ -24,12 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/kubectl/pkg/cmd/set"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -45,30 +47,31 @@ type PauseOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	Resources        []string
+	LabelSelector    string
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 
 	fieldManager string
 }
 
 var (
-	pauseLong = templates.LongDesc(`
-		Mark the provided resource as paused
+	pauseLong = templates.LongDesc(i18n.T(`
+		Mark the provided resource as paused.
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
-		Currently only deployments support being paused.`)
+		Currently only deployments support being paused.`))
 
 	pauseExample = templates.Examples(`
-		# Mark the nginx deployment as paused. Any current state of
-		# the deployment will continue its function, new updates to the deployment will not
-		# have an effect as long as the deployment is paused.
+		# Mark the nginx deployment as paused
+		# Any current state of the deployment will continue its function; new updates
+		# to the deployment will not have an effect as long as the deployment is paused
 		kubectl rollout pause deployment/nginx`)
 )
 
 // NewCmdRolloutPause returns a Command instance for 'rollout pause' sub command
-func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutPause(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := &PauseOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
@@ -82,12 +85,12 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:                 i18n.T("Mark the provided resource as paused"),
 		Long:                  pauseLong,
 		Example:               pauseExample,
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunPause())
 		},
-		ValidArgs: validArgs,
 	}
 
 	o.PrintFlags.AddFlags(cmd)
@@ -95,6 +98,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-rollout")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	return cmd
 }
 
@@ -131,6 +135,7 @@ func (o *PauseOptions) RunPause() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
 		ContinueOnError().
@@ -152,7 +157,14 @@ func (o *PauseOptions) RunPause() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Pauser)) {
+	patches := set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Pauser))
+
+	if len(patches) == 0 && len(allErrs) == 0 {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+		return nil
+	}
+
+	for _, patch := range patches {
 		info := patch.Info
 
 		if patch.Err != nil {

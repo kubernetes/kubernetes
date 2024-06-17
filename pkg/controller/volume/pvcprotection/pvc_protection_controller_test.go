@@ -17,12 +17,11 @@ limitations under the License.
 package pvcprotection
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,10 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -146,7 +146,7 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 	}
 }
 
-func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnabled bool) {
+func TestPVCProtectionController(t *testing.T) {
 	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
 		Version:  "v1",
@@ -184,31 +184,22 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		deletedPod *v1.Pod
 		// List of expected kubeclient actions that should happen during the
 		// test.
-		expectedActions                     []clienttesting.Action
-		storageObjectInUseProtectionEnabled bool
+		expectedActions []clienttesting.Action
 	}{
 		//
 		// PVC events
 		//
 		{
-			name:       "StorageObjectInUseProtection Enabled, PVC without finalizer -> finalizer is added",
+			name:       "PVC without finalizer -> finalizer is added",
 			updatedPVC: pvc(),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:                                "StorageObjectInUseProtection Disabled, PVC without finalizer -> finalizer is not added",
-			updatedPVC:                          pvc(),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: false,
-		},
-		{
-			name:                                "PVC with finalizer -> no action",
-			updatedPVC:                          withProtectionFinalizer(pvc()),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			name:            "PVC with finalizer -> no action",
+			updatedPVC:      withProtectionFinalizer(pvc()),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name:       "saving PVC finalizer fails -> controller retries",
@@ -228,25 +219,14 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				// This succeeds
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, withProtectionFinalizer(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name:       "StorageObjectInUseProtection Enabled, deleted PVC with finalizer -> finalizer is removed",
+			name:       "deleted PVC with finalizer -> finalizer is removed",
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
-		},
-		{
-			name:       "StorageObjectInUseProtection Disabled, deleted PVC with finalizer -> finalizer is removed",
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
-			},
-			storageObjectInUseProtectionEnabled: false,
 		},
 		{
 			name:       "finalizer removal fails -> controller retries",
@@ -269,7 +249,6 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				// Succeeds
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name: "deleted PVC with finalizer + pod with the PVC exists -> finalizer is not removed",
@@ -289,16 +268,14 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name: "deleted PVC with finalizer + pod with the PVC finished but is not deleted -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVC:                          deleted(withProtectionFinalizer(pvc())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			updatedPVC:      deleted(withProtectionFinalizer(pvc())),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name: "deleted PVC with finalizer + pod with the PVC exists but is not in the Informer's cache yet -> finalizer is not removed",
@@ -310,7 +287,6 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			expectedActions: []clienttesting.Action{
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		//
 		// Pod events
@@ -320,18 +296,16 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			updatedPod:                          withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			updatedPod:      withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name: "updated finished Pod -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			updatedPod:                          withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			updatedPod:      withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name: "updated unscheduled Pod -> finalizer is removed",
@@ -343,7 +317,6 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name: "deleted running Pod -> finalizer is removed",
@@ -355,7 +328,6 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name: "pod delete and create with same namespaced name seen as an update, old pod used deleted PVC -> finalizer is removed",
@@ -368,37 +340,33 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
-			storageObjectInUseProtectionEnabled: true,
 		},
 		{
 			name: "pod delete and create with same namespaced name seen as an update, old pod used non-deleted PVC -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withProtectionFinalizer(pvc()),
 			},
-			deletedPod:                          withPVC(defaultPVCName, pod()),
-			updatedPod:                          withUID("uid2", pod()),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			deletedPod:      withPVC(defaultPVCName, pod()),
+			updatedPod:      withUID("uid2", pod()),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name: "pod delete and create with same namespaced name seen as an update, both pods reference deleted PVC -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			deletedPod:                          withPVC(defaultPVCName, pod()),
-			updatedPod:                          withUID("uid2", withPVC(defaultPVCName, pod())),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			deletedPod:      withPVC(defaultPVCName, pod()),
+			updatedPod:      withUID("uid2", withPVC(defaultPVCName, pod())),
+			expectedActions: []clienttesting.Action{},
 		},
 		{
 			name: "pod update from unscheduled to scheduled, deleted PVC is referenced -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			deletedPod:                          unscheduled(withPVC(defaultPVCName, pod())),
-			updatedPod:                          withPVC(defaultPVCName, pod()),
-			expectedActions:                     []clienttesting.Action{},
-			storageObjectInUseProtectionEnabled: true,
+			deletedPod:      unscheduled(withPVC(defaultPVCName, pod())),
+			updatedPod:      withPVC(defaultPVCName, pod()),
+			expectedActions: []clienttesting.Action{},
 		},
 	}
 
@@ -430,7 +398,8 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		podInformer := informers.Core().V1().Pods()
 
 		// Create the controller
-		ctrl, err := NewPVCProtectionController(pvcInformer, podInformer, client, test.storageObjectInUseProtectionEnabled, genericEphemeralVolumeFeatureEnabled)
+		logger, _ := ktesting.NewTestContext(t)
+		ctrl, err := NewPVCProtectionController(logger, pvcInformer, podInformer, client)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -455,15 +424,15 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 
 		// Start the test by simulating an event
 		if test.updatedPVC != nil {
-			ctrl.pvcAddedUpdated(test.updatedPVC)
+			ctrl.pvcAddedUpdated(logger, test.updatedPVC)
 		}
 		switch {
 		case test.deletedPod != nil && test.updatedPod != nil && test.deletedPod.Namespace == test.updatedPod.Namespace && test.deletedPod.Name == test.updatedPod.Name:
-			ctrl.podAddedDeletedUpdated(test.deletedPod, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, test.deletedPod, test.updatedPod, false)
 		case test.updatedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.updatedPod, false)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.updatedPod, false)
 		case test.deletedPod != nil:
-			ctrl.podAddedDeletedUpdated(nil, test.deletedPod, true)
+			ctrl.podAddedDeletedUpdated(logger, nil, test.deletedPod, true)
 		}
 
 		// Process the controller queue until we get expected results
@@ -475,8 +444,8 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
-				ctrl.processNextWorkItem()
+				logger.V(5).Info("Non-empty queue, processing one", "test", test.name, "queueLength", ctrl.queue.Len())
+				ctrl.processNextWorkItem(context.TODO())
 			}
 			if ctrl.queue.Len() > 0 {
 				// There is still some work in the queue, process it now
@@ -486,7 +455,7 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log every wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					logger.V(5).Info("Waiting for the remaining actions", "test", test.name, "currentActionCount", currentActionCount, "expectedActionCount", len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.
@@ -499,13 +468,13 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		actions := client.Actions()
 		for i, action := range actions {
 			if len(test.expectedActions) < i+1 {
-				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), spew.Sdump(actions[i:]))
+				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), dump.Pretty(actions[i:]))
 				break
 			}
 
 			expectedAction := test.expectedActions[i]
 			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
+				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, dump.Pretty(expectedAction), dump.Pretty(action))
 			}
 		}
 
@@ -517,9 +486,4 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		}
 
 	}
-}
-
-func TestPVCProtectionController(t *testing.T) {
-	t.Run("with-GenericEphemeralVolume", func(t *testing.T) { testPVCProtectionController(t, true) })
-	t.Run("without-GenericEphemeralVolume", func(t *testing.T) { testPVCProtectionController(t, false) })
 }

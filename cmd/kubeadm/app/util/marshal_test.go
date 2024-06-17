@@ -24,11 +24,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -82,7 +80,7 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 
 	t.Logf("\n%s", bytes)
 
-	obj2, err := UnmarshalFromYaml(bytes, corev1.SchemeGroupVersion)
+	obj2, err := UniversalUnmarshal(bytes)
 	if err != nil {
 		t.Fatalf("unexpected error marshalling: %v", err)
 	}
@@ -109,50 +107,48 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 	}
 }
 
-func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
-	cfg := &kubeadmapiv1beta2.InitConfiguration{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       constants.InitConfigurationKind,
-			APIVersion: kubeadmapiv1beta2.SchemeGroupVersion.String(),
-		},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			Name:      "testNode",
-			CRISocket: "/var/run/cri.sock",
-		},
-		BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
-			{
-				Token: &kubeadmapiv1beta2.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
-			},
-		},
-		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work
-		// by design. This is because we have a `json:"-"` annotation in order to avoid struct duplication. See the comment
-		// at the kubeadmapiv1beta2.InitConfiguration definition.
+func TestUnmarshalJson(t *testing.T) {
+	bytes := []byte(string(`{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "someName",
+    "namespace": "testNamespace",
+	"labels": {
+		"test": "yes"
 	}
+  },
+  "spec": {
+	"restartPolicy": "Always"
+  }
+}`))
 
-	kubeadmapiv1beta2.SetDefaults_InitConfiguration(cfg)
-	scheme := runtime.NewScheme()
-	if err := kubeadmapiv1beta2.AddToScheme(scheme); err != nil {
-		t.Fatal(err)
-	}
-	codecs := serializer.NewCodecFactory(scheme)
-
-	bytes, err := MarshalToYamlForCodecs(cfg, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
-	if err != nil {
-		t.Fatalf("unexpected error marshalling InitConfiguration: %v", err)
-	}
 	t.Logf("\n%s", bytes)
 
-	obj, err := UnmarshalFromYamlForCodecs(bytes, kubeadmapiv1beta2.SchemeGroupVersion, codecs)
+	obj2, err := UniversalUnmarshal(bytes)
 	if err != nil {
-		t.Fatalf("unexpected error unmarshalling InitConfiguration: %v", err)
+		t.Fatalf("unexpected error marshalling: %v", err)
 	}
 
-	cfg2, ok := obj.(*kubeadmapiv1beta2.InitConfiguration)
-	if !ok || cfg2 == nil {
-		t.Fatal("did not get InitConfiguration back")
+	pod2, ok := obj2.(*corev1.Pod)
+	if !ok {
+		t.Fatal("did not get a Pod")
 	}
-	if !reflect.DeepEqual(*cfg, *cfg2) {
-		t.Errorf("expected %v, got %v", *cfg, *cfg2)
+
+	if pod2.Name != "someName" {
+		t.Errorf("expected someName, got %q", pod2.Name)
+	}
+
+	if pod2.Namespace != "testNamespace" {
+		t.Errorf("expected testNamespace, got %q", pod2.Namespace)
+	}
+
+	if !reflect.DeepEqual(pod2.Labels, map[string]string{"test": "yes"}) {
+		t.Errorf("expected [test:yes], got %v", pod2.Labels)
+	}
+
+	if pod2.Spec.RestartPolicy != "Always" {
+		t.Errorf("expected Always, got %q", pod2.Spec.RestartPolicy)
 	}
 }
 
@@ -396,6 +392,107 @@ func TestGroupVersionKindsHasJoinConfiguration(t *testing.T) {
 			actual := GroupVersionKindsHasJoinConfiguration(rt.gvks...)
 			if rt.expected != actual {
 				t2.Errorf("expected gvks has JoinConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasResetConfiguration(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "NoResetConfiguration",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "ResetConfigurationFound",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "ResetConfiguration"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+
+			actual := GroupVersionKindsHasResetConfiguration(rt.gvks...)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has ResetConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasClusterConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		expected bool
+	}{
+		{
+			name: "does not have ClusterConfiguraiton",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "has ClusterConfiguraiton",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "foo.k8s.io", Version: "v1", Kind: "ClusterConfiguration"},
+			},
+			expected: true,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			actual := GroupVersionKindsHasClusterConfiguration(rt.gvks...)
+			if rt.expected != actual {
+				t.Errorf("expected gvks to have a ClusterConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestGroupVersionKindsHasUpgradeConfiguration(t *testing.T) {
+	var tests = []struct {
+		name     string
+		gvks     []schema.GroupVersionKind
+		kind     string
+		expected bool
+	}{
+		{
+			name: "no UpgradeConfiguration found",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "UpgradeConfiguration is found",
+			gvks: []schema.GroupVersionKind{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"},
+				{Group: "bar.k8s.io", Version: "v2", Kind: "UpgradeConfiguration"},
+			},
+			expected: true,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			actual := GroupVersionKindsHasUpgradeConfiguration(rt.gvks...)
+			if rt.expected != actual {
+				t2.Errorf("expected gvks has UpgradeConfiguration: %t\n\tactual: %t\n", rt.expected, actual)
 			}
 		})
 	}

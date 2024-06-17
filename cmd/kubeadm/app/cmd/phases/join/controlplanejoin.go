@@ -25,10 +25,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
 var controlPlaneJoinExample = cmdutil.Examples(`
@@ -42,11 +41,14 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 		options.ControlPlane,
 		options.NodeName,
 	}
-	if name == "etcd" {
-		flags = append(flags, options.Kustomize, options.Patches)
+	if name == "etcd" || name == "all" {
+		flags = append(flags, options.Patches)
 	}
 	if name != "mark-control-plane" {
 		flags = append(flags, options.APIServerAdvertiseAddress)
+	}
+	if name != "update-status" {
+		flags = append(flags, options.DryRun)
 	}
 	return flags
 }
@@ -66,7 +68,6 @@ func NewControlPlaneJoinPhase() workflow.Phase {
 				ArgsValidator:  cobra.NoArgs,
 			},
 			newEtcdLocalSubphase(),
-			newUpdateStatusSubphase(),
 			newMarkControlPlaneSubphase(),
 		},
 	}
@@ -78,20 +79,6 @@ func newEtcdLocalSubphase() workflow.Phase {
 		Short:         "Add a new local etcd member",
 		Run:           runEtcdPhase,
 		InheritFlags:  getControlPlaneJoinPhaseFlags("etcd"),
-		ArgsValidator: cobra.NoArgs,
-	}
-}
-
-func newUpdateStatusSubphase() workflow.Phase {
-	return workflow.Phase{
-		Name: "update-status",
-		Short: fmt.Sprintf(
-			"Register the new control-plane node into the %s maintained in the %s ConfigMap",
-			kubeadmconstants.ClusterStatusConfigMapKey,
-			kubeadmconstants.KubeadmConfigConfigMap,
-		),
-		Run:           runUpdateStatusPhase,
-		InheritFlags:  getControlPlaneJoinPhaseFlags("update-status"),
 		ArgsValidator: cobra.NoArgs,
 	}
 }
@@ -117,7 +104,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
@@ -125,10 +112,19 @@ func runEtcdPhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	// in case of local etcd
+	// in case of external etcd
 	if cfg.Etcd.External != nil {
-		fmt.Println("[control-plane-join] using external etcd - no local stacked instance added")
+		fmt.Println("[control-plane-join] Using external etcd - no local stacked instance added")
 		return nil
+	}
+
+	if !data.DryRun() {
+		// Create the etcd data directory
+		if err := etcdutil.CreateDataDirectory(cfg.Etcd.Local.DataDir); err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("[control-plane-join] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
 	}
 
 	// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
@@ -141,35 +137,8 @@ func runEtcdPhase(c workflow.RunData) error {
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), data.KustomizeDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), data.CertificateWriteDir()); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
-	}
-
-	return nil
-}
-
-func runUpdateStatusPhase(c workflow.RunData) error {
-	data, ok := c.(JoinData)
-	if !ok {
-		return errors.New("control-plane-join phase invoked with an invalid data struct")
-	}
-
-	if data.Cfg().ControlPlane == nil {
-		return nil
-	}
-
-	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
-	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
-	}
-	cfg, err := data.InitCfg()
-	if err != nil {
-		return err
-	}
-
-	if err := uploadconfigphase.UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
 	}
 
 	return nil
@@ -186,7 +155,7 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
+	client, err := data.Client()
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
@@ -195,8 +164,12 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 		return err
 	}
 
-	if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
-		return errors.Wrap(err, "error applying control-plane label and taints")
+	if !data.DryRun() {
+		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
+			return errors.Wrap(err, "error applying control-plane label and taints")
+		}
+	} else {
+		fmt.Printf("[control-plane-join] Would mark node %s as a control-plane\n", cfg.NodeRegistration.Name)
 	}
 
 	return nil

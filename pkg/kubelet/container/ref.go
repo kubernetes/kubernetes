@@ -20,10 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ImplicitContainerPrefix is a container name prefix that will indicate that container was started implicitly (like the pod infra container).
@@ -32,9 +30,6 @@ var ImplicitContainerPrefix = "implicitly required container "
 // GenerateContainerRef returns an *v1.ObjectReference which references the given container
 // within the given pod. Returns an error if the reference can't be constructed or the
 // container doesn't actually belong to the pod.
-//
-// This function will return an error if the provided Pod does not have a selfLink,
-// but we expect selfLink to be populated at all call sites for the function.
 func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
@@ -70,15 +65,13 @@ func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 			return fmt.Sprintf("spec.initContainers{%s}", here.Name), nil
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		for i := range pod.Spec.EphemeralContainers {
-			here := &pod.Spec.EphemeralContainers[i]
-			if here.Name == container.Name {
-				if here.Name == "" {
-					return fmt.Sprintf("spec.ephemeralContainers[%d]", i), nil
-				}
-				return fmt.Sprintf("spec.ephemeralContainers{%s}", here.Name), nil
+	for i := range pod.Spec.EphemeralContainers {
+		here := &pod.Spec.EphemeralContainers[i]
+		if here.Name == container.Name {
+			if here.Name == "" {
+				return fmt.Sprintf("spec.ephemeralContainers[%d]", i), nil
 			}
+			return fmt.Sprintf("spec.ephemeralContainers{%s}", here.Name), nil
 		}
 	}
 	return "", fmt.Errorf("container %q not found in pod %s/%s", container.Name, pod.Namespace, pod.Name)

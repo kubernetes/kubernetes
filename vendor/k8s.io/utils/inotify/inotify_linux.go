@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 // Copyright 2010 The Go Authors. All rights reserved.
@@ -8,23 +9,23 @@
 Package inotify implements a wrapper for the Linux inotify system.
 
 Example:
-    watcher, err := inotify.NewWatcher()
-    if err != nil {
-        log.Fatal(err)
-    }
-    err = watcher.Watch("/tmp")
-    if err != nil {
-        log.Fatal(err)
-    }
-    for {
-        select {
-        case ev := <-watcher.Event:
-            log.Println("event:", ev)
-        case err := <-watcher.Error:
-            log.Println("error:", err)
-        }
-    }
 
+	watcher, err := inotify.NewWatcher()
+	if err != nil {
+	    log.Fatal(err)
+	}
+	err = watcher.Watch("/tmp")
+	if err != nil {
+	    log.Fatal(err)
+	}
+	for {
+	    select {
+	    case ev := <-watcher.Event:
+	        log.Println("event:", ev)
+	    case err := <-watcher.Error:
+	        log.Println("error:", err)
+	    }
+	}
 */
 package inotify // import "k8s.io/utils/inotify"
 
@@ -120,7 +121,11 @@ func (w *Watcher) RemoveWatch(path string) error {
 	}
 	success, errno := syscall.InotifyRmWatch(w.fd, watch.wd)
 	if success == -1 {
-		return os.NewSyscallError("inotify_rm_watch", errno)
+		// when file descriptor or watch descriptor not found, InotifyRmWatch syscall return EINVAL error
+		// if return error, it may lead this path remain in watches and paths map, and no other event can trigger remove action.
+		if errno != syscall.EINVAL {
+			return os.NewSyscallError("inotify_rm_watch", errno)
+		}
 	}
 	delete(w.watches, path)
 	// Locking here to protect the read from paths in readEvents.

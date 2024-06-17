@@ -4,7 +4,7 @@ This document will take you through setting up and trying the sample apiserver o
 
 ## Pre requisites
 
-- Go 1.7.x or later installed and setup. More infomration can be found at [go installation](https://golang.org/doc/install)
+- Go 1.7.x or later installed and setup. More information can be found at [go installation](https://go.dev/doc/install)
 - Dockerhub account to push the image to [Dockerhub](https://hub.docker.com/)
 
 ## Install Minikube

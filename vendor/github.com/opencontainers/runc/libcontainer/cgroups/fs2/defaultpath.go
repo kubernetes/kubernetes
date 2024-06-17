@@ -18,41 +18,37 @@ package fs2
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
-	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
-	"github.com/pkg/errors"
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 const UnifiedMountpoint = "/sys/fs/cgroup"
 
 func defaultDirPath(c *configs.Cgroup) (string, error) {
 	if (c.Name != "" || c.Parent != "") && c.Path != "" {
-		return "", errors.Errorf("cgroup: either Path or Name and Parent should be used, got %+v", c)
-	}
-	if len(c.Paths) != 0 {
-		// never set by specconv
-		return "", errors.Errorf("cgroup: Paths is unsupported, use Path, got %+v", c)
+		return "", fmt.Errorf("cgroup: either Path or Name and Parent should be used, got %+v", c)
 	}
 
-	// XXX: Do not remove this code. Path safety is important! -- cyphar
-	cgPath := libcontainerUtils.CleanPath(c.Path)
-	cgParent := libcontainerUtils.CleanPath(c.Parent)
-	cgName := libcontainerUtils.CleanPath(c.Name)
-
-	return _defaultDirPath(UnifiedMountpoint, cgPath, cgParent, cgName)
+	return _defaultDirPath(UnifiedMountpoint, c.Path, c.Parent, c.Name)
 }
 
 func _defaultDirPath(root, cgPath, cgParent, cgName string) (string, error) {
 	if (cgName != "" || cgParent != "") && cgPath != "" {
 		return "", errors.New("cgroup: either Path or Name and Parent should be used")
 	}
-	innerPath := cgPath
+
+	// XXX: Do not remove CleanPath. Path safety is important! -- cyphar
+	innerPath := utils.CleanPath(cgPath)
 	if innerPath == "" {
+		cgParent := utils.CleanPath(cgParent)
+		cgName := utils.CleanPath(cgName)
 		innerPath = filepath.Join(cgParent, cgName)
 	}
 	if filepath.IsAbs(innerPath) {
@@ -82,16 +78,14 @@ func parseCgroupFile(path string) (string, error) {
 }
 
 func parseCgroupFromReader(r io.Reader) (string, error) {
-	var (
-		s = bufio.NewScanner(r)
-	)
+	s := bufio.NewScanner(r)
 	for s.Scan() {
 		var (
 			text  = s.Text()
 			parts = strings.SplitN(text, ":", 3)
 		)
 		if len(parts) < 3 {
-			return "", errors.Errorf("invalid cgroup entry: %q", text)
+			return "", fmt.Errorf("invalid cgroup entry: %q", text)
 		}
 		// text is like "0::/user.slice/user-1001.slice/session-1.scope"
 		if parts[0] == "0" && parts[1] == "" {

@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // PodsGetter has a method to return a PodInterface.
@@ -47,8 +53,9 @@ type PodInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error)
-	GetEphemeralContainers(ctx context.Context, podName string, options metav1.GetOptions) (*v1.EphemeralContainers, error)
-	UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (*v1.EphemeralContainers, error)
+	Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
+	ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
+	UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
 
 	PodExpansion
 }
@@ -81,7 +88,26 @@ func (c *pods) Get(ctx context.Context, name string, options metav1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of Pods that match those selectors.
-func (c *pods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
+func (c *pods) List(ctx context.Context, opts metav1.ListOptions) (*v1.PodList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for pods, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for pods", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for pods ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for pods", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Pods that match those selectors.
+func (c *pods) list(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -93,6 +119,23 @@ func (c *pods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.Po
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Pods
+func (c *pods) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.PodList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("pods").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -197,30 +240,72 @@ func (c *pods) Patch(ctx context.Context, name string, pt types.PatchType, data 
 	return
 }
 
-// GetEphemeralContainers takes name of the pod, and returns the corresponding v1.EphemeralContainers object, and an error if there is any.
-func (c *pods) GetEphemeralContainers(ctx context.Context, podName string, options metav1.GetOptions) (result *v1.EphemeralContainers, err error) {
-	result = &v1.EphemeralContainers{}
-	err = c.client.Get().
+// Apply takes the given apply declarative configuration, applies it and returns the applied pod.
+func (c *pods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error) {
+	if pod == nil {
+		return nil, fmt.Errorf("pod provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+	name := pod.Name
+	if name == nil {
+		return nil, fmt.Errorf("pod.Name must be provided to Apply")
+	}
+	result = &v1.Pod{}
+	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
 		Resource("pods").
-		Name(podName).
-		SubResource("ephemeralcontainers").
-		VersionedParams(&options, scheme.ParameterCodec).
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
 		Do(ctx).
 		Into(result)
 	return
 }
 
-// UpdateEphemeralContainers takes the top resource name and the representation of a ephemeralContainers and updates it. Returns the server's representation of the ephemeralContainers, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (result *v1.EphemeralContainers, err error) {
-	result = &v1.EphemeralContainers{}
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *pods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error) {
+	if pod == nil {
+		return nil, fmt.Errorf("pod provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	name := pod.Name
+	if name == nil {
+		return nil, fmt.Errorf("pod.Name must be provided to Apply")
+	}
+
+	result = &v1.Pod{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("pods").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateEphemeralContainers takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
+	result = &v1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
 		Name(podName).
 		SubResource("ephemeralcontainers").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(ephemeralContainers).
+		Body(pod).
 		Do(ctx).
 		Into(result)
 	return

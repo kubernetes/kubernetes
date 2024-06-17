@@ -27,9 +27,12 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a node.
+// NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// The following fields define time interval from which metrics were
@@ -59,9 +62,12 @@ type NodeMetricsList struct {
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a pod.
+// PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// The following fields define time interval from which metrics were
@@ -86,7 +92,7 @@ type PodMetricsList struct {
 	Items []PodMetrics
 }
 
-// resource usage metrics of a container.
+// ContainerMetrics sets resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string

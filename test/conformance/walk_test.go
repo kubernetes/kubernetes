@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"k8s.io/kubernetes/test/conformance/behaviors"
 )
 
 func TestConformance(t *testing.T) {
@@ -30,7 +28,7 @@ func TestConformance(t *testing.T) {
 		filename    string
 		code        string
 		targetFrame frame
-		output      *behaviors.ConformanceData
+		output      *ConformanceData
 	}{
 		{
 			desc:     "Grabs comment above test",
@@ -47,7 +45,7 @@ func TestConformance(t *testing.T) {
 	*/
 	 framework.ConformanceIt("validates describe with ConformanceIt", func() {})
 	})`,
-			output: &behaviors.ConformanceData{
+			output: &ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/test/list/main_test.go#L11",
 				TestName:    "Kubelet-OutputToLogs",
 				Description: `By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.`,
@@ -59,7 +57,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   //                                      Testname: Test with spaces
 				   //Description: Should pick up testname even if it is not within 3 spaces
@@ -67,7 +65,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &behaviors.ConformanceData{
+			output: &ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
 				TestName:    "Test with spaces",
 				Description: `Should pick up testname even if it is not within 3 spaces even when executed from memory.`,
@@ -79,7 +77,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   // Testname: First test
 				   // Description: Should pick up testname even if it is not within 3 spaces
@@ -91,7 +89,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &behaviors.ConformanceData{
+			output: &ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L13",
 				TestName:    "Second test",
 				Description: `Should target the correct test/comment based on the line numbers`,
@@ -103,7 +101,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   // Testname: First test
 				   // Description: Should target the correct test/comment based on the line numbers
@@ -114,7 +112,7 @@ func TestConformance(t *testing.T) {
 				   framework.ConformanceIt("should work", func() {})
 		   })
 	})`,
-			output: &behaviors.ConformanceData{
+			output: &ConformanceData{
 				URL:         "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8",
 				TestName:    "First test",
 				Description: `Should target the correct test/comment based on the line numbers`,
@@ -141,7 +139,7 @@ func TestCommentToConformanceData(t *testing.T) {
 	tcs := []struct {
 		desc     string
 		input    string
-		expected *behaviors.ConformanceData
+		expected *ConformanceData
 	}{
 		{
 			desc: "Empty comment leads to nil",
@@ -154,19 +152,11 @@ func TestCommentToConformanceData(t *testing.T) {
 		}, {
 			desc:     "Testname but no Release does not result in nil",
 			input:    "Testname: mytest\nDescription: foo",
-			expected: &behaviors.ConformanceData{TestName: "mytest", Description: "foo"},
+			expected: &ConformanceData{TestName: "mytest", Description: "foo"},
 		}, {
 			desc:     "All fields parsed and newlines and whitespace removed from description",
 			input:    "Release: v1.1\n\t\tTestname: mytest\n\t\tDescription: foo\n\t\tbar\ndone",
-			expected: &behaviors.ConformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
-		}, {
-			desc:     "Behaviors are read",
-			input:    "Testname: behaviors\nBehaviors:\n- should behave\n- second behavior",
-			expected: &behaviors.ConformanceData{TestName: "behaviors", Behaviors: []string{"should behave", "second behavior"}},
-		}, {
-			desc:     "Multiple behaviors are parsed",
-			input:    "Testname: behaviors2\nBehaviors:\n- first behavior\n- second behavior",
-			expected: &behaviors.ConformanceData{TestName: "behaviors2", Behaviors: []string{"first behavior", "second behavior"}},
+			expected: &ConformanceData{TestName: "mytest", Release: "v1.1", Description: "foo bar done"},
 		},
 	}
 

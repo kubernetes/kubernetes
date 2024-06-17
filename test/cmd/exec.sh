@@ -30,6 +30,29 @@ run_kubectl_exec_pod_tests() {
   # POD abc should error since it doesn't exist
   kube::test::if_has_string "${output_message}" 'pods "abc" not found'
 
+  ### Test execute multiple resources
+  output_message=$(! kubectl exec -f - 2>&1 -- echo test << __EOF__
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test2
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+__EOF__
+)
+  kube::test::if_has_string "${output_message}" 'cannot exec into multiple objects at a time'
+
   ### Test execute existing POD
   # Create test-pod
   kubectl create -f hack/testdata/pod.yaml

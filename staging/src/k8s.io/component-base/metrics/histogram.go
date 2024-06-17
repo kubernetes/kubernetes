@@ -17,22 +17,11 @@ limitations under the License.
 package metrics
 
 import (
-	"github.com/blang/semver"
+	"context"
+
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// DefBuckets is a wrapper for prometheus.DefBuckets
-var DefBuckets = prometheus.DefBuckets
-
-// LinearBuckets is a wrapper for prometheus.LinearBuckets.
-func LinearBuckets(start, width float64, count int) []float64 {
-	return prometheus.LinearBuckets(start, width, count)
-}
-
-// ExponentialBuckets is a wrapper for prometheus.ExponentialBuckets.
-func ExponentialBuckets(start, factor float64, count int) []float64 {
-	return prometheus.ExponentialBuckets(start, factor, count)
-}
 
 // Histogram is our internal representation for our wrapping struct around prometheus
 // histograms. Summary implements both kubeCollector and ObserverMetric
@@ -50,7 +39,7 @@ func NewHistogram(opts *HistogramOpts) *Histogram {
 
 	h := &Histogram{
 		HistogramOpts: opts,
-		lazyMetric:    lazyMetric{},
+		lazyMetric:    lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
 	h.setPrometheusHistogram(noopMetric{})
 	h.lazyInit(h, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
@@ -83,6 +72,11 @@ func (h *Histogram) initializeDeprecatedMetric() {
 	h.initializeMetric()
 }
 
+// WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
+func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	return h.ObserverMetric
+}
+
 // HistogramVec is the internal representation of our wrapping struct around prometheus
 // histogramVecs.
 type HistogramVec struct {
@@ -94,17 +88,27 @@ type HistogramVec struct {
 
 // NewHistogramVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.HistogramVec object. However, the object returned will not measure
-// anything unless the collector is first registered, since the metric is lazily instantiated.
+// anything unless the collector is first registered, since the metric is lazily instantiated,
+// and only members extracted after
+// registration will actually measure anything.
+
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
+
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
 
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
-		lazyMetric:     lazyMetric{},
+		lazyMetric:     lazyMetric{stabilityLevel: opts.StabilityLevel},
 	}
-	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
+	v.lazyInit(v, fqName)
 	return v
 }
 
@@ -123,13 +127,16 @@ func (v *HistogramVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-// Default Prometheus behavior actually results in the creation of a new metric
-// if a metric with the unique label values is not found in the underlying stored metricMap.
+// Default Prometheus Vec behavior is that member extraction results in creation of a new element
+// if one with the unique label values is not found in the underlying stored metricMap.
 // This means  that if this function is called but the underlying metric is not registered
 // (which means it will never be exposed externally nor consumed), the metric will exist in memory
 // for perpetuity (i.e. throughout application lifecycle).
 //
 // For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/histogram.go#L460-L470
+//
+// In contrast, the Vec behavior in this package is that member extraction before registration
+// returns a permanent noop object.
 
 // WithLabelValues returns the ObserverMetric for the given slice of label
 // values (same order as the VariableLabels in Desc). If that combination of
@@ -138,6 +145,9 @@ func (v *HistogramVec) initializeDeprecatedMetric() {
 func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
 	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
@@ -149,6 +159,9 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.HistogramVec.With(labels)
 }
@@ -174,4 +187,28 @@ func (v *HistogramVec) Reset() {
 	}
 
 	v.HistogramVec.Reset()
+}
+
+// WithContext returns wrapped HistogramVec with context
+func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
+	return &HistogramVecWithContext{
+		ctx:          ctx,
+		HistogramVec: v,
+	}
+}
+
+// HistogramVecWithContext is the wrapper of HistogramVec with context.
+type HistogramVecWithContext struct {
+	*HistogramVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of HistogramVec.WithLabelValues.
+func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
+	return vc.HistogramVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of HistogramVec.With.
+func (vc *HistogramVecWithContext) With(labels map[string]string) ObserverMetric {
+	return vc.HistogramVec.With(labels)
 }

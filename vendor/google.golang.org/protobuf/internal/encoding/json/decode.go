@@ -121,7 +121,7 @@ func (d *Decoder) Read() (Token, error) {
 
 	case ObjectClose:
 		if len(d.openStack) == 0 ||
-			d.lastToken.kind == comma ||
+			d.lastToken.kind&(Name|comma) != 0 ||
 			d.openStack[len(d.openStack)-1] != ObjectOpen {
 			return Token{}, d.newSyntaxError(tok.pos, unexpectedFmt, tok.RawString())
 		}
@@ -294,7 +294,7 @@ func (d *Decoder) isValueNext() bool {
 }
 
 // consumeToken constructs a Token for given Kind with raw value derived from
-// current d.in and given size, and consumes the given size-lenght of it.
+// current d.in and given size, and consumes the given size-length of it.
 func (d *Decoder) consumeToken(kind Kind, size int) Token {
 	tok := Token{
 		kind: kind,

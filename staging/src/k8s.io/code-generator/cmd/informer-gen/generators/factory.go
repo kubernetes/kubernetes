@@ -21,9 +21,9 @@ import (
 	"path"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 )
@@ -31,7 +31,7 @@ import (
 // factoryGenerator produces a file of listers for a given GroupVersion and
 // type.
 type factoryGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             map[string]clientgentypes.GroupVersions
@@ -75,6 +75,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
+		"cacheTransformFunc":             c.Universe.Type(cacheTransformFunc),
 		"groupVersions":                  g.groupVersions,
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
@@ -109,11 +110,17 @@ type sharedInformerFactory struct {
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
+	transform {{.cacheTransformFunc|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[{{.reflectType|raw}}]bool
+	// wg tracks how many goroutines were started.
+	wg sync.WaitGroup
+	// shuttingDown is true when Shutdown has been called. It may still be running
+	// because it needs to wait for goroutines.
+	shuttingDown bool
 }
 
 // WithCustomResyncConfig sets a custom resync period for the specified informer types.
@@ -138,6 +145,14 @@ func WithTweakListOptions(tweakListOptions internalinterfaces.TweakListOptionsFu
 func WithNamespace(namespace string) SharedInformerOption {
 	return func(factory *sharedInformerFactory) *sharedInformerFactory {
 		factory.namespace = namespace
+		return factory
+	}
+}
+
+// WithTransform sets a transform on all informers.
+func WithTransform(transform {{.cacheTransformFunc|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.transform = transform
 		return factory
 	}
 }
@@ -174,20 +189,40 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 	return factory
 }
 
-// Start initializes all requested informers.
 func (f *sharedInformerFactory) Start(stopCh <-chan struct{}) {
-  f.lock.Lock()
-  defer f.lock.Unlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
-  for informerType, informer := range f.informers {
-    if !f.startedInformers[informerType] {
-      go informer.Run(stopCh)
-      f.startedInformers[informerType] = true
-    }
-  }
+	if f.shuttingDown {
+		return
+	}
+
+	for informerType, informer := range f.informers {
+		if !f.startedInformers[informerType] {
+			f.wg.Add(1)
+			// We need a new variable in each loop iteration,
+			// otherwise the goroutine would use the loop variable
+			// and that keeps changing.
+			informer := informer
+			go func() {
+				defer f.wg.Done()
+				informer.Run(stopCh)
+			}()
+			f.startedInformers[informerType] = true
+		}
+	}
 }
 
-// WaitForCacheSync waits for all started informers' cache were synced.
+func (f *sharedInformerFactory) Shutdown() {
+	f.lock.Lock()
+	f.shuttingDown = true
+	f.lock.Unlock()
+
+
+	// Will return immediately if there is nothing to wait for.
+	f.wg.Wait()
+}
+
 func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
 	informers := func()map[reflect.Type]cache.SharedIndexInformer{
                f.lock.Lock()
@@ -209,7 +244,7 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
        return res
 }
 
-// InternalInformerFor returns the SharedIndexInformer for obj using an internal
+// InformerFor returns the SharedIndexInformer for obj using an internal
 // client.
 func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}} {
   f.lock.Lock()
@@ -227,20 +262,67 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   }
 
   informer = newFunc(f.client, resyncPeriod)
+  informer.SetTransform(f.transform)
   f.informers[informerType] = informer
 
   return informer
 }
-
 `
 
 var sharedInformerFactoryInterface = `
 // SharedInformerFactory provides shared informers for resources in all known
 // API group versions.
+//
+// It is typically used like this:
+//
+//   ctx, cancel := context.Background()
+//   defer cancel()
+//   factory := NewSharedInformerFactory(client, resyncPeriod)
+//   defer factory.WaitForStop()    // Returns immediately if nothing was started.
+//   genericInformer := factory.ForResource(resource)
+//   typedInformer := factory.SomeAPIGroup().V1().SomeType()
+//   factory.Start(ctx.Done())          // Start processing these informers.
+//   synced := factory.WaitForCacheSync(ctx.Done())
+//   for v, ok := range synced {
+//       if !ok {
+//           fmt.Fprintf(os.Stderr, "caches failed to sync: %v", v)
+//           return
+//       }
+//   }
+//
+//   // Creating informers can also be created after Start, but then
+//   // Start must be called again:
+//   anotherGenericInformer := factory.ForResource(resource)
+//   factory.Start(ctx.Done())
 type SharedInformerFactory interface {
 	{{.informerFactoryInterface|raw}}
-	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
+
+	// Start initializes all requested informers. They are handled in goroutines
+	// which run until the stop channel gets closed.
+        Start(stopCh <-chan struct{})
+
+	// Shutdown marks a factory as shutting down. At that point no new
+	// informers can be started anymore and Start will return without
+	// doing anything.
+	//
+	// In addition, Shutdown blocks until all goroutines have terminated. For that
+	// to happen, the close channel(s) that they were started with must be closed,
+	// either before Shutdown gets called or while it is waiting.
+	//
+	// Shutdown may be called multiple times, even concurrently. All such calls will
+	// block until all goroutines have terminated.
+	Shutdown()
+
+	// WaitForCacheSync blocks until all started informers' caches were synced
+	// or the stop channel gets closed.
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+
+	// ForResource gives generic access to a shared informer of the matching type.
+	ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error)
+
+	// InformerFor returns the SharedIndexInformer for obj using an internal
+	// client.
+	InformerFor(obj {{.runtimeObject|raw}}, newFunc {{.interfacesNewInformerFunc|raw}}) {{.cacheSharedIndexInformer|raw}}
 
 	{{$gvInterfaces := .gvInterfaces}}
 	{{$gvGoNames := .gvGoNames}}

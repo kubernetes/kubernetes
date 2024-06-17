@@ -34,7 +34,6 @@ import (
 
 const (
 	// Constant for the retry-after interval on rate limiting.
-	// TODO: maybe make this dynamic? or user-adjustable?
 	retryAfter = "1"
 
 	// How often inflight usage metric should be updated. Because
@@ -43,7 +42,10 @@ const (
 	inflightUsageMetricUpdatePeriod = time.Second
 )
 
-var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
+var (
+	nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
+	watchVerbs              = sets.NewString("watch")
+)
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
@@ -54,7 +56,7 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 // requestWatermark is used to track maximal numbers of requests in a particular phase of handling
 type requestWatermark struct {
 	phase                                string
-	readOnlyObserver, mutatingObserver   fcmetrics.TimedObserver
+	readOnlyObserver, mutatingObserver   fcmetrics.RatioedGauge
 	lock                                 sync.Mutex
 	readOnlyWatermark, mutatingWatermark int
 }
@@ -83,27 +85,42 @@ func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
 
 // watermark tracks requests being executed (not waiting in a queue)
 var watermark = &requestWatermark{
-	phase:            metrics.ExecutingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.ReadOnlyKind}).RequestsExecuting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.MutatingKind}).RequestsExecuting,
+	phase: metrics.ExecutingPhase,
 }
 
-func startRecordingUsage(watermark *requestWatermark) {
-	go func() {
-		wait.Forever(func() {
-			watermark.lock.Lock()
-			readOnlyWatermark := watermark.readOnlyWatermark
-			mutatingWatermark := watermark.mutatingWatermark
-			watermark.readOnlyWatermark = 0
-			watermark.mutatingWatermark = 0
-			watermark.lock.Unlock()
+// startWatermarkMaintenance starts the goroutines to observe and maintain the specified watermark.
+func startWatermarkMaintenance(watermark *requestWatermark, stopCh <-chan struct{}) {
+	// Periodically update the inflight usage metric.
+	go wait.Until(func() {
+		watermark.lock.Lock()
+		readOnlyWatermark := watermark.readOnlyWatermark
+		mutatingWatermark := watermark.mutatingWatermark
+		watermark.readOnlyWatermark = 0
+		watermark.mutatingWatermark = 0
+		watermark.lock.Unlock()
 
-			metrics.UpdateInflightRequestMetrics(watermark.phase, readOnlyWatermark, mutatingWatermark)
-		}, inflightUsageMetricUpdatePeriod)
-	}()
+		metrics.UpdateInflightRequestMetrics(watermark.phase, readOnlyWatermark, mutatingWatermark)
+	}, inflightUsageMetricUpdatePeriod, stopCh)
 }
 
-var startOnce sync.Once
+var initMaxInFlightOnce sync.Once
+
+func initMaxInFlight(nonMutatingLimit, mutatingLimit int) {
+	initMaxInFlightOnce.Do(func() {
+		// Fetching these gauges is delayed until after their underlying metric has been registered
+		// so that this latches onto the efficient implementation.
+		watermark.readOnlyObserver = fcmetrics.GetExecutingReadonlyConcurrency()
+		watermark.mutatingObserver = fcmetrics.GetExecutingMutatingConcurrency()
+		if nonMutatingLimit != 0 {
+			watermark.readOnlyObserver.SetDenominator(float64(nonMutatingLimit))
+			klog.V(2).InfoS("Set denominator for readonly requests", "limit", nonMutatingLimit)
+		}
+		if mutatingLimit != 0 {
+			watermark.mutatingObserver.SetDenominator(float64(mutatingLimit))
+			klog.V(2).InfoS("Set denominator for mutating requests", "limit", mutatingLimit)
+		}
+	})
+}
 
 // WithMaxInFlightLimit limits the number of in-flight requests to buffer size of the passed in channel.
 func WithMaxInFlightLimit(
@@ -112,7 +129,6 @@ func WithMaxInFlightLimit(
 	mutatingLimit int,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 ) http.Handler {
-	startOnce.Do(func() { startRecordingUsage(watermark) })
 	if nonMutatingLimit == 0 && mutatingLimit == 0 {
 		return handler
 	}
@@ -120,12 +136,17 @@ func WithMaxInFlightLimit(
 	var mutatingChan chan bool
 	if nonMutatingLimit != 0 {
 		nonMutatingChan = make(chan bool, nonMutatingLimit)
-		watermark.readOnlyObserver.SetX1(float64(nonMutatingLimit))
+		klog.V(2).InfoS("Initialized nonMutatingChan", "len", nonMutatingLimit)
+	} else {
+		klog.V(2).InfoS("Running with nil nonMutatingChan")
 	}
 	if mutatingLimit != 0 {
 		mutatingChan = make(chan bool, mutatingLimit)
-		watermark.mutatingObserver.SetX1(float64(mutatingLimit))
+		klog.V(2).InfoS("Initialized mutatingChan", "len", mutatingLimit)
+	} else {
+		klog.V(2).InfoS("Running with nil mutatingChan")
 	}
+	initMaxInFlight(nonMutatingLimit, mutatingLimit)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -186,20 +207,16 @@ func WithMaxInFlightLimit(
 					}
 				}
 				// We need to split this data between buckets used for throttling.
-				if isMutatingRequest {
-					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
-				} else {
-					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
-				}
+				metrics.RecordDroppedRequest(r, requestInfo, metrics.APIServerComponent, isMutatingRequest)
 				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
-				tooManyRequests(r, w)
+				tooManyRequests(r, w, retryAfter)
 			}
 		}
 	})
 }
 
-func tooManyRequests(req *http.Request, w http.ResponseWriter) {
-	// Return a 429 status indicating "Too Many Requests"
-	w.Header().Set("Retry-After", retryAfter)
-	http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
+// StartMaxInFlightWatermarkMaintenance starts the goroutines to observe and maintain watermarks for max-in-flight
+// requests.
+func StartMaxInFlightWatermarkMaintenance(stopCh <-chan struct{}) {
+	startWatermarkMaintenance(watermark, stopCh)
 }

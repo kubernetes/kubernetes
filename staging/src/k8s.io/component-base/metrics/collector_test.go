@@ -63,6 +63,8 @@ func TestBaseCustomCollector(t *testing.T) {
 	var (
 		alphaDesc = NewDesc("metric_alpha", "alpha metric", []string{"name"}, nil,
 			ALPHA, "")
+		internalDesc = NewDesc("metric_internal", "internal metrics", []string{"name"}, nil,
+			INTERNAL, "")
 		stableDesc = NewDesc("metric_stable", "stable metrics", []string{"name"}, nil,
 			STABLE, "")
 		deprecatedDesc = NewDesc("metric_deprecated", "stable deprecated metrics", []string{"name"}, nil,
@@ -72,7 +74,7 @@ func TestBaseCustomCollector(t *testing.T) {
 	)
 
 	registry := newKubeRegistry(currentVersion)
-	customCollector := newTestCustomCollector(alphaDesc, stableDesc, deprecatedDesc, hiddenDesc)
+	customCollector := newTestCustomCollector(alphaDesc, internalDesc, stableDesc, deprecatedDesc, hiddenDesc)
 
 	if err := registry.CustomRegister(customCollector); err != nil {
 		t.Fatalf("register collector failed with err: %v", err)
@@ -82,6 +84,9 @@ func TestBaseCustomCollector(t *testing.T) {
         # HELP metric_alpha [ALPHA] alpha metric
         # TYPE metric_alpha gauge
         metric_alpha{name="value"} 1
+		# HELP metric_internal [INTERNAL] internal metrics
+        # TYPE metric_internal gauge
+        metric_internal{name="value"} 1
         # HELP metric_stable [STABLE] stable metrics
         # TYPE metric_stable gauge
         metric_stable{name="value"} 1
@@ -91,7 +96,7 @@ func TestBaseCustomCollector(t *testing.T) {
 	`
 
 	err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), alphaDesc.fqName,
-		stableDesc.fqName, deprecatedDesc.fqName, hiddenDesc.fqName)
+		internalDesc.fqName, stableDesc.fqName, deprecatedDesc.fqName, hiddenDesc.fqName)
 	if err != nil {
 		t.Fatal(err)
 	}

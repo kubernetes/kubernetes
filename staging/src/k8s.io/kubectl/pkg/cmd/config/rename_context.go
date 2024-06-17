@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -37,19 +39,19 @@ type RenameContextOptions struct {
 
 const (
 	renameContextUse = "rename-context CONTEXT_NAME NEW_NAME"
-
-	renameContextShort = "Renames a context from the kubeconfig file."
 )
 
 var (
-	renameContextLong = templates.LongDesc(`
+	renameContextShort = i18n.T("Rename a context from the kubeconfig file")
+
+	renameContextLong = templates.LongDesc(i18n.T(`
 		Renames a context from the kubeconfig file.
 
-		CONTEXT_NAME is the context name that you wish to change.
+		CONTEXT_NAME is the context name that you want to change.
 
-		NEW_NAME is the new name you wish to set.
+		NEW_NAME is the new name you want to set.
 
-		Note: In case the context being renamed is the 'current-context', this field will also be updated.`)
+		Note: If the context being renamed is the 'current-context', this field will also be updated.`))
 
 	renameContextExample = templates.Examples(`
 		# Rename the context 'old-name' to 'new-name' in your kubeconfig file
@@ -66,6 +68,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Short:                 renameContextShort,
 		Long:                  renameContextLong,
 		Example:               renameContextExample,
+		ValidArgsFunction:     completion.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, args, out))
 			cmdutil.CheckErr(options.Validate())

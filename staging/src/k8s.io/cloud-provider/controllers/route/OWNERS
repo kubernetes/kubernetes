@@ -1,13 +1,13 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- gmarek
-- wojtek-t
-- bowei
-- andrewsykim
-- cheftako
+  - wojtek-t
+  - bowei
+  - andrewsykim
+  - cheftako
 reviewers:
-- gmarek
-- wojtek-t
-- andrewsykim
-- cheftako
+  - wojtek-t
+  - andrewsykim
+  - cheftako
+emeritus_approvers:
+  - gmarek

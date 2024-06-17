@@ -15,8 +15,8 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
+ENV CUDA_PKG_VERSION=11-4
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cuda-samples-$CUDA_PKG_VERSION && \
     rm -rf /var/lib/apt/lists/*

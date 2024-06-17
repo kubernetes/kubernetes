@@ -31,13 +31,15 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*
@@ -46,7 +48,7 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			Description: Create a Custom Resource Definition. Attempt to watch it; the watch MUST observe create,
 			modify and delete events.
 		*/
-		framework.ConformanceIt("watch on custom resource definition objects", func() {
+		framework.ConformanceIt("watch on custom resource definition objects", func(ctx context.Context) {
 
 			const (
 				watchCRNameA = "name1"
@@ -80,47 +82,47 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 			noxuResourceClient, err := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
 			framework.ExpectNoError(err, "creating custom resource client")
 
-			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
+			watchA, err := watchCRWithName(ctx, noxuResourceClient, watchCRNameA)
 			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameA)
 
-			watchB, err := watchCRWithName(noxuResourceClient, watchCRNameB)
+			watchB, err := watchCRWithName(ctx, noxuResourceClient, watchCRNameB)
 			framework.ExpectNoError(err, "failed to watch custom resource: %s", watchCRNameB)
 
 			testCrA := fixtures.NewNoxuInstance(ns, watchCRNameA)
 			testCrB := fixtures.NewNoxuInstance(ns, watchCRNameB)
 
 			ginkgo.By("Creating first CR ")
-			testCrA, err = instantiateCustomResource(testCrA, noxuResourceClient, noxuDefinition)
+			testCrA, err = instantiateCustomResource(ctx, testCrA, noxuResourceClient, noxuDefinition)
 			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrA)
 			expectEvent(watchA, watch.Added, testCrA)
 			expectNoEvent(watchB, watch.Added, testCrA)
 
 			ginkgo.By("Creating second CR")
-			testCrB, err = instantiateCustomResource(testCrB, noxuResourceClient, noxuDefinition)
+			testCrB, err = instantiateCustomResource(ctx, testCrB, noxuResourceClient, noxuDefinition)
 			framework.ExpectNoError(err, "failed to instantiate custom resource: %+v", testCrB)
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
 			ginkgo.By("Modifying first CR")
-			err = patchCustomResource(noxuResourceClient, watchCRNameA)
+			err = patchCustomResource(ctx, noxuResourceClient, watchCRNameA)
 			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Modified, nil)
 			expectNoEvent(watchB, watch.Modified, nil)
 
 			ginkgo.By("Modifying second CR")
-			err = patchCustomResource(noxuResourceClient, watchCRNameB)
+			err = patchCustomResource(ctx, noxuResourceClient, watchCRNameB)
 			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Modified, nil)
 			expectNoEvent(watchA, watch.Modified, nil)
 
 			ginkgo.By("Deleting first CR")
-			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
+			err = deleteCustomResource(ctx, noxuResourceClient, watchCRNameA)
 			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Deleted, nil)
 			expectNoEvent(watchB, watch.Deleted, nil)
 
 			ginkgo.By("Deleting second CR")
-			err = deleteCustomResource(noxuResourceClient, watchCRNameB)
+			err = deleteCustomResource(ctx, noxuResourceClient, watchCRNameB)
 			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Deleted, nil)
 			expectNoEvent(watchA, watch.Deleted, nil)
@@ -128,9 +130,9 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 	})
 })
 
-func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (watch.Interface, error) {
+func watchCRWithName(ctx context.Context, crdResourceClient dynamic.ResourceInterface, name string) (watch.Interface, error) {
 	return crdResourceClient.Watch(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + name,
 			TimeoutSeconds: int64ptr(600),
@@ -138,8 +140,8 @@ func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (
 	)
 }
 
-func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(context.TODO(), instanceToCreate, metav1.CreateOptions{})
+func instantiateCustomResource(ctx context.Context, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
+	createdInstance, err := client.Create(ctx, instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +169,9 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 	return createdInstance, nil
 }
 
-func patchCustomResource(client dynamic.ResourceInterface, name string) error {
+func patchCustomResource(ctx context.Context, client dynamic.ResourceInterface, name string) error {
 	_, err := client.Patch(
-		context.TODO(),
+		ctx,
 		name,
 		types.JSONPatchType,
 		[]byte(`[{ "op": "add", "path": "/dummy", "value": "test" }]`),
@@ -177,8 +179,8 @@ func patchCustomResource(client dynamic.ResourceInterface, name string) error {
 	return err
 }
 
-func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
-	return client.Delete(context.TODO(), name, metav1.DeleteOptions{})
+func deleteCustomResource(ctx context.Context, client dynamic.ResourceInterface, name string) error {
+	return client.Delete(ctx, name, metav1.DeleteOptions{})
 }
 
 func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd *apiextensionsv1.CustomResourceDefinition) (dynamic.ResourceInterface, error) {

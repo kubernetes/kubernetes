@@ -1,9 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- bowei
+  - bowei
+  - sig-network-approvers
 emeritus_approvers:
-- dnardo
+  - dnardo
 reviewers:
-- bowei
-- freehan
+  - bowei
+  - freehan
+  - sig-network-reviewers

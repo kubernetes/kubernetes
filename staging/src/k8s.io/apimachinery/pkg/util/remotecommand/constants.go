@@ -27,8 +27,8 @@ const (
 
 	// The SPDY subprotocol "channel.k8s.io" is used for remote command
 	// attachment/execution. This represents the initial unversioned subprotocol,
-	// which has the known bugs http://issues.k8s.io/13394 and
-	// http://issues.k8s.io/13395.
+	// which has the known bugs https://issues.k8s.io/13394 and
+	// https://issues.k8s.io/13395.
 	StreamProtocolV1Name = "channel.k8s.io"
 
 	// The SPDY subprotocol "v2.channel.k8s.io" is used for remote command
@@ -46,8 +46,22 @@ const (
 	// adds support for exit codes.
 	StreamProtocolV4Name = "v4.channel.k8s.io"
 
+	// The subprotocol "v5.channel.k8s.io" is used for remote command
+	// attachment/execution. It is the 5th version of the subprotocol and
+	// adds support for a CLOSE signal.
+	StreamProtocolV5Name = "v5.channel.k8s.io"
+
 	NonZeroExitCodeReason = metav1.StatusReason("NonZeroExitCode")
 	ExitCodeCauseType     = metav1.CauseType("ExitCode")
+
+	// RemoteCommand stream identifiers. The first three identifiers (for STDIN,
+	// STDOUT, STDERR) are the same as their file descriptors.
+	StreamStdIn  = 0
+	StreamStdOut = 1
+	StreamStdErr = 2
+	StreamErr    = 3
+	StreamResize = 4
+	StreamClose  = 255
 )
 
 var SupportedStreamingProtocols = []string{StreamProtocolV4Name, StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}

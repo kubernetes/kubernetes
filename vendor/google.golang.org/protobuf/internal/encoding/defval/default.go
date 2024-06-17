@@ -15,8 +15,8 @@ import (
 	"strconv"
 
 	ptext "google.golang.org/protobuf/internal/encoding/text"
-	errors "google.golang.org/protobuf/internal/errors"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/internal/errors"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // Format is the serialization format used to represent the default value.
@@ -35,56 +35,56 @@ const (
 
 // Unmarshal deserializes the default string s according to the given kind k.
 // When k is an enum, a list of enum value descriptors must be provided.
-func Unmarshal(s string, k pref.Kind, evs pref.EnumValueDescriptors, f Format) (pref.Value, pref.EnumValueDescriptor, error) {
+func Unmarshal(s string, k protoreflect.Kind, evs protoreflect.EnumValueDescriptors, f Format) (protoreflect.Value, protoreflect.EnumValueDescriptor, error) {
 	switch k {
-	case pref.BoolKind:
+	case protoreflect.BoolKind:
 		if f == GoTag {
 			switch s {
 			case "1":
-				return pref.ValueOfBool(true), nil, nil
+				return protoreflect.ValueOfBool(true), nil, nil
 			case "0":
-				return pref.ValueOfBool(false), nil, nil
+				return protoreflect.ValueOfBool(false), nil, nil
 			}
 		} else {
 			switch s {
 			case "true":
-				return pref.ValueOfBool(true), nil, nil
+				return protoreflect.ValueOfBool(true), nil, nil
 			case "false":
-				return pref.ValueOfBool(false), nil, nil
+				return protoreflect.ValueOfBool(false), nil, nil
 			}
 		}
-	case pref.EnumKind:
+	case protoreflect.EnumKind:
 		if f == GoTag {
 			// Go tags use the numeric form of the enum value.
 			if n, err := strconv.ParseInt(s, 10, 32); err == nil {
-				if ev := evs.ByNumber(pref.EnumNumber(n)); ev != nil {
-					return pref.ValueOfEnum(ev.Number()), ev, nil
+				if ev := evs.ByNumber(protoreflect.EnumNumber(n)); ev != nil {
+					return protoreflect.ValueOfEnum(ev.Number()), ev, nil
 				}
 			}
 		} else {
 			// Descriptor default_value use the enum identifier.
-			ev := evs.ByName(pref.Name(s))
+			ev := evs.ByName(protoreflect.Name(s))
 			if ev != nil {
-				return pref.ValueOfEnum(ev.Number()), ev, nil
+				return protoreflect.ValueOfEnum(ev.Number()), ev, nil
 			}
 		}
-	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind:
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
 		if v, err := strconv.ParseInt(s, 10, 32); err == nil {
-			return pref.ValueOfInt32(int32(v)), nil, nil
+			return protoreflect.ValueOfInt32(int32(v)), nil, nil
 		}
-	case pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
 		if v, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return pref.ValueOfInt64(int64(v)), nil, nil
+			return protoreflect.ValueOfInt64(int64(v)), nil, nil
 		}
-	case pref.Uint32Kind, pref.Fixed32Kind:
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
 		if v, err := strconv.ParseUint(s, 10, 32); err == nil {
-			return pref.ValueOfUint32(uint32(v)), nil, nil
+			return protoreflect.ValueOfUint32(uint32(v)), nil, nil
 		}
-	case pref.Uint64Kind, pref.Fixed64Kind:
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
 		if v, err := strconv.ParseUint(s, 10, 64); err == nil {
-			return pref.ValueOfUint64(uint64(v)), nil, nil
+			return protoreflect.ValueOfUint64(uint64(v)), nil, nil
 		}
-	case pref.FloatKind, pref.DoubleKind:
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
 		var v float64
 		var err error
 		switch s {
@@ -98,29 +98,29 @@ func Unmarshal(s string, k pref.Kind, evs pref.EnumValueDescriptors, f Format) (
 			v, err = strconv.ParseFloat(s, 64)
 		}
 		if err == nil {
-			if k == pref.FloatKind {
-				return pref.ValueOfFloat32(float32(v)), nil, nil
+			if k == protoreflect.FloatKind {
+				return protoreflect.ValueOfFloat32(float32(v)), nil, nil
 			} else {
-				return pref.ValueOfFloat64(float64(v)), nil, nil
+				return protoreflect.ValueOfFloat64(float64(v)), nil, nil
 			}
 		}
-	case pref.StringKind:
+	case protoreflect.StringKind:
 		// String values are already unescaped and can be used as is.
-		return pref.ValueOfString(s), nil, nil
-	case pref.BytesKind:
+		return protoreflect.ValueOfString(s), nil, nil
+	case protoreflect.BytesKind:
 		if b, ok := unmarshalBytes(s); ok {
-			return pref.ValueOfBytes(b), nil, nil
+			return protoreflect.ValueOfBytes(b), nil, nil
 		}
 	}
-	return pref.Value{}, nil, errors.New("could not parse value for %v: %q", k, s)
+	return protoreflect.Value{}, nil, errors.New("could not parse value for %v: %q", k, s)
 }
 
 // Marshal serializes v as the default string according to the given kind k.
 // When specifying the Descriptor format for an enum kind, the associated
 // enum value descriptor must be provided.
-func Marshal(v pref.Value, ev pref.EnumValueDescriptor, k pref.Kind, f Format) (string, error) {
+func Marshal(v protoreflect.Value, ev protoreflect.EnumValueDescriptor, k protoreflect.Kind, f Format) (string, error) {
 	switch k {
-	case pref.BoolKind:
+	case protoreflect.BoolKind:
 		if f == GoTag {
 			if v.Bool() {
 				return "1", nil
@@ -134,17 +134,17 @@ func Marshal(v pref.Value, ev pref.EnumValueDescriptor, k pref.Kind, f Format) (
 				return "false", nil
 			}
 		}
-	case pref.EnumKind:
+	case protoreflect.EnumKind:
 		if f == GoTag {
 			return strconv.FormatInt(int64(v.Enum()), 10), nil
 		} else {
 			return string(ev.Name()), nil
 		}
-	case pref.Int32Kind, pref.Sint32Kind, pref.Sfixed32Kind, pref.Int64Kind, pref.Sint64Kind, pref.Sfixed64Kind:
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind, protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
 		return strconv.FormatInt(v.Int(), 10), nil
-	case pref.Uint32Kind, pref.Fixed32Kind, pref.Uint64Kind, pref.Fixed64Kind:
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind, protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
 		return strconv.FormatUint(v.Uint(), 10), nil
-	case pref.FloatKind, pref.DoubleKind:
+	case protoreflect.FloatKind, protoreflect.DoubleKind:
 		f := v.Float()
 		switch {
 		case math.IsInf(f, -1):
@@ -154,16 +154,16 @@ func Marshal(v pref.Value, ev pref.EnumValueDescriptor, k pref.Kind, f Format) (
 		case math.IsNaN(f):
 			return "nan", nil
 		default:
-			if k == pref.FloatKind {
+			if k == protoreflect.FloatKind {
 				return strconv.FormatFloat(f, 'g', -1, 32), nil
 			} else {
 				return strconv.FormatFloat(f, 'g', -1, 64), nil
 			}
 		}
-	case pref.StringKind:
+	case protoreflect.StringKind:
 		// String values are serialized as is without any escaping.
 		return v.String(), nil
-	case pref.BytesKind:
+	case protoreflect.BytesKind:
 		if s, ok := marshalBytes(v.Bytes()); ok {
 			return s, nil
 		}

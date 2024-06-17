@@ -36,16 +36,16 @@ type unsetOptions struct {
 }
 
 var (
-	unsetLong = templates.LongDesc(`
-	Unsets an individual value in a kubeconfig file
+	unsetLong = templates.LongDesc(i18n.T(`
+	Unset an individual value in a kubeconfig file.
 
-	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
+	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`))
 
 	unsetExample = templates.Examples(`
-		# Unset the current-context.
+		# Unset the current-context
 		kubectl config unset current-context
 
-		# Unset namespace in foo context.
+		# Unset namespace in foo context
 		kubectl config unset contexts.foo.namespace`)
 )
 
@@ -56,7 +56,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 	cmd := &cobra.Command{
 		Use:                   "unset PROPERTY_NAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Unsets an individual value in a kubeconfig file"),
+		Short:                 i18n.T("Unset an individual value in a kubeconfig file"),
 		Long:                  unsetLong,
 		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {

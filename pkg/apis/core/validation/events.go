@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +40,7 @@ const (
 
 func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	// Make sure events always pass legacy validation.
-	allErrs := legacyValidateEvent(event)
+	allErrs := legacyValidateEvent(event, requestVersion)
 	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
 		// No further validation for backwards compatibility.
 		return allErrs
@@ -73,7 +73,7 @@ func ValidateEventCreate(event *core.Event, requestVersion schema.GroupVersion) 
 
 func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	// Make sure the new event always passes legacy validation.
-	allErrs := legacyValidateEvent(newEvent)
+	allErrs := legacyValidateEvent(newEvent, requestVersion)
 	if requestVersion == v1.SchemeGroupVersion || requestVersion == eventsv1beta1.SchemeGroupVersion {
 		// No further validation for backwards compatibility.
 		return allErrs
@@ -95,7 +95,18 @@ func ValidateEventUpdate(newEvent, oldEvent *core.Event, requestVersion schema.G
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Count, oldEvent.Count, field.NewPath("count"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Reason, oldEvent.Reason, field.NewPath("reason"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Type, oldEvent.Type, field.NewPath("type"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+
+	// Disallow changes to eventTime greater than microsecond-level precision.
+	// Tolerating sub-microsecond changes is required to tolerate updates
+	// from clients that correctly truncate to microsecond-precision when serializing,
+	// or from clients built with incorrect nanosecond-precision protobuf serialization.
+	// See https://github.com/kubernetes/kubernetes/issues/111928
+	newTruncated := newEvent.EventTime.Truncate(time.Microsecond).UTC()
+	oldTruncated := oldEvent.EventTime.Truncate(time.Microsecond).UTC()
+	if newTruncated != oldTruncated {
+		allErrs = append(allErrs, ValidateImmutableField(newEvent.EventTime, oldEvent.EventTime, field.NewPath("eventTime"))...)
+	}
+
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Action, oldEvent.Action, field.NewPath("action"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.Related, oldEvent.Related, field.NewPath("related"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newEvent.ReportingController, oldEvent.ReportingController, field.NewPath("reportingController"))...)
@@ -109,7 +120,7 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 	zeroTime := time.Time{}
 	if event.Series != nil {
 		if event.Series.Count < 2 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", fmt.Sprintf("should be at least 2")))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("series.count"), "", "should be at least 2"))
 		}
 		if event.Series.LastObservedTime.Time == zeroTime {
 			allErrs = append(allErrs, field.Required(field.NewPath("series.lastObservedTime"), ""))
@@ -119,10 +130,15 @@ func validateV1EventSeries(event *core.Event) field.ErrorList {
 }
 
 // legacyValidateEvent makes sure that the event makes sense.
-func legacyValidateEvent(event *core.Event) field.ErrorList {
+func legacyValidateEvent(event *core.Event, requestVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// Because go
 	zeroTime := time.Time{}
+
+	reportingControllerFieldName := "reportingController"
+	if requestVersion == v1.SchemeGroupVersion {
+		reportingControllerFieldName = "reportingComponent"
+	}
 
 	// "New" Events need to have EventTime set, so it's validating old object.
 	if event.EventTime.Time == zeroTime {
@@ -140,15 +156,13 @@ func legacyValidateEvent(event *core.Event) field.ErrorList {
 		}
 
 	} else {
-		if len(event.InvolvedObject.Namespace) == 0 && event.Namespace != metav1.NamespaceSystem {
+		if len(event.InvolvedObject.Namespace) == 0 && event.Namespace != metav1.NamespaceDefault && event.Namespace != metav1.NamespaceSystem {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 		}
 		if len(event.ReportingController) == 0 {
-			allErrs = append(allErrs, field.Required(field.NewPath("reportingController"), ""))
+			allErrs = append(allErrs, field.Required(field.NewPath(reportingControllerFieldName), ""))
 		}
-		for _, msg := range validation.IsQualifiedName(event.ReportingController) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("reportingController"), event.ReportingController, msg))
-		}
+		allErrs = append(allErrs, ValidateQualifiedName(event.ReportingController, field.NewPath(reportingControllerFieldName))...)
 		if len(event.ReportingInstance) == 0 {
 			allErrs = append(allErrs, field.Required(field.NewPath("reportingInstance"), ""))
 		}

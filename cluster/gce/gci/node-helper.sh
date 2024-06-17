@@ -28,8 +28,6 @@ function get-node-instance-metadata-from-file {
   metadata+="cluster-location=${KUBE_TEMP}/cluster-location.txt,"
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
   metadata+="gci-update-strategy=${KUBE_TEMP}/gci-update.txt,"
-  metadata+="gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,"
-  metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt,"
   metadata+="shutdown-script=${KUBE_ROOT}/cluster/gce/gci/shutdown.sh,"
   metadata+="${NODE_EXTRA_METADATA}"
   echo "${metadata}"

@@ -21,7 +21,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"k8s.io/klog/v2"
 )
 
@@ -33,6 +33,7 @@ type EtcdMigrateCfg struct {
 	port              uint64
 	peerListenUrls    string
 	peerAdvertiseUrls string
+	clientListenUrls  string
 	etcdDataPrefix    string
 	ttlKeysDirectory  string
 	supportedVersions SupportedVersions

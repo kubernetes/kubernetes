@@ -40,6 +40,7 @@ type serializerType struct {
 
 	Serializer       runtime.Serializer
 	PrettySerializer runtime.Serializer
+	StrictSerializer runtime.Serializer
 
 	AcceptStreamContentTypes []string
 	StreamContentType        string
@@ -70,9 +71,19 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 		)
 	}
 
+	strictJSONSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: false, Pretty: false, Strict: true},
+	)
+	jsonSerializerType.StrictSerializer = strictJSONSerializer
+
 	yamlSerializer := json.NewSerializerWithOptions(
 		mf, scheme, scheme,
 		json.SerializerOptions{Yaml: true, Pretty: false, Strict: options.Strict},
+	)
+	strictYAMLSerializer := json.NewSerializerWithOptions(
+		mf, scheme, scheme,
+		json.SerializerOptions{Yaml: true, Pretty: false, Strict: true},
 	)
 	protoSerializer := protobuf.NewSerializer(scheme, scheme)
 	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
@@ -85,12 +96,16 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 			FileExtensions:     []string{"yaml"},
 			EncodesAsText:      true,
 			Serializer:         yamlSerializer,
+			StrictSerializer:   strictYAMLSerializer,
 		},
 		{
 			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
 			ContentType:        runtime.ContentTypeProtobuf,
 			FileExtensions:     []string{"pb"},
 			Serializer:         protoSerializer,
+			// note, strict decoding is unsupported for protobuf,
+			// fall back to regular serializing
+			StrictSerializer: protoSerializer,
 
 			Framer:           protobuf.LengthDelimitedFramer,
 			StreamSerializer: protoRawSerializer,
@@ -108,10 +123,9 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 // CodecFactory provides methods for retrieving codecs and serializers for specific
 // versions and content types.
 type CodecFactory struct {
-	scheme      *runtime.Scheme
-	serializers []serializerType
-	universal   runtime.Decoder
-	accepts     []runtime.SerializerInfo
+	scheme    *runtime.Scheme
+	universal runtime.Decoder
+	accepts   []runtime.SerializerInfo
 
 	legacySerializer runtime.Serializer
 }
@@ -188,6 +202,7 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 				EncodesAsText:    d.EncodesAsText,
 				Serializer:       d.Serializer,
 				PrettySerializer: d.PrettySerializer,
+				StrictSerializer: d.StrictSerializer,
 			}
 
 			mediaType, _, err := mime.ParseMediaType(info.MediaType)
@@ -216,9 +231,8 @@ func newCodecFactory(scheme *runtime.Scheme, serializers []serializerType) Codec
 	}
 
 	return CodecFactory{
-		scheme:      scheme,
-		serializers: serializers,
-		universal:   recognizer.NewDecoder(decoders...),
+		scheme:    scheme,
+		universal: recognizer.NewDecoder(decoders...),
 
 		accepts: accepts,
 
@@ -245,7 +259,7 @@ func (f CodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 // invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
 //
 // TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
-//   All other callers will be forced to request a Codec directly.
+// All other callers will be forced to request a Codec directly.
 func (f CodecFactory) LegacyCodec(version ...schema.GroupVersion) runtime.Codec {
 	return versioning.NewDefaultingCodecForScheme(f.scheme, f.legacySerializer, f.universal, schema.GroupVersions(version), runtime.InternalGroupVersioner)
 }

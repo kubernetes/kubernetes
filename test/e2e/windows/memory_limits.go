@@ -18,27 +18,32 @@ package windows
 
 import (
 	"context"
-	"fmt"
-	"strconv"
+	"encoding/json"
 	"time"
+
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
+var _ = sigDescribe(feature.Windows, "Memory Limits", framework.WithSerial(), framework.WithSlow(), skipUnlessWindows(func() {
 
 	f := framework.NewDefaultFramework("memory-limit-test-windows")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// NOTE(vyta): these tests are Windows specific
@@ -46,18 +51,17 @@ var _ = SIGDescribe("[Feature:Windows] Memory Limits [Serial] [Slow]", func() {
 	})
 
 	ginkgo.Context("Allocatable node memory", func() {
-		ginkgo.It("should be equal to a calculated allocatable memory value", func() {
-			checkNodeAllocatableTest(f)
+		ginkgo.It("should be equal to a calculated allocatable memory value", func(ctx context.Context) {
+			checkNodeAllocatableTest(ctx, f)
 		})
 	})
 
 	ginkgo.Context("attempt to deploy past allocatable memory limits", func() {
-		ginkgo.It("should fail deployments of pods once there isn't enough memory", func() {
-			overrideAllocatableMemoryTest(f, framework.TestContext.CloudConfig.NumNodes)
+		ginkgo.It("should fail deployments of pods once there isn't enough memory", func(ctx context.Context) {
+			overrideAllocatableMemoryTest(ctx, f, framework.TestContext.CloudConfig.NumNodes)
 		})
 	})
-
-})
+}))
 
 type nodeMemory struct {
 	// capacity
@@ -76,9 +80,9 @@ type nodeMemory struct {
 
 // runDensityBatchTest runs the density batch pod creation test
 // checks that a calculated value for NodeAllocatable is equal to the reported value
-func checkNodeAllocatableTest(f *framework.Framework) {
+func checkNodeAllocatableTest(ctx context.Context, f *framework.Framework) {
 
-	nodeMem := getNodeMemory(f)
+	nodeMem := getNodeMemory(ctx, f)
 	framework.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
@@ -88,73 +92,37 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
 	calculatedNodeAlloc.Sub(nodeMem.hardEviction)
 
-	ginkgo.By(fmt.Sprintf("Checking stated allocatable memory %v against calculated allocatable memory %v", &nodeMem.allocatable, calculatedNodeAlloc))
-
 	// sanity check against stated allocatable
-	framework.ExpectEqual(calculatedNodeAlloc.Cmp(nodeMem.allocatable), 0)
+	gomega.Expect(calculatedNodeAlloc.Cmp(nodeMem.allocatable)).To(gomega.Equal(0), "calculated allocatable memory %+v and stated allocatable memory %+v are same", calculatedNodeAlloc, nodeMem.allocatable)
 }
 
 // Deploys `allocatablePods + 1` pods, each with a memory limit of `1/allocatablePods` of the total allocatable
 // memory, then confirms that the last pod failed because of failedScheduling
-func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) {
-	const (
-		podType = "memory_limit_test_pod"
-	)
-
-	totalAllocatable := getTotalAllocatableMemory(f)
-
-	memValue := totalAllocatable.Value()
-	memPerPod := memValue / int64(allocatablePods)
-	ginkgo.By(fmt.Sprintf("Deploying %d pods with mem limit %v, then one additional pod", allocatablePods, memPerPod))
-
-	// these should all work
-	pods := newMemLimitTestPods(allocatablePods, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().CreateBatch(pods)
-
-	failurePods := newMemLimitTestPods(1, imageutils.GetPauseImageName(), podType, strconv.FormatInt(memPerPod, 10))
-	f.PodClient().Create(failurePods[0])
-
-	gomega.Eventually(func() bool {
-		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, e := range eventList.Items {
-			// Look for an event that shows FailedScheduling
-			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-				return true
-			}
-		}
-		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.Equal(true))
-}
-
-// newMemLimitTestPods creates a list of pods (specification) for test.
-func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit string) []*v1.Pod {
-	var pods []*v1.Pod
-
-	memLimitQuantity, err := resource.ParseQuantity(memoryLimit)
+func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, allocatablePods int) {
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: selector.String(),
+	})
 	framework.ExpectNoError(err)
 
-	for i := 0; i < numPods; i++ {
-
-		podName := "test-" + string(uuid.NewUUID())
-		pod := v1.Pod{
+	framework.Logf("Scheduling 1 pod per node to consume all allocatable memory")
+	for _, node := range nodeList.Items {
+		status := node.Status
+		podMemLimt := resource.NewQuantity(status.Allocatable.Memory().Value()-(1024*1024*100), resource.BinarySI)
+		podName := "mem-test-" + string(uuid.NewUUID())
+		framework.Logf("Scheduling pod %s on node %s (allocatable memory=%v) with memory limit %v", podName, node.Name, status.Allocatable.Memory(), podMemLimt)
+		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
-				Labels: map[string]string{
-					"type": podType,
-					"name": podName,
-				},
 			},
 			Spec: v1.PodSpec{
-				// Restart policy is always (default).
 				Containers: []v1.Container{
 					{
-						Image: imageName,
 						Name:  podName,
+						Image: imageutils.GetPauseImageName(),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
-								v1.ResourceMemory: memLimitQuantity,
+								v1.ResourceMemory: *podMemLimt,
 							},
 						},
 					},
@@ -162,34 +130,73 @@ func newMemLimitTestPods(numPods int, imageName, podType string, memoryLimit str
 				NodeSelector: map[string]string{
 					"kubernetes.io/os": "windows",
 				},
+				NodeName: node.Name,
 			},
 		}
-
-		pods = append(pods, &pod)
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
 	}
-
-	return pods
+	framework.Logf("Schedule additional pod which should not get scheduled")
+	podName := "mem-failure-pod"
+	failurePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  podName,
+					Image: imageutils.GetPauseImageName(),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(1024*1024*1024, resource.BinarySI),
+						},
+					},
+				},
+			},
+			NodeSelector: map[string]string{
+				"kubernetes.io/os": "windows",
+			},
+		},
+	}
+	framework.Logf("Ensuring that pod %s fails to schedule", podName)
+	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	gomega.Eventually(ctx, func() bool {
+		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, e := range eventList.Items {
+			// Look for an event that shows FailedScheduling
+			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
+				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				return true
+			}
+		}
+		return false
+	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 }
 
 // getNodeMemory populates a nodeMemory struct with information from the first
-func getNodeMemory(f *framework.Framework) nodeMemory {
+func getNodeMemory(ctx context.Context, f *framework.Framework) nodeMemory {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	framework.ExpectNoError(err)
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	framework.ExpectNotEqual(nodeList.Size(), 0)
+	gomega.Expect(nodeList.Items).ToNot(gomega.BeEmpty())
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
-
 	status := nodeList.Items[0].Status
-
 	nodeName := nodeList.Items[0].ObjectMeta.Name
 
-	kubeletConfig, err := e2ekubelet.GetCurrentKubeletConfig(nodeName, f.Namespace.Name, true)
+	framework.Logf("Getting configuration details for node %s", nodeName)
+	request := f.ClientSet.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("configz")
+	rawbytes, err := request.DoRaw(ctx)
+	framework.ExpectNoError(err)
+	kubeletConfig, err := decodeConfigz(rawbytes)
 	framework.ExpectNoError(err)
 
 	systemReserve, err := resource.ParseQuantity(kubeletConfig.SystemReserved["memory"])
@@ -222,23 +229,31 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 	return nodeMem
 }
 
-// getTotalAllocatableMemory gets the sum of all agent node's allocatable memory
-func getTotalAllocatableMemory(f *framework.Framework) *resource.Quantity {
-	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selector.String(),
-	})
-	framework.ExpectNoError(err)
-
-	ginkgo.By("Summing allocatable memory across all agent nodes")
-
-	totalAllocatable := resource.NewQuantity(0, resource.BinarySI)
-
-	for _, node := range nodeList.Items {
-		status := node.Status
-
-		totalAllocatable.Add(status.Allocatable[v1.ResourceMemory])
+// modified from https://github.com/kubernetes/kubernetes/blob/master/test/e2e/framework/kubelet/config.go#L110
+// the proxy version was causing and non proxy used a value that isn't set by e2e
+func decodeConfigz(contentsBytes []byte) (*kubeletconfig.KubeletConfiguration, error) {
+	// This hack because /configz reports the following structure:
+	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
+	type configzWrapper struct {
+		ComponentConfig kubeletconfigv1beta1.KubeletConfiguration `json:"kubeletconfig"`
 	}
 
-	return totalAllocatable
+	configz := configzWrapper{}
+	kubeCfg := kubeletconfig.KubeletConfiguration{}
+
+	err := json.Unmarshal(contentsBytes, &configz)
+	if err != nil {
+		return nil, err
+	}
+
+	scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+	err = scheme.Convert(&configz.ComponentConfig, &kubeCfg, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeCfg, nil
 }

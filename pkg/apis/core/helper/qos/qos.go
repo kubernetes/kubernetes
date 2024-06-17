@@ -30,15 +30,27 @@ func isSupportedQoSComputeResource(name core.ResourceName) bool {
 	return supportedQoSComputeResources.Has(string(name))
 }
 
-// GetPodQOS returns the QoS class of a pod.
+// GetPodQOS returns the QoS class of a pod persisted in the PodStatus.QOSClass field.
+// If PodStatus.QOSClass is empty, it returns value of ComputePodQOS() which evaluates pod's QoS class.
+func GetPodQOS(pod *core.Pod) core.PodQOSClass {
+	if pod.Status.QOSClass != "" {
+		return pod.Status.QOSClass
+	}
+	return ComputePodQOS(pod)
+}
+
+// ComputePodQOS evaluates the list of containers to determine a pod's QoS class. This function is more
+// expensive than GetPodQOS which should be used for pods having a non-empty .Status.QOSClass.
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *core.Pod) core.PodQOSClass {
+// When this function is updated please also update staging/src/k8s.io/kubectl/pkg/util/qos/qos.go
+func ComputePodQOS(pod *core.Pod) core.PodQOSClass {
 	requests := core.ResourceList{}
 	limits := core.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
+	// note, ephemeral containers are not considered for QoS as they cannot define resources
 	allContainers := []core.Container{}
 	allContainers = append(allContainers, pod.Spec.Containers...)
 	allContainers = append(allContainers, pod.Spec.InitContainers...)

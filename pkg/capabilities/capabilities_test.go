@@ -18,10 +18,17 @@ package capabilities
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 )
 
 func TestGet(t *testing.T) {
+	defer func() {
+		capInstance.lock.Lock()
+		defer capInstance.lock.Unlock()
+		capInstance.capabilities = nil
+		capInstance.once = sync.Once{}
+	}()
 	defaultCap := Capabilities{
 		AllowPrivileged: false,
 		PrivilegedSources: PrivilegedSources{

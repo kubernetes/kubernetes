@@ -21,8 +21,7 @@
 package proto
 
 import (
-	"math"
-	"sync"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/encoding"
@@ -38,73 +37,22 @@ func init() {
 // codec is a Codec implementation with protobuf. It is the default codec for gRPC.
 type codec struct{}
 
-type cachedProtoBuffer struct {
-	lastMarshaledSize uint32
-	proto.Buffer
+func (codec) Marshal(v any) ([]byte, error) {
+	vv, ok := v.(proto.Message)
+	if !ok {
+		return nil, fmt.Errorf("failed to marshal, message is %T, want proto.Message", v)
+	}
+	return proto.Marshal(vv)
 }
 
-func capToMaxInt32(val int) uint32 {
-	if val > math.MaxInt32 {
-		return uint32(math.MaxInt32)
+func (codec) Unmarshal(data []byte, v any) error {
+	vv, ok := v.(proto.Message)
+	if !ok {
+		return fmt.Errorf("failed to unmarshal, message is %T, want proto.Message", v)
 	}
-	return uint32(val)
-}
-
-func marshal(v interface{}, cb *cachedProtoBuffer) ([]byte, error) {
-	protoMsg := v.(proto.Message)
-	newSlice := make([]byte, 0, cb.lastMarshaledSize)
-
-	cb.SetBuf(newSlice)
-	cb.Reset()
-	if err := cb.Marshal(protoMsg); err != nil {
-		return nil, err
-	}
-	out := cb.Bytes()
-	cb.lastMarshaledSize = capToMaxInt32(len(out))
-	return out, nil
-}
-
-func (codec) Marshal(v interface{}) ([]byte, error) {
-	if pm, ok := v.(proto.Marshaler); ok {
-		// object can marshal itself, no need for buffer
-		return pm.Marshal()
-	}
-
-	cb := protoBufferPool.Get().(*cachedProtoBuffer)
-	out, err := marshal(v, cb)
-
-	// put back buffer and lose the ref to the slice
-	cb.SetBuf(nil)
-	protoBufferPool.Put(cb)
-	return out, err
-}
-
-func (codec) Unmarshal(data []byte, v interface{}) error {
-	protoMsg := v.(proto.Message)
-	protoMsg.Reset()
-
-	if pu, ok := protoMsg.(proto.Unmarshaler); ok {
-		// object can unmarshal itself, no need for buffer
-		return pu.Unmarshal(data)
-	}
-
-	cb := protoBufferPool.Get().(*cachedProtoBuffer)
-	cb.SetBuf(data)
-	err := cb.Unmarshal(protoMsg)
-	cb.SetBuf(nil)
-	protoBufferPool.Put(cb)
-	return err
+	return proto.Unmarshal(data, vv)
 }
 
 func (codec) Name() string {
 	return Name
-}
-
-var protoBufferPool = &sync.Pool{
-	New: func() interface{} {
-		return &cachedProtoBuffer{
-			Buffer:            proto.Buffer{},
-			lastMarshaledSize: 16,
-		}
-	},
 }

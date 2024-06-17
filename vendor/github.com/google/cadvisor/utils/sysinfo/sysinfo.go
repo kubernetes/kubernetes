@@ -57,6 +57,16 @@ func GetBlockDeviceInfo(sysfs sysfs.SysFs) (map[string]info.DiskInfo, error) {
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "sr") {
 			continue
 		}
+		// Ignore "hidden" devices (i.e. nvme path device sysfs entries).
+		// These devices are in the form of /dev/nvme$Xc$Yn$Z and will
+		// not have a device handle (i.e. "hidden")
+		isHidden, err := sysfs.IsBlockDeviceHidden(name)
+		if err != nil {
+			return nil, err
+		}
+		if isHidden {
+			continue
+		}
 		diskInfo := info.DiskInfo{
 			Name: name,
 		}
@@ -104,7 +114,7 @@ func GetNetworkDevices(sysfs sysfs.SysFs) ([]info.NetInfo, error) {
 	for _, dev := range devs {
 		name := dev.Name()
 		// Ignore docker, loopback, and veth devices.
-		ignoredDevices := []string{"lo", "veth", "docker"}
+		ignoredDevices := []string{"lo", "veth", "docker", "nerdctl"}
 		ignored := false
 		for _, prefix := range ignoredDevices {
 			if strings.HasPrefix(name, prefix) {
@@ -200,7 +210,7 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 	}
 
 	if len(nodesDirs) == 0 {
-		klog.Warningf("Nodes topology is not available, providing CPU topology")
+		klog.V(4).Info("Nodes topology is not available, providing CPU topology")
 		return getCPUTopology(sysFs)
 	}
 
@@ -239,6 +249,11 @@ func GetNodesInfo(sysFs sysfs.SysFs) ([]info.Node, int, error) {
 
 		hugepagesDirectory := fmt.Sprintf("%s/%s", nodeDir, hugepagesDir)
 		node.HugePages, err = GetHugePagesInfo(sysFs, hugepagesDirectory)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		node.Distances, err = getDistances(sysFs, nodeDir)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -332,20 +347,34 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 
 		for _, cache := range caches {
 			c := info.Cache{
+				Id:    cache.Id,
 				Size:  cache.Size,
 				Level: cache.Level,
 				Type:  cache.Type,
 			}
-			if cache.Cpus == numThreadsPerNode && cache.Level > cacheLevel2 {
-				// Add a node-level cache.
-				cacheFound := false
-				for _, nodeCache := range node.Caches {
-					if nodeCache == c {
-						cacheFound = true
+			if cache.Level > cacheLevel2 {
+				if cache.Cpus == numThreadsPerNode {
+					// Add a node level cache.
+					cacheFound := false
+					for _, nodeCache := range node.Caches {
+						if nodeCache == c {
+							cacheFound = true
+						}
 					}
-				}
-				if !cacheFound {
-					node.Caches = append(node.Caches, c)
+					if !cacheFound {
+						node.Caches = append(node.Caches, c)
+					}
+				} else {
+					// Add uncore cache, for architecture in which l3 cache only shared among some cores.
+					uncoreCacheFound := false
+					for _, uncoreCache := range node.Cores[coreID].UncoreCaches {
+						if uncoreCache == c {
+							uncoreCacheFound = true
+						}
+					}
+					if !uncoreCacheFound {
+						node.Cores[coreID].UncoreCaches = append(node.Cores[coreID].UncoreCaches, c)
+					}
 				}
 			} else if cache.Cpus == numThreadsPerCore {
 				// Add core level cache
@@ -377,13 +406,34 @@ func getNodeMemInfo(sysFs sysfs.SysFs, nodeDir string) (uint64, error) {
 	return uint64(memory), nil
 }
 
-// getCoresInfo retruns infromation about physical cores
+// getDistances returns information about distances between NUMA nodes
+func getDistances(sysFs sysfs.SysFs, nodeDir string) ([]uint64, error) {
+	rawDistance, err := sysFs.GetDistances(nodeDir)
+	if err != nil {
+		//Ignore if per-node info is not available.
+		klog.Warningf("Found node without distance information, nodeDir: %s", nodeDir)
+		return nil, nil
+	}
+
+	distances := []uint64{}
+	for _, distance := range strings.Split(rawDistance, " ") {
+		distanceUint, err := strconv.ParseUint(distance, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("cannot convert %s to int", distance)
+		}
+		distances = append(distances, distanceUint)
+	}
+
+	return distances, nil
+}
+
+// getCoresInfo returns information about physical cores
 func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 	cores := make([]info.Core, 0, len(cpuDirs))
 	for _, cpuDir := range cpuDirs {
 		cpuID, err := getMatchedInt(cpuDirRegExp, cpuDir)
 		if err != nil {
-			return nil, fmt.Errorf("Unexpected format of CPU directory, cpuDirRegExp %s, cpuDir: %s", cpuDirRegExp, cpuDir)
+			return nil, fmt.Errorf("unexpected format of CPU directory, cpuDirRegExp %s, cpuDir: %s", cpuDirRegExp, cpuDir)
 		}
 		if !sysFs.IsCPUOnline(cpuDir) {
 			continue
@@ -401,25 +451,6 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 			return nil, err
 		}
 
-		coreIDx := -1
-		for id, core := range cores {
-			if core.Id == physicalID {
-				coreIDx = id
-			}
-		}
-		if coreIDx == -1 {
-			cores = append(cores, info.Core{})
-			coreIDx = len(cores) - 1
-		}
-		desiredCore := &cores[coreIDx]
-
-		desiredCore.Id = physicalID
-		if len(desiredCore.Threads) == 0 {
-			desiredCore.Threads = []int{cpuID}
-		} else {
-			desiredCore.Threads = append(desiredCore.Threads, cpuID)
-		}
-
 		rawPhysicalPackageID, err := sysFs.GetCPUPhysicalPackageID(cpuDir)
 		if os.IsNotExist(err) {
 			klog.Warningf("Cannot read physical package id for %s, physical_package_id file does not exist, err: %s", cpuDir, err)
@@ -432,7 +463,28 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		coreIDx := -1
+		for id, core := range cores {
+			if core.Id == physicalID && core.SocketID == physicalPackageID {
+				coreIDx = id
+			}
+		}
+		if coreIDx == -1 {
+			cores = append(cores, info.Core{})
+			coreIDx = len(cores) - 1
+		}
+		desiredCore := &cores[coreIDx]
+
+		desiredCore.Id = physicalID
 		desiredCore.SocketID = physicalPackageID
+
+		if len(desiredCore.Threads) == 0 {
+			desiredCore.Threads = []int{cpuID}
+		} else {
+			desiredCore.Threads = append(desiredCore.Threads, cpuID)
+		}
+
 	}
 	return cores, nil
 }
@@ -522,4 +574,15 @@ func GetSocketFromCPU(topology []info.Node, cpu int) int {
 		}
 	}
 	return -1
+}
+
+// GetOnlineCPUs returns available cores.
+func GetOnlineCPUs(topology []info.Node) []int {
+	onlineCPUs := make([]int, 0)
+	for _, node := range topology {
+		for _, core := range node.Cores {
+			onlineCPUs = append(onlineCPUs, core.Threads...)
+		}
+	}
+	return onlineCPUs
 }

@@ -22,13 +22,12 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -36,13 +35,13 @@ const provisionerPluginName = "kubernetes.io/mock-provisioner"
 
 // TestStorageClasses tests apiserver-side behavior of creation of storage class objects and their use by pvcs.
 func TestStorageClasses(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
 
-	ns := framework.CreateTestingNamespace("storageclass", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(client, "storageclass", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	DoTestStorageClasses(t, client, ns)
 }
@@ -73,7 +72,7 @@ func DoTestStorageClasses(t *testing.T, client clientset.Interface, ns *v1.Names
 			Namespace: ns.Name,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources:        v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
+			Resources:        v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse("1G")}},
 			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			StorageClassName: &classGold,
 		},

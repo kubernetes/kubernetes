@@ -38,13 +38,13 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	if len(ps.MatchLabels)+len(ps.MatchExpressions) == 0 {
 		return labels.Everything(), nil
 	}
-	selector := labels.NewSelector()
+	requirements := make([]labels.Requirement, 0, len(ps.MatchLabels)+len(ps.MatchExpressions))
 	for k, v := range ps.MatchLabels {
 		r, err := labels.NewRequirement(k, selection.Equals, []string{v})
 		if err != nil {
 			return nil, err
 		}
-		selector = selector.Add(*r)
+		requirements = append(requirements, *r)
 	}
 	for _, expr := range ps.MatchExpressions {
 		var op selection.Operator
@@ -58,14 +58,16 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 		case LabelSelectorOpDoesNotExist:
 			op = selection.DoesNotExist
 		default:
-			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
+			return nil, fmt.Errorf("%q is not a valid label selector operator", expr.Operator)
 		}
 		r, err := labels.NewRequirement(expr.Key, op, append([]string(nil), expr.Values...))
 		if err != nil {
 			return nil, err
 		}
-		selector = selector.Add(*r)
+		requirements = append(requirements, *r)
 	}
+	selector := labels.NewSelector()
+	selector = selector.Add(requirements...)
 	return selector, nil
 }
 
@@ -154,7 +156,7 @@ func SetAsLabelSelector(ls labels.Set) *LabelSelector {
 	}
 
 	selector := &LabelSelector{
-		MatchLabels: make(map[string]string),
+		MatchLabels: make(map[string]string, len(ls)),
 	}
 	for label, value := range ls {
 		selector.MatchLabels[label] = value
@@ -199,6 +201,20 @@ func SetMetaDataAnnotation(obj *ObjectMeta, ann string, value string) {
 		obj.Annotations = make(map[string]string)
 	}
 	obj.Annotations[ann] = value
+}
+
+// HasLabel returns a bool if passed in label exists
+func HasLabel(obj ObjectMeta, label string) bool {
+	_, found := obj.Labels[label]
+	return found
+}
+
+// SetMetaDataLabel sets the label and value
+func SetMetaDataLabel(obj *ObjectMeta, label string, value string) {
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	obj.Labels[label] = value
 }
 
 // SingleObject returns a ListOptions for watching a single object.

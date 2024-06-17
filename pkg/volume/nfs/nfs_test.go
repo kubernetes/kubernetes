@@ -17,11 +17,11 @@ limitations under the License.
 package nfs
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +43,7 @@ func TestCanSupport(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/nfs")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/nfs" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -96,7 +96,7 @@ func TestRecycler(t *testing.T) {
 	}
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -119,7 +119,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Got a nil Mounter")
 	}
 	volumePath := mounter.GetPath()
-	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
+	expectedPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~nfs/vol1")
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
@@ -135,6 +135,20 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	if mounter.(*nfsMounter).readOnly {
 		t.Errorf("The volume source should not be read-only and it is.")
+	}
+	mntDevs, err := fake.List()
+	if err != nil {
+		t.Errorf("fakeMounter.List() failed: %v", err)
+	}
+	if len(mntDevs) != 1 {
+		t.Errorf("unexpected number of mounted devices. expected: %v, got %v", 1, len(mntDevs))
+	} else {
+		if mntDevs[0].Type != "nfs" {
+			t.Errorf("unexpected type of mounted devices. expected: %v, got %v", "nfs", mntDevs[0].Type)
+		}
+		if mntDevs[0].Device != expectedDevice {
+			t.Errorf("unexpected nfs device, expected %q, got: %q", expectedDevice, mntDevs[0].Device)
+		}
 	}
 	log := fake.GetLog()
 	if len(log) != 1 {
@@ -178,7 +192,23 @@ func TestPluginVolume(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/somepath", ReadOnly: false}},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "localhost:/somepath")
+}
+
+func TestIPV6VolumeSource(t *testing.T) {
+	vol := &v1.Volume{
+		Name:         "vol1",
+		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "0:0:0:0:0:0:0:1", Path: "/somepath", ReadOnly: false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "[0:0:0:0:0:0:0:1]:/somepath")
+}
+
+func TestIPV4VolumeSource(t *testing.T) {
+	vol := &v1.Volume{
+		Name:         "vol1",
+		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "127.0.0.1", Path: "/somepath", ReadOnly: false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "127.0.0.1:/somepath")
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -193,7 +223,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false), "localhost:/somepath")
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {

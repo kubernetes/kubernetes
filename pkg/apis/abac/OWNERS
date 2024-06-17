@@ -1,8 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+# approval on api packages bubbles to api-approvers
 reviewers:
-- lavalamp
-- smarterclayton
-- deads2k
-- liggitt
-- mbohlool
+  - sig-auth-authorizers-approvers
+  - sig-auth-authorizers-reviewers
+labels:
+  - sig/auth

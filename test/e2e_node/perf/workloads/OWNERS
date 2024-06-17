@@ -1,9 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- vishh
-- derekwaynecarr
-- balajismaniam
-- ConnorDoyle
+  - derekwaynecarr
 reviewers:
-- sig-node-reviewers
+  - sig-node-reviewers
+emeritus_approvers:
+  - balajismaniam
+  - ConnorDoyle
+  - vishh

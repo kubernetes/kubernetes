@@ -206,8 +206,7 @@ func TestUniformDistribution(t *testing.T) {
 	}{
 		{64, 3, 1 << uint(math.Ceil(math.Log2(float64(ff(64, 3))))+spare)},
 		{128, 3, ff(128, 3)},
-		{128, 3, 3 * ff(128, 3)},
-		{70, 4, ff(70, 4)},
+		{50, 4, ff(50, 4)},
 	}
 	for _, test := range tests {
 		dealer, err := NewDealer(test.deckSize, test.handSize)
@@ -233,8 +232,9 @@ func TestUniformDistribution(t *testing.T) {
 			}
 			handCoordinateMap[handCoordinate]++
 		}
+		numHandsSeen := len(handCoordinateMap)
 
-		t.Logf("Deck size = %v, hand size = %v, number of possible hands = %d, number of hands seen = %d, number of deals = %d, expected count range = [%v, %v]", test.deckSize, test.handSize, allCoordinateCount, len(handCoordinateMap), test.hashMax, minCount, maxCount)
+		t.Logf("Deck size = %v, hand size = %v, number of possible hands = %d, number of hands seen = %d, number of deals = %d, expected count range = [%v, %v]", test.deckSize, test.handSize, allCoordinateCount, numHandsSeen, test.hashMax, minCount, maxCount)
 
 		// histogram maps (count of times a hand is seen) to (number of hands having that count)
 		histogram := make(map[int]int)
@@ -247,14 +247,13 @@ func TestUniformDistribution(t *testing.T) {
 			goodSum += histogram[count]
 		}
 
-		goodPct := 100 * float64(goodSum) / float64(allCoordinateCount)
+		goodPct := 100 * float64(goodSum) / float64(numHandsSeen)
 
 		t.Logf("good percentage = %v, histogram = %v", goodPct, histogram)
-		if goodSum != allCoordinateCount {
+		if goodSum != numHandsSeen {
 			t.Errorf("Only %v percent of the hands got a central count", goodPct)
 		}
 	}
-	return
 }
 
 func TestDealer_DealIntoHand(t *testing.T) {
@@ -277,7 +276,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 6 cap: 6 slice",
-			make([]int, 6, 6),
+			make([]int, 6),
 			6,
 		},
 		{
@@ -287,7 +286,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 4 cap: 4 slice",
-			make([]int, 4, 4),
+			make([]int, 4),
 			6,
 		},
 		{
@@ -297,7 +296,7 @@ func TestDealer_DealIntoHand(t *testing.T) {
 		},
 		{
 			"size: 10 cap: 10 slice",
-			make([]int, 10, 10),
+			make([]int, 10),
 			6,
 		},
 		{

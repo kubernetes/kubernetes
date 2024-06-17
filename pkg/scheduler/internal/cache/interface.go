@@ -17,9 +17,10 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -31,55 +32,60 @@ import (
 //
 // State Machine of a pod's events in scheduler's cache:
 //
+//	+-------------------------------------------+  +----+
+//	|                            Add            |  |    |
+//	|                                           |  |    | Update
+//	+      Assume                Add            v  v    |
 //
-//   +-------------------------------------------+  +----+
-//   |                            Add            |  |    |
-//   |                                           |  |    | Update
-//   +      Assume                Add            v  v    |
-//Initial +--------> Assumed +------------+---> Added <--+
-//   ^                +   +               |       +
-//   |                |   |               |       |
-//   |                |   |           Add |       | Remove
-//   |                |   |               |       |
-//   |                |   |               +       |
-//   +----------------+   +-----------> Expired   +----> Deleted
-//         Forget             Expire
+// Initial +--------> Assumed +------------+---> Added <--+
 //
+//	^                +   +               |       +
+//	|                |   |               |       |
+//	|                |   |           Add |       | Remove
+//	|                |   |               |       |
+//	|                |   |               +       |
+//	+----------------+   +-----------> Expired   +----> Deleted
+//	      Forget             Expire
 //
 // Note that an assumed pod can expire, because if we haven't received Add event notifying us
 // for a while, there might be some problems and we shouldn't keep the pod in cache anymore.
 //
 // Note that "Initial", "Expired", and "Deleted" pods do not actually exist in cache.
 // Based on existing use cases, we are making the following assumptions:
-// - No pod would be assumed twice
-// - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
-// - If a pod wasn't added, it wouldn't be removed or updated.
-// - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
-//   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
+//   - No pod would be assumed twice
+//   - A pod could be added without going through scheduler. In this case, we will see Add but not Assume event.
+//   - If a pod wasn't added, it wouldn't be removed or updated.
+//   - Both "Expired" and "Deleted" are valid end states. In case of some problems, e.g. network issue,
+//     a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
-	// ListPods lists all pods in the cache.
-	ListPods(selector labels.Selector) ([]*v1.Pod, error)
+	// NodeCount returns the number of nodes in the cache.
+	// DO NOT use outside of tests.
+	NodeCount() int
+
+	// PodCount returns the number of pods in the cache (including those from deleted nodes).
+	// DO NOT use outside of tests.
+	PodCount() (int, error)
 
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
 	// After expiration, its information would be subtracted.
-	AssumePod(pod *v1.Pod) error
+	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
 	// FinishBinding signals that cache for assumed pod can be expired
-	FinishBinding(pod *v1.Pod) error
+	FinishBinding(logger klog.Logger, pod *v1.Pod) error
 
 	// ForgetPod removes an assumed pod from cache.
-	ForgetPod(pod *v1.Pod) error
+	ForgetPod(logger klog.Logger, pod *v1.Pod) error
 
 	// AddPod either confirms a pod if it's assumed, or adds it back if it's expired.
 	// If added back, the pod's information would be added again.
-	AddPod(pod *v1.Pod) error
+	AddPod(logger klog.Logger, pod *v1.Pod) error
 
 	// UpdatePod removes oldPod's information and adds newPod's information.
-	UpdatePod(oldPod, newPod *v1.Pod) error
+	UpdatePod(logger klog.Logger, oldPod, newPod *v1.Pod) error
 
 	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
-	RemovePod(pod *v1.Pod) error
+	RemovePod(logger klog.Logger, pod *v1.Pod) error
 
 	// GetPod returns the pod from the cache with the same namespace and the
 	// same name of the specified pod.
@@ -89,18 +95,22 @@ type Cache interface {
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	AddNode(node *v1.Node) error
+	// It returns a clone of added NodeInfo object.
+	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
 
 	// UpdateNode updates overall information about node.
-	UpdateNode(oldNode, newNode *v1.Node) error
+	// It returns a clone of updated NodeInfo object.
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
 
 	// RemoveNode removes overall information about node.
-	RemoveNode(node *v1.Node) error
+	RemoveNode(logger klog.Logger, node *v1.Node) error
 
 	// UpdateSnapshot updates the passed infoSnapshot to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
-	UpdateSnapshot(nodeSnapshot *Snapshot) error
+	// The snapshot only includes Nodes that are not deleted at the time this function is called.
+	// nodeinfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+	UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapshot) error
 
 	// Dump produces a dump of the current cache.
 	Dump() *Dump
@@ -108,6 +118,6 @@ type Cache interface {
 
 // Dump is a dump of the cache state.
 type Dump struct {
-	AssumedPods map[string]bool
+	AssumedPods sets.Set[string]
 	Nodes       map[string]*framework.NodeInfo
 }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !purego && !appengine
 // +build !purego,!appengine
 
 package impl
@@ -109,6 +110,7 @@ func (p pointer) String() *string                       { return (*string)(p.p) 
 func (p pointer) StringPtr() **string                   { return (**string)(p.p) }
 func (p pointer) StringSlice() *[]string                { return (*[]string)(p.p) }
 func (p pointer) Bytes() *[]byte                        { return (*[]byte)(p.p) }
+func (p pointer) BytesPtr() **[]byte                    { return (**[]byte)(p.p) }
 func (p pointer) BytesSlice() *[][]byte                 { return (*[][]byte)(p.p) }
 func (p pointer) WeakFields() *weakFields               { return (*weakFields)(p.p) }
 func (p pointer) Extensions() *map[int32]ExtensionField { return (*map[int32]ExtensionField)(p.p) }
@@ -134,6 +136,46 @@ func (p pointer) AppendPointerSlice(v pointer) {
 // SetPointer sets *p to v.
 func (p pointer) SetPointer(v pointer) {
 	*(*unsafe.Pointer)(p.p) = (unsafe.Pointer)(v.p)
+}
+
+func (p pointer) growBoolSlice(addCap int) {
+	sp := p.BoolSlice()
+	s := make([]bool, 0, addCap+len(*sp))
+	s = s[:len(*sp)]
+	copy(s, *sp)
+	*sp = s
+}
+
+func (p pointer) growInt32Slice(addCap int) {
+	sp := p.Int32Slice()
+	s := make([]int32, 0, addCap+len(*sp))
+	s = s[:len(*sp)]
+	copy(s, *sp)
+	*sp = s
+}
+
+func (p pointer) growUint32Slice(addCap int) {
+	p.growInt32Slice(addCap)
+}
+
+func (p pointer) growFloat32Slice(addCap int) {
+	p.growInt32Slice(addCap)
+}
+
+func (p pointer) growInt64Slice(addCap int) {
+	sp := p.Int64Slice()
+	s := make([]int64, 0, addCap+len(*sp))
+	s = s[:len(*sp)]
+	copy(s, *sp)
+	*sp = s
+}
+
+func (p pointer) growUint64Slice(addCap int) {
+	p.growInt64Slice(addCap)
+}
+
+func (p pointer) growFloat64Slice(addCap int) {
+	p.growInt64Slice(addCap)
 }
 
 // Static check that MessageState does not exceed the size of a pointer.

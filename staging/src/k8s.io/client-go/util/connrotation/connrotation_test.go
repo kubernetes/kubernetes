@@ -26,7 +26,7 @@ import (
 )
 
 func TestCloseAll(t *testing.T) {
-	closed := make(chan struct{})
+	closed := make(chan struct{}, 50)
 	dialFn := func(ctx context.Context, network, address string) (net.Conn, error) {
 		return closeOnlyConn{onClose: func() { closed <- struct{}{} }}, nil
 	}
@@ -42,10 +42,11 @@ func TestCloseAll(t *testing.T) {
 			}
 		}
 		dialer.CloseAll()
+		deadline := time.After(time.Second)
 		for j := 0; j < numConns; j++ {
 			select {
 			case <-closed:
-			case <-time.After(time.Second):
+			case <-deadline:
 				t.Fatalf("iteration %d: 1s after CloseAll only %d/%d connections closed", i, j, numConns)
 			}
 		}
@@ -59,53 +60,47 @@ func TestCloseAllRace(t *testing.T) {
 		return closeOnlyConn{onClose: func() { atomic.AddInt64(&conns, -1) }}, nil
 	})
 
-	done := make(chan struct{})
+	const raceCount = 5000
+	begin := &sync.WaitGroup{}
+	begin.Add(1)
+
 	wg := &sync.WaitGroup{}
 
 	// Close all as fast as we can
 	wg.Add(1)
 	go func() {
+		begin.Wait()
 		defer wg.Done()
-		for {
-			select {
-			case <-done:
-				return
-			default:
-				dialer.CloseAll()
-			}
+		for i := 0; i < raceCount; i++ {
+			dialer.CloseAll()
 		}
 	}()
 
 	// Dial as fast as we can
 	wg.Add(1)
 	go func() {
+		begin.Wait()
 		defer wg.Done()
-		for {
-			select {
-			case <-done:
+		for i := 0; i < raceCount; i++ {
+			if _, err := dialer.Dial("", ""); err != nil {
+				t.Error(err)
 				return
-			default:
-				if _, err := dialer.Dial("", ""); err != nil {
-					t.Error(err)
-					return
-				}
-				atomic.AddInt64(&conns, 1)
 			}
+			atomic.AddInt64(&conns, 1)
 		}
 	}()
 
-	// Soak to ensure no races
-	time.Sleep(time.Second)
+	// Trigger both goroutines as close to the same time as possible
+	begin.Done()
 
-	// Signal completion
-	close(done)
 	// Wait for goroutines
 	wg.Wait()
+
 	// Ensure CloseAll ran after all dials
 	dialer.CloseAll()
 
 	// Expect all connections to close within 5 seconds
-	for start := time.Now(); time.Now().Sub(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
 		// Ensure all connections were closed
 		if c := atomic.LoadInt64(&conns); c == 0 {
 			break

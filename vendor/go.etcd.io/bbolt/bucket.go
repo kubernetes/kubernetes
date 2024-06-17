@@ -81,7 +81,7 @@ func (b *Bucket) Writable() bool {
 // Do not use a cursor after the transaction is closed.
 func (b *Bucket) Cursor() *Cursor {
 	// Update transaction statistics.
-	b.tx.stats.CursorCount++
+	b.tx.stats.IncCursorCount(1)
 
 	// Allocate and return a cursor.
 	return &Cursor{
@@ -162,12 +162,17 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 		return nil, ErrBucketNameRequired
 	}
 
+	// Insert into node.
+	// Tip: Use a new variable `newKey` instead of reusing the existing `key` to prevent
+	// it from being marked as leaking, and accordingly cannot be allocated on stack.
+	newKey := cloneBytes(key)
+
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, _, flags := c.seek(newKey)
 
 	// Return an error if there is an existing key.
-	if bytes.Equal(key, k) {
+	if bytes.Equal(newKey, k) {
 		if (flags & bucketLeafFlag) != 0 {
 			return nil, ErrBucketExists
 		}
@@ -182,16 +187,14 @@ func (b *Bucket) CreateBucket(key []byte) (*Bucket, error) {
 	}
 	var value = bucket.write()
 
-	// Insert into node.
-	key = cloneBytes(key)
-	c.node().put(key, key, value, 0, bucketLeafFlag)
+	c.node().put(newKey, newKey, value, 0, bucketLeafFlag)
 
 	// Since subbuckets are not allowed on inline buckets, we need to
 	// dereference the inline page, if it exists. This will cause the bucket
 	// to be treated as a regular, non-inline bucket for the rest of the tx.
 	b.page = nil
 
-	return b.Bucket(key), nil
+	return b.Bucket(newKey), nil
 }
 
 // CreateBucketIfNotExists creates a new bucket if it doesn't already exist and returns a reference to it.
@@ -229,11 +232,9 @@ func (b *Bucket) DeleteBucket(key []byte) error {
 
 	// Recursively delete all child buckets.
 	child := b.Bucket(key)
-	err := child.ForEach(func(k, v []byte) error {
-		if _, _, childFlags := child.Cursor().seek(k); (childFlags & bucketLeafFlag) != 0 {
-			if err := child.DeleteBucket(k); err != nil {
-				return fmt.Errorf("delete bucket: %s", err)
-			}
+	err := child.ForEachBucket(func(k []byte) error {
+		if err := child.DeleteBucket(k); err != nil {
+			return fmt.Errorf("delete bucket: %s", err)
 		}
 		return nil
 	})
@@ -290,18 +291,23 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 		return ErrValueTooLarge
 	}
 
+	// Insert into node.
+	// Tip: Use a new variable `newKey` instead of reusing the existing `key` to prevent
+	// it from being marked as leaking, and accordingly cannot be allocated on stack.
+	newKey := cloneBytes(key)
+
 	// Move cursor to correct position.
 	c := b.Cursor()
-	k, _, flags := c.seek(key)
+	k, _, flags := c.seek(newKey)
 
 	// Return an error if there is an existing key with a bucket value.
-	if bytes.Equal(key, k) && (flags&bucketLeafFlag) != 0 {
+	if bytes.Equal(newKey, k) && (flags&bucketLeafFlag) != 0 {
 		return ErrIncompatibleValue
 	}
 
-	// Insert into node.
-	key = cloneBytes(key)
-	c.node().put(key, key, value, 0, 0)
+	// gofail: var beforeBucketPut struct{}
+
+	c.node().put(newKey, newKey, value, 0, 0)
 
 	return nil
 }
@@ -353,7 +359,7 @@ func (b *Bucket) SetSequence(v uint64) error {
 		_ = b.node(b.root, nil)
 	}
 
-	// Increment and return the sequence.
+	// Set the sequence.
 	b.bucket.sequence = v
 	return nil
 }
@@ -378,6 +384,7 @@ func (b *Bucket) NextSequence() (uint64, error) {
 }
 
 // ForEach executes a function for each key/value pair in a bucket.
+// Because ForEach uses a Cursor, the iteration over keys is in lexicographical order.
 // If the provided function returns an error then the iteration is stopped and
 // the error is returned to the caller. The provided function must not modify
 // the bucket; this will result in undefined behavior.
@@ -394,7 +401,22 @@ func (b *Bucket) ForEach(fn func(k, v []byte) error) error {
 	return nil
 }
 
-// Stat returns stats on a bucket.
+func (b *Bucket) ForEachBucket(fn func(k []byte) error) error {
+	if b.tx.db == nil {
+		return ErrTxClosed
+	}
+	c := b.Cursor()
+	for k, _, flags := c.first(); k != nil; k, _, flags = c.next() {
+		if flags&bucketLeafFlag != 0 {
+			if err := fn(k); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Stats returns stats on a bucket.
 func (b *Bucket) Stats() BucketStats {
 	var s, subStats BucketStats
 	pageSize := b.tx.db.pageSize
@@ -402,7 +424,7 @@ func (b *Bucket) Stats() BucketStats {
 	if b.root == 0 {
 		s.InlineBucketN += 1
 	}
-	b.forEachPage(func(p *page, depth int) {
+	b.forEachPage(func(p *page, depth int, pgstack []pgid) {
 		if (p.flags & leafPageFlag) != 0 {
 			s.KeyN += int(p.count)
 
@@ -461,7 +483,7 @@ func (b *Bucket) Stats() BucketStats {
 
 		// Keep track of maximum page depth.
 		if depth+1 > s.Depth {
-			s.Depth = (depth + 1)
+			s.Depth = depth + 1
 		}
 	})
 
@@ -477,15 +499,15 @@ func (b *Bucket) Stats() BucketStats {
 }
 
 // forEachPage iterates over every page in a bucket, including inline pages.
-func (b *Bucket) forEachPage(fn func(*page, int)) {
+func (b *Bucket) forEachPage(fn func(*page, int, []pgid)) {
 	// If we have an inline page then just use that.
 	if b.page != nil {
-		fn(b.page, 0)
+		fn(b.page, 0, []pgid{b.root})
 		return
 	}
 
 	// Otherwise traverse the page hierarchy.
-	b.tx.forEachPage(b.root, 0, fn)
+	b.tx.forEachPage(b.root, fn)
 }
 
 // forEachPageNode iterates over every page (or node) in a bucket.
@@ -499,8 +521,8 @@ func (b *Bucket) forEachPageNode(fn func(*page, *node, int)) {
 	b._forEachPageNode(b.root, 0, fn)
 }
 
-func (b *Bucket) _forEachPageNode(pgid pgid, depth int, fn func(*page, *node, int)) {
-	var p, n = b.pageNode(pgid)
+func (b *Bucket) _forEachPageNode(pgId pgid, depth int, fn func(*page, *node, int)) {
+	var p, n = b.pageNode(pgId)
 
 	// Execute function.
 	fn(p, n, depth)
@@ -640,11 +662,11 @@ func (b *Bucket) rebalance() {
 }
 
 // node creates a node from a page and associates it with a given parent.
-func (b *Bucket) node(pgid pgid, parent *node) *node {
+func (b *Bucket) node(pgId pgid, parent *node) *node {
 	_assert(b.nodes != nil, "nodes map expected")
 
 	// Retrieve node if it's already been created.
-	if n := b.nodes[pgid]; n != nil {
+	if n := b.nodes[pgId]; n != nil {
 		return n
 	}
 
@@ -659,15 +681,15 @@ func (b *Bucket) node(pgid pgid, parent *node) *node {
 	// Use the inline page if this is an inline bucket.
 	var p = b.page
 	if p == nil {
-		p = b.tx.page(pgid)
+		p = b.tx.page(pgId)
 	}
 
 	// Read the page into the node and cache it.
 	n.read(p)
-	b.nodes[pgid] = n
+	b.nodes[pgId] = n
 
 	// Update statistics.
-	b.tx.stats.NodeCount++
+	b.tx.stats.IncNodeCount(1)
 
 	return n
 }

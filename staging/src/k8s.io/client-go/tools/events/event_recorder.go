@@ -24,12 +24,12 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 type recorderImpl struct {
@@ -40,20 +40,45 @@ type recorderImpl struct {
 	clock clock.Clock
 }
 
+var _ EventRecorder = &recorderImpl{}
+
 func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
-	timestamp := metav1.MicroTime{time.Now()}
+	recorder.eventf(klog.Background(), regarding, related, eventtype, reason, action, note, args...)
+}
+
+type recorderImplLogger struct {
+	*recorderImpl
+	logger klog.Logger
+}
+
+var _ EventRecorderLogger = &recorderImplLogger{}
+
+func (recorder *recorderImplLogger) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	recorder.eventf(recorder.logger, regarding, related, eventtype, reason, action, note, args...)
+}
+
+func (recorder *recorderImplLogger) WithLogger(logger klog.Logger) EventRecorderLogger {
+	return &recorderImplLogger{recorderImpl: recorder.recorderImpl, logger: logger}
+}
+
+func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	timestamp := metav1.MicroTime{Time: time.Now()}
 	message := fmt.Sprintf(note, args...)
 	refRegarding, err := reference.GetReference(recorder.scheme, regarding)
 	if err != nil {
-		klog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", regarding, err, eventtype, reason, message)
+		logger.Error(err, "Could not construct reference, will not report event", "object", regarding, "eventType", eventtype, "reason", reason, "message", message)
 		return
 	}
-	refRelated, err := reference.GetReference(recorder.scheme, related)
-	if err != nil {
-		klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
+
+	var refRelated *v1.ObjectReference
+	if related != nil {
+		refRelated, err = reference.GetReference(recorder.scheme, related)
+		if err != nil {
+			logger.V(9).Info("Could not construct reference", "object", related, "err", err)
+		}
 	}
 	if !util.ValidateEventType(eventtype) {
-		klog.Errorf("Unsupported event type: '%v'", eventtype)
+		logger.Error(nil, "Unsupported event type", "eventType", eventtype)
 		return
 	}
 	event := recorder.makeEvent(refRegarding, refRelated, timestamp, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)

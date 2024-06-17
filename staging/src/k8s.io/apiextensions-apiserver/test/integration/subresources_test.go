@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
@@ -41,51 +42,14 @@ import (
 var labelSelectorPath = ".status.labelSelector"
 var anotherLabelSelectorPath = ".status.anotherLabelSelector"
 
-func NewNoxuSubresourcesCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiextensionsv1beta1.CustomResourceDefinition {
-	return []*apiextensionsv1beta1.CustomResourceDefinition{
-		// CRD that uses top-level subresources
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "mygroup.example.com",
-				Version: "v1beta1",
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-					Plural:     "noxus",
-					Singular:   "nonenglishnoxu",
-					Kind:       "WishIHadChosenNoxu",
-					ShortNames: []string{"foo", "bar", "abc", "def"},
-					ListKind:   "NoxuItemList",
-				},
-				Scope: scope,
-				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
-					{
-						Name:    "v1beta1",
-						Served:  true,
-						Storage: true,
-					},
-					{
-						Name:    "v1",
-						Served:  true,
-						Storage: false,
-					},
-				},
-				Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-					Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-					Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-						SpecReplicasPath:   ".spec.replicas",
-						StatusReplicasPath: ".status.replicas",
-						LabelSelectorPath:  &labelSelectorPath,
-					},
-				},
-			},
-		},
+func NewNoxuSubresourcesCRDs(scope apiextensionsv1.ResourceScope) []*apiextensionsv1.CustomResourceDefinition {
+	return []*apiextensionsv1.CustomResourceDefinition{
 		// CRD that uses per-version subresources
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
-			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-				Group:   "mygroup.example.com",
-				Version: "v1beta1",
-				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: "mygroup.example.com",
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
 					Plural:     "noxus",
 					Singular:   "nonenglishnoxu",
 					Kind:       "WishIHadChosenNoxu",
@@ -93,32 +57,34 @@ func NewNoxuSubresourcesCRDs(scope apiextensionsv1beta1.ResourceScope) []*apiext
 					ListKind:   "NoxuItemList",
 				},
 				Scope: scope,
-				Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 					{
 						Name:    "v1beta1",
 						Served:  true,
 						Storage: true,
-						Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-							Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-							Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale: &apiextensionsv1.CustomResourceSubresourceScale{
 								SpecReplicasPath:   ".spec.replicas",
 								StatusReplicasPath: ".status.replicas",
 								LabelSelectorPath:  &labelSelectorPath,
 							},
 						},
+						Schema: fixtures.AllowAllSchema(),
 					},
 					{
 						Name:    "v1",
 						Served:  true,
 						Storage: false,
-						Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-							Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-							Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
+						Subresources: &apiextensionsv1.CustomResourceSubresources{
+							Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+							Scale: &apiextensionsv1.CustomResourceSubresourceScale{
 								SpecReplicasPath:   ".spec.replicas",
 								StatusReplicasPath: ".status.replicas",
 								LabelSelectorPath:  &anotherLabelSelectorPath,
 							},
 						},
+						Schema: fixtures.AllowAllSchema(),
 					},
 				},
 			},
@@ -146,6 +112,26 @@ func NewNoxuSubresourceInstance(namespace, name, version string) *unstructured.U
 	}
 }
 
+func NewNoxuSubresourceInstanceWithReplicas(namespace, name, version, replicasField string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": fmt.Sprintf("mygroup.example.com/%s", version),
+			"kind":       "WishIHadChosenNoxu",
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+				"name":      name,
+			},
+			"spec": map[string]interface{}{
+				"num":         int64(10),
+				replicasField: int64(3),
+			},
+			"status": map[string]interface{}{
+				"replicas": int64(7),
+			},
+		},
+	}
+}
+
 func TestStatusSubresource(t *testing.T) {
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
@@ -153,9 +139,9 @@ func TestStatusSubresource(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -252,7 +238,7 @@ func TestStatusSubresource(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -279,7 +265,7 @@ func TestScaleSubresource(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
 		for _, v := range noxuDefinition.Spec.Versions {
 			// Start with a new CRD, so that the object doesn't have resourceVersion
@@ -291,13 +277,13 @@ func TestScaleSubresource(t *testing.T) {
 			}
 			// set invalid json path for specReplicasPath
 			subresources.Scale.SpecReplicasPath = "foo,bar"
-			_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err == nil {
 				t.Fatalf("unexpected non-error: specReplicasPath should be a valid json path under .spec")
 			}
 
 			subresources.Scale.SpecReplicasPath = ".spec.replicas"
-			noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -338,12 +324,6 @@ func TestScaleSubresource(t *testing.T) {
 			}
 			if gottenScale.Status.Selector != "bar" {
 				t.Fatalf("Scale.Status.Selector: expected: %v, got: %v", "bar", gottenScale.Status.Selector)
-			}
-
-			// check self link
-			expectedSelfLink := fmt.Sprintf("/apis/mygroup.example.com/%s/namespaces/not-the-default/noxus/foo/scale", v.Name)
-			if gottenScale.GetSelfLink() != expectedSelfLink {
-				t.Fatalf("Scale.Metadata.SelfLink: expected: %v, got: %v", expectedSelfLink, gottenScale.GetSelfLink())
 			}
 
 			// update the scale object
@@ -396,10 +376,89 @@ func TestScaleSubresource(t *testing.T) {
 				t.Fatalf("unexpected non-error: .spec.replicas should be less than 2147483647")
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
-			if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+			if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 				t.Fatal(err)
 			}
 		}
+	}
+}
+
+func TestApplyScaleSubresource(t *testing.T) {
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)[0]
+	subresources, err := getSubresourcesForVersion(noxuDefinition, "v1beta1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	subresources.Scale.SpecReplicasPath = ".spec.replicas[0]"
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a client for it.
+	ns := "not-the-default"
+	noxuResourceClient := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1beta1")
+
+	obj := NewNoxuSubresourceInstanceWithReplicas(ns, "foo", "v1beta1", "replicas[0]")
+	obj, err = noxuResourceClient.Create(context.TODO(), obj, metav1.CreateOptions{})
+	if err != nil {
+		t.Logf("%#v", obj)
+		t.Fatalf("Failed to create CustomResource: %v", err)
+	}
+
+	noxuResourceClient = newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1")
+	patch := `{"metadata": {"name": "foo"}, "kind": "WishIHadChosenNoxu", "apiVersion": "mygroup.example.com/v1", "spec": {"replicas": 3}}`
+	obj, err = noxuResourceClient.Patch(context.TODO(), "foo", types.ApplyPatchType, []byte(patch), metav1.PatchOptions{FieldManager: "applier"})
+	if err != nil {
+		t.Logf("%#v", obj)
+		t.Fatalf("Failed to Apply CustomResource: %v", err)
+	}
+
+	if got := len(obj.GetManagedFields()); got != 2 {
+		t.Fatalf("Expected 2 managed fields, got %v: %v", got, obj.GetManagedFields())
+	}
+
+	_, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, []byte(`{"spec": {"replicas": 5}}`), metav1.PatchOptions{FieldManager: "scaler"}, "scale")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to Get CustomResource: %v", err)
+	}
+
+	// Managed fields should have 3 entries: one for scale, one for spec, and one for the rest of the fields
+	managedFields := obj.GetManagedFields()
+	if len(managedFields) != 3 {
+		t.Fatalf("Expected 3 managed fields, got %v: %v", len(managedFields), obj.GetManagedFields())
+	}
+	specEntry := managedFields[0]
+	if specEntry.Manager != "applier" || specEntry.APIVersion != "mygroup.example.com/v1" || specEntry.Operation != "Apply" || string(specEntry.FieldsV1.Raw) != `{"f:spec":{}}` || specEntry.Subresource != "" {
+		t.Fatalf("Unexpected entry: %v", specEntry)
+	}
+	scaleEntry := managedFields[1]
+	if scaleEntry.Manager != "scaler" || scaleEntry.APIVersion != "mygroup.example.com/v1" || scaleEntry.Operation != "Update" || string(scaleEntry.FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` || scaleEntry.Subresource != "scale" {
+		t.Fatalf("Unexpected entry: %v", scaleEntry)
+	}
+	restEntry := managedFields[2]
+	if restEntry.Manager != "integration.test" || restEntry.APIVersion != "mygroup.example.com/v1beta1" {
+		t.Fatalf("Unexpected entry: %v", restEntry)
 	}
 }
 
@@ -419,22 +478,16 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fields other than properties in root schema are not allowed
-	noxuDefinition := newNoxuValidationCRDs(apiextensionsv1beta1.NamespaceScoped)[0]
-	noxuDefinition.Spec.Subresources = &apiextensionsv1beta1.CustomResourceSubresources{
-		Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-	}
-	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-	if err == nil {
-		t.Fatalf(`unexpected non-error, expected: must not have "additionalProperties" at the root of the schema if the status subresource is enabled`)
-	}
+	noxuDefinition := newNoxuValidationCRDs()[0]
 
 	// make sure we are not restricting fields to properties even in subschemas
-	noxuDefinition.Spec.Validation.OpenAPIV3Schema = &apiextensionsv1beta1.JSONSchemaProps{
-		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+	noxuDefinition.Spec.Versions[0].Schema.OpenAPIV3Schema = &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
 			"spec": {
+				Type:        "object",
 				Description: "Validation for spec",
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"replicas": {
 						Type: "integer",
 					},
@@ -444,7 +497,9 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 		Required:    []string{"spec"},
 		Description: "This is a description at the root of the schema",
 	}
-	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition.Spec.Versions[1].Schema.OpenAPIV3Schema = noxuDefinition.Spec.Versions[0].Schema.OpenAPIV3Schema
+
+	_, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("unable to created crd %v: %v", noxuDefinition.Name, err)
 	}
@@ -464,10 +519,12 @@ func TestValidateOnlyStatus(t *testing.T) {
 	// 4. update the spec of the cr with .spec.num = 15 (spec is invalid), expect error
 
 	// max value of spec.num = 10 and status.num = 10
-	schema := &apiextensionsv1beta1.JSONSchemaProps{
-		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+	schema := &apiextensionsv1.JSONSchemaProps{
+		Type: "object",
+		Properties: map[string]apiextensionsv1.JSONSchemaProps{
 			"spec": {
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"num": {
 						Type:    "integer",
 						Maximum: float64Ptr(10),
@@ -475,7 +532,8 @@ func TestValidateOnlyStatus(t *testing.T) {
 				},
 			},
 			"status": {
-				Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					"num": {
 						Type:    "integer",
 						Maximum: float64Ptr(10),
@@ -485,24 +543,16 @@ func TestValidateOnlyStatus(t *testing.T) {
 		},
 	}
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
-	for i, noxuDefinition := range noxuDefinitions {
-		if i == 0 {
-			noxuDefinition.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: schema,
-			}
-		} else {
-			noxuDefinition.Spec.Versions[0].Schema = &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: schema,
-			}
-			schemaWithDescription := schema.DeepCopy()
-			schemaWithDescription.Description = "test"
-			noxuDefinition.Spec.Versions[1].Schema = &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: schemaWithDescription,
-			}
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
+	for _, noxuDefinition := range noxuDefinitions {
+		noxuDefinition.Spec.Versions[0].Schema = &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: schema.DeepCopy(),
+		}
+		noxuDefinition.Spec.Versions[1].Schema = &apiextensionsv1.CustomResourceValidation{
+			OpenAPIV3Schema: schema.DeepCopy(),
 		}
 
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -545,12 +595,13 @@ func TestValidateOnlyStatus(t *testing.T) {
 			if !isStatus || statusError == nil {
 				t.Fatalf("expected status error, got %T: %v", err, err)
 			}
-			if !strings.Contains(statusError.Error(), "Invalid value") {
-				t.Fatalf("expected 'Invalid value' in error, got: %v", err)
+			expectedErr := "WishIHadChosenNoxu.mygroup.example.com \"foo\" is invalid: status.num: Invalid value: 15: num in body should be less than or equal to 10"
+			if !strings.Contains(statusError.Error(), expectedErr) {
+				t.Fatalf("expected %q in error, got: %v", expectedErr, err)
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -572,9 +623,9 @@ func TestSubresourcesDiscovery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -641,7 +692,7 @@ func TestSubresourcesDiscovery(t *testing.T) {
 				t.Fatalf("incorrect scale via discovery: expected: %v, got: %v", expectedVerbs, scale.Verbs)
 			}
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -654,9 +705,9 @@ func TestGeneration(t *testing.T) {
 	}
 	defer tearDown()
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -714,7 +765,7 @@ func TestGeneration(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -741,9 +792,9 @@ func TestSubresourcePatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinitions := NewNoxuSubresourcesCRDs(apiextensionsv1.NamespaceScoped)
 	for _, noxuDefinition := range noxuDefinitions {
-		noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -772,26 +823,13 @@ func TestSubresourcePatch(t *testing.T) {
 
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 999, "status", "num") // .status.num should be 999
 			expectInt64(t, patchedNoxuInstance.UnstructuredContent(), 10, "spec", "num")    // .spec.num should remain 10
-			rv, found, err := unstructured.NestedString(patchedNoxuInstance.UnstructuredContent(), "metadata", "resourceVersion")
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !found {
-				t.Fatalf("metadata.resourceVersion not found")
-			}
 
-			// this call waits for the resourceVersion to be reached in the cache before returning.
-			// We need to do this because the patch gets its initial object from the storage, and the cache serves that.
-			// If it is out of date, then our initial patch is applied to an old resource version, which conflicts
-			// and then the updated object shows a conflicting diff, which permanently fails the patch.
-			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
-			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
+			// server-side-apply increments resouceVersion if the resource is unchanged for 1 second after the previous write,
+			// and by waiting a second we ensure that resourceVersion will be updated if the no-op patch increments resourceVersion
+			time.Sleep(time.Second)
 			// no-op patch
+			rv := patchedNoxuInstance.GetResourceVersion()
+			found := false
 			t.Logf("Patching .status.num again to 999")
 			patchedNoxuInstance, err = noxuResourceClient.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{}, "status")
 			if err != nil {
@@ -829,17 +867,6 @@ func TestSubresourcePatch(t *testing.T) {
 			}
 			if !found {
 				t.Fatalf("metadata.resourceVersion not found")
-			}
-
-			// this call waits for the resourceVersion to be reached in the cache before returning.
-			// We need to do this because the patch gets its initial object from the storage, and the cache serves that.
-			// If it is out of date, then our initial patch is applied to an old resource version, which conflicts
-			// and then the updated object shows a conflicting diff, which permanently fails the patch.
-			// This gives expected stability in the patch without retrying on an known number of conflicts below in the test.
-			// See https://issue.k8s.io/42644
-			_, err = noxuResourceClient.Get(context.TODO(), "foo", metav1.GetOptions{ResourceVersion: patchedNoxuInstance.GetResourceVersion()})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Scale.Spec.Replicas = 7 but Scale.Status.Replicas should remain 0
@@ -888,7 +915,7 @@ func TestSubresourcePatch(t *testing.T) {
 			}
 			noxuResourceClient.Delete(context.TODO(), "foo", metav1.DeleteOptions{})
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
 	}

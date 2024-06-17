@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winio
@@ -7,11 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"syscall"
 	"unicode/utf16"
+
+	"golang.org/x/sys/windows"
 )
 
 //sys backupRead(h syscall.Handle, b []byte, bytesRead *uint32, abort bool, processSecurity bool, context *uintptr) (err error) = BackupRead
@@ -24,7 +26,7 @@ const (
 	BackupAlternateData
 	BackupLink
 	BackupPropertyData
-	BackupObjectId
+	BackupObjectId //revive:disable-line:var-naming ID, not Id
 	BackupReparseData
 	BackupSparseBlock
 	BackupTxfsData
@@ -34,14 +36,16 @@ const (
 	StreamSparseAttributes = uint32(8)
 )
 
+//nolint:revive // var-naming: ALL_CAPS
 const (
-	WRITE_DAC              = 0x40000
-	WRITE_OWNER            = 0x80000
-	ACCESS_SYSTEM_SECURITY = 0x1000000
+	WRITE_DAC              = windows.WRITE_DAC
+	WRITE_OWNER            = windows.WRITE_OWNER
+	ACCESS_SYSTEM_SECURITY = windows.ACCESS_SYSTEM_SECURITY
 )
 
 // BackupHeader represents a backup stream of a file.
 type BackupHeader struct {
+	//revive:disable-next-line:var-naming ID, not Id
 	Id         uint32 // The backup stream ID
 	Attributes uint32 // Stream attributes
 	Size       int64  // The size of the stream in bytes
@@ -49,8 +53,8 @@ type BackupHeader struct {
 	Offset     int64  // The offset of the stream in the file (for BackupSparseBlock only).
 }
 
-type win32StreamId struct {
-	StreamId   uint32
+type win32StreamID struct {
+	StreamID   uint32
 	Attributes uint32
 	Size       uint64
 	NameSize   uint32
@@ -71,7 +75,7 @@ func NewBackupStreamReader(r io.Reader) *BackupStreamReader {
 // Next returns the next backup stream and prepares for calls to Read(). It skips the remainder of the current stream if
 // it was not completely read.
 func (r *BackupStreamReader) Next() (*BackupHeader, error) {
-	if r.bytesLeft > 0 {
+	if r.bytesLeft > 0 { //nolint:nestif // todo: flatten this
 		if s, ok := r.r.(io.Seeker); ok {
 			// Make sure Seek on io.SeekCurrent sometimes succeeds
 			// before trying the actual seek.
@@ -82,16 +86,16 @@ func (r *BackupStreamReader) Next() (*BackupHeader, error) {
 				r.bytesLeft = 0
 			}
 		}
-		if _, err := io.Copy(ioutil.Discard, r); err != nil {
+		if _, err := io.Copy(io.Discard, r); err != nil {
 			return nil, err
 		}
 	}
-	var wsi win32StreamId
+	var wsi win32StreamID
 	if err := binary.Read(r.r, binary.LittleEndian, &wsi); err != nil {
 		return nil, err
 	}
 	hdr := &BackupHeader{
-		Id:         wsi.StreamId,
+		Id:         wsi.StreamID,
 		Attributes: wsi.Attributes,
 		Size:       int64(wsi.Size),
 	}
@@ -102,7 +106,7 @@ func (r *BackupStreamReader) Next() (*BackupHeader, error) {
 		}
 		hdr.Name = syscall.UTF16ToString(name)
 	}
-	if wsi.StreamId == BackupSparseBlock {
+	if wsi.StreamID == BackupSparseBlock {
 		if err := binary.Read(r.r, binary.LittleEndian, &hdr.Offset); err != nil {
 			return nil, err
 		}
@@ -147,8 +151,8 @@ func (w *BackupStreamWriter) WriteHeader(hdr *BackupHeader) error {
 		return fmt.Errorf("missing %d bytes", w.bytesLeft)
 	}
 	name := utf16.Encode([]rune(hdr.Name))
-	wsi := win32StreamId{
-		StreamId:   hdr.Id,
+	wsi := win32StreamID{
+		StreamID:   hdr.Id,
 		Attributes: hdr.Attributes,
 		Size:       uint64(hdr.Size),
 		NameSize:   uint32(len(name) * 2),
@@ -203,7 +207,7 @@ func (r *BackupFileReader) Read(b []byte) (int, error) {
 	var bytesRead uint32
 	err := backupRead(syscall.Handle(r.f.Fd()), b, &bytesRead, false, r.includeSecurity, &r.ctx)
 	if err != nil {
-		return 0, &os.PathError{"BackupRead", r.f.Name(), err}
+		return 0, &os.PathError{Op: "BackupRead", Path: r.f.Name(), Err: err}
 	}
 	runtime.KeepAlive(r.f)
 	if bytesRead == 0 {
@@ -216,7 +220,7 @@ func (r *BackupFileReader) Read(b []byte) (int, error) {
 // the underlying file.
 func (r *BackupFileReader) Close() error {
 	if r.ctx != 0 {
-		backupRead(syscall.Handle(r.f.Fd()), nil, nil, true, false, &r.ctx)
+		_ = backupRead(syscall.Handle(r.f.Fd()), nil, nil, true, false, &r.ctx)
 		runtime.KeepAlive(r.f)
 		r.ctx = 0
 	}
@@ -242,7 +246,7 @@ func (w *BackupFileWriter) Write(b []byte) (int, error) {
 	var bytesWritten uint32
 	err := backupWrite(syscall.Handle(w.f.Fd()), b, &bytesWritten, false, w.includeSecurity, &w.ctx)
 	if err != nil {
-		return 0, &os.PathError{"BackupWrite", w.f.Name(), err}
+		return 0, &os.PathError{Op: "BackupWrite", Path: w.f.Name(), Err: err}
 	}
 	runtime.KeepAlive(w.f)
 	if int(bytesWritten) != len(b) {
@@ -255,7 +259,7 @@ func (w *BackupFileWriter) Write(b []byte) (int, error) {
 // close the underlying file.
 func (w *BackupFileWriter) Close() error {
 	if w.ctx != 0 {
-		backupWrite(syscall.Handle(w.f.Fd()), nil, nil, true, false, &w.ctx)
+		_ = backupWrite(syscall.Handle(w.f.Fd()), nil, nil, true, false, &w.ctx)
 		runtime.KeepAlive(w.f)
 		w.ctx = 0
 	}
@@ -271,7 +275,13 @@ func OpenForBackup(path string, access uint32, share uint32, createmode uint32) 
 	if err != nil {
 		return nil, err
 	}
-	h, err := syscall.CreateFile(&winPath[0], access, share, nil, createmode, syscall.FILE_FLAG_BACKUP_SEMANTICS|syscall.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	h, err := syscall.CreateFile(&winPath[0],
+		access,
+		share,
+		nil,
+		createmode,
+		syscall.FILE_FLAG_BACKUP_SEMANTICS|syscall.FILE_FLAG_OPEN_REPARSE_POINT,
+		0)
 	if err != nil {
 		err = &os.PathError{Op: "open", Path: path, Err: err}
 		return nil, err

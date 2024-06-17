@@ -25,11 +25,10 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
 # create a nice clean place to put our new vendor tree
-# must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
-# to work with docker-machine on macs
-mkdir -p "${KUBE_ROOT}/_tmp"
-_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
+_tmpdir="$(kube::realpath "$(mktemp -d -t "$(basename "$0").XXXXXX")")"
 
 if [[ -z ${KEEP_TMP:-} ]]; then
     KEEP_TMP=false
@@ -52,9 +51,6 @@ _kubetmp="${_tmpdir}/kubernetes"
 mkdir -p "${_kubetmp}"
 tar --exclude=.git --exclude="./_*" -c . | (cd "${_kubetmp}" && tar xf -)
 
-# Do all our work in module mode
-export GO111MODULE=on
-
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree
   rm -rf ./vendor ./LICENSES
@@ -76,7 +72,7 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
     ret=1
   fi
 
-  if ! _out="$(diff -Naupr -x "BUILD" -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
+  if ! _out="$(diff -Naupr -x "AUTHORS*" -x "CONTRIBUTORS*" vendor "${_kubetmp}/vendor")"; then
     echo "Your vendored results are different:" >&2
     echo "${_out}" >&2
     echo "Vendor Verify failed." >&2
@@ -93,6 +89,18 @@ popd > /dev/null 2>&1
 if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
+
+# Ensure we can tidy every repo using only its recorded versions
+for repo in $(kube::util::list_staging_repos); do
+  pushd "${_kubetmp}/staging/src/k8s.io/${repo}" >/dev/null 2>&1
+    echo "Tidying k8s.io/${repo}..."
+    GODEBUG=gocacheverify=1 go mod tidy
+  popd >/dev/null 2>&1
+done
+pushd "${_kubetmp}" >/dev/null 2>&1
+  echo "Tidying k8s.io/kubernetes..."
+  GODEBUG=gocacheverify=1 go mod tidy
+popd >/dev/null 2>&1
 
 echo "Vendor Verified."
 # ex: ts=2 sw=2 et filetype=sh

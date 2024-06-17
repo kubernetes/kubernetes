@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	coordinationv1 "k8s.io/client-go/applyconfigurations/coordination/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // LeasesGetter has a method to return a LeaseInterface.
@@ -46,6 +52,7 @@ type LeaseInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.LeaseList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Lease, err error)
+	Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Lease, err error)
 	LeaseExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *leases) Get(ctx context.Context, name string, options metav1.GetOptions
 }
 
 // List takes label and field selectors, and returns the list of Leases that match those selectors.
-func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
+func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (*v1.LeaseList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for leases, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for leases", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for leases ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for leases", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Leases that match those selectors.
+func (c *leases) list(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *leases) List(ctx context.Context, opts metav1.ListOptions) (result *v1.
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Leases
+func (c *leases) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.LeaseList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.LeaseList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("leases").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied lease.
+func (c *leases) Apply(ctx context.Context, lease *coordinationv1.LeaseApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Lease, err error) {
+	if lease == nil {
+		return nil, fmt.Errorf("lease provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(lease)
+	if err != nil {
+		return nil, err
+	}
+	name := lease.Name
+	if name == nil {
+		return nil, fmt.Errorf("lease.Name must be provided to Apply")
+	}
+	result = &v1.Lease{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("leases").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

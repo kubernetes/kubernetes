@@ -39,6 +39,21 @@
         }
       ]
     },
+    "ControlCharacterKind": {
+      "description": "Control character %",
+      "properties": {
+        "field1": {
+          "description": "Control character %",
+        }
+      },
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "",
+          "kind": "ControlCharacterKind",
+          "version": "v1"
+        }
+      ]
+    },
     "OtherKind": {
       "description": "This is another kind of Kind",
       "required": [

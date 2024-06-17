@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -20,7 +21,7 @@ package emptydir
 
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 )

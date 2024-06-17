@@ -34,8 +34,8 @@ type CurrentContextOptions struct {
 }
 
 var (
-	currentContextLong = templates.LongDesc(`
-		Displays the current-context`)
+	currentContextLong = templates.LongDesc(i18n.T(`
+		Display the current-context.`))
 
 	currentContextExample = templates.Examples(`
 		# Display the current-context
@@ -48,7 +48,7 @@ func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAcce
 
 	cmd := &cobra.Command{
 		Use:     "current-context",
-		Short:   i18n.T("Displays the current-context"),
+		Short:   i18n.T("Display the current-context"),
 		Long:    currentContextLong,
 		Example: currentContextExample,
 		Run: func(cmd *cobra.Command, args []string) {

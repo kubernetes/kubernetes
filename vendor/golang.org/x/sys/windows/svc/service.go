@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build windows
+//go:build windows
 
 // Package svc provides everything required to build Windows service.
-//
 package svc
 
 import (
 	"errors"
-	"runtime"
-	"syscall"
+	"sync"
 	"unsafe"
 
-	"golang.org/x/sys/internal/unsafeheader"
 	"golang.org/x/sys/windows"
 )
 
@@ -50,6 +47,7 @@ const (
 	HardwareProfileChange = Cmd(windows.SERVICE_CONTROL_HARDWAREPROFILECHANGE)
 	PowerEvent            = Cmd(windows.SERVICE_CONTROL_POWEREVENT)
 	SessionChange         = Cmd(windows.SERVICE_CONTROL_SESSIONCHANGE)
+	PreShutdown           = Cmd(windows.SERVICE_CONTROL_PRESHUTDOWN)
 )
 
 // Accepted is used to describe commands accepted by the service.
@@ -65,16 +63,39 @@ const (
 	AcceptHardwareProfileChange = Accepted(windows.SERVICE_ACCEPT_HARDWAREPROFILECHANGE)
 	AcceptPowerEvent            = Accepted(windows.SERVICE_ACCEPT_POWEREVENT)
 	AcceptSessionChange         = Accepted(windows.SERVICE_ACCEPT_SESSIONCHANGE)
+	AcceptPreShutdown           = Accepted(windows.SERVICE_ACCEPT_PRESHUTDOWN)
+)
+
+// ActivityStatus allows for services to be selected based on active and inactive categories of service state.
+type ActivityStatus uint32
+
+const (
+	Active      = ActivityStatus(windows.SERVICE_ACTIVE)
+	Inactive    = ActivityStatus(windows.SERVICE_INACTIVE)
+	AnyActivity = ActivityStatus(windows.SERVICE_STATE_ALL)
 )
 
 // Status combines State and Accepted commands to fully describe running service.
 type Status struct {
-	State      State
-	Accepts    Accepted
-	CheckPoint uint32 // used to report progress during a lengthy operation
-	WaitHint   uint32 // estimated time required for a pending operation, in milliseconds
-	ProcessId  uint32 // if the service is running, the process identifier of it, and otherwise zero
+	State                   State
+	Accepts                 Accepted
+	CheckPoint              uint32 // used to report progress during a lengthy operation
+	WaitHint                uint32 // estimated time required for a pending operation, in milliseconds
+	ProcessId               uint32 // if the service is running, the process identifier of it, and otherwise zero
+	Win32ExitCode           uint32 // set if the service has exited with a win32 exit code
+	ServiceSpecificExitCode uint32 // set if the service has exited with a service-specific exit code
 }
+
+// StartReason is the reason that the service was started.
+type StartReason uint32
+
+const (
+	StartReasonDemand           = StartReason(windows.SERVICE_START_REASON_DEMAND)
+	StartReasonAuto             = StartReason(windows.SERVICE_START_REASON_AUTO)
+	StartReasonTrigger          = StartReason(windows.SERVICE_START_REASON_TRIGGER)
+	StartReasonRestartOnFailure = StartReason(windows.SERVICE_START_REASON_RESTART_ON_FAILURE)
+	StartReasonDelayedAuto      = StartReason(windows.SERVICE_START_REASON_DELAYEDAUTO)
+)
 
 // ChangeRequest is sent to the service Handler to request service status change.
 type ChangeRequest struct {
@@ -87,7 +108,6 @@ type ChangeRequest struct {
 
 // Handler is the interface that must be implemented to build Windows service.
 type Handler interface {
-
 	// Execute will be called by the package code at the start of
 	// the service, and the service will exit once Execute completes.
 	// Inside Execute you must read service change requests from r and
@@ -102,28 +122,6 @@ type Handler interface {
 	Execute(args []string, r <-chan ChangeRequest, s chan<- Status) (svcSpecificEC bool, exitCode uint32)
 }
 
-var (
-	// These are used by asm code.
-	goWaitsH                       uintptr
-	cWaitsH                        uintptr
-	ssHandle                       uintptr
-	sName                          *uint16
-	sArgc                          uintptr
-	sArgv                          **uint16
-	ctlHandlerExProc               uintptr
-	cSetEvent                      uintptr
-	cWaitForSingleObject           uintptr
-	cRegisterServiceCtrlHandlerExW uintptr
-)
-
-func init() {
-	k := windows.NewLazySystemDLL("kernel32.dll")
-	cSetEvent = k.NewProc("SetEvent").Addr()
-	cWaitForSingleObject = k.NewProc("WaitForSingleObject").Addr()
-	a := windows.NewLazySystemDLL("advapi32.dll")
-	cRegisterServiceCtrlHandlerExW = a.NewProc("RegisterServiceCtrlHandlerExW").Addr()
-}
-
 type ctlEvent struct {
 	cmd       Cmd
 	eventType uint32
@@ -136,34 +134,8 @@ type ctlEvent struct {
 type service struct {
 	name    string
 	h       windows.Handle
-	cWaits  *event
-	goWaits *event
 	c       chan ctlEvent
 	handler Handler
-}
-
-func newService(name string, handler Handler) (*service, error) {
-	var s service
-	var err error
-	s.name = name
-	s.c = make(chan ctlEvent)
-	s.handler = handler
-	s.cWaits, err = newEvent()
-	if err != nil {
-		return nil, err
-	}
-	s.goWaits, err = newEvent()
-	if err != nil {
-		s.cWaits.Close()
-		return nil, err
-	}
-	return &s, nil
-}
-
-func (s *service) close() error {
-	s.cWaits.Close()
-	s.goWaits.Close()
-	return nil
 }
 
 type exitCode struct {
@@ -202,6 +174,9 @@ func (s *service) updateStatus(status *Status, ec *exitCode) error {
 	if status.Accepts&AcceptSessionChange != 0 {
 		t.ControlsAccepted |= windows.SERVICE_ACCEPT_SESSIONCHANGE
 	}
+	if status.Accepts&AcceptPreShutdown != 0 {
+		t.ControlsAccepted |= windows.SERVICE_ACCEPT_PRESHUTDOWN
+	}
 	if ec.errno == 0 {
 		t.Win32ExitCode = windows.NO_ERROR
 		t.ServiceSpecificExitCode = windows.NO_ERROR
@@ -217,23 +192,38 @@ func (s *service) updateStatus(status *Status, ec *exitCode) error {
 	return windows.SetServiceStatus(s.h, &t)
 }
 
-const (
-	sysErrSetServiceStatusFailed = uint32(syscall.APPLICATION_ERROR) + iota
-	sysErrNewThreadInCallback
+var (
+	initCallbacks       sync.Once
+	ctlHandlerCallback  uintptr
+	serviceMainCallback uintptr
 )
 
-func (s *service) run() {
-	s.goWaits.Wait()
-	s.h = windows.Handle(ssHandle)
+func ctlHandler(ctl, evtype, evdata, context uintptr) uintptr {
+	s := (*service)(unsafe.Pointer(context))
+	e := ctlEvent{cmd: Cmd(ctl), eventType: uint32(evtype), eventData: evdata, context: 123456} // Set context to 123456 to test issue #25660.
+	s.c <- e
+	return 0
+}
 
-	var argv []*uint16
-	hdr := (*unsafeheader.Slice)(unsafe.Pointer(&argv))
-	hdr.Data = unsafe.Pointer(sArgv)
-	hdr.Len = int(sArgc)
-	hdr.Cap = int(sArgc)
+var theService service // This is, unfortunately, a global, which means only one service per process.
 
-	args := make([]string, len(argv))
-	for i, a := range argv {
+// serviceMain is the entry point called by the service manager, registered earlier by
+// the call to StartServiceCtrlDispatcher.
+func serviceMain(argc uint32, argv **uint16) uintptr {
+	handle, err := windows.RegisterServiceCtrlHandlerEx(windows.StringToUTF16Ptr(theService.name), ctlHandlerCallback, uintptr(unsafe.Pointer(&theService)))
+	if sysErr, ok := err.(windows.Errno); ok {
+		return uintptr(sysErr)
+	} else if err != nil {
+		return uintptr(windows.ERROR_UNKNOWN_EXCEPTION)
+	}
+	theService.h = handle
+	defer func() {
+		theService.h = 0
+	}()
+	args16 := unsafe.Slice(argv, int(argc))
+
+	args := make([]string, len(args16))
+	for i, a := range args16 {
 		args[i] = windows.UTF16PtrToString(a)
 	}
 
@@ -242,7 +232,7 @@ func (s *service) run() {
 	exitFromHandler := make(chan exitCode)
 
 	go func() {
-		ss, errno := s.handler.Execute(args, cmdsToHandler, changesFromHandler)
+		ss, errno := theService.handler.Execute(args, cmdsToHandler, changesFromHandler)
 		exitFromHandler <- exitCode{ss, errno}
 	}()
 
@@ -251,7 +241,7 @@ func (s *service) run() {
 		CurrentStatus: Status{State: Stopped},
 	}
 	var outch chan ChangeRequest
-	inch := s.c
+	inch := theService.c
 loop:
 	for {
 		select {
@@ -267,14 +257,13 @@ loop:
 			outcr.EventData = r.eventData
 			outcr.Context = r.context
 		case outch <- outcr:
-			inch = s.c
+			inch = theService.c
 			outch = nil
 		case c := <-changesFromHandler:
-			err := s.updateStatus(&c, &ec)
+			err := theService.updateStatus(&c, &ec)
 			if err != nil {
-				// best suitable error number
-				ec.errno = sysErrSetServiceStatusFailed
-				if err2, ok := err.(syscall.Errno); ok {
+				ec.errno = uint32(windows.ERROR_EXCEPTION_IN_SERVICE)
+				if err2, ok := err.(windows.Errno); ok {
 					ec.errno = uint32(err2)
 				}
 				break loop
@@ -285,87 +274,43 @@ loop:
 		}
 	}
 
-	s.updateStatus(&Status{State: Stopped}, &ec)
-	s.cWaits.Set()
-}
+	theService.updateStatus(&Status{State: Stopped}, &ec)
 
-func newCallback(fn interface{}) (cb uintptr, err error) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			return
-		}
-		cb = 0
-		switch v := r.(type) {
-		case string:
-			err = errors.New(v)
-		case error:
-			err = v
-		default:
-			err = errors.New("unexpected panic in syscall.NewCallback")
-		}
-	}()
-	return syscall.NewCallback(fn), nil
+	return windows.NO_ERROR
 }
-
-// BUG(brainman): There is no mechanism to run multiple services
-// inside one single executable. Perhaps, it can be overcome by
-// using RegisterServiceCtrlHandlerEx Windows api.
 
 // Run executes service name by calling appropriate handler function.
 func Run(name string, handler Handler) error {
-	runtime.LockOSThread()
-
-	tid := windows.GetCurrentThreadId()
-
-	s, err := newService(name, handler)
-	if err != nil {
-		return err
-	}
-
-	ctlHandler := func(ctl, evtype, evdata, context uintptr) uintptr {
-		e := ctlEvent{cmd: Cmd(ctl), eventType: uint32(evtype), eventData: evdata, context: context}
-		// We assume that this callback function is running on
-		// the same thread as Run. Nowhere in MS documentation
-		// I could find statement to guarantee that. So putting
-		// check here to verify, otherwise things will go bad
-		// quickly, if ignored.
-		i := windows.GetCurrentThreadId()
-		if i != tid {
-			e.errno = sysErrNewThreadInCallback
-		}
-		s.c <- e
-		// Always return NO_ERROR (0) for now.
-		return windows.NO_ERROR
-	}
-
-	var svcmain uintptr
-	getServiceMain(&svcmain)
+	initCallbacks.Do(func() {
+		ctlHandlerCallback = windows.NewCallback(ctlHandler)
+		serviceMainCallback = windows.NewCallback(serviceMain)
+	})
+	theService.name = name
+	theService.handler = handler
+	theService.c = make(chan ctlEvent)
 	t := []windows.SERVICE_TABLE_ENTRY{
-		{ServiceName: syscall.StringToUTF16Ptr(s.name), ServiceProc: svcmain},
+		{ServiceName: windows.StringToUTF16Ptr(theService.name), ServiceProc: serviceMainCallback},
 		{ServiceName: nil, ServiceProc: 0},
 	}
-
-	goWaitsH = uintptr(s.goWaits.h)
-	cWaitsH = uintptr(s.cWaits.h)
-	sName = t[0].ServiceName
-	ctlHandlerExProc, err = newCallback(ctlHandler)
-	if err != nil {
-		return err
-	}
-
-	go s.run()
-
-	err = windows.StartServiceCtrlDispatcher(&t[0])
-	if err != nil {
-		return err
-	}
-	return nil
+	return windows.StartServiceCtrlDispatcher(&t[0])
 }
 
 // StatusHandle returns service status handle. It is safe to call this function
 // from inside the Handler.Execute because then it is guaranteed to be set.
-// This code will have to change once multiple services are possible per process.
 func StatusHandle() windows.Handle {
-	return windows.Handle(ssHandle)
+	return theService.h
+}
+
+// DynamicStartReason returns the reason why the service was started. It is safe
+// to call this function from inside the Handler.Execute because then it is
+// guaranteed to be set.
+func DynamicStartReason() (StartReason, error) {
+	var allocReason *uint32
+	err := windows.QueryServiceDynamicInformation(theService.h, windows.SERVICE_DYNAMIC_INFORMATION_LEVEL_START_REASON, unsafe.Pointer(&allocReason))
+	if err != nil {
+		return 0, err
+	}
+	reason := StartReason(*allocReason)
+	windows.LocalFree(windows.Handle(unsafe.Pointer(allocReason)))
+	return reason, nil
 }

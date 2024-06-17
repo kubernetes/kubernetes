@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ReplicaSetsGetter has a method to return a ReplicaSetInterface.
@@ -47,8 +53,11 @@ type ReplicaSetInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ReplicaSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ReplicaSet, err error)
+	Apply(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error)
+	ApplyStatus(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error)
 	GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (*v1beta1.Scale, error)
 	UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (*v1beta1.Scale, error)
+	ApplyScale(ctx context.Context, replicaSetName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (*v1beta1.Scale, error)
 
 	ReplicaSetExpansion
 }
@@ -81,7 +90,26 @@ func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOption
 }
 
 // List takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
-func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
+func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ReplicaSetList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for replicasets, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for replicasets", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for replicasets ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for replicasets", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ReplicaSets that match those selectors.
+func (c *replicaSets) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -93,6 +121,23 @@ func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ReplicaSets
+func (c *replicaSets) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ReplicaSetList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.ReplicaSetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicasets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -197,6 +242,62 @@ func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType
 	return
 }
 
+// Apply takes the given apply declarative configuration, applies it and returns the applied replicaSet.
+func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error) {
+	if replicaSet == nil {
+		return nil, fmt.Errorf("replicaSet provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicaSet)
+	if err != nil {
+		return nil, err
+	}
+	name := replicaSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
+	}
+	result = &v1beta1.ReplicaSet{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *extensionsv1beta1.ReplicaSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ReplicaSet, err error) {
+	if replicaSet == nil {
+		return nil, fmt.Errorf("replicaSet provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicaSet)
+	if err != nil {
+		return nil, err
+	}
+
+	name := replicaSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicaSet.Name must be provided to Apply")
+	}
+
+	result = &v1beta1.ReplicaSet{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
 // GetScale takes name of the replicaSet, and returns the corresponding v1beta1.Scale object, and an error if there is any.
 func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
 	result = &v1beta1.Scale{}
@@ -221,6 +322,31 @@ func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, sc
 		SubResource("scale").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(scale).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, scale *extensionsv1beta1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+
+	result = &v1beta1.Scale{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicasets").
+		Name(replicaSetName).
+		SubResource("scale").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
 		Do(ctx).
 		Into(result)
 	return

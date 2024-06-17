@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -25,13 +26,13 @@ import (
 )
 
 // TestReachableHTTP tests that the given host serves HTTP on the given port.
-func TestReachableHTTP(host string, port int, timeout time.Duration) {
-	TestReachableHTTPWithRetriableErrorCodes(host, port, []int{}, timeout)
+func TestReachableHTTP(ctx context.Context, host string, port int, timeout time.Duration) {
+	TestReachableHTTPWithRetriableErrorCodes(ctx, host, port, []int{}, timeout)
 }
 
 // TestReachableHTTPWithRetriableErrorCodes tests that the given host serves HTTP on the given port with the given retriableErrCodes.
-func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func TestReachableHTTPWithRetriableErrorCodes(ctx context.Context, host string, port int, retriableErrCodes []int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, "/echo?msg=hello",
 			&e2enetwork.HTTPPokeParams{
 				BodyContains:   "hello",
@@ -43,8 +44,8 @@ func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableEr
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		if err == wait.ErrWaitTimeout {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
+		if wait.Interrupted(err) {
 			framework.Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
 		} else {
 			framework.Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)

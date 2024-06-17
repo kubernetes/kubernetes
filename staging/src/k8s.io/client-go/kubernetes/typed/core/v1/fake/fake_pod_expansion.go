@@ -19,12 +19,13 @@ package fake
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -67,7 +68,7 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(strings.NewReader("fake logs")),
+				Body:       io.NopCloser(strings.NewReader("fake logs")),
 			}
 			return resp, nil
 		}),
@@ -78,7 +79,23 @@ func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	return fakeClient.Request()
 }
 
-func (c *FakePods) Evict(ctx context.Context, eviction *policy.Eviction) error {
+func (c *FakePods) Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error {
+	return c.EvictV1beta1(ctx, eviction)
+}
+
+func (c *FakePods) EvictV1(ctx context.Context, eviction *policyv1.Eviction) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Namespace = c.ns
+	action.Resource = podsResource
+	action.Subresource = "eviction"
+	action.Object = eviction
+
+	_, err := c.Fake.Invokes(action, eviction)
+	return err
+}
+
+func (c *FakePods) EvictV1beta1(ctx context.Context, eviction *policyv1beta1.Eviction) error {
 	action := core.CreateActionImpl{}
 	action.Verb = "create"
 	action.Namespace = c.ns

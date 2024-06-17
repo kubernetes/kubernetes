@@ -19,7 +19,6 @@ package credentialprovider
 import (
 	"encoding/base64"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -33,7 +32,7 @@ func TestReadDockerConfigFile(t *testing.T) {
 	//test dockerconfig json
 	inputDockerconfigJSONFile := "{ \"auths\": { \"http://foo.example.com\":{\"auth\":\"Zm9vOmJhcgo=\",\"email\":\"foo@example.com\"}}}"
 
-	preferredPath, err := ioutil.TempDir("", "test_foo_bar_dockerconfigjson_")
+	preferredPath, err := os.MkdirTemp("", "test_foo_bar_dockerconfigjson_")
 	if err != nil {
 		t.Fatalf("Creating tmp dir fail: %v", err)
 		return
@@ -306,6 +305,99 @@ func TestDockerConfigEntryJSONCompatibleEncode(t *testing.T) {
 
 		if string(tt.expect) != string(actual) {
 			t.Errorf("case %d: expected %v, got %v", i, string(tt.expect), string(actual))
+		}
+	}
+}
+
+func TestReadDockerConfigFileFromBytes(t *testing.T) {
+	testCases := []struct {
+		id               string
+		input            []byte
+		expectedCfg      DockerConfig
+		errorExpected    bool
+		expectedErrorMsg string
+	}{
+		{
+			id:    "valid input, no error expected",
+			input: []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}}`),
+			expectedCfg: DockerConfig(map[string]DockerConfigEntry{
+				"http://foo.example.com": {
+					Username: "foo",
+					Password: "bar",
+					Email:    "foo@example.com",
+				},
+			}),
+		},
+		{
+			id:               "invalid input, error expected",
+			input:            []byte(`{"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"`),
+			errorExpected:    true,
+			expectedErrorMsg: "error occurred while trying to unmarshal json",
+		},
+	}
+
+	for _, tc := range testCases {
+		cfg, err := ReadDockerConfigFileFromBytes(tc.input)
+		if err != nil && !tc.errorExpected {
+			t.Fatalf("Error was not expected: %v", err)
+		}
+		if err != nil && tc.errorExpected {
+			if !reflect.DeepEqual(err.Error(), tc.expectedErrorMsg) {
+				t.Fatalf("Expected error message: `%s` got `%s`", tc.expectedErrorMsg, err.Error())
+			}
+		} else {
+			if !reflect.DeepEqual(cfg, tc.expectedCfg) {
+				t.Fatalf("expected: %v got %v", tc.expectedCfg, cfg)
+			}
+		}
+	}
+}
+
+func TestReadDockerConfigJSONFileFromBytes(t *testing.T) {
+	testCases := []struct {
+		id               string
+		input            []byte
+		expectedCfg      DockerConfig
+		errorExpected    bool
+		expectedErrorMsg string
+	}{
+		{
+			id:    "valid input, no error expected",
+			input: []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"}}}`),
+			expectedCfg: DockerConfig(map[string]DockerConfigEntry{
+				"http://foo.example.com": {
+					Username: "foo",
+					Password: "bar",
+					Email:    "foo@example.com",
+				},
+				"http://bar.example.com": {
+					Username: "bar",
+					Password: "baz",
+					Email:    "bar@example.com",
+				},
+			}),
+		},
+		{
+			id:               "invalid input, error expected",
+			input:            []byte(`{"auths": {"http://foo.example.com":{"username": "foo", "password": "bar", "email": "foo@example.com"}, "http://bar.example.com":{"username": "bar", "password": "baz", "email": "bar@example.com"`),
+			errorExpected:    true,
+			expectedErrorMsg: "error occurred while trying to unmarshal json",
+		},
+	}
+
+	for _, tc := range testCases {
+		cfg, err := readDockerConfigJSONFileFromBytes(tc.input)
+		if err != nil && !tc.errorExpected {
+			t.Fatalf("Error was not expected: %v", err)
+		}
+		if err != nil && tc.errorExpected {
+			if !reflect.DeepEqual(err.Error(), tc.expectedErrorMsg) {
+				t.Fatalf("Expected error message: `%s` got `%s`", tc.expectedErrorMsg, err.Error())
+			}
+		} else {
+			if !reflect.DeepEqual(cfg, tc.expectedCfg) {
+				t.Fatalf("expected: %v got %v", tc.expectedCfg, cfg)
+			}
 		}
 	}
 }

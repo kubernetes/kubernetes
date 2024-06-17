@@ -18,14 +18,15 @@ package helper
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestGetPodServices(t *testing.T) {
@@ -48,16 +49,11 @@ func TestGetPodServices(t *testing.T) {
 	}
 	var pods []*v1.Pod
 	for i := 0; i < 5; i++ {
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "test",
-				Name:      fmt.Sprintf("test-pod-%d", i),
-				Labels: map[string]string{
-					"app":   fmt.Sprintf("test-%d", i),
-					"label": fmt.Sprintf("label-%d", i),
-				},
-			},
-		}
+		pod := st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).
+			Namespace("test").
+			Label("app", fmt.Sprintf("test-%d", i)).
+			Label("label", fmt.Sprintf("label-%d", i)).
+			Obj()
 		pods = append(pods, pod)
 	}
 
@@ -97,8 +93,8 @@ func TestGetPodServices(t *testing.T) {
 			get, err := GetPodServices(fakeInformerFactory.Core().V1().Services().Lister(), test.pod)
 			if err != nil {
 				t.Errorf("Error from GetPodServices: %v", err)
-			} else if !reflect.DeepEqual(get, test.expect) {
-				t.Errorf("Expect services %v, but got %v", test.expect, get)
+			} else if diff := cmp.Diff(test.expect, get); diff != "" {
+				t.Errorf("Unexpected services (-want, +got):\n%s", diff)
 			}
 		})
 	}

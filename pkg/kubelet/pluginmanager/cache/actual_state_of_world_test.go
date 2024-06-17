@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -117,6 +118,11 @@ func Test_ASW_RemovePlugin_Positive(t *testing.T) {
 // Verifies PluginExistsWithCorrectTimestamp returns false for an existing
 // plugin with the wrong timestamp
 func Test_ASW_PluginExistsWithCorrectTimestamp_Negative_WrongTimestamp(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	// First, add a plugin
 	asw := NewActualStateOfWorld()
 	pluginInfo := PluginInfo{

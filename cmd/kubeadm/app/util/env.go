@@ -21,11 +21,13 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 // GetProxyEnvVars builds a list of environment variables in order to use the right proxy
-func GetProxyEnvVars() []v1.EnvVar {
-	envs := []v1.EnvVar{}
+func GetProxyEnvVars() []kubeadmapi.EnvVar {
+	envs := []kubeadmapi.EnvVar{}
 	for _, env := range os.Environ() {
 		pos := strings.Index(env, "=")
 		if pos == -1 {
@@ -35,9 +37,27 @@ func GetProxyEnvVars() []v1.EnvVar {
 		name := env[:pos]
 		value := env[pos+1:]
 		if strings.HasSuffix(strings.ToLower(name), "_proxy") && value != "" {
-			envVar := v1.EnvVar{Name: name, Value: value}
+			envVar := kubeadmapi.EnvVar{
+				EnvVar: v1.EnvVar{Name: name, Value: value},
+			}
 			envs = append(envs, envVar)
 		}
 	}
 	return envs
+}
+
+// MergeKubeadmEnvVars merges values of environment variable slices.
+// The values defined in later slices overwrite values in previous ones.
+func MergeKubeadmEnvVars(envList ...[]kubeadmapi.EnvVar) []v1.EnvVar {
+	m := make(map[string]v1.EnvVar)
+	merged := []v1.EnvVar{}
+	for _, envs := range envList {
+		for _, env := range envs {
+			m[env.Name] = env.EnvVar
+		}
+	}
+	for _, v := range m {
+		merged = append(merged, v)
+	}
+	return merged
 }

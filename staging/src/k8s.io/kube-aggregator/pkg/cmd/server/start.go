@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -55,7 +56,7 @@ type AggregatorOptions struct {
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
 // with a default AggregatorOptions.
-func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
@@ -67,12 +68,13 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(stopCh); err != nil {
+			if err := o.RunAggregator(c.Context()); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.SetContext(ctx)
 
 	o.AddFlags(cmd.Flags())
 	return cmd
@@ -119,7 +121,7 @@ func (o *AggregatorOptions) Complete() error {
 }
 
 // RunAggregator runs the API Aggregator.
-func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
+func (o AggregatorOptions) RunAggregator(ctx context.Context) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -142,6 +144,9 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	)
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(aggregatorscheme.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "kube-aggregator"
+	// prevent generic API server from installing the OpenAPI handler. Aggregator server
+	// has its own customized OpenAPI handler.
+	serverConfig.SkipOpenAPIInstallation = true
 
 	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister())
 
@@ -168,5 +173,5 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	return prepared.Run(stopCh)
+	return prepared.Run(ctx)
 }

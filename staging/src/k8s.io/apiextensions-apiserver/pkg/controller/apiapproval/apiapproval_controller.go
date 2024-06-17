@@ -46,7 +46,7 @@ type KubernetesAPIApprovalPolicyConformantConditionController struct {
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// last protectedAnnotation value this controller updated the condition per CRD name (to avoid two
 	// different version of the apiextensions-apiservers in HA to fight for the right message)
@@ -60,10 +60,13 @@ func NewKubernetesAPIApprovalPolicyConformantConditionController(
 	crdClient client.CustomResourceDefinitionsGetter,
 ) *KubernetesAPIApprovalPolicyConformantConditionController {
 	c := &KubernetesAPIApprovalPolicyConformantConditionController{
-		crdClient:                   crdClient,
-		crdLister:                   crdInformer.Lister(),
-		crdSynced:                   crdInformer.Informer().HasSynced,
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "kubernetes_api_approval_conformant_condition_controller"),
+		crdClient: crdClient,
+		crdLister: crdInformer.Lister(),
+		crdSynced: crdInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "kubernetes_api_approval_conformant_condition_controller"},
+		),
 		lastSeenProtectedAnnotation: map[string]string{},
 	}
 
@@ -179,7 +182,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 }
 
 // Run starts the controller.
-func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -190,7 +193,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(threadine
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -210,7 +213,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) processNextWo
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

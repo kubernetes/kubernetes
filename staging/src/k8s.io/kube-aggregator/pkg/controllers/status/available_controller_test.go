@@ -27,10 +27,9 @@ import (
 
 	"k8s.io/utils/pointer"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -127,12 +126,14 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 		serviceLister:    v1listers.NewServiceLister(serviceIndexer),
 		endpointsLister:  v1listers.NewEndpointsLister(endpointsIndexer),
 		serviceResolver:  &fakeServiceResolver{url: testServer.URL},
-		queue: workqueue.NewNamedRateLimitingQueue(
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
-			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
-			"AvailableConditionController"),
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 30*time.Second),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "AvailableConditionController"},
+		),
+		metrics: newAvailabilityMetrics(),
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -202,15 +203,17 @@ func TestBuildCache(t *testing.T) {
 		})
 	}
 }
+
 func TestSync(t *testing.T) {
 	tests := []struct {
 		name string
 
-		apiServiceName     string
-		apiServices        []*apiregistration.APIService
-		services           []*v1.Service
-		endpoints          []*v1.Endpoints
-		forceDiscoveryFail bool
+		apiServiceName  string
+		apiServices     []*apiregistration.APIService
+		services        []*v1.Service
+		endpoints       []*v1.Endpoints
+		backendStatus   int
+		backendLocation string
 
 		expectedAvailability apiregistration.APIServiceCondition
 	}{
@@ -218,6 +221,7 @@ func TestSync(t *testing.T) {
 			name:           "local",
 			apiServiceName: "local.group",
 			apiServices:    []*apiregistration.APIService{newLocalAPIService("local.group")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionTrue,
@@ -230,6 +234,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "not-bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -250,7 +255,8 @@ func TestSync(t *testing.T) {
 					},
 				},
 			}},
-			endpoints: []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:     []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus: http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -263,6 +269,7 @@ func TestSync(t *testing.T) {
 			apiServiceName: "remote.group",
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -276,6 +283,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpoints("foo", "bar")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -289,6 +297,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, "wrongName")},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -302,6 +311,7 @@ func TestSync(t *testing.T) {
 			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
 			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
 			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusOK,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionTrue,
@@ -310,12 +320,41 @@ func TestSync(t *testing.T) {
 			},
 		},
 		{
-			name:               "remote-bad-return",
-			apiServiceName:     "remote.group",
-			apiServices:        []*apiregistration.APIService{newRemoteAPIService("remote.group")},
-			services:           []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
-			endpoints:          []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
-			forceDiscoveryFail: true,
+			name:           "remote-bad-return",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusForbidden,
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "FailedDiscoveryCheck",
+				Message: `failing or missing response from`,
+			},
+		},
+		{
+			name:            "remote-redirect",
+			apiServiceName:  "remote.group",
+			apiServices:     []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:        []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:       []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:   http.StatusFound,
+			backendLocation: "/test",
+			expectedAvailability: apiregistration.APIServiceCondition{
+				Type:    apiregistration.Available,
+				Status:  apiregistration.ConditionFalse,
+				Reason:  "FailedDiscoveryCheck",
+				Message: `failing or missing response from`,
+			},
+		},
+		{
+			name:           "remote-304",
+			apiServiceName: "remote.group",
+			apiServices:    []*apiregistration.APIService{newRemoteAPIService("remote.group")},
+			services:       []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)},
+			endpoints:      []*v1.Endpoints{newEndpointsWithAddress("foo", "bar", testServicePort, testServicePortName)},
+			backendStatus:  http.StatusNotModified,
 			expectedAvailability: apiregistration.APIServiceCondition{
 				Type:    apiregistration.Available,
 				Status:  apiregistration.ConditionFalse,
@@ -342,10 +381,10 @@ func TestSync(t *testing.T) {
 			}
 
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !tc.forceDiscoveryFail {
-					w.WriteHeader(http.StatusOK)
+				if tc.backendLocation != "" {
+					w.Header().Set("Location", tc.backendLocation)
 				}
-				w.WriteHeader(http.StatusForbidden)
+				w.WriteHeader(tc.backendStatus)
 			}))
 			defer testServer.Close()
 
@@ -356,6 +395,7 @@ func TestSync(t *testing.T) {
 				endpointsLister:            v1listers.NewEndpointsLister(endpointsIndexer),
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+				metrics:                    newAvailabilityMetrics(),
 			}
 			c.sync(tc.apiServiceName)
 
@@ -405,15 +445,20 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
+	c := AvailableConditionController{
+		apiServiceClient: fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter),
+		metrics:          newAvailabilityMetrics(),
+	}
+
+	c.updateAPIServiceStatus(foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
-		t.Error(spew.Sdump(fakeClient.Actions()))
+		t.Error(dump.Pretty(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
+	c.updateAPIServiceStatus(foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
-		t.Error(spew.Sdump(fakeClient.Actions()))
+		t.Error(dump.Pretty(fakeClient.Actions()))
 	}
 }
 

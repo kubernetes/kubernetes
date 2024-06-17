@@ -20,19 +20,20 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
 	// Start starts device plugin registration service.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, initialContainers containermap.ContainerMap, initialContainerRunningSet sets.Set[string]) error
 
 	// Allocate configures and assigns devices to a container in a pod. From
 	// the requested device resources, Allocate will communicate with the
@@ -60,7 +61,10 @@ type Manager interface {
 	GetWatcherHandler() cache.PluginHandler
 
 	// GetDevices returns information about the devices assigned to pods and containers
-	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+	GetDevices(podUID, containerName string) ResourceDeviceInstances
+
+	// GetAllocatableDevices returns information about all the devices known to the manager
+	GetAllocatableDevices() ResourceDeviceInstances
 
 	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
 	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
@@ -70,6 +74,10 @@ type Manager interface {
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments
 	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+
+	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
+	// and is consulted to make Topology aware resource alignments per Pod
+	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
@@ -85,27 +93,13 @@ type DeviceRunContainerOptions struct {
 	Devices []kubecontainer.DeviceInfo
 	// The Annotations for the container
 	Annotations []kubecontainer.Annotation
+	// CDI Devices for the container
+	CDIDevices []kubecontainer.CDIDevice
 }
 
-// TODO: evaluate whether we need these error definitions.
+// TODO: evaluate whether we need this error definition.
 const (
-	// errFailedToDialDevicePlugin is the error raised when the device plugin could not be
-	// reached on the registered socket
-	errFailedToDialDevicePlugin = "failed to dial device plugin:"
-	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
-	// supported by the Kubelet registry
-	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
-	// errInvalidResourceName is the error raised when a device plugin is registering
-	// itself with an invalid ResourceName
-	errInvalidResourceName = "the ResourceName %q is invalid"
-	// errEndpointStopped indicates that the endpoint has been stopped
 	errEndpointStopped = "endpoint %v has been stopped"
-	// errBadSocket is the error raised when the registry socket path is not absolute
-	errBadSocket = "bad socketPath, must be an absolute path:"
-	// errListenSocket is the error raised when the registry could not listen on the socket
-	errListenSocket = "failed to listen to socket while starting device plugin registry, with error"
-	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully
-	errListAndWatch = "listAndWatch ended unexpectedly for device plugin %s with error %v"
 )
 
 // endpointStopGracePeriod indicates the grace period after an endpoint is stopped

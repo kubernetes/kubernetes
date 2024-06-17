@@ -21,7 +21,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
@@ -469,5 +469,87 @@ func TestEnableHiddenStableCollector(t *testing.T) {
 				d.ClearState()
 			}
 		})
+	}
+}
+
+func TestRegistryReset(t *testing.T) {
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+	registry := newKubeRegistry(currentVersion)
+	resettableMetric := NewCounterVec(&CounterOpts{
+		Name: "reset_metric",
+		Help: "this metric can be reset",
+	}, []string{"label"})
+	// gauges cannot be reset
+	nonResettableMetric := NewGauge(&GaugeOpts{
+		Name: "not_reset_metric",
+		Help: "this metric cannot be reset",
+	})
+
+	registry.MustRegister(resettableMetric)
+	registry.MustRegister(nonResettableMetric)
+	resettableMetric.WithLabelValues("one").Inc()
+	resettableMetric.WithLabelValues("two").Inc()
+	resettableMetric.WithLabelValues("two").Inc()
+	nonResettableMetric.Inc()
+
+	nonResettableOutput := `
+        # HELP not_reset_metric [ALPHA] this metric cannot be reset
+        # TYPE not_reset_metric gauge
+        not_reset_metric 1
+`
+	resettableOutput := `
+        # HELP reset_metric [ALPHA] this metric can be reset
+        # TYPE reset_metric counter
+        reset_metric{label="one"} 1
+        reset_metric{label="two"} 2
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput+resettableOutput), "reset_metric", "not_reset_metric"); err != nil {
+		t.Fatal(err)
+	}
+	registry.Reset()
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(nonResettableOutput), "reset_metric", "not_reset_metric"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDisabledMetrics(t *testing.T) {
+	o := NewOptions()
+	o.DisabledMetrics = []string{"should_be_disabled"}
+	o.Apply()
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.1-alpha-1.12345",
+	}
+	registry := newKubeRegistry(currentVersion)
+	disabledMetric := NewCounterVec(&CounterOpts{
+		Name: "should_be_disabled",
+		Help: "this metric should be disabled",
+	}, []string{"label"})
+	// gauges cannot be reset
+	enabledMetric := NewGauge(&GaugeOpts{
+		Name: "should_be_enabled",
+		Help: "this metric should not be disabled",
+	})
+
+	registry.MustRegister(disabledMetric)
+	registry.MustRegister(enabledMetric)
+	disabledMetric.WithLabelValues("one").Inc()
+	disabledMetric.WithLabelValues("two").Inc()
+	disabledMetric.WithLabelValues("two").Inc()
+	enabledMetric.Inc()
+
+	enabledMetricOutput := `
+        # HELP should_be_enabled [ALPHA] this metric should not be disabled
+        # TYPE should_be_enabled gauge
+        should_be_enabled 1
+`
+
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(enabledMetricOutput), "should_be_disabled", "should_be_enabled"); err != nil {
+		t.Fatal(err)
 	}
 }

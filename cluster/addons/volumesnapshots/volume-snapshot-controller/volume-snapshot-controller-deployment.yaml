@@ -22,8 +22,8 @@ spec:
       serviceAccount: volume-snapshot-controller
       containers:
         - name: volume-snapshot-controller
-          # TODO(xyang): Replace with an official image when it is released
-          image: gcr.io/k8s-staging-csi/snapshot-controller:v2.0.0-rc2
+          image: registry.k8s.io/sig-storage/snapshot-controller:v8.0.0
           args:
             - "--v=5"
-          imagePullPolicy: Always
+            - "--metrics-path=/metrics"
+            - "--http-endpoint=:9102"

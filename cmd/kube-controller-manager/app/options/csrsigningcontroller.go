@@ -45,9 +45,7 @@ func (o *CSRSigningControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.KubeAPIServerClientSignerConfiguration.KeyFile, "cluster-signing-kube-apiserver-client-key-file", o.KubeAPIServerClientSignerConfiguration.KeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign certificates for the kubernetes.io/kube-apiserver-client signer.  If specified, --cluster-signing-{cert,key}-file must not be set.")
 	fs.StringVar(&o.LegacyUnknownSignerConfiguration.CertFile, "cluster-signing-legacy-unknown-cert-file", o.LegacyUnknownSignerConfiguration.CertFile, "Filename containing a PEM-encoded X509 CA certificate used to issue certificates for the kubernetes.io/legacy-unknown signer.  If specified, --cluster-signing-{cert,key}-file must not be set.")
 	fs.StringVar(&o.LegacyUnknownSignerConfiguration.KeyFile, "cluster-signing-legacy-unknown-key-file", o.LegacyUnknownSignerConfiguration.KeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign certificates for the kubernetes.io/legacy-unknown signer.  If specified, --cluster-signing-{cert,key}-file must not be set.")
-	fs.DurationVar(&o.ClusterSigningDuration.Duration, "cluster-signing-duration", o.ClusterSigningDuration.Duration, "The length of duration signed certificates will be given.")
-	fs.DurationVar(&o.ClusterSigningDuration.Duration, "experimental-cluster-signing-duration", o.ClusterSigningDuration.Duration, "The length of duration signed certificates will be given.")
-	fs.MarkDeprecated("experimental-cluster-signing-duration", "use --cluster-signing-duration")
+	fs.DurationVar(&o.ClusterSigningDuration.Duration, "cluster-signing-duration", o.ClusterSigningDuration.Duration, "The max length of duration signed certificates will be given.  Individual CSRs may request shorter certs by setting spec.expirationSeconds.")
 }
 
 // ApplyTo fills up CSRSigningController config with options.

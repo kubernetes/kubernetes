@@ -19,7 +19,7 @@ spec:
       serviceAccountName: fluentd-gcp-scaler
       containers:
       - name: fluentd-gcp-scaler
-        image: k8s.gcr.io/fluentd-gcp-scaler:0.5.2
+        image: registry.k8s.io/fluentd-gcp-scaler:0.5.2
         command:
           - /scaler.sh
           - --ds-name=fluentd-gcp-{{ fluentd_gcp_yaml_version }}
@@ -27,7 +27,7 @@ spec:
         env:
         # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy
         - name: CPU_REQUEST
-          value: 100m
+          value: 10m
         - name: MEMORY_REQUEST
           value: 200Mi
         - name: CPU_LIMIT

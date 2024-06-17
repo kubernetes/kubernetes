@@ -31,7 +31,7 @@ var isInitialism func(string) bool
 // GoNamePrefixFunc sets an optional rule to prefix go names
 // which do not start with a letter.
 //
-// e.g. to help converting "123" into "{prefix}123"
+// e.g. to help convert "123" into "{prefix}123"
 //
 // The default is to prefix with "X"
 var GoNamePrefixFunc func(string) string
@@ -91,7 +91,7 @@ func init() {
 }
 
 const (
-	//collectionFormatComma = "csv"
+	// collectionFormatComma = "csv"
 	collectionFormatSpace = "ssv"
 	collectionFormatTab   = "tsv"
 	collectionFormatPipe  = "pipes"
@@ -99,10 +99,11 @@ const (
 )
 
 // JoinByFormat joins a string array by a known format (e.g. swagger's collectionFormat attribute):
-//		ssv: space separated value
-//		tsv: tab separated value
-//		pipes: pipe (|) separated value
-//		csv: comma separated value (default)
+//
+//	ssv: space separated value
+//	tsv: tab separated value
+//	pipes: pipe (|) separated value
+//	csv: comma separated value (default)
 func JoinByFormat(data []string, format string) []string {
 	if len(data) == 0 {
 		return data
@@ -124,11 +125,11 @@ func JoinByFormat(data []string, format string) []string {
 }
 
 // SplitByFormat splits a string by a known format:
-//		ssv: space separated value
-//		tsv: tab separated value
-//		pipes: pipe (|) separated value
-//		csv: comma separated value (default)
 //
+//	ssv: space separated value
+//	tsv: tab separated value
+//	pipes: pipe (|) separated value
+//	csv: comma separated value (default)
 func SplitByFormat(data, format string) []string {
 	if data == "" {
 		return nil
@@ -340,12 +341,21 @@ type zeroable interface {
 // IsZero returns true when the value passed into the function is a zero value.
 // This allows for safer checking of interface values.
 func IsZero(data interface{}) bool {
+	v := reflect.ValueOf(data)
+	// check for nil data
+	switch v.Kind() {
+	case reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if v.IsNil() {
+			return true
+		}
+	}
+
 	// check for things that have an IsZero method instead
 	if vv, ok := data.(zeroable); ok {
 		return vv.IsZero()
 	}
+
 	// continue with slightly more complex reflection
-	v := reflect.ValueOf(data)
 	switch v.Kind() {
 	case reflect.String:
 		return v.Len() == 0
@@ -357,20 +367,19 @@ func IsZero(data interface{}) bool {
 		return v.Uint() == 0
 	case reflect.Float32, reflect.Float64:
 		return v.Float() == 0
-	case reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
-		return v.IsNil()
 	case reflect.Struct, reflect.Array:
 		return reflect.DeepEqual(data, reflect.Zero(v.Type()).Interface())
 	case reflect.Invalid:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // AddInitialisms add additional initialisms
 func AddInitialisms(words ...string) {
 	for _, word := range words {
-		//commonInitialisms[upper(word)] = true
+		// commonInitialisms[upper(word)] = true
 		commonInitialisms.add(upper(word))
 	}
 	// sort again

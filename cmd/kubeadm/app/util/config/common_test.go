@@ -18,12 +18,23 @@ package config
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/lithammer/dedent"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -32,9 +43,10 @@ const KubeadmGroupName = "kubeadm.k8s.io"
 
 func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
-		gv              schema.GroupVersion
-		allowDeprecated bool
-		expectedErr     bool
+		gv                schema.GroupVersion
+		allowDeprecated   bool
+		allowExperimental bool
+		expectedErr       bool
 	}{
 		{
 			gv: schema.GroupVersion{
@@ -60,28 +72,21 @@ func TestValidateSupportedVersion(t *testing.T) {
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
-				Version: "v1alpha3",
-			},
-			allowDeprecated: true,
-			expectedErr:     true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
 				Version: "v1beta1",
 			},
-			allowDeprecated: true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
-				Version: "v1beta1",
-			},
+			expectedErr: true,
 		},
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
 				Version: "v1beta2",
+			},
+			expectedErr: true,
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta3",
 			},
 		},
 		{
@@ -90,11 +95,17 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Version: "v1",
 			},
 		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta4",
+			},
+		},
 	}
 
 	for _, rt := range tests {
 		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gv, rt.allowDeprecated), func(t *testing.T) {
-			err := validateSupportedVersion(rt.gv, rt.allowDeprecated)
+			err := validateSupportedVersion(rt.gv, rt.allowDeprecated, rt.allowExperimental)
 			if rt.expectedErr && err == nil {
 				t.Error("unexpected success")
 			} else if !rt.expectedErr && err != nil {
@@ -132,8 +143,8 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta2.ClusterConfiguration{
-				APIServer: kubeadmapiv1beta2.APIServer{
+			cfg := &kubeadmapiv1.ClusterConfiguration{
+				APIServer: kubeadmapiv1.APIServer{
 					CertSANs: test.in,
 				},
 			}
@@ -203,31 +214,49 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 	}
 }
 
-func TestMigrateOldConfigFromFile(t *testing.T) {
+// NOTE: do not delete this test once an older API is removed and there is only one API left.
+// Update the inline "gv" and "gvNew" variables, to have the GroupVersion String of
+// the API to be tested. If there are no new APIs make "gvNew" point to the old API.
+// If an experimental API has to be tested, use the 'allowExperimental' option
+// and add negative and positive test cases for the experimental API.
+func TestMigrateOldConfig(t *testing.T) {
+	var (
+		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
+		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
+	)
 	tests := []struct {
-		desc          string
-		oldCfg        string
-		expectedKinds []string
-		expectErr     bool
+		name              string
+		oldCfg            string
+		expectedKinds     []string
+		expectErr         bool
+		allowExperimental bool
 	}{
 		{
-			desc:      "empty file produces empty result",
+			name:      "empty file produces empty result",
 			oldCfg:    "",
 			expectErr: false,
 		},
 		{
-			desc: "bad config produces error",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
-			`),
+			name: "bad config produces error",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			`, gv)),
 			expectErr: true,
 		},
 		{
-			desc: "InitConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "unknown API produces error",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: Foo
+			`, gv)),
+			expectErr: true,
+		},
+		{
+			name: "InitConfiguration only gets migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
-			`),
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -235,11 +264,12 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "ClusterConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "ClusterConfiguration only gets migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
-			`),
+			kubernetesVersion: v1.10.0
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -247,30 +277,31 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "JoinConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "JoinConfiguration only gets migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, gv)),
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
 			expectErr: false,
 		},
 		{
-			desc: "Init + Cluster Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "Init + Cluster Configurations are migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			`),
+			kubernetesVersion: v1.10.0
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -278,40 +309,19 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "Init + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "Init + Join Configurations are migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
-			expectedKinds: []string{
-				constants.InitConfigurationKind,
-				constants.ClusterConfigurationKind,
-				constants.JoinConfigurationKind,
-			},
-			expectErr: false,
-		},
-		{
-			desc: "Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
-			kind: ClusterConfiguration
-			---
-			apiVersion: kubeadm.k8s.io/v1beta1
-			kind: JoinConfiguration
-			discovery:
-			  bootstrapToken:
-			    token: abcdef.0123456789abcdef
-			    apiServerEndpoint: kube-apiserver:6443
-			    unsafeSkipCAVerification: true
-			`),
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -320,22 +330,20 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "Init + Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
-			kind: InitConfiguration
-			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "Cluster + Join Configurations are migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
+			kubernetesVersion: v1.10.0
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
 			    token: abcdef.0123456789abcdef
 			    apiServerEndpoint: kube-apiserver:6443
 			    unsafeSkipCAVerification: true
-			`),
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -344,15 +352,41 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			desc: "component configs are not migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			name: "Init + Cluster + Join Configurations are migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
+			kubernetesVersion: v1.10.0
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: %[1]s
+			kind: JoinConfiguration
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, gv)),
+			expectedKinds: []string{
+				constants.InitConfigurationKind,
+				constants.ClusterConfigurationKind,
+				constants.JoinConfigurationKind,
+			},
+			expectErr: false,
+		},
+		{
+			name: "component configs are not migrated",
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			---
+			apiVersion: %[1]s
+			kind: ClusterConfiguration
+			kubernetesVersion: v1.10.0
+			---
+			apiVersion: %[1]s
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
@@ -365,7 +399,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 			---
 			apiVersion: kubelet.config.k8s.io/v1beta1
 			kind: KubeletConfiguration
-			`),
+			`, gv)),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -376,29 +410,603 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.desc, func(t *testing.T) {
-			b, err := MigrateOldConfig([]byte(test.oldCfg))
-			if test.expectErr {
-				if err == nil {
-					t.Fatalf("unexpected success:\n%s", b)
+		t.Run(test.name, func(t *testing.T) {
+			b, err := MigrateOldConfig([]byte(test.oldCfg), test.allowExperimental, defaultEmptyMigrateMutators())
+			if test.expectErr != (err != nil) {
+				t.Fatalf("expected error: %v, got: %v", test.expectErr, err != nil)
+			}
+			gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
+			if err != nil {
+				t.Fatalf("unexpected error returned by GroupVersionKindsFromBytes: %v", err)
+			}
+			if len(gvks) != len(test.expectedKinds) {
+				t.Fatalf("length mismatch between resulting gvks and expected kinds:\n\tlen(gvks)=%d\n\tlen(expectedKinds)=%d",
+					len(gvks), len(test.expectedKinds))
+			}
+			for _, expectedKind := range test.expectedKinds {
+				if !kubeadmutil.GroupVersionKindsHasKind(gvks, expectedKind) {
+					t.Fatalf("migration failed to produce config kind: %s", expectedKind)
 				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected failure: %v", err)
+			}
+			expectedGV := gvNew
+			if test.allowExperimental {
+				expectedGV = gvNew
+			}
+			for _, gvk := range gvks {
+				if gvk.GroupVersion().String() != expectedGV {
+					t.Errorf("GV mismatch, expected GV: %s, got GV: %s", expectedGV, gvk.GroupVersion().String())
 				}
-				gvks, err := kubeadmutil.GroupVersionKindsFromBytes(b)
-				if err != nil {
-					t.Fatalf("unexpected error returned by GroupVersionKindsFromBytes: %v", err)
-				}
-				if len(gvks) != len(test.expectedKinds) {
-					t.Fatalf("length mismatch between resulting gvks and expected kinds:\n\tlen(gvks)=%d\n\tlen(expectedKinds)=%d",
-						len(gvks), len(test.expectedKinds))
-				}
-				for _, expectedKind := range test.expectedKinds {
-					if !kubeadmutil.GroupVersionKindsHasKind(gvks, expectedKind) {
-						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
-					}
-				}
+			}
+		})
+	}
+}
+
+// Test the migration of all breaking changes in v1beta4, marked as "MIGRATED" in the YAML below:
+// - ExtraArgs
+// - ClusterConfiguration.APIServer.TimeoutForControlPlane -> {Init|Join}Configuration.Timeout.ControlPlaneComponentHealthCheck
+// - JoinConfiguration.Discovery.Timeout -> JoinConfiguration.Timeout.Discovery
+func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
+	var (
+		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
+		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
+
+		input = dedent.Dedent(fmt.Sprintf(`
+		apiVersion: %s
+		bootstrapTokens:
+		- groups:
+		  - system:bootstrappers:kubeadm:default-node-token
+		  token: n32eo4.cci2j99rnn8fmv42
+		  ttl: 24h0m0s
+		  usages:
+		  - signing
+		  - authentication
+		kind: InitConfiguration
+		localAPIEndpoint:
+		  advertiseAddress: 1.2.3.4
+		  bindPort: 6443
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  kubeletExtraArgs: # MIGRATED
+		    foo: bar
+		  name: node
+		---
+		apiServer:
+		  timeoutForControlPlane: 2m32s # MIGRATED
+		  extraArgs: # MIGRATED
+		    foo: bar
+		apiVersion: %[1]s
+		controllerManager:
+		  extraArgs: # MIGRATED
+		    foo: bar
+		etcd:
+		  local:
+		    extraArgs: # MIGRATED
+		      foo: bar
+		kind: ClusterConfiguration
+		kubernetesVersion: v1.10.0
+		scheduler:
+		  extraArgs: # MIGRATED
+		    foo: bar
+		---
+		apiVersion: %[1]s
+		kind: JoinConfiguration
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  imagePullPolicy: IfNotPresent
+		  kubeletExtraArgs: # MIGRATED
+		    foo: baz
+		  name: foo
+		  taints: null
+		discovery:
+		  bootstrapToken:
+		    apiServerEndpoint: some-address:6443
+		    token: abcdef.0123456789abcdef
+		    unsafeSkipCAVerification: true
+		  tlsBootstrapToken: abcdef.0123456789abcdef
+		  timeout: 2m10s # MIGRATED
+		`, gv))
+
+		expectedOutput = dedent.Dedent(fmt.Sprintf(`
+		apiVersion: %s
+		bootstrapTokens:
+		- groups:
+		  - system:bootstrappers:kubeadm:default-node-token
+		  token: n32eo4.cci2j99rnn8fmv42
+		  ttl: 24h0m0s
+		  usages:
+		  - signing
+		  - authentication
+		kind: InitConfiguration
+		localAPIEndpoint:
+		  advertiseAddress: 1.2.3.4
+		  bindPort: 6443
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  imagePullPolicy: IfNotPresent
+		  imagePullSerial: true
+		  kubeletExtraArgs:
+		  - name: foo
+		    value: bar
+		  name: node
+		  taints:
+		  - effect: NoSchedule
+		    key: node-role.kubernetes.io/control-plane
+		timeouts:
+		  controlPlaneComponentHealthCheck: 2m32s
+		  discovery: 5m0s
+		  etcdAPICall: 2m0s
+		  kubeletHealthCheck: 4m0s
+		  kubernetesAPICall: 1m0s
+		  tlsBootstrap: 5m0s
+		  upgradeManifests: 5m0s
+		---
+		apiServer:
+		  extraArgs:
+		  - name: foo
+		    value: bar
+		apiVersion: %[1]s
+		caCertificateValidityPeriod: 87600h0m0s
+		certificateValidityPeriod: 8760h0m0s
+		certificatesDir: /etc/kubernetes/pki
+		clusterName: kubernetes
+		controllerManager:
+		  extraArgs:
+		  - name: foo
+		    value: bar
+		dns: {}
+		encryptionAlgorithm: RSA-2048
+		etcd:
+		  local:
+		    dataDir: /var/lib/etcd
+		    extraArgs:
+		    - name: foo
+		      value: bar
+		imageRepository: registry.k8s.io
+		kind: ClusterConfiguration
+		kubernetesVersion: v1.10.0
+		networking:
+		  dnsDomain: cluster.local
+		  serviceSubnet: 10.96.0.0/12
+		proxy: {}
+		scheduler:
+		  extraArgs:
+		  - name: foo
+		    value: bar
+		---
+		apiVersion: %[1]s
+		caCertPath: /etc/kubernetes/pki/ca.crt
+		discovery:
+		  bootstrapToken:
+		    apiServerEndpoint: some-address:6443
+		    token: abcdef.0123456789abcdef
+		    unsafeSkipCAVerification: true
+		  tlsBootstrapToken: abcdef.0123456789abcdef
+		kind: JoinConfiguration
+		nodeRegistration:
+		  criSocket: unix:///some-socket-path
+		  imagePullPolicy: IfNotPresent
+		  imagePullSerial: true
+		  kubeletExtraArgs:
+		  - name: foo
+		    value: baz
+		  name: foo
+		  taints: null
+		timeouts:
+		  controlPlaneComponentHealthCheck: 2m32s
+		  discovery: 2m10s
+		  etcdAPICall: 2m0s
+		  kubeletHealthCheck: 4m0s
+		  kubernetesAPICall: 1m0s
+		  tlsBootstrap: 5m0s
+		  upgradeManifests: 5m0s
+		`, gvNew))
+	)
+
+	b, err := MigrateOldConfig([]byte(input), false, defaultEmptyMigrateMutators())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Trim one leading new line as MigrateOldConfig does the same
+	expectedOutput = strings.TrimLeft(expectedOutput, "\n")
+
+	// Split string lines in the diff
+	diff := cmp.Diff(expectedOutput, string(b), cmpopts.AcyclicTransformer("multiline", func(s string) []string {
+		return strings.Split(s, "\n")
+	}))
+	if len(diff) > 0 {
+		t.Fatalf("unexpected diff (-want,+got):\n%s", diff)
+	}
+}
+
+// NOTE: do not delete this test once an older API is removed and there is only one API left.
+// Update the inline "gv" and "gvNew" variables, to have the GroupVersion String of
+// the API to be tested. If there are no experimental APIs make "gvNew" point to
+// an non-experimental API.
+func TestValidateConfig(t *testing.T) {
+	var (
+		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
+		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
+	)
+	tests := []struct {
+		name              string
+		cfg               string
+		expectedError     bool
+		allowExperimental bool
+	}{
+		{
+			name: "invalid subdomain",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			  name: foo bar # not a valid subdomain
+			`, gv)),
+			expectedError: true,
+		},
+		{
+			name: "unknown API GVK",
+			cfg: dedent.Dedent(`
+			apiVersion: foo/bar # not a valid GroupVersion
+			kind: zzz # not a valid Kind
+			`),
+			expectedError: true,
+		},
+		{
+			name: "legacy API GVK",
+			cfg: dedent.Dedent(`
+			apiVersion: kubeadm.k8s.io/v1beta1 # legacy API
+			kind: InitConfiguration
+			`),
+			expectedError: true,
+		},
+		{
+			name: "unknown field",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			foo: bar
+			`, gv)),
+			expectedError: true,
+		},
+		{
+			name: "valid",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			`, gv)),
+			expectedError: false,
+		},
+		{
+			name: "valid: experimental API",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: InitConfiguration
+			`, gvNew)),
+			expectedError: false,
+		},
+		{
+			name: "valid ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			force: true
+			`, gvNew)),
+			expectedError: false,
+		},
+		{
+			name: "invalid field in ResetConfiguration",
+			cfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			kind: ResetConfiguration
+			foo: bar
+			`, gvNew)),
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateConfig([]byte(test.cfg), test.allowExperimental)
+			if (err != nil) != test.expectedError {
+				t.Fatalf("expected error: %v, got: %v, error: %v", test.expectedError, (err != nil), err)
+			}
+		})
+	}
+}
+
+func TestIsKubeadmPrereleaseVersion(t *testing.T) {
+	validVersionInfo := &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0-alpha.1"}
+	tests := []struct {
+		name           string
+		versionInfo    *apimachineryversion.Info
+		k8sVersion     *version.Version
+		mcpVersion     *version.Version
+		expectedResult bool
+	}{
+		{
+			name:           "invalid versionInfo",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: false,
+		},
+		{
+			name:           "kubeadm is not a prerelease version",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			expectedResult: false,
+		},
+		{
+			name:           "mcpVersion is equal to k8sVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.21.0"),
+			expectedResult: true,
+		},
+		{
+			name:           "k8sVersion is 1 MINOR version older than mcpVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.22.0"),
+			expectedResult: true,
+		},
+		{
+			name:           "k8sVersion is 2 MINOR versions older than mcpVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.23.0"),
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isKubeadmPrereleaseVersion(tc.versionInfo, tc.k8sVersion, tc.mcpVersion)
+			if result != tc.expectedResult {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestNormalizeKubernetesVersion(t *testing.T) {
+	validVersion := fmt.Sprintf("v%v", constants.MinimumControlPlaneVersion)
+	validCIVersion := fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, validVersion)
+	tests := []struct {
+		name        string
+		cfg         *kubeadmapi.ClusterConfiguration
+		expectedCfg *kubeadmapi.ClusterConfiguration
+		expectErr   bool
+	}{
+		{
+			name: "normal version, default image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validVersion,
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: "",
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "normal version, custom image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validVersion,
+				ImageRepository:   "custom.repository",
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: "",
+				ImageRepository:     "custom.repository",
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "ci version, default image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validCIVersion,
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: validCIVersion,
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   constants.DefaultCIImageRepository,
+			},
+			expectErr: false,
+		},
+		{
+			name: "ci version, custom image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validCIVersion,
+				ImageRepository:   "custom.repository",
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: validCIVersion,
+				ImageRepository:     "custom.repository",
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "unsupported old version",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v0.0.0",
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   "v0.0.0",
+				CIKubernetesVersion: "",
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   "",
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := NormalizeKubernetesVersion(tc.cfg)
+			if !reflect.DeepEqual(tc.cfg, tc.expectedCfg) {
+				t.Errorf("expected ClusterConfiguration: %#v, got %#v", tc.expectedCfg, tc.cfg)
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected failure: %v", err)
+			}
+		})
+	}
+}
+
+// TODO: update the test cases for this test once v1beta3 is removed.
+func TestDefaultMigrateMutators(t *testing.T) {
+	tests := []struct {
+		name          string
+		mutators      migrateMutators
+		input         []any
+		expected      []any
+		expectedDiff  bool
+		expectedError bool
+	}{
+		{
+			name:     "mutate InitConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					APIServer: kubeadmapi.APIServer{
+						TimeoutForControlPlane: &metav1.Duration{
+							Duration: 1234 * time.Millisecond,
+						},
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.InitConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{
+						Duration: 1234 * time.Millisecond,
+					},
+				},
+			}},
+		},
+		{
+			name:     "mutate JoinConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.JoinConfiguration{
+				Discovery: kubeadmapi.Discovery{
+					Timeout: &metav1.Duration{
+						Duration: 1234 * time.Microsecond,
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					Discovery: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.JoinConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					Discovery: &metav1.Duration{
+						Duration: 1234 * time.Microsecond,
+					},
+				},
+			}},
+		},
+		{
+			name:     "diff when mutating InitConfiguration",
+			mutators: defaultMigrateMutators(),
+			input: []any{&kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					APIServer: kubeadmapi.APIServer{
+						TimeoutForControlPlane: &metav1.Duration{
+							Duration: 1234 * time.Millisecond,
+						},
+					},
+				},
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{},
+				},
+			}},
+			expected: []any{&kubeadmapi.InitConfiguration{
+				Timeouts: &kubeadmapi.Timeouts{
+					ControlPlaneComponentHealthCheck: &metav1.Duration{
+						Duration: 1 * time.Millisecond, // a different value
+					},
+				},
+			}},
+			expectedDiff: true,
+		},
+		{
+			name:          "expect an error for a missing mutator",
+			mutators:      migrateMutators{}, // empty list of mutators
+			input:         []any{&kubeadmapi.ResetConfiguration{}},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.mutators.mutate(tc.input)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
+			}
+			if err != nil {
+				return
+			}
+			diff := cmp.Diff(tc.expected, tc.input)
+			if (len(diff) > 0) != tc.expectedDiff {
+				t.Fatalf("got a diff with the expected config (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsKubeadmConfigPresent(t *testing.T) {
+	var tcases = []struct {
+		name     string
+		gvkmap   kubeadmapi.DocumentMap
+		expected bool
+	}{
+		{
+			name: " Wrong Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "foo.k8s.io", Version: "v1", Kind: "Foo"}: []byte(`kind: Foo`),
+			},
+			expected: false,
+		},
+		{
+			name: "Empty Group value",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: false,
+		},
+		{
+			name:     "Nil value",
+			gvkmap:   nil,
+			expected: false,
+		},
+		{
+			name: "Correct Group value 1",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: "kubeadm.k8s.io", Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+		{
+			name: "Correct Group value 2",
+			gvkmap: kubeadmapi.DocumentMap{
+				{Group: kubeadmapi.GroupName, Version: "v1", Kind: "Empty"}: []byte(`kind: Empty`),
+			},
+			expected: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			if isKubeadmConfigPresent(tt.gvkmap) != tt.expected {
+				t.Error("unexpected result")
 			}
 		})
 	}

@@ -19,7 +19,6 @@ package clientcmd
 import (
 	"errors"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -83,10 +82,13 @@ func (o *PathOptions) GetEnvVarFiles() []string {
 }
 
 func (o *PathOptions) GetLoadingPrecedence() []string {
+	if o.IsExplicitFile() {
+		return []string{o.GetExplicitFile()}
+	}
+
 	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
 		return envVarFiles
 	}
-
 	return []string{o.GlobalFile}
 }
 
@@ -132,11 +134,7 @@ func (o *PathOptions) GetDefaultFilename() string {
 }
 
 func (o *PathOptions) IsExplicitFile() bool {
-	if len(o.LoadingRules.ExplicitPath) > 0 {
-		return true
-	}
-
-	return false
+	return len(o.LoadingRules.ExplicitPath) > 0
 }
 
 func (o *PathOptions) GetExplicitFile() string {
@@ -149,7 +147,7 @@ func NewDefaultPathOptions() *PathOptions {
 		EnvVar:           RecommendedConfigPathEnvVar,
 		ExplicitFileFlag: RecommendedConfigPathFlag,
 
-		GlobalFileSubpath: path.Join(RecommendedHomeDir, RecommendedFileName),
+		GlobalFileSubpath: filepath.Join(RecommendedHomeDir, RecommendedFileName),
 
 		LoadingRules: NewDefaultClientConfigLoadingRules(),
 	}
@@ -371,7 +369,7 @@ func (p *persister) Persist(config map[string]string) error {
 	authInfo, ok := newConfig.AuthInfos[p.user]
 	if ok && authInfo.AuthProvider != nil {
 		authInfo.AuthProvider.Config = config
-		ModifyConfig(p.configAccess, *newConfig, false)
+		return ModifyConfig(p.configAccess, *newConfig, false)
 	}
 	return nil
 }

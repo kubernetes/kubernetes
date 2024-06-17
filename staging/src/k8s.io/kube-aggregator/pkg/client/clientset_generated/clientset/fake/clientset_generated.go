@@ -76,14 +76,17 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var _ clientset.Interface = &Clientset{}
-
-// ApiregistrationV1beta1 retrieves the ApiregistrationV1beta1Client
-func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
-	return &fakeapiregistrationv1beta1.FakeApiregistrationV1beta1{Fake: &c.Fake}
-}
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // ApiregistrationV1 retrieves the ApiregistrationV1Client
 func (c *Clientset) ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface {
 	return &fakeapiregistrationv1.FakeApiregistrationV1{Fake: &c.Fake}
+}
+
+// ApiregistrationV1beta1 retrieves the ApiregistrationV1beta1Client
+func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
+	return &fakeapiregistrationv1beta1.FakeApiregistrationV1beta1{Fake: &c.Fake}
 }

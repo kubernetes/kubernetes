@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package system
@@ -5,10 +6,8 @@ package system
 import (
 	"os"
 	"os/exec"
-	"sync"
 	"unsafe"
 
-	"github.com/opencontainers/runc/libcontainer/user"
 	"golang.org/x/sys/unix"
 )
 
@@ -38,15 +37,16 @@ func Execv(cmd string, args []string, env []string) error {
 		return err
 	}
 
-	return unix.Exec(name, args, env)
+	return Exec(name, args, env)
 }
 
-func Prlimit(pid, resource int, limit unix.Rlimit) error {
-	_, _, err := unix.RawSyscall6(unix.SYS_PRLIMIT64, uintptr(pid), uintptr(resource), uintptr(unsafe.Pointer(&limit)), uintptr(unsafe.Pointer(&limit)), 0, 0)
-	if err != 0 {
-		return err
+func Exec(cmd string, args []string, env []string) error {
+	for {
+		err := unix.Exec(cmd, args, env)
+		if err != unix.EINTR { //nolint:errorlint // unix errors are bare
+			return &os.PathError{Op: "exec", Path: cmd, Err: err}
+		}
 	}
-	return nil
 }
 
 func SetParentDeathSignal(sig uintptr) error {
@@ -85,52 +85,6 @@ func Setctty() error {
 		return err
 	}
 	return nil
-}
-
-var (
-	inUserNS bool
-	nsOnce   sync.Once
-)
-
-// RunningInUserNS detects whether we are currently running in a user namespace.
-// Originally copied from github.com/lxc/lxd/shared/util.go
-func RunningInUserNS() bool {
-	nsOnce.Do(func() {
-		uidmap, err := user.CurrentProcessUIDMap()
-		if err != nil {
-			// This kernel-provided file only exists if user namespaces are supported
-			return
-		}
-		inUserNS = UIDMapInUserNS(uidmap)
-	})
-	return inUserNS
-}
-
-func UIDMapInUserNS(uidmap []user.IDMap) bool {
-	/*
-	 * We assume we are in the initial user namespace if we have a full
-	 * range - 4294967295 uids starting at uid 0.
-	 */
-	if len(uidmap) == 1 && uidmap[0].ID == 0 && uidmap[0].ParentID == 0 && uidmap[0].Count == 4294967295 {
-		return false
-	}
-	return true
-}
-
-// GetParentNSeuid returns the euid within the parent user namespace
-func GetParentNSeuid() int64 {
-	euid := int64(os.Geteuid())
-	uidmap, err := user.CurrentProcessUIDMap()
-	if err != nil {
-		// This kernel-provided file only exists if user namespaces are supported
-		return euid
-	}
-	for _, um := range uidmap {
-		if um.ID <= euid && euid <= um.ID+um.Count-1 {
-			return um.ParentID + euid - um.ID
-		}
-	}
-	return euid
 }
 
 // SetSubreaper sets the value i as the subreaper setting for the calling process

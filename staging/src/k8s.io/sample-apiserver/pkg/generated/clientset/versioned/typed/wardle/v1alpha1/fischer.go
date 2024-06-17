@@ -20,13 +20,19 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/generated/applyconfiguration/wardle/v1alpha1"
 	scheme "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -46,6 +52,7 @@ type FischerInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error)
+	Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error)
 	FischerExpansion
 }
 
@@ -74,7 +81,26 @@ func (c *fischers) Get(ctx context.Context, name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of Fischers that match those selectors.
-func (c *fischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
+func (c *fischers) List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.FischerList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for fischers, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for fischers", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for fischers ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for fischers", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Fischers that match those selectors.
+func (c *fischers) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +111,22 @@ func (c *fischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Fischers
+func (c *fischers) watchList(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1alpha1.FischerList{}
+	err = c.client.Get().
+		Resource("fischers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +203,31 @@ func (c *fischers) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied fischer.
+func (c *fischers) Apply(ctx context.Context, fischer *wardlev1alpha1.FischerApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Fischer, err error) {
+	if fischer == nil {
+		return nil, fmt.Errorf("fischer provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(fischer)
+	if err != nil {
+		return nil, err
+	}
+	name := fischer.Name
+	if name == nil {
+		return nil, fmt.Errorf("fischer.Name must be provided to Apply")
+	}
+	result = &v1alpha1.Fischer{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("fischers").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

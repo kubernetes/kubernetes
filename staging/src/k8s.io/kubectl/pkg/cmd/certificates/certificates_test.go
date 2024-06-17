@@ -18,7 +18,7 @@ package certificates
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -27,10 +27,9 @@ import (
 	"github.com/spf13/cobra"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
-	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -63,20 +62,7 @@ func TestCertificates(t *testing.T) {
 			expectOutput: `approved`,
 		},
 		{
-			name:    "approve existing, no v1",
-			nov1:    true,
-			command: "approve",
-			args:    []string{"certificatesigningrequests.v1beta1.certificates.k8s.io/existing"},
-			expectActions: []string{
-				`GET /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing`, // unstructured get
-				`GET /apis/certificates.k8s.io/v1/certificatesigningrequests/existing`,      // typed get, 404
-				`GET /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing`, // typed get fallback
-				`PUT /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing/approval`,
-			},
-			expectOutput: `approved`,
-		},
-		{
-			name:      "approve existing, no v1 or v1beta1",
+			name:      "approve existing, no v1",
 			nov1:      true,
 			nov1beta1: true,
 			command:   "approve",
@@ -133,20 +119,7 @@ func TestCertificates(t *testing.T) {
 			expectOutput: `denied`,
 		},
 		{
-			name:    "deny existing, no v1",
-			nov1:    true,
-			command: "deny",
-			args:    []string{"certificatesigningrequests.v1beta1.certificates.k8s.io/existing"},
-			expectActions: []string{
-				`GET /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing`, // unstructured get
-				`GET /apis/certificates.k8s.io/v1/certificatesigningrequests/existing`,      // typed get, 404
-				`GET /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing`, // typed get fallback
-				`PUT /apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing/approval`,
-			},
-			expectOutput: `denied`,
-		},
-		{
-			name:      "deny existing, no v1 or v1beta1",
+			name:      "deny existing, no v1",
 			nov1:      true,
 			nov1beta1: true,
 			command:   "deny",
@@ -202,20 +175,11 @@ func TestCertificates(t *testing.T) {
 				TypeMeta:   metav1.TypeMeta{APIVersion: "certificates.k8s.io/v1", Kind: "CertificateSigningRequest"},
 				ObjectMeta: metav1.ObjectMeta{Name: "existing"},
 			}
-			existingV1beta1 := &certificatesv1beta1.CertificateSigningRequest{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "certificates.k8s.io/v1beta1", Kind: "CertificateSigningRequest"},
-				ObjectMeta: metav1.ObjectMeta{Name: "existing"},
-			}
 
 			approvedV1 := &certificatesv1.CertificateSigningRequest{
 				TypeMeta:   metav1.TypeMeta{APIVersion: "certificates.k8s.io/v1", Kind: "CertificateSigningRequest"},
 				ObjectMeta: metav1.ObjectMeta{Name: "approved"},
 				Status:     certificatesv1.CertificateSigningRequestStatus{Conditions: []certificatesv1.CertificateSigningRequestCondition{{Type: certificatesv1.CertificateApproved}}},
-			}
-			approvedV1beta1 := &certificatesv1beta1.CertificateSigningRequest{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "certificates.k8s.io/v1beta1", Kind: "CertificateSigningRequest"},
-				ObjectMeta: metav1.ObjectMeta{Name: "existing"},
-				Status:     certificatesv1beta1.CertificateSigningRequestStatus{Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{{Type: certificatesv1beta1.CertificateApproved}}},
 			}
 
 			deniedV1 := &certificatesv1.CertificateSigningRequest{
@@ -223,52 +187,31 @@ func TestCertificates(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "denied"},
 				Status:     certificatesv1.CertificateSigningRequestStatus{Conditions: []certificatesv1.CertificateSigningRequestCondition{{Type: certificatesv1.CertificateDenied}}},
 			}
-			deniedV1beta1 := &certificatesv1beta1.CertificateSigningRequest{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "certificates.k8s.io/v1beta1", Kind: "CertificateSigningRequest"},
-				ObjectMeta: metav1.ObjectMeta{Name: "denied"},
-				Status:     certificatesv1beta1.CertificateSigningRequestStatus{Conditions: []certificatesv1beta1.CertificateSigningRequestCondition{{Type: certificatesv1beta1.CertificateDenied}}},
-			}
 
 			actions := []string{}
 			fakeClient := fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				actions = append(actions, req.Method+" "+req.URL.Path)
 				switch p, m := req.URL.Path, req.Method; {
 				case tc.nov1 && strings.HasPrefix(p, "/apis/certificates.k8s.io/v1/"):
-					return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(bytes.NewBuffer([]byte{}))}, nil
-				case tc.nov1beta1 && strings.HasPrefix(p, "/apis/certificates.k8s.io/v1beta1/"):
-					return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(bytes.NewBuffer([]byte{}))}, nil
+					return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(bytes.NewBuffer([]byte{}))}, nil
 
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/missing" && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusNotFound}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/missing" && m == http.MethodGet:
 					return &http.Response{StatusCode: http.StatusNotFound}, nil
 
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/existing" && m == http.MethodGet:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, existingV1)}, nil
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/existing/approval" && m == http.MethodPut:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, existingV1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing" && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, existingV1beta1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/existing/approval" && m == http.MethodPut:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, existingV1beta1)}, nil
 
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/approved" && m == http.MethodGet:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, approvedV1)}, nil
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/approved/approval" && m == http.MethodPut:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, approvedV1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/approved" && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, approvedV1beta1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/approved/approval" && m == http.MethodPut:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, approvedV1beta1)}, nil
 
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/denied" && m == http.MethodGet:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, deniedV1)}, nil
 				case p == "/apis/certificates.k8s.io/v1/certificatesigningrequests/denied/approval" && m == http.MethodPut:
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, deniedV1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/denied" && m == http.MethodGet:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, deniedV1beta1)}, nil
-				case p == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests/denied/approval" && m == http.MethodPut:
-					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, deniedV1beta1)}, nil
 
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -292,7 +235,8 @@ func TestCertificates(t *testing.T) {
 				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 				Client:               fakeClient,
 			}
-			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+			streams, _, buf, errbuf := genericiooptions.NewTestIOStreams()
+			tf.ClientConfigVal.Transport = fakeClient.Transport
 
 			defer func() {
 				// Restore cmdutil behavior.

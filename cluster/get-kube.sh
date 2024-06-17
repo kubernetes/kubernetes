@@ -29,13 +29,14 @@
 #    stable release, (e.g. 'v1.3.7').
 #    See https://github.com/kubernetes/kubernetes/releases for release options.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
-#    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
+#    (Defaults to https://dl.k8s.io/release).
 #
 #  Set KUBERNETES_SERVER_ARCH to choose the server (Kubernetes cluster)
 #  architecture to download:
 #    * amd64 [default]
 #    * arm
 #    * arm64
+#    * ppc64le
 #
 #  Set KUBERNETES_NODE_PLATFORM to choose the platform for which to download
 #  the node binaries. If none of KUBERNETES_NODE_PLATFORM and
@@ -53,6 +54,7 @@
 #    * amd64 [default]
 #    * arm
 #    * arm64
+#    * ppc64le
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
@@ -70,10 +72,11 @@ KUBERNETES_CI_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL:-${KUBERNETES_RELEASE_URL
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
 KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*))?$"
-KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+#                       v1                .26               .0              -(rc            .0                .)?0              (  +014f      )?
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+\\.(0|[1-9][0-9]*)\\.)?(0|[1-9][0-9]*)(\\+[-0-9a-z]*)?$"
 
 # Sets KUBE_VERSION variable if an explicit version number was provided (e.g. "v1.0.6",
-# "v1.2.0-alpha.1.881+376438b69c7612") or resolves the "published" version
+# "v1.2.0-alpha.1.881+376438b69c7612", or "v1.2.0-881+376438b69c7612") or resolves the "published" version
 # <path>/<version> (e.g. "release/stable",' "ci/latest-1") by reading from GCS.
 #
 # See the docs on getting builds for more information about version
@@ -133,7 +136,7 @@ fi
 
 if [[ -d "./kubernetes" ]]; then
   if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
-    echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
+    echo "'kubernetes' directory already exists. Should we skip download step and start to create cluster based on it? [Y]/n"
     read -r confirm
     if [[ ! "${confirm}" =~ ^[nN]$ ]]; then
       echo "Skipping download step."
@@ -164,13 +167,15 @@ case "${machine}" in
     ;;
   aarch64*|arm64*)
     ;;
+  ppc64le*)
+    ;;
   arm*)
     ;;
   i?86*)
     ;;
   *)
     echo "Unknown, unsupported architecture (${machine})." >&2
-    echo "Supported architectures x86_64, i686, arm, arm64." >&2
+    echo "Supported architectures x86_64, i686, arm, arm64, ppc64le." >&2
     echo "Bailing out." >&2
     exit 3
     ;;
@@ -186,11 +191,12 @@ if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
   if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
     # Use KUBERNETES_RELEASE_URL for Releases and Pre-Releases
     # ie. 1.18.0 or 1.19.0-beta.0
+    # shellcheck disable=SC2269 # this line is a noop but it helps with reading
     KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}"
   elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
-    # ie. v1.19.0-beta.0.318+b618411f1edb98
+    # ie. v1.19.0-beta.0.318+b618411f1edb98 and v1.19.0-318+b618411f1edb98
     KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
   else
     echo "Version doesn't match regexp" >&2
@@ -236,7 +242,9 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${need_download}"; then
-  if [[ $(which curl) ]]; then
+  if [[ $(which gsutil) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"
+  elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
@@ -247,7 +255,7 @@ if "${need_download}"; then
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else
-    echo "Couldn't find curl or wget.  Bailing out."
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out."
     exit 1
   fi
 fi

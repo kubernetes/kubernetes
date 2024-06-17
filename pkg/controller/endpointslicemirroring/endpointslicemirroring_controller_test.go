@@ -23,12 +23,17 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -44,17 +49,23 @@ type endpointSliceMirroringController struct {
 	serviceStore       cache.Store
 }
 
-func newController(batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMirroringController) {
+func newController(ctx context.Context, batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMirroringController) {
 	client := newClientset()
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	esController := NewController(
+		ctx,
 		informerFactory.Core().V1().Endpoints(),
-		informerFactory.Discovery().V1beta1().EndpointSlices(),
+		informerFactory.Discovery().V1().EndpointSlices(),
 		informerFactory.Core().V1().Services(),
 		int32(1000),
 		client,
 		batchPeriod)
+
+	// The event processing pipeline is normally started via Run() method.
+	// However, since we don't start it in unit tests, we explicitly start it here.
+	esController.eventBroadcaster.StartLogging(klog.Infof)
+	esController.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	esController.endpointsSynced = alwaysReady
 	esController.endpointSlicesSynced = alwaysReady
@@ -63,7 +74,7 @@ func newController(batchPeriod time.Duration) (*fake.Clientset, *endpointSliceMi
 	return client, &endpointSliceMirroringController{
 		esController,
 		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
-		informerFactory.Discovery().V1beta1().EndpointSlices().Informer().GetStore(),
+		informerFactory.Discovery().V1().EndpointSlices().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
 	}
 }
@@ -74,12 +85,14 @@ func TestSyncEndpoints(t *testing.T) {
 
 	testCases := []struct {
 		testName           string
+		service            *v1.Service
 		endpoints          *v1.Endpoints
 		endpointSlices     []*discovery.EndpointSlice
 		expectedNumActions int
 		expectedNumSlices  int
 	}{{
 		testName: "Endpoints with no addresses",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -90,6 +103,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label true",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{discovery.LabelSkipMirror: "true"},
@@ -104,6 +118,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Endpoints with skip label false",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{discovery.LabelSkipMirror: "false"},
@@ -117,7 +132,36 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumActions: 1,
 		expectedNumSlices:  1,
 	}, {
+		testName: "Endpoints with missing Service",
+		service:  nil,
+		endpoints: &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Ports:     []v1.EndpointPort{{Port: 80}},
+				Addresses: []v1.EndpointAddress{{IP: "10.0.0.1"}},
+			}},
+		},
+		endpointSlices:     []*discovery.EndpointSlice{},
+		expectedNumActions: 0,
+		expectedNumSlices:  0,
+	}, {
+		testName: "Endpoints with Service with selector specified",
+		service: &v1.Service{
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{"foo": "bar"},
+			},
+		},
+		endpoints: &v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Ports:     []v1.EndpointPort{{Port: 80}},
+				Addresses: []v1.EndpointAddress{{IP: "10.0.0.1"}},
+			}},
+		},
+		endpointSlices:     []*discovery.EndpointSlice{},
+		expectedNumActions: 0,
+		expectedNumSlices:  0,
+	}, {
 		testName: "Existing EndpointSlices that need to be cleaned up",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -136,6 +180,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  0,
 	}, {
 		testName: "Existing EndpointSlices managed by a different controller, no addresses to sync",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports: []v1.EndpointPort{{Port: 80}},
@@ -154,6 +199,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices: 0,
 	}, {
 		testName: "Endpoints with 1000 addresses",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports:     []v1.EndpointPort{{Port: 80}},
@@ -165,6 +211,7 @@ func TestSyncEndpoints(t *testing.T) {
 		expectedNumSlices:  1,
 	}, {
 		testName: "Endpoints with 1001 addresses - 1 should not be mirrored",
+		service:  &v1.Service{},
 		endpoints: &v1.Endpoints{
 			Subsets: []v1.EndpointSubset{{
 				Ports:     []v1.EndpointPort{{Port: 80}},
@@ -178,33 +225,45 @@ func TestSyncEndpoints(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			client, esController := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			client, esController := newController(ctx, time.Duration(0))
 			tc.endpoints.Name = endpointsName
 			tc.endpoints.Namespace = namespace
 			esController.endpointsStore.Add(tc.endpoints)
-			esController.serviceStore.Add(&v1.Service{ObjectMeta: metav1.ObjectMeta{
-				Name:      endpointsName,
-				Namespace: namespace,
-			}})
+			if tc.service != nil {
+				tc.service.Name = endpointsName
+				tc.service.Namespace = namespace
+				esController.serviceStore.Add(tc.service)
+			}
 
 			for _, epSlice := range tc.endpointSlices {
 				epSlice.Namespace = namespace
 				esController.endpointSliceStore.Add(epSlice)
-				_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Expected no error creating EndpointSlice, got %v", err)
 				}
 			}
 
-			err := esController.syncEndpoints(fmt.Sprintf("%s/%s", namespace, endpointsName))
+			logger, _ := ktesting.NewTestContext(t)
+			err := esController.syncEndpoints(logger, fmt.Sprintf("%s/%s", namespace, endpointsName))
 			if err != nil {
-				t.Errorf("Unexpected error from syncEndpoints: %v", err)
+				t.Fatalf("Unexpected error from syncEndpoints: %v", err)
 			}
 
 			numInitialActions := len(tc.endpointSlices)
-			numExtraActions := len(client.Actions()) - numInitialActions
-			if numExtraActions != tc.expectedNumActions {
-				t.Fatalf("Expected %d additional client actions, got %d: %#v", tc.expectedNumActions, numExtraActions, client.Actions()[numInitialActions:])
+			// Wait for the expected event show up in test "Endpoints with 1001 addresses - 1 should not be mirrored"
+			err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (done bool, err error) {
+				actions := client.Actions()
+				numExtraActions := len(actions) - numInitialActions
+				if numExtraActions != tc.expectedNumActions {
+					t.Logf("Expected %d additional client actions, got %d: %#v. Will retry", tc.expectedNumActions, numExtraActions, actions[numInitialActions:])
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				t.Fatal("Timed out waiting for expected actions")
 			}
 
 			endpointSlices := fetchEndpointSlices(t, client, namespace)
@@ -214,45 +273,23 @@ func TestSyncEndpoints(t *testing.T) {
 }
 
 func TestShouldMirror(t *testing.T) {
-	svcWithSelector := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "with-selector",
-			Namespace: "example1",
-		},
-		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"with": "selector"},
-		},
-	}
-	svcWithoutSelector := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "without-selector",
-			Namespace: "example1",
-		},
-		Spec: v1.ServiceSpec{},
-	}
-
 	testCases := []struct {
 		testName     string
 		endpoints    *v1.Endpoints
-		service      *v1.Service
 		shouldMirror bool
 	}{{
-		testName: "Service without selector with matching endpoints",
-		service:  svcWithoutSelector,
+		testName: "Standard Endpoints",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
+				Name: "test-endpoints",
 			},
 		},
 		shouldMirror: true,
 	}, {
-		testName: "Service without selector, matching Endpoints with skip-mirror=true",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with skip-mirror=true",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace,
+				Name: "test-endpoints",
 				Labels: map[string]string{
 					discovery.LabelSkipMirror: "true",
 				},
@@ -260,12 +297,10 @@ func TestShouldMirror(t *testing.T) {
 		},
 		shouldMirror: false,
 	}, {
-		testName: "Service without selector, matching Endpoints with skip-mirror=invalid",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with skip-mirror=invalid",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
+				Name: "test-endpoints",
 				Labels: map[string]string{
 					discovery.LabelSkipMirror: "invalid",
 				},
@@ -273,40 +308,13 @@ func TestShouldMirror(t *testing.T) {
 		},
 		shouldMirror: true,
 	}, {
-		testName: "Service without selector, matching Endpoints with leader election annotation",
-		service:  svcWithoutSelector,
+		testName: "Endpoints with leader election annotation",
 		endpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace,
+				Name: "test-endpoints",
 				Annotations: map[string]string{
 					resourcelock.LeaderElectionRecordAnnotationKey: "",
 				},
-			},
-		},
-		shouldMirror: false,
-	}, {
-		testName: "Service without selector, matching Endpoints without skip label in different namespace",
-		service:  svcWithSelector,
-		endpoints: &v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithSelector.Name,
-				Namespace: svcWithSelector.Namespace + "different",
-			},
-		},
-		shouldMirror: false,
-	}, {
-		testName:     "Service without selector or matching endpoints",
-		service:      svcWithoutSelector,
-		endpoints:    nil,
-		shouldMirror: false,
-	}, {
-		testName: "Endpoints without matching Service",
-		service:  nil,
-		endpoints: &v1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcWithoutSelector.Name,
-				Namespace: svcWithoutSelector.Namespace,
 			},
 		},
 		shouldMirror: false,
@@ -314,19 +322,13 @@ func TestShouldMirror(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, c := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			_, c := newController(ctx, time.Duration(0))
 
 			if tc.endpoints != nil {
 				err := c.endpointsStore.Add(tc.endpoints)
 				if err != nil {
 					t.Fatalf("Error adding Endpoints to store: %v", err)
-				}
-			}
-
-			if tc.service != nil {
-				err := c.serviceStore.Add(tc.service)
-				if err != nil {
-					t.Fatalf("Error adding Service to store: %v", err)
 				}
 			}
 
@@ -438,7 +440,8 @@ func TestEndpointSlicesMirroredForService(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, c := newController(time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			_, c := newController(ctx, time.Duration(0))
 
 			err := c.endpointSliceStore.Add(tc.endpointSlice)
 			if err != nil {

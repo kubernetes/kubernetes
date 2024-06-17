@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // NetworkPoliciesGetter has a method to return a NetworkPolicyInterface.
@@ -46,6 +52,7 @@ type NetworkPolicyInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.NetworkPolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.NetworkPolicy, err error)
+	Apply(ctx context.Context, networkPolicy *extensionsv1beta1.NetworkPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.NetworkPolicy, err error)
 	NetworkPolicyExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *networkPolicies) Get(ctx context.Context, name string, options v1.GetOp
 }
 
 // List takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
-func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
+func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.NetworkPolicyList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for networkpolicies, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for networkpolicies", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for networkpolicies ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for networkpolicies", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of NetworkPolicies that match those selectors.
+func (c *networkPolicies) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (result
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of NetworkPolicies
+func (c *networkPolicies) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.NetworkPolicyList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied networkPolicy.
+func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *extensionsv1beta1.NetworkPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.NetworkPolicy, err error) {
+	if networkPolicy == nil {
+		return nil, fmt.Errorf("networkPolicy provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(networkPolicy)
+	if err != nil {
+		return nil, err
+	}
+	name := networkPolicy.Name
+	if name == nil {
+		return nil, fmt.Errorf("networkPolicy.Name must be provided to Apply")
+	}
+	result = &v1beta1.NetworkPolicy{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("networkpolicies").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

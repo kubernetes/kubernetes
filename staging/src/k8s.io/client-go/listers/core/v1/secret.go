@@ -20,8 +20,8 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/listers"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -38,25 +38,17 @@ type SecretLister interface {
 
 // secretLister implements the SecretLister interface.
 type secretLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*v1.Secret]
 }
 
 // NewSecretLister returns a new SecretLister.
 func NewSecretLister(indexer cache.Indexer) SecretLister {
-	return &secretLister{indexer: indexer}
-}
-
-// List lists all Secrets in the indexer.
-func (s *secretLister) List(selector labels.Selector) (ret []*v1.Secret, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Secret))
-	})
-	return ret, err
+	return &secretLister{listers.New[*v1.Secret](indexer, v1.Resource("secret"))}
 }
 
 // Secrets returns an object that can list and get Secrets.
 func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
-	return secretNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return secretNamespaceLister{listers.NewNamespaced[*v1.Secret](s.ResourceIndexer, namespace)}
 }
 
 // SecretNamespaceLister helps list and get Secrets.
@@ -74,26 +66,5 @@ type SecretNamespaceLister interface {
 // secretNamespaceLister implements the SecretNamespaceLister
 // interface.
 type secretNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all Secrets in the indexer for a given namespace.
-func (s secretNamespaceLister) List(selector labels.Selector) (ret []*v1.Secret, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Secret))
-	})
-	return ret, err
-}
-
-// Get retrieves the Secret from the indexer for a given namespace and name.
-func (s secretNamespaceLister) Get(name string) (*v1.Secret, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1.Resource("secret"), name)
-	}
-	return obj.(*v1.Secret), nil
+	listers.ResourceIndexer[*v1.Secret]
 }

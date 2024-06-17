@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -57,7 +58,7 @@ func (s *sourceFile) startWatch() {
 		}
 
 		if err := s.doWatch(); err != nil {
-			klog.Errorf("Unable to read config path %q: %v", s.path, err)
+			klog.ErrorS(err, "Unable to read config path", "path", s.path)
 			if _, retryable := err.(*retryableError); !retryable {
 				backOff.Next(backOffID, time.Now())
 			}
@@ -102,7 +103,7 @@ func (s *sourceFile) doWatch() error {
 func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
 	// Ignore file start with dots
 	if strings.HasPrefix(filepath.Base(e.Name), ".") {
-		klog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
+		klog.V(4).InfoS("Ignored pod manifest, because it starts with dots", "eventName", e.Name)
 		return nil
 	}
 	var eventType podEventType
@@ -139,14 +140,14 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 			pod, podExist, err := s.store.GetByKey(objKey)
 			if err != nil {
 				return err
-			} else if !podExist {
-				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
-			} else {
-				if err = s.store.Delete(pod); err != nil {
-					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
-				}
-				delete(s.fileKeyMapping, e.fileName)
 			}
+			if !podExist {
+				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
+			}
+			if err = s.store.Delete(pod); err != nil {
+				return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
+			}
+			delete(s.fileKeyMapping, e.fileName)
 		}
 	}
 	return nil

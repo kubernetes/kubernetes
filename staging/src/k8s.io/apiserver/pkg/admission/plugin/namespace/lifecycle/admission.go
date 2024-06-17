@@ -29,13 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilcache "k8s.io/apimachinery/pkg/util/cache"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -140,7 +140,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 			exists = true
 		}
 		if exists {
-			klog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
+			klog.V(4).InfoS("Namespace existed in cache after waiting", "namespace", klog.KRef("", a.GetNamespace()))
 		}
 	}
 
@@ -161,7 +161,8 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		case err != nil:
 			return errors.NewInternalError(err)
 		}
-		klog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
+
+		klog.V(4).InfoS("Found namespace via storage lookup", "namespace", klog.KRef("", a.GetNamespace()))
 	}
 
 	// ensure that we're not trying to create objects in terminating namespaces

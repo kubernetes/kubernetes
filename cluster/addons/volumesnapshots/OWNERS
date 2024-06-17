@@ -1,7 +1,4 @@
 approvers:
-- saad-ali
-- msau42
+  - sig-storage-approvers
 reviewers:
-- jingxu97
-- xing-yang
-- yuxiangqian
+  - sig-storage-reviewers

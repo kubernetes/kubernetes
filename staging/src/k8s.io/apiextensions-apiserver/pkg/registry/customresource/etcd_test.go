@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	registrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -50,12 +52,12 @@ import (
 func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testing.EtcdTestServer) {
 	server, etcdStorage := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	etcdStorage.Codec = unstructured.UnstructuredJSONScheme
-	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
+	groupResource := schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage.ForResource(groupResource), Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "noxus"}
 
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"},
 		&metav1.ListOptions{},
-		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
 		&metav1.DeleteOptions{},
 	)
@@ -91,7 +93,8 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	table, _ := tableconvertor.New(headers)
 
 	storage := customresource.NewStorage(
-		schema.GroupResource{Group: "mygroup.example.com", Resource: "noxus"},
+		groupResource,
+		groupResource,
 		kind,
 		schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "NoxuItemList"},
 		customresource.NewStrategy(
@@ -103,10 +106,12 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 			nil,
 			status,
 			scale,
+			nil,
 		),
 		restOptions,
 		[]string{"all"},
 		table,
+		managedfields.ResourcePathMappings{},
 	)
 
 	return storage, server
@@ -406,7 +411,7 @@ func TestScaleGet(t *testing.T) {
 
 	got := obj.(*autoscalingv1.Scale)
 	if !apiequality.Semantic.DeepEqual(got, want) {
-		t.Errorf("unexpected scale: %s", diff.ObjectDiff(got, want))
+		t.Errorf("unexpected scale: %s", cmp.Diff(got, want))
 	}
 }
 

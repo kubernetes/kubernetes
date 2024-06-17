@@ -28,19 +28,46 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func ValidateLabelSelector(ps *metav1.LabelSelector, fldPath *field.Path) field.ErrorList {
+// LabelSelectorValidationOptions is a struct that can be passed to ValidateLabelSelector to record the validate options
+type LabelSelectorValidationOptions struct {
+	// Allow invalid label value in selector
+	AllowInvalidLabelValueInSelector bool
+}
+
+// LabelSelectorHasInvalidLabelValue returns true if the given selector contains an invalid label value in a match expression.
+// This is useful for determining whether AllowInvalidLabelValueInSelector should be set to true when validating an update
+// based on existing persisted invalid values.
+func LabelSelectorHasInvalidLabelValue(ps *metav1.LabelSelector) bool {
+	if ps == nil {
+		return false
+	}
+	for _, e := range ps.MatchExpressions {
+		for _, v := range e.Values {
+			if len(validation.IsValidLabelValue(v)) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ValidateLabelSelector validate the LabelSelector according to the opts and returns any validation errors.
+// opts.AllowInvalidLabelValueInSelector is only expected to be set to true when required for backwards compatibility with existing invalid data.
+func ValidateLabelSelector(ps *metav1.LabelSelector, opts LabelSelectorValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ps == nil {
 		return allErrs
 	}
 	allErrs = append(allErrs, ValidateLabels(ps.MatchLabels, fldPath.Child("matchLabels"))...)
 	for i, expr := range ps.MatchExpressions {
-		allErrs = append(allErrs, ValidateLabelSelectorRequirement(expr, fldPath.Child("matchExpressions").Index(i))...)
+		allErrs = append(allErrs, ValidateLabelSelectorRequirement(expr, opts, fldPath.Child("matchExpressions").Index(i))...)
 	}
 	return allErrs
 }
 
-func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPath *field.Path) field.ErrorList {
+// ValidateLabelSelectorRequirement validate the requirement according to the opts and returns any validation errors.
+// opts.AllowInvalidLabelValueInSelector is only expected to be set to true when required for backwards compatibility with existing invalid data.
+func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, opts LabelSelectorValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	switch sr.Operator {
 	case metav1.LabelSelectorOpIn, metav1.LabelSelectorOpNotIn:
@@ -55,6 +82,13 @@ func ValidateLabelSelectorRequirement(sr metav1.LabelSelectorRequirement, fldPat
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("operator"), sr.Operator, "not a valid selector operator"))
 	}
 	allErrs = append(allErrs, ValidateLabelName(sr.Key, fldPath.Child("key"))...)
+	if !opts.AllowInvalidLabelValueInSelector {
+		for valueIndex, value := range sr.Values {
+			for _, msg := range validation.IsValidLabelValue(value) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("values").Index(valueIndex), value, msg))
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -81,6 +115,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	//lint:file-ignore SA1019 Keep validation for deprecated OrphanDependents option until it's being removed
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("propagationPolicy"), options.PropagationPolicy, "orphanDependents and deletionPropagation cannot be both set"))
 	}
@@ -95,17 +130,19 @@ func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 }
 
 func ValidateCreateOptions(options *metav1.CreateOptions) field.ErrorList {
-	return append(
-		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
-		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
-	)
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
+	return allErrs
 }
 
 func ValidateUpdateOptions(options *metav1.UpdateOptions) field.ErrorList {
-	return append(
-		ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager")),
-		ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...,
-	)
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
+	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
+	return allErrs
 }
 
 func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchType) field.ErrorList {
@@ -122,6 +159,7 @@ func ValidatePatchOptions(options *metav1.PatchOptions, patchType types.PatchTyp
 	}
 	allErrs = append(allErrs, ValidateFieldManager(options.FieldManager, field.NewPath("fieldManager"))...)
 	allErrs = append(allErrs, ValidateDryRun(field.NewPath("dryRun"), options.DryRun)...)
+	allErrs = append(allErrs, ValidateFieldValidation(field.NewPath("fieldValidation"), options.FieldValidation)...)
 	return allErrs
 }
 
@@ -158,6 +196,18 @@ func ValidateDryRun(fldPath *field.Path, dryRun []string) field.ErrorList {
 	return allErrs
 }
 
+var allowedFieldValidationValues = sets.NewString("", metav1.FieldValidationIgnore, metav1.FieldValidationWarn, metav1.FieldValidationStrict)
+
+// ValidateFieldValidation validates that a fieldValidation query param only contains allowed values.
+func ValidateFieldValidation(fldPath *field.Path, fieldValidation string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !allowedFieldValidationValues.Has(fieldValidation) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, fieldValidation, allowedFieldValidationValues.List()))
+	}
+	return allErrs
+
+}
+
 const UninitializedStatusUpdateErrorMsg string = `must not update status when the object is uninitialized`
 
 // ValidateTableOptions returns any invalid flags on TableOptions.
@@ -171,9 +221,12 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 	return allErrs
 }
 
+const MaxSubresourceNameLength = 256
+
 func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, fields := range fieldsList {
+	for i, fields := range fieldsList {
+		fldPath := fldPath.Index(i)
 		switch fields.Operation {
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
@@ -181,6 +234,11 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+		}
+		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
+
+		if len(fields.Subresource) > MaxSubresourceNameLength {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), fields.Subresource, MaxSubresourceNameLength))
 		}
 	}
 	return allErrs

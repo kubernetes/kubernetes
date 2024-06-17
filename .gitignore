@@ -4,6 +4,9 @@
 # OSX trash
 .DS_Store
 
+# Developers can store local stuff in dirs named __something
+__*
+
 # Eclipse files
 .classpath
 .project
@@ -61,6 +64,9 @@ network_closure.sh
 /third_party/etcd*
 /default.etcd
 
+# Also ignore protoc installed by hack/install-protoc.sh
+/third_party/protoc*
+
 # User cluster configs
 .kubeconfig
 
@@ -81,8 +87,9 @@ network_closure.sh
 /_tmp/
 /doc_tmp/
 
-# Test artifacts produced by Jenkins jobs
+# Test artifacts produced by Prow/kubetest2 jobs
 /_artifacts/
+/_rundir/
 
 # Go dependencies installed on Jenkins
 /_gopath/
@@ -103,22 +110,8 @@ network_closure.sh
 # Downloaded kubernetes binary release tar ball
 kubernetes.tar.gz
 
-# generated files in any directory
-# TODO(thockin): uncomment this when we stop committing the generated files.
-#zz_generated.*
-zz_generated.openapi.go
+# Phony test files used as part of coverage generation
 zz_generated_*_test.go
-
-# TODO(roycaihw): remove this when we stop committing the generated definition
-!staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
-!staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
-# low-change blueprint in code-generator to notice changes
-!staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
-# low-change sample-apiserver spec to be compilable when published
-!staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go
-
-# make-related metadata
-/.make/
 
 # Just in time generated data in the source, should never be committed
 /test/e2e/generated/bindata.go

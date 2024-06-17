@@ -7,17 +7,22 @@
         "labels": {
             "tier": "cluster-management",
             "component": "cluster-autoscaler"
-        },
-        "annotations": {
-            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
         }
     },
     "spec": {
+        "securityContext": {
+            {{runAsUser}}
+            {{runAsGroup}}
+            {{supplementalGroups}}
+            "seccompProfile": {
+                "type": "RuntimeDefault"
+            }
+        },
         "hostNetwork": true,
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "k8s.gcr.io/cluster-autoscaler:v1.18.0",
+                "image": "registry.k8s.io/autoscaling/cluster-autoscaler:v1.26.1",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",

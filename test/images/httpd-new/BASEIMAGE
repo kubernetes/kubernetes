@@ -1,0 +1,7 @@
+linux/amd64=httpd:2.4.39-alpine
+linux/arm=arm32v6/httpd:2.4.39-alpine
+linux/arm64=arm64v8/httpd:2.4.39-alpine
+linux/ppc64le=ppc64le/httpd:2.4.39-alpine
+linux/s390x=s390x/httpd:2.4.39-alpine
+windows/amd64/1809=REGISTRY/busybox:1.29-2-windows-amd64-1809
+windows/amd64/ltsc2022=REGISTRY/busybox:1.29-2-windows-amd64-ltsc2022

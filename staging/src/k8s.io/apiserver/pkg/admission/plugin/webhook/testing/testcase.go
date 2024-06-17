@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	registrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -243,6 +244,17 @@ type MutatingTest struct {
 	ExpectReinvokeWebhooks map[string]bool
 }
 
+// DurationTest is webhook duration test case, used both in mutating and
+// validating plugin test cases.
+type DurationTest struct {
+	Name                string
+	Webhooks            []registrationv1.ValidatingWebhook
+	InitContext         bool
+	IsDryRun            bool
+	ExpectedDurationSum time.Duration
+	ExpectedDurationMax time.Duration
+}
+
 // ConvertToMutatingTestCases converts a validating test case to a mutating one for test purposes.
 func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string) []MutatingTest {
 	r := make([]MutatingTest, len(tests))
@@ -264,6 +276,18 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 				break
 			}
 		}
+		// Change annotation keys for Validating's fail open to Mutating's fail open.
+		failOpenAnnotations := map[string]string{}
+		for key, value := range t.ExpectAnnotations {
+			if strings.HasPrefix(key, "failed-open.validating.webhook.admission.k8s.io/") {
+				failOpenAnnotations[key] = value
+			}
+		}
+		for key, value := range failOpenAnnotations {
+			newKey := strings.Replace(key, "failed-open.validating.webhook.admission.k8s.io/", "failed-open.mutation.webhook.admission.k8s.io/", 1)
+			t.ExpectAnnotations[newKey] = value
+			delete(t.ExpectAnnotations, key)
+		}
 		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.SkipBenchmark, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
 	}
 	return r
@@ -273,7 +297,18 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 func ConvertToMutatingWebhooks(webhooks []registrationv1.ValidatingWebhook) []registrationv1.MutatingWebhook {
 	mutating := make([]registrationv1.MutatingWebhook, len(webhooks))
 	for i, h := range webhooks {
-		mutating[i] = registrationv1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.ObjectSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions, nil}
+		mutating[i] = registrationv1.MutatingWebhook{
+			Name:                    h.Name,
+			ClientConfig:            h.ClientConfig,
+			Rules:                   h.Rules,
+			FailurePolicy:           h.FailurePolicy,
+			MatchPolicy:             h.MatchPolicy,
+			NamespaceSelector:       h.NamespaceSelector,
+			ObjectSelector:          h.ObjectSelector,
+			SideEffects:             h.SideEffects,
+			TimeoutSeconds:          h.TimeoutSeconds,
+			AdmissionReviewVersions: h.AdmissionReviewVersions,
+		}
 	}
 	return mutating
 }
@@ -408,6 +443,11 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 
 			SkipBenchmark: true,
 			ExpectAllow:   true,
+			ExpectAnnotations: map[string]string{
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "internalErr A",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_1": "internalErr B",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_2": "internalErr C",
+			},
 		},
 		{
 			Name: "match & fail (but disallow because fail close on nil FailurePolicy)",
@@ -502,8 +542,9 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			SkipBenchmark: true,
-			ExpectAllow:   true,
+			SkipBenchmark:     true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "nilResponse"},
 		},
 		{
 			Name: "absent response and fail closed",
@@ -658,6 +699,98 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
+	}
+}
+
+// NewNonMutatingPanicTestCases returns test cases with a given base url.
+// All test cases in NewNonMutatingTestCases have no Patch set in
+// AdmissionResponse. The expected responses are set for panic handling.
+func NewNonMutatingPanicTestCases(url *url.URL) []ValidatingTest {
+	policyIgnore := registrationv1.Ignore
+	policyFail := registrationv1.Fail
+
+	return []ValidatingTest{
+		{
+			Name: "match & allow, but panic",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "allow.example.com",
+				ClientConfig:            ccfgSVC("allow"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode:  http.StatusForbidden,
+			ErrorContains:     "ValidatingAdmissionWebhook/allow.example.com has panicked: Start panicking!",
+			ExpectAnnotations: map[string]string{},
+		},
+		{
+			Name: "match & fail (but allow because fail open)",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "internalErr A",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr B",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr C",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+
+			SkipBenchmark: true,
+			ExpectAllow:   true,
+			ExpectAnnotations: map[string]string{
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "internalErr A",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_1": "internalErr B",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_2": "internalErr C",
+			},
+		},
+		{
+			Name: "match & fail (but fail because fail closed)",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "internalErr A",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr B",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr C",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ExpectAllow:      false,
+			ErrorContains:    " has panicked: Start panicking!",
+		},
 	}
 }
 
@@ -1006,7 +1139,7 @@ func NewCachedClientTestcases(url *url.URL) []CachedTest {
 			ExpectCacheMiss: true,
 		},
 		{
-			Name: "cached: service webhook, path 'allow'",
+			Name: "cached: url webhook, path 'allow'",
 			Webhooks: []registrationv1.ValidatingWebhook{{
 				Name:                    "cache5",
 				ClientConfig:            ccfgURL("allow"),
@@ -1050,4 +1183,68 @@ func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
 	return admission.NewObjectInterfacesFromScheme(scheme)
+}
+
+// NewValidationDurationTestCases returns test cases for webhook duration test
+func NewValidationDurationTestCases(url *url.URL) []DurationTest {
+	ccfgURL := urlConfigGenerator{url}.ccfgURL
+	webhooks := []registrationv1.ValidatingWebhook{
+		{
+			Name:                    "allow match",
+			ClientConfig:            ccfgURL("allow/100"),
+			Rules:                   matchEverythingRules,
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "allow no match",
+			ClientConfig:            ccfgURL("allow/200"),
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "disallow match",
+			ClientConfig:            ccfgURL("disallow/400"),
+			Rules:                   matchEverythingRules,
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+		{
+			Name:                    "disallow no match",
+			ClientConfig:            ccfgURL("disallow/800"),
+			NamespaceSelector:       &metav1.LabelSelector{},
+			ObjectSelector:          &metav1.LabelSelector{},
+			AdmissionReviewVersions: []string{"v1beta1"},
+		},
+	}
+
+	return []DurationTest{
+		{
+			Name:                "duration test",
+			IsDryRun:            false,
+			InitContext:         true,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 500,
+			ExpectedDurationMax: 400,
+		},
+		{
+			Name:                "duration dry run",
+			IsDryRun:            true,
+			InitContext:         true,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 0,
+			ExpectedDurationMax: 0,
+		},
+		{
+			Name:                "duration no init",
+			IsDryRun:            false,
+			InitContext:         false,
+			Webhooks:            webhooks,
+			ExpectedDurationSum: 0,
+			ExpectedDurationMax: 0,
+		},
+	}
 }

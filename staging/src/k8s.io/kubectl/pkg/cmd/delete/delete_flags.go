@@ -17,12 +17,17 @@ limitations under the License.
 package delete
 
 import (
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/dynamic"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 // DeleteFlags composes common printer flag structs
@@ -32,20 +37,21 @@ type DeleteFlags struct {
 	LabelSelector *string
 	FieldSelector *string
 
-	All            *bool
-	AllNamespaces  *bool
-	Cascade        *bool
-	Force          *bool
-	GracePeriod    *int
-	IgnoreNotFound *bool
-	Now            *bool
-	Timeout        *time.Duration
-	Wait           *bool
-	Output         *string
-	Raw            *string
+	All               *bool
+	AllNamespaces     *bool
+	CascadingStrategy *string
+	Force             *bool
+	GracePeriod       *int
+	IgnoreNotFound    *bool
+	Now               *bool
+	Timeout           *time.Duration
+	Wait              *bool
+	Output            *string
+	Raw               *string
+	Interactive       *bool
 }
 
-func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
+func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericiooptions.IOStreams) (*DeleteOptions, error) {
 	options := &DeleteOptions{
 		DynamicClient: dynamicClient,
 		IOStreams:     streams,
@@ -73,8 +79,12 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.AllNamespaces != nil {
 		options.DeleteAllNamespaces = *f.AllNamespaces
 	}
-	if f.Cascade != nil {
-		options.Cascade = *f.Cascade
+	if f.CascadingStrategy != nil {
+		var err error
+		options.CascadingStrategy, err = parseCascadingFlag(streams, *f.CascadingStrategy)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if f.Force != nil {
 		options.ForceDeletion = *f.Force
@@ -97,20 +107,23 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	if f.Raw != nil {
 		options.Raw = *f.Raw
 	}
+	if f.Interactive != nil {
+		options.Interactive = *f.Interactive
+	}
 
-	return options
+	return options, nil
 }
 
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	f.FileNameFlags.AddFlags(cmd.Flags())
 	if f.LabelSelector != nil {
-		cmd.Flags().StringVarP(f.LabelSelector, "selector", "l", *f.LabelSelector, "Selector (label query) to filter on, not including uninitialized ones.")
+		cmdutil.AddLabelSelectorFlagVar(cmd, f.LabelSelector)
 	}
 	if f.FieldSelector != nil {
 		cmd.Flags().StringVarP(f.FieldSelector, "field-selector", "", *f.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	}
 	if f.All != nil {
-		cmd.Flags().BoolVar(f.All, "all", *f.All, "Delete all resources, including uninitialized ones, in the namespace of the specified resource types.")
+		cmd.Flags().BoolVar(f.All, "all", *f.All, "Delete all resources, in the namespace of the specified resource types.")
 	}
 	if f.AllNamespaces != nil {
 		cmd.Flags().BoolVarP(f.AllNamespaces, "all-namespaces", "A", *f.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
@@ -118,8 +131,13 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Force != nil {
 		cmd.Flags().BoolVar(f.Force, "force", *f.Force, "If true, immediately remove resources from API and bypass graceful deletion. Note that immediate deletion of some resources may result in inconsistency or data loss and requires confirmation.")
 	}
-	if f.Cascade != nil {
-		cmd.Flags().BoolVar(f.Cascade, "cascade", *f.Cascade, "If true, cascade the deletion of the resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	if f.CascadingStrategy != nil {
+		cmd.Flags().StringVar(
+			f.CascadingStrategy,
+			"cascade",
+			*f.CascadingStrategy,
+			`Must be "background", "orphan", or "foreground". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to background.`)
+		cmd.Flags().Lookup("cascade").NoOptDefVal = "background"
 	}
 	if f.Now != nil {
 		cmd.Flags().BoolVar(f.Now, "now", *f.Now, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
@@ -142,11 +160,14 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	if f.Raw != nil {
 		cmd.Flags().StringVar(f.Raw, "raw", *f.Raw, "Raw URI to DELETE to the server.  Uses the transport specified by the kubeconfig file.")
 	}
+	if f.Interactive != nil {
+		cmd.Flags().BoolVarP(f.Interactive, "interactive", "i", *f.Interactive, "If true, delete resource only when user confirms.")
+	}
 }
 
 // NewDeleteCommandFlags provides default flags and values for use with the "delete" command
 func NewDeleteCommandFlags(usage string) *DeleteFlags {
-	cascade := true
+	cascadingStrategy := "background"
 	gracePeriod := -1
 
 	// setup command defaults
@@ -161,6 +182,7 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 	timeout := time.Duration(0)
 	wait := true
 	raw := ""
+	interactive := false
 
 	filenames := []string{}
 	recursive := false
@@ -172,8 +194,8 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		LabelSelector: &labelSelector,
 		FieldSelector: &fieldSelector,
 
-		Cascade:     &cascade,
-		GracePeriod: &gracePeriod,
+		CascadingStrategy: &cascadingStrategy,
+		GracePeriod:       &gracePeriod,
 
 		All:            &all,
 		AllNamespaces:  &allNamespaces,
@@ -184,12 +206,13 @@ func NewDeleteCommandFlags(usage string) *DeleteFlags {
 		Wait:           &wait,
 		Output:         &output,
 		Raw:            &raw,
+		Interactive:    &interactive,
 	}
 }
 
 // NewDeleteFlags provides default flags and values for use in commands outside of "delete"
 func NewDeleteFlags(usage string) *DeleteFlags {
-	cascade := true
+	cascadingStrategy := "background"
 	gracePeriod := -1
 
 	force := false
@@ -203,12 +226,36 @@ func NewDeleteFlags(usage string) *DeleteFlags {
 	return &DeleteFlags{
 		FileNameFlags: &genericclioptions.FileNameFlags{Usage: usage, Filenames: &filenames, Kustomize: &kustomize, Recursive: &recursive},
 
-		Cascade:     &cascade,
-		GracePeriod: &gracePeriod,
+		CascadingStrategy: &cascadingStrategy,
+		GracePeriod:       &gracePeriod,
 
 		// add non-defaults
 		Force:   &force,
 		Timeout: &timeout,
 		Wait:    &wait,
 	}
+}
+
+func parseCascadingFlag(streams genericiooptions.IOStreams, cascadingFlag string) (metav1.DeletionPropagation, error) {
+	boolValue, err := strconv.ParseBool(cascadingFlag)
+	// The flag is not a boolean
+	if err != nil {
+		switch cascadingFlag {
+		case "orphan":
+			return metav1.DeletePropagationOrphan, nil
+		case "foreground":
+			return metav1.DeletePropagationForeground, nil
+		case "background":
+			return metav1.DeletePropagationBackground, nil
+		default:
+			return metav1.DeletePropagationBackground, fmt.Errorf(`invalid cascade value (%v). Must be "background", "foreground", or "orphan"`, cascadingFlag)
+		}
+	}
+	// The flag was a boolean
+	if boolValue {
+		fmt.Fprintf(streams.ErrOut, "warning: --cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.\n", cascadingFlag, "background")
+		return metav1.DeletePropagationBackground, nil
+	}
+	fmt.Fprintf(streams.ErrOut, "warning: --cascade=%v is deprecated (boolean value) and can be replaced with --cascade=%s.\n", cascadingFlag, "orphan")
+	return metav1.DeletePropagationOrphan, nil
 }

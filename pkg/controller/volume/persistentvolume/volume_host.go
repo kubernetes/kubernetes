@@ -21,15 +21,14 @@ import (
 	"net"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
@@ -74,10 +73,6 @@ func (ctrl *PersistentVolumeController) NewWrapperUnmounter(volName string, spec
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
-func (ctrl *PersistentVolumeController) GetCloudProvider() cloudprovider.Interface {
-	return ctrl.cloud
-}
-
 func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
@@ -92,6 +87,10 @@ func (ctrl *PersistentVolumeController) GetHostIP() (net.IP, error) {
 
 func (ctrl *PersistentVolumeController) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (ctrl *PersistentVolumeController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
 }
 
 func (ctrl *PersistentVolumeController) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
@@ -114,7 +113,8 @@ func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ s
 
 func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		klog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
+		//nolint:logcheck
+		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }
 

@@ -100,7 +100,8 @@ func getControlPlanePhaseFlags(name string) []string {
 		options.CertificatesDir,
 		options.KubernetesVersion,
 		options.ImageRepository,
-		options.Kustomize,
+		options.Patches,
+		options.DryRun,
 	}
 	if name == "all" || name == kubeadmconstants.KubeAPIServer {
 		flags = append(flags,
@@ -145,6 +146,6 @@ func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
 		cfg := data.Cfg()
 
 		fmt.Printf("[control-plane] Creating static Pod manifest for %q\n", component)
-		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.KustomizeDir(), data.PatchesDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, component)
+		return controlplane.CreateStaticPodFiles(data.ManifestDir(), data.PatchesDir(), &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), component)
 	}
 }

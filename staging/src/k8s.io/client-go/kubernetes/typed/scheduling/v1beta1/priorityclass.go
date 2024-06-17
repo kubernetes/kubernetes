@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	schedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // PriorityClassesGetter has a method to return a PriorityClassInterface.
@@ -46,6 +52,7 @@ type PriorityClassInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PriorityClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PriorityClass, err error)
+	Apply(ctx context.Context, priorityClass *schedulingv1beta1.PriorityClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PriorityClass, err error)
 	PriorityClassExpansion
 }
 
@@ -74,7 +81,26 @@ func (c *priorityClasses) Get(ctx context.Context, name string, options v1.GetOp
 }
 
 // List takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
-func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
+func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PriorityClassList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for priorityclasses, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for priorityclasses", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for priorityclasses ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for priorityclasses", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of PriorityClasses that match those selectors.
+func (c *priorityClasses) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +111,22 @@ func (c *priorityClasses) List(ctx context.Context, opts v1.ListOptions) (result
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of PriorityClasses
+func (c *priorityClasses) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PriorityClassList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.PriorityClassList{}
+	err = c.client.Get().
+		Resource("priorityclasses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +203,31 @@ func (c *priorityClasses) Patch(ctx context.Context, name string, pt types.Patch
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied priorityClass.
+func (c *priorityClasses) Apply(ctx context.Context, priorityClass *schedulingv1beta1.PriorityClassApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PriorityClass, err error) {
+	if priorityClass == nil {
+		return nil, fmt.Errorf("priorityClass provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(priorityClass)
+	if err != nil {
+		return nil, err
+	}
+	name := priorityClass.Name
+	if name == nil {
+		return nil, fmt.Errorf("priorityClass.Name must be provided to Apply")
+	}
+	result = &v1beta1.PriorityClass{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("priorityclasses").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

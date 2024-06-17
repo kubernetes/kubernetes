@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 type GroupVersionHolder struct {
@@ -46,13 +46,12 @@ func TestGroupVersionUnmarshalJSON(t *testing.T) {
 		if !reflect.DeepEqual(result.GV, c.expect) {
 			t.Errorf("JSON codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
 		}
-		// test the json-iterator codec
-		iter := json.CaseSensitiveJsonIterator()
-		if err := iter.Unmarshal(c.input, &result); err != nil {
-			t.Errorf("json-iterator codec failed to unmarshal input '%v': %v", c.input, err)
+		// test the utiljson codec
+		if err := utiljson.Unmarshal(c.input, &result); err != nil {
+			t.Errorf("util/json codec failed to unmarshal input '%v': %v", c.input, err)
 		}
 		if !reflect.DeepEqual(result.GV, c.expect) {
-			t.Errorf("json-iterator codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
+			t.Errorf("util/json codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
 		}
 	}
 }

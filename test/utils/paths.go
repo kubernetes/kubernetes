@@ -27,6 +27,11 @@ import (
 
 // GetK8sRootDir returns the root directory for kubernetes, if present in the gopath.
 func GetK8sRootDir() (string, error) {
+	dir := os.Getenv("KUBE_ROOT")
+	if len(dir) > 0 {
+		return dir, nil
+	}
+
 	dir, err := RootDir()
 	if err != nil {
 		return "", err
@@ -59,12 +64,17 @@ func RootDir() (string, error) {
 }
 
 // GetK8sBuildOutputDir returns the build output directory for k8s
-func GetK8sBuildOutputDir() (string, error) {
+// For dockerized build, targetArch (eg: 'linux/arm64', 'linux/amd64') must be explicitly specified
+// For non dockerized build, targetArch is ignored
+func GetK8sBuildOutputDir(isDockerizedBuild bool, targetArch string) (string, error) {
 	k8sRoot, err := GetK8sRootDir()
 	if err != nil {
 		return "", err
 	}
 	buildOutputDir := filepath.Join(k8sRoot, "_output/local/go/bin")
+	if isDockerizedBuild {
+		buildOutputDir = filepath.Join(k8sRoot, "_output/dockerized/bin/", targetArch)
+	}
 	if _, err := os.Stat(buildOutputDir); err != nil {
 		return "", err
 	}

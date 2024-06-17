@@ -22,13 +22,13 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -259,7 +259,33 @@ func TestWatch(t *testing.T) {
 	)
 }
 
-//TODO TestUpdateStatus
+func TestUpdateStatus(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.Destroy()
+
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
+	rcStart, err := createController(storage.Controller, *validController, t)
+	if err != nil {
+		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
+	}
+
+	rc := rcStart.DeepCopy()
+	rc.Status.Replicas++
+	_, _, err = storage.Status.Update(ctx, rc.Name, rest.DefaultUpdatedObjectInfo(rc), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Status.Get(ctx, rc.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	rcGot := obj.(*api.ReplicationController)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(rc.Status, rcGot.Status) {
+		t.Errorf("unexpected object: %s", cmp.Diff(rc.Status, rcGot.Status))
+	}
+}
 
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
@@ -294,7 +320,7 @@ func TestScaleGet(t *testing.T) {
 	}
 	got := obj.(*autoscaling.Scale)
 	if !apiequality.Semantic.DeepEqual(want, got) {
-		t.Errorf("unexpected scale: %s", diff.ObjectDiff(want, got))
+		t.Errorf("unexpected scale: %s", cmp.Diff(want, got))
 	}
 }
 

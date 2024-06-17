@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -22,7 +23,7 @@ import (
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
@@ -44,7 +45,7 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 		}
 		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
 			continue
 		}
 		// System containers don't have a filesystem associated with them.
@@ -79,7 +80,7 @@ func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig c
 		}
 		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			klog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
 			continue
 		}
 		s.Name = sys

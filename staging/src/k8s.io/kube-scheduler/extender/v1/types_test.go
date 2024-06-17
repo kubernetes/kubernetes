@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -50,7 +49,7 @@ func TestCompatibility(t *testing.T) {
 			emptyObj: &ExtenderPreemptionArgs{},
 			obj: &ExtenderPreemptionArgs{
 				Pod:                   &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "podname"}},
-				NodeNameToVictims:     map[string]*Victims{"foo": {Pods: []*v1.Pod{&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "podname"}}}, NumPDBViolations: 1}},
+				NodeNameToVictims:     map[string]*Victims{"foo": {Pods: []*corev1.Pod{{ObjectMeta: metav1.ObjectMeta{Name: "podname"}}}, NumPDBViolations: 1}},
 				NodeNameToMetaVictims: map[string]*MetaVictims{"foo": {Pods: []*MetaPod{{UID: "myuid"}}, NumPDBViolations: 1}},
 			},
 			expectJSON: `{"Pod":{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null},"status":{}},"NodeNameToVictims":{"foo":{"Pods":[{"metadata":{"name":"podname","creationTimestamp":null},"spec":{"containers":null},"status":{}}],"NumPDBViolations":1}},"NodeNameToMetaVictims":{"foo":{"Pods":[{"UID":"myuid"}],"NumPDBViolations":1}}}`,
@@ -67,12 +66,13 @@ func TestCompatibility(t *testing.T) {
 		{
 			emptyObj: &ExtenderFilterResult{},
 			obj: &ExtenderFilterResult{
-				Nodes:       &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "nodename"}}}},
-				NodeNames:   &[]string{"node1"},
-				FailedNodes: FailedNodesMap{"foo": "bar"},
-				Error:       "myerror",
+				Nodes:                      &corev1.NodeList{Items: []corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "nodename"}}}},
+				NodeNames:                  &[]string{"node1"},
+				FailedNodes:                FailedNodesMap{"foo": "bar"},
+				FailedAndUnresolvableNodes: FailedNodesMap{"baz": "qux"},
+				Error:                      "myerror",
 			},
-			expectJSON: `{"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"],"FailedNodes":{"foo":"bar"},"Error":"myerror"}`,
+			expectJSON: `{"Nodes":{"metadata":{},"items":[{"metadata":{"name":"nodename","creationTimestamp":null},"spec":{},"status":{"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"machineID":"","systemUUID":"","bootID":"","kernelVersion":"","osImage":"","containerRuntimeVersion":"","kubeletVersion":"","kubeProxyVersion":"","operatingSystem":"","architecture":""}}}]},"NodeNames":["node1"],"FailedNodes":{"foo":"bar"},"FailedAndUnresolvableNodes":{"baz":"qux"},"Error":"myerror"}`,
 		},
 		{
 			emptyObj: &ExtenderBindingArgs{},

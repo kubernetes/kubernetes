@@ -22,14 +22,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SetStatusCondition sets the corresponding condition in conditions to newCondition.
+// SetStatusCondition sets the corresponding condition in conditions to newCondition and returns true
+// if the conditions are changed by this call.
 // conditions must be non-nil.
-// 1. if the condition of the specified type already exists (all fields of the existing condition are updated to
-//    newCondition, LastTransitionTime is set to now if the new status differs from the old status)
-// 2. if a condition of the specified type does not exist (LastTransitionTime is set to now() if unset, and newCondition is appended)
-func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Condition) {
+//  1. if the condition of the specified type already exists (all fields of the existing condition are updated to
+//     newCondition, LastTransitionTime is set to now if the new status differs from the old status)
+//  2. if a condition of the specified type does not exist (LastTransitionTime is set to now() if unset, and newCondition is appended)
+func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Condition) (changed bool) {
 	if conditions == nil {
-		return
+		return false
 	}
 	existingCondition := FindStatusCondition(*conditions, newCondition.Type)
 	if existingCondition == nil {
@@ -37,7 +38,7 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 			newCondition.LastTransitionTime = metav1.NewTime(time.Now())
 		}
 		*conditions = append(*conditions, newCondition)
-		return
+		return true
 	}
 
 	if existingCondition.Status != newCondition.Status {
@@ -47,17 +48,31 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 		} else {
 			existingCondition.LastTransitionTime = metav1.NewTime(time.Now())
 		}
+		changed = true
 	}
 
-	existingCondition.Reason = newCondition.Reason
-	existingCondition.Message = newCondition.Message
+	if existingCondition.Reason != newCondition.Reason {
+		existingCondition.Reason = newCondition.Reason
+		changed = true
+	}
+	if existingCondition.Message != newCondition.Message {
+		existingCondition.Message = newCondition.Message
+		changed = true
+	}
+	if existingCondition.ObservedGeneration != newCondition.ObservedGeneration {
+		existingCondition.ObservedGeneration = newCondition.ObservedGeneration
+		changed = true
+	}
+
+	return changed
 }
 
-// RemoveStatusCondition removes the corresponding conditionType from conditions.
+// RemoveStatusCondition removes the corresponding conditionType from conditions if present. Returns
+// true if it was present and got removed.
 // conditions must be non-nil.
-func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) {
-	if conditions == nil {
-		return
+func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) (removed bool) {
+	if conditions == nil || len(*conditions) == 0 {
+		return false
 	}
 	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)
 	for _, condition := range *conditions {
@@ -66,7 +81,10 @@ func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string)
 		}
 	}
 
+	removed = len(*conditions) != len(newConditions)
 	*conditions = newConditions
+
+	return removed
 }
 
 // FindStatusCondition finds the conditionType in conditions.

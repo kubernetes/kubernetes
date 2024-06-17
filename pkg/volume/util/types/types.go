@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // UniquePodName defines the type to key pods off of
@@ -36,22 +36,48 @@ type UniquePVCName types.UID
 type GeneratedOperations struct {
 	// Name of operation - could be used for resetting shared exponential backoff
 	OperationName     string
-	OperationFunc     func() (eventErr error, detailedErr error)
+	OperationFunc     func() (context OperationContext)
 	EventRecorderFunc func(*error)
-	CompleteFunc      func(*error)
+	CompleteFunc      func(CompleteFuncParam)
+}
+
+type OperationContext struct {
+	EventErr    error
+	DetailedErr error
+	Migrated    bool
+}
+
+func NewOperationContext(eventErr, detailedErr error, migrated bool) OperationContext {
+	return OperationContext{
+		EventErr:    eventErr,
+		DetailedErr: detailedErr,
+		Migrated:    migrated,
+	}
+}
+
+type CompleteFuncParam struct {
+	Err      *error
+	Migrated *bool
 }
 
 // Run executes the operations and its supporting functions
 func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
+	var context OperationContext
 	if o.CompleteFunc != nil {
-		defer o.CompleteFunc(&detailedErr)
+		c := CompleteFuncParam{
+			Err:      &context.DetailedErr,
+			Migrated: &context.Migrated,
+		}
+		defer o.CompleteFunc(c)
 	}
 	if o.EventRecorderFunc != nil {
 		defer o.EventRecorderFunc(&eventErr)
 	}
 	// Handle panic, if any, from operationFunc()
 	defer runtime.RecoverFromPanic(&detailedErr)
-	return o.OperationFunc()
+
+	context = o.OperationFunc()
+	return context.EventErr, context.DetailedErr
 }
 
 // FailedPrecondition error indicates CSI operation returned failed precondition
@@ -74,6 +100,23 @@ func NewFailedPreconditionError(msg string) *FailedPrecondition {
 func IsFailedPreconditionError(err error) bool {
 	var failedPreconditionError *FailedPrecondition
 	return errors.As(err, &failedPreconditionError)
+}
+
+type OperationNotSupported struct {
+	msg string
+}
+
+func (err *OperationNotSupported) Error() string {
+	return err.msg
+}
+
+func NewOperationNotSupportedError(msg string) *OperationNotSupported {
+	return &OperationNotSupported{msg: msg}
+}
+
+func IsOperationNotSupportedError(err error) bool {
+	var operationNotSupportedError *OperationNotSupported
+	return errors.As(err, &operationNotSupportedError)
 }
 
 // TransientOperationFailure indicates operation failed with a transient error
@@ -122,10 +165,7 @@ func IsOperationFinishedError(err error) bool {
 // on PVC and actual filesystem on disk did not match
 func IsFilesystemMismatchError(err error) bool {
 	mountError := mount.MountError{}
-	if errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch {
-		return true
-	}
-	return false
+	return errors.As(err, &mountError) && mountError.Type == mount.FilesystemMismatch
 }
 
 // IsUncertainProgressError checks if given error is of type that indicates

@@ -20,12 +20,14 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -54,8 +56,8 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 				{
 					Name: "dswp-test-volume-name",
 					VolumeSource: v1.VolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName: "dswp-test-fake-device",
+						RBD: &v1.RBDVolumeSource{
+							RBDImage: "dswp-test-fake-device",
 						},
 					},
 				},
@@ -70,7 +72,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 
 	podName := util.GetUniquePodName(pod)
 
-	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].GCEPersistentDisk.PDName
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].RBD.RBDImage
 
 	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
@@ -84,14 +86,14 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 		podLister:                fakePodInformer.Lister(),
 		pvcLister:                pvcLister,
 		pvLister:                 pvLister,
-		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator),
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 		intreeToCSITranslator:    csiTranslator,
 	}
 
 	//add the given node to the list of nodes managed by dsw
-	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
-
-	dswp.findAndAddActivePods()
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName))
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.findAndAddActivePods(logger)
 
 	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
 
@@ -117,7 +119,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	//add pod and volume again
-	dswp.findAndAddActivePods()
+	dswp.findAndAddActivePods(logger)
 
 	//check if the given volume referenced by the pod is added to dsw for the second time
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
@@ -129,7 +131,7 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 	fakePodInformer.Informer().GetStore().Delete(pod)
-	dswp.findAndRemoveDeletedPods()
+	dswp.findAndRemoveDeletedPods(logger)
 	//check if the given volume referenced by the pod still exists in dsw
 	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
 	if volumeExists {
@@ -139,4 +141,87 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 			volumeExists)
 	}
 
+}
+
+func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
+	fakeVolumePluginMgr, fakeVolumePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakeClient := &fake.Clientset{}
+
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
+
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dswp-test-pod",
+			UID:       "dswp-test-pod-uid",
+			Namespace: "dswp-test",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "dswp-test-host",
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						CSI: &v1.CSIVolumeSource{
+							Driver: "dswp-test-fake-csi-driver",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+		},
+	}
+
+	fakePodInformer.Informer().GetStore().Add(pod)
+
+	generatedVolumeName := "fake-plugin/dswp-test-fake-csi-driver"
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+
+	csiTranslator := csitrans.New()
+	dswp := &desiredStateOfWorldPopulator{
+		loopSleepDuration:        100 * time.Millisecond,
+		listPodsRetryDuration:    3 * time.Second,
+		desiredStateOfWorld:      fakesDSW,
+		volumePluginMgr:          fakeVolumePluginMgr,
+		podLister:                fakePodInformer.Lister(),
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		csiMigratedPluginManager: csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		intreeToCSITranslator:    csiTranslator,
+	}
+
+	//add the given node to the list of nodes managed by dsw
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName))
+	logger, _ := ktesting.NewTestContext(t)
+	dswp.findAndAddActivePods(logger)
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	//check if the given volume referenced by the pod is added to dsw
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	// Change the CSI volume plugin attachability
+	fakeVolumePlugin.NonAttachable = true
+
+	dswp.findAndRemoveDeletedPods(logger)
+
+	// The volume should not exist after it becomes non-attachable
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
 }

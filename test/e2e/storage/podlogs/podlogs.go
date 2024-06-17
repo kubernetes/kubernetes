@@ -33,8 +33,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-
-	"github.com/pkg/errors"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,10 +56,17 @@ type LogOutput struct {
 // Matches harmless errors from pkg/kubelet/kubelet_pods.go.
 var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|waiting to start|not available)|the server could not find the requested resource`)
 
-// CopyAllLogs follows the logs of all containers in all pods,
+// CopyPodLogs is basically CopyPodLogs for all current or future pods in the given namespace ns
+func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
+	return CopyPodLogs(ctx, cs, ns, "", to)
+}
+
+// CopyPodLogs follows the logs of all containers in pod with the given podName,
 // including those that get created in the future, and writes each log
 // line as configured in the output options. It does that until the
 // context is done or until an error occurs.
+//
+// If podName is empty, it will follow all pods in the given namespace ns.
 //
 // Beware that there is currently no way to force log collection
 // before removing pods, which means that there is a known race
@@ -68,10 +74,28 @@ var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|w
 // would be a blocking function with collects logs from all currently
 // running pods, but that then would have the disadvantage that
 // already deleted pods aren't covered.
-func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
+//
+// Another race occurs is when a pod shuts down. Logging stops, but if
+// then the pod is not removed from the apiserver quickly enough, logging
+// resumes and dumps the old log again. Previously, this was allowed based
+// on the assumption that it is better to log twice than miss log messages
+// of pods that started and immediately terminated or when logging temporarily
+// stopped.
+//
+// But it turned out to be rather confusing, so now a heuristic is used: if
+// log output of a container was already captured, then capturing does not
+// resume if the pod is marked for deletion.
+func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string, to LogOutput) error {
+	options := meta.ListOptions{}
+	if podName != "" {
+		options = meta.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
+		}
+	}
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
+
 	if err != nil {
-		return errors.Wrap(err, "cannot create Pod event watcher")
+		return fmt.Errorf("cannot create Pod event watcher: %w", err)
 	}
 
 	go func() {
@@ -85,7 +109,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), meta.ListOptions{})
+			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), options)
 			if err != nil {
 				if to.StatusWriter != nil {
 					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
@@ -106,6 +130,9 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 						// there cannot be any new output and we can ignore it.
 						(pod.Status.ContainerStatuses[i].State.Terminated != nil &&
 							started[id]) ||
+						// State.Terminated might not have been updated although the container already
+						// stopped running. Also check whether the pod is deleted.
+						(pod.DeletionTimestamp != nil && started[id]) ||
 						// Don't attempt to get logs for a container unless it is running or has terminated.
 						// Trying to get a log would just end up with an error that we would have to suppress.
 						(pod.Status.ContainerStatuses[i].State.Running == nil &&
@@ -231,25 +258,51 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 // logsForPod starts reading the logs for a certain pod. If the pod has more than one
 // container, opts.Container must be set. Reading stops when the context is done.
 // The stream includes formatted error messages and ends with
-//    rpc error: code = Unknown desc = Error: No such container: 41a...
+//
+//	rpc error: code = Unknown desc = Error: No such container: 41a...
+//
 // when the pod gets deleted while streaming.
 func logsForPod(ctx context.Context, cs clientset.Interface, ns, pod string, opts *v1.PodLogOptions) (io.ReadCloser, error) {
 	return cs.CoreV1().Pods(ns).GetLogs(pod, opts).Stream(ctx)
 }
 
 // WatchPods prints pod status events for a certain namespace or all namespaces
-// when namespace name is empty.
-func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Writer) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
+// when namespace name is empty. The closer can be nil if the caller doesn't want
+// the file to be closed when watching stops.
+func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Writer, toCloser io.Closer) (finalErr error) {
+	defer func() {
+		if finalErr != nil && toCloser != nil {
+			toCloser.Close()
+		}
+	}()
+
+	pods, err := cs.CoreV1().Pods(ns).Watch(context.Background(), meta.ListOptions{})
 	if err != nil {
-		return errors.Wrap(err, "cannot create Pod event watcher")
+		return fmt.Errorf("cannot create Pod watcher: %w", err)
+	}
+	defer func() {
+		if finalErr != nil {
+			pods.Stop()
+		}
+	}()
+
+	events, err := cs.CoreV1().Events(ns).Watch(context.Background(), meta.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("cannot create Event watcher: %w", err)
 	}
 
 	go func() {
-		defer watcher.Stop()
+		defer func() {
+			pods.Stop()
+			events.Stop()
+			if toCloser != nil {
+				toCloser.Close()
+			}
+		}()
+		timeFormat := "15:04:05.000"
 		for {
 			select {
-			case e := <-watcher.ResultChan():
+			case e := <-pods.ResultChan():
 				if e.Object == nil {
 					continue
 				}
@@ -260,7 +313,8 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 				}
 				buffer := new(bytes.Buffer)
 				fmt.Fprintf(buffer,
-					"pod event: %s: %s/%s %s: %s %s\n",
+					"%s pod: %s: %s/%s %s: %s %s\n",
+					time.Now().Format(timeFormat),
 					e.Type,
 					pod.Namespace,
 					pod.Name,
@@ -286,7 +340,29 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 					fmt.Fprintf(buffer, "\n")
 				}
 				to.Write(buffer.Bytes())
+			case e := <-events.ResultChan():
+				if e.Object == nil {
+					continue
+				}
+
+				event, ok := e.Object.(*v1.Event)
+				if !ok {
+					continue
+				}
+				to.Write([]byte(fmt.Sprintf("%s event: %s/%s %s: %s %s: %s (%v - %v)\n",
+					time.Now().Format(timeFormat),
+					event.InvolvedObject.APIVersion,
+					event.InvolvedObject.Kind,
+					event.InvolvedObject.Name,
+					event.Source.Component,
+					event.Type,
+					event.Message,
+					event.FirstTimestamp,
+					event.LastTimestamp,
+				)))
 			case <-ctx.Done():
+				to.Write([]byte(fmt.Sprintf("%s ==== stopping pod watch ====\n",
+					time.Now().Format(timeFormat))))
 				return
 			}
 		}

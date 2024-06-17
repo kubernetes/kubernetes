@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 ########################################################
-# Kubectl version (--short, --client, --output) #
+# Kubectl version (--client, --output) #
 ########################################################
 run_kubectl_version_tests() {
   set -o nounset
@@ -44,27 +44,34 @@ run_kubectl_version_tests() {
   kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_version_test" "the flag '--client' correctly has no server version info"
 
   kube::log::status "Testing kubectl version: verify json output"
-  kube::test::version::json_client_server_object_to_file "" "clientVersion" "${TEMP}/client_json_version_test"
-  kube::test::version::json_client_server_object_to_file "" "serverVersion" "${TEMP}/server_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "clientVersion.gitVersion" "${TEMP}/client_json_version_test"
+  kube::test::version::json_client_server_object_to_file "" "serverVersion.gitVersion" "${TEMP}/server_json_version_test"
   kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_json_version_test" "--output json has correct client info"
   kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_json_version_test" "--output json has correct server info"
 
   kube::log::status "Testing kubectl version: verify json output using additional --client flag does not contain serverVersion"
-  kube::test::version::json_client_server_object_to_file "--client" "clientVersion" "${TEMP}/client_only_json_version_test"
-  kube::test::version::json_client_server_object_to_file "--client" "serverVersion" "${TEMP}/server_client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "clientVersion.gitVersion" "${TEMP}/client_only_json_version_test"
+  kube::test::version::json_client_server_object_to_file "--client" "serverVersion.gitVersion" "${TEMP}/server_client_only_json_version_test"
   kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_only_json_version_test" "--client --output json has correct client info"
   kube::test::version::diff_assert "${TEMP}/server_version_test" "ne" "${TEMP}/server_client_only_json_version_test" "--client --output json has no server info"
-
-  kube::log::status "Testing kubectl version: compare json output using additional --short flag"
-  kube::test::version::json_client_server_object_to_file "--short" "clientVersion" "${TEMP}/client_short_json_version_test"
-  kube::test::version::json_client_server_object_to_file "--short" "serverVersion" "${TEMP}/server_short_json_version_test"
-  kube::test::version::diff_assert "${TEMP}/client_version_test" "eq" "${TEMP}/client_short_json_version_test" "--short --output client json info is equal to non short result"
-  kube::test::version::diff_assert "${TEMP}/server_version_test" "eq" "${TEMP}/server_short_json_version_test" "--short --output server json info is equal to non short result"
 
   kube::log::status "Testing kubectl version: compare json output with yaml output"
   kube::test::version::json_object_to_file "" "${TEMP}/client_server_json_version_test"
   kube::test::version::yaml_object_to_file "" "${TEMP}/client_server_yaml_version_test"
   kube::test::version::diff_assert "${TEMP}/client_server_json_version_test" "eq" "${TEMP}/client_server_yaml_version_test" "--output json/yaml has identical information"
+
+  kube::log::status "Testing kubectl version: contains semantic version of embedded kustomize"
+  output_message=$(kubectl version)
+  kube::test::if_has_not_string "${output_message}" "Kustomize Version\: unknown" "kustomize version should not be unknown"
+  kube::test::if_has_string "${output_message}" "Kustomize Version\: v[[:digit:]][[:digit:]]*\.[[:digit:]][[:digit:]]*\.[[:digit:]][[:digit:]]*" "kubectl kustomize version should have a reasonable value"
+
+  kube::log::status "Testing kubectl version: all output formats include kustomize version"
+  output_message=$(kubectl version --client)
+  kube::test::if_has_string "${output_message}" "Kustomize Version" "kustomize version should be printed when --client is specified"
+  output_message=$(kubectl version -o yaml)
+  kube::test::if_has_string "${output_message}" "kustomizeVersion" "kustomize version should be printed when -o yaml is used"
+  output_message=$(kubectl version -o json)
+  kube::test::if_has_string "${output_message}" "kustomizeVersion" "kustomize version should be printed when -o json is used"
 
   set +o nounset
   set +o errexit

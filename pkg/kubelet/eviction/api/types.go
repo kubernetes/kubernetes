@@ -32,10 +32,25 @@ const (
 	SignalNodeFsAvailable Signal = "nodefs.available"
 	// SignalNodeFsInodesFree is amount of inodes available on filesystem that kubelet uses for volumes, daemon logs, etc.
 	SignalNodeFsInodesFree Signal = "nodefs.inodesFree"
-	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images and container writable layers.
+	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images layers.
+	// If the container filesystem and image filesystem are not separate,
+	// than imagefs can store both image layers and writeable layers.
 	SignalImageFsAvailable Signal = "imagefs.available"
-	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writable layers.
+	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images layers.
+	// If the container filesystem and image filesystem are not separate,
+	// than imagefs can store both image layers and writeable layers.
 	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
+	// SignalContainerFsAvailable is amount of storage available on filesystem that container runtime uses for container writable layers.
+	// In case of a single filesystem, containerfs=nodefs.
+	// In case of a image filesystem, containerfs=imagefs.
+	// We will override user settings and set to either imagefs or nodefs depending on configuration.
+	SignalContainerFsAvailable Signal = "containerfs.available"
+	// SignalContainerFsInodesFree is amount of inodes available on filesystem that container runtime uses for container writable layers.
+	// SignalContainerFsAvailable is amount of storage available on filesystem that container runtime uses for container writable layers.
+	// In case of a single filesystem, containerfs=nodefs.
+	// In case of a image filesystem, containerfs=imagefs.
+	// We will override user settings and set to either imagefs or nodefs depending on configuration.
+	SignalContainerFsInodesFree Signal = "containerfs.inodesFree"
 	// SignalAllocatableMemoryAvailable is amount of memory available for pod allocation (i.e. allocatable - workingSet (of pods), in bytes.
 	SignalAllocatableMemoryAvailable Signal = "allocatableMemory.available"
 	// SignalPIDAvailable is amount of PID available for pod allocation
@@ -58,12 +73,15 @@ const (
 // from either above or below, never both). There is thus no reason to expose the
 // operator in the Kubelet's public API. Instead, we internally map signal types to operators.
 var OpForSignal = map[Signal]ThresholdOperator{
-	SignalMemoryAvailable:   OpLessThan,
-	SignalNodeFsAvailable:   OpLessThan,
-	SignalNodeFsInodesFree:  OpLessThan,
-	SignalImageFsAvailable:  OpLessThan,
-	SignalImageFsInodesFree: OpLessThan,
-	SignalPIDAvailable:      OpLessThan,
+	SignalMemoryAvailable:            OpLessThan,
+	SignalNodeFsAvailable:            OpLessThan,
+	SignalNodeFsInodesFree:           OpLessThan,
+	SignalImageFsAvailable:           OpLessThan,
+	SignalImageFsInodesFree:          OpLessThan,
+	SignalContainerFsAvailable:       OpLessThan,
+	SignalContainerFsInodesFree:      OpLessThan,
+	SignalAllocatableMemoryAvailable: OpLessThan,
+	SignalPIDAvailable:               OpLessThan,
 }
 
 // ThresholdValue is a value holder that abstracts literal versus percentage based quantity

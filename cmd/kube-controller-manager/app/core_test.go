@@ -17,7 +17,7 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
+	"context"
 	"testing"
 	"time"
 
@@ -43,6 +43,17 @@ func (TestClientBuilder) ConfigOrDie(name string) *restclient.Config {
 func (TestClientBuilder) Client(name string) (clientset.Interface, error) { return nil, nil }
 func (m TestClientBuilder) ClientOrDie(name string) clientset.Interface {
 	return m.clientset
+}
+
+func (m TestClientBuilder) DiscoveryClient(name string) (discovery.DiscoveryInterface, error) {
+	return m.clientset.Discovery(), nil
+}
+func (m TestClientBuilder) DiscoveryClientOrDie(name string) discovery.DiscoveryInterface {
+	ret, err := m.DiscoveryClient(name)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
 // FakeDiscoveryWithError inherits DiscoveryInterface(via FakeDiscovery) with some methods accepting testing data.
@@ -93,14 +104,13 @@ func possibleDiscoveryResource() []*metav1.APIResourceList {
 	}
 }
 
-type controllerInitFunc func(ControllerContext) (http.Handler, bool, error)
-
 func TestController_DiscoveryError(t *testing.T) {
-	controllerInitFuncMap := map[string]controllerInitFunc{
-		"ResourceQuotaController":          startResourceQuotaController,
-		"GarbageCollectorController":       startGarbageCollectorController,
-		"EndpointSliceController":          startEndpointSliceController,
-		"EndpointSliceMirroringController": startEndpointSliceMirroringController,
+	controllerDescriptorMap := map[string]*ControllerDescriptor{
+		"ResourceQuotaController":          newResourceQuotaControllerDescriptor(),
+		"GarbageCollectorController":       newGarbageCollectorControllerDescriptor(),
+		"EndpointSliceController":          newEndpointSliceControllerDescriptor(),
+		"EndpointSliceMirroringController": newEndpointSliceMirroringControllerDescriptor(),
+		"PodDisruptionBudgetController":    newDisruptionControllerDescriptor(),
 	}
 
 	tcs := map[string]struct {
@@ -130,14 +140,14 @@ func TestController_DiscoveryError(t *testing.T) {
 			ObjectOrMetadataInformerFactory: testInformerFactory,
 			InformersStarted:                make(chan struct{}),
 		}
-		for funcName, controllerInit := range controllerInitFuncMap {
-			_, _, err := controllerInit(ctx)
+		for controllerName, controllerDesc := range controllerDescriptorMap {
+			_, _, err := controllerDesc.GetInitFunc()(context.TODO(), ctx, controllerName)
 			if test.expectedErr != (err != nil) {
-				t.Errorf("%v test failed for use case: %v", funcName, name)
+				t.Errorf("%v test failed for use case: %v", controllerName, name)
 			}
 		}
 		_, _, err := startModifiedNamespaceController(
-			ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
+			context.TODO(), ctx, testClientset, testClientBuilder.ConfigOrDie("namespace-controller"))
 		if test.expectedErr != (err != nil) {
 			t.Errorf("Namespace Controller test failed for use case: %v", name)
 		}

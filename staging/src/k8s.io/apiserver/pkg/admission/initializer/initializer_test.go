@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -32,7 +34,7 @@ import (
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target := initializer.New(nil, nil, &TestAuthorizer{}, nil)
+	target := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil)
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	target.Initialize(wantAuthorizerAdmission)
 	if wantAuthorizerAdmission.auth == nil {
@@ -44,7 +46,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target := initializer.New(cs, nil, &TestAuthorizer{}, nil)
+	target := initializer.New(cs, nil, nil, &TestAuthorizer{}, nil, nil, nil)
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
 	if wantExternalKubeClientSet.cs != cs {
@@ -57,11 +59,23 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target := initializer.New(cs, sf, &TestAuthorizer{}, nil)
+	target := initializer.New(cs, nil, sf, &TestAuthorizer{}, nil, nil, nil)
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
 		t.Errorf("expected informer factory to be initialized")
+	}
+}
+
+// TestWantsShutdownSignal ensures that the shutdown signal is injected
+// when the WantsShutdownSignal interface is implemented by a plugin.
+func TestWantsShutdownNotification(t *testing.T) {
+	stopCh := make(chan struct{})
+	target := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, stopCh, nil)
+	wantDrainedNotification := &WantDrainedNotification{}
+	target.Initialize(wantDrainedNotification)
+	if wantDrainedNotification.stopCh == nil {
+		t.Errorf("expected stopCh to be initialized but found nil")
 	}
 }
 
@@ -114,6 +128,23 @@ func (self *WantAuthorizerAdmission) ValidateInitialization() error      { retur
 var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 
+// WantDrainedNotification is a test stub that filfills the WantsDrainedNotification interface.
+type WantDrainedNotification struct {
+	stopCh <-chan struct{}
+}
+
+func (self *WantDrainedNotification) SetDrainedNotification(stopCh <-chan struct{}) {
+	self.stopCh = stopCh
+}
+func (self *WantDrainedNotification) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	return nil
+}
+func (self *WantDrainedNotification) Handles(o admission.Operation) bool { return false }
+func (self *WantDrainedNotification) ValidateInitialization() error      { return nil }
+
+var _ admission.Interface = &WantDrainedNotification{}
+var _ initializer.WantsDrainedNotification = &WantDrainedNotification{}
+
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}
 
@@ -121,14 +152,58 @@ func (t *TestAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return authorizer.DecisionNoOpinion, "", nil
 }
 
-// wantClientCert is a test stub for testing that fulfulls the WantsClientCert interface.
-type clientCertWanter struct {
-	gotCert, gotKey []byte
+func TestRESTMapperAdmissionPlugin(t *testing.T) {
+	initializer := initializer.New(nil, nil, nil, &TestAuthorizer{}, nil, nil, &doNothingRESTMapper{})
+	wantsRESTMapperAdmission := &WantsRESTMapperAdmissionPlugin{}
+	initializer.Initialize(wantsRESTMapperAdmission)
+
+	if wantsRESTMapperAdmission.mapper == nil {
+		t.Errorf("Expected REST mapper to be initialized but found nil")
+	}
 }
 
-func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
-func (s *clientCertWanter) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+type WantsRESTMapperAdmissionPlugin struct {
+	doNothingAdmission
+	doNothingPluginInitialization
+	mapper meta.RESTMapper
+}
+
+func (p *WantsRESTMapperAdmissionPlugin) SetRESTMapper(mapper meta.RESTMapper) {
+	p.mapper = mapper
+}
+
+type doNothingRESTMapper struct{}
+
+func (doNothingRESTMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, nil
+}
+func (doNothingRESTMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+func (doNothingRESTMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+func (doNothingRESTMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+func (doNothingRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return nil, nil
+}
+func (doNothingRESTMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+func (doNothingRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
+}
+
+type doNothingAdmission struct{}
+
+func (doNothingAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
-func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
-func (s *clientCertWanter) ValidateInitialization() error      { return nil }
+func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
+func (doNothingAdmission) Validate() error                    { return nil }
+
+type doNothingPluginInitialization struct{}
+
+func (doNothingPluginInitialization) ValidateInitialization() error { return nil }

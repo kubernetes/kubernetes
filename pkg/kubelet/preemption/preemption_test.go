@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -57,7 +57,7 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 	return f.killedPods
 }
 
-func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (f *fakePodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(status *v1.PodStatus)) error {
 	if f.errDuringPodKilling {
 		f.killedPods = []*v1.Pod{}
 		return fmt.Errorf("problem killing pod %v", pod)
@@ -495,7 +495,7 @@ func parseCPUToInt64(res string) int64 {
 	return (&r).MilliValue()
 }
 
-func parseNonCpuResourceToInt64(res string) int64 {
+func parseNonCPUResourceToInt64(res string) int64 {
 	r := resource.MustParse(res)
 	return (&r).Value()
 }
@@ -511,7 +511,7 @@ func getAdmissionRequirementList(cpu, memory, pods int) admissionRequirementList
 	if memory > 0 {
 		reqs = append(reqs, &admissionRequirement{
 			resourceName: v1.ResourceMemory,
-			quantity:     parseNonCpuResourceToInt64(fmt.Sprintf("%dMi", memory)),
+			quantity:     parseNonCPUResourceToInt64(fmt.Sprintf("%dMi", memory)),
 		})
 	}
 	if pods > 0 {

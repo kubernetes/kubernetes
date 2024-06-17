@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1310,5 +1310,69 @@ func TestValidateEventUpdateForNewV1Events(t *testing.T) {
 		if e, a := item.valid, len(updateErrs) == 0; e != a {
 			t.Errorf("%v: expected %v, got %v: %v", item.msg, e, a, updateErrs)
 		}
+	}
+}
+
+func TestEventV1EventTimeImmutability(t *testing.T) {
+	testcases := []struct {
+		Name  string
+		Old   metav1.MicroTime
+		New   metav1.MicroTime
+		Valid bool
+	}{
+		{
+			Name:  "noop microsecond precision",
+			Old:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Microsecond))),
+			New:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Microsecond))),
+			Valid: true,
+		},
+		{
+			Name:  "noop nanosecond precision",
+			Old:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Nanosecond))),
+			New:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Nanosecond))),
+			Valid: true,
+		},
+		{
+			Name:  "modify nanoseconds within the same microsecond",
+			Old:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Nanosecond))),
+			New:   metav1.NewMicroTime(time.Unix(100, int64(6*time.Nanosecond))),
+			Valid: true,
+		},
+		{
+			Name:  "modify microseconds",
+			Old:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Microsecond))),
+			New:   metav1.NewMicroTime(time.Unix(100, int64(5*time.Microsecond-time.Nanosecond))),
+			Valid: false,
+		},
+		{
+			Name:  "modify seconds",
+			Old:   metav1.NewMicroTime(time.Unix(100, 0)),
+			New:   metav1.NewMicroTime(time.Unix(101, 0)),
+			Valid: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			oldEvent := &core.Event{
+				ObjectMeta:          metav1.ObjectMeta{Name: "test", Namespace: metav1.NamespaceSystem, ResourceVersion: "2"},
+				InvolvedObject:      core.ObjectReference{APIVersion: "v2", Kind: "Node"},
+				Series:              &core.EventSeries{Count: 2, LastObservedTime: tc.Old},
+				EventTime:           tc.Old,
+				ReportingController: "k8s.io/my-controller",
+				ReportingInstance:   "node-xyz",
+				Action:              "Do",
+				Reason:              "Yeees",
+				Type:                "Normal",
+			}
+
+			newEvent := oldEvent.DeepCopy()
+			newEvent.EventTime = tc.New
+
+			updateErrs := ValidateEventUpdate(newEvent, oldEvent, eventsv1.SchemeGroupVersion)
+			if e, a := tc.Valid, len(updateErrs) == 0; e != a {
+				t.Errorf("%v: expected valid=%v, got %v: %v", tc.Valid, e, a, updateErrs)
+			}
+		})
 	}
 }

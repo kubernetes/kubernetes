@@ -24,8 +24,6 @@ set -x
 
 . "${1}"
 
-make generated_files
-
 WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 TIMEOUT=${TIMEOUT:-"45m"}
@@ -33,7 +31,7 @@ TIMEOUT=${TIMEOUT:-"45m"}
 mkdir -p "${ARTIFACTS}"
 
 go run test/e2e_node/runner/remote/run_remote.go  --test-suite=conformance \
-  --logtostderr --vmodule=*=4 --ssh-env="gce" --ssh-user="$GCE_USER" \
+  --vmodule=*=4 --ssh-env="gce" --ssh-user="$GCE_USER" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --hosts="$GCE_HOSTS" \
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \

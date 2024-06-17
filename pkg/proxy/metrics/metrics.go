@@ -22,17 +22,43 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 )
 
 const kubeProxySubsystem = "kubeproxy"
 
 var (
-	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
+	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy
+	// rules. (With the iptables proxy, this includes both full and partial syncs.)
 	SyncProxyRulesLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// SyncFullProxyRulesLatency is the latency of one round of full rule syncing.
+	SyncFullProxyRulesLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_full_proxy_rules_duration_seconds",
+			Help:           "SyncProxyRules latency in seconds for full resyncs",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// SyncPartialProxyRulesLatency is the latency of one round of partial rule syncing.
+	SyncPartialProxyRulesLatency = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_partial_proxy_rules_duration_seconds",
+			Help:           "SyncProxyRules latency in seconds for partial resyncs",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -61,7 +87,7 @@ var (
 			Subsystem: kubeProxySubsystem,
 			Name:      "network_programming_duration_seconds",
 			Help:      "In Cluster Network Programming Latency in seconds",
-			Buckets: merge(
+			Buckets: metrics.MergeBuckets(
 				metrics.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
 				metrics.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
 				metrics.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
@@ -115,15 +141,105 @@ var (
 		},
 	)
 
-	// IptablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
+	// iptablesCTStateInvalidDroppedPacketsDescription describe the metrics for the number of packets dropped
+	// by iptables which were marked INVALID by conntrack.
+	iptablesCTStateInvalidDroppedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_iptables_ct_state_invalid_dropped_packets_total",
+		"packets dropped by iptables to work around conntrack problems",
+		nil, nil, metrics.ALPHA, "")
+	IPTablesCTStateInvalidDroppedNFAcctCounter   = "ct_state_invalid_dropped_pkts"
+	iptablesCTStateInvalidDroppedMetricCollector = newNFAcctMetricCollector(IPTablesCTStateInvalidDroppedNFAcctCounter, iptablesCTStateInvalidDroppedPacketsDescription)
+
+	// IPTablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
 	// seen.
-	IptablesRestoreFailuresTotal = metrics.NewCounter(
+	IPTablesRestoreFailuresTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_restore_failures_total",
 			Help:           "Cumulative proxy iptables restore failures",
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+
+	// IPTablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
+	// failures (resulting in a fall back to a full restore) that the proxy has seen.
+	IPTablesPartialRestoreFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_partial_restore_failures_total",
+			Help:           "Cumulative proxy iptables partial restore failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// IPTablesRulesTotal is the total number of iptables rules that the iptables
+	// proxy has installed.
+	IPTablesRulesTotal = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_total",
+			Help:           "Total number of iptables rules owned by kube-proxy",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"table"},
+	)
+
+	// IPTablesRulesLastSync is the number of iptables rules that the iptables proxy
+	// updated in the last sync.
+	IPTablesRulesLastSync = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_last",
+			Help:           "Number of iptables rules written by kube-proxy in last sync",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"table"},
+	)
+
+	// NFTablesSyncFailuresTotal is the number of nftables sync failures that the
+	// proxy has seen.
+	NFTablesSyncFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_nftables_sync_failures_total",
+			Help:           "Cumulative proxy nftables sync failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// NFTablesCleanupFailuresTotal is the number of nftables stale chain cleanup
+	// failures that the proxy has seen.
+	NFTablesCleanupFailuresTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_nftables_cleanup_failures_total",
+			Help:           "Cumulative proxy nftables cleanup failures",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// ProxyHealthzTotal is the number of returned HTTP Status for each
+	// healthz probe.
+	ProxyHealthzTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "proxy_healthz_total",
+			Help:           "Cumulative proxy healthz HTTP status",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"code"},
+	)
+
+	// ProxyLivezTotal is the number of returned HTTP Status for each
+	// livez probe.
+	ProxyLivezTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "proxy_livez_total",
+			Help:           "Cumulative proxy livez HTTP status",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"code"},
 	)
 
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
@@ -137,22 +253,71 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// SyncProxyRulesNoLocalEndpointsTotal is the total number of rules that do
+	// not have an available endpoint. This can be caused by an internal
+	// traffic policy with no available local workload.
+	SyncProxyRulesNoLocalEndpointsTotal = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_no_local_endpoints_total",
+			Help:           "Number of services with a Local traffic policy and no endpoints",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"traffic_policy"},
+	)
+
+	// localhostNodePortsAcceptedPacketsDescription describe the metrics for the number of packets accepted
+	// by iptables which were destined for nodeports on loopback interface.
+	localhostNodePortsAcceptedPacketsDescription = metrics.NewDesc(
+		"kubeproxy_iptables_localhost_nodeports_accepted_packets_total",
+		"Number of packets accepted on nodeports of loopback interface",
+		nil, nil, metrics.ALPHA, "")
+	LocalhostNodePortAcceptedNFAcctCounter     = "localhost_nps_accepted_pkts"
+	localhostNodePortsAcceptedMetricsCollector = newNFAcctMetricCollector(LocalhostNodePortAcceptedNFAcctCounter, localhostNodePortsAcceptedPacketsDescription)
 )
 
 var registerMetricsOnce sync.Once
 
 // RegisterMetrics registers kube-proxy metrics.
-func RegisterMetrics() {
+func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 	registerMetricsOnce.Do(func() {
+		// Core kube-proxy metrics for all backends
 		legacyregistry.MustRegister(SyncProxyRulesLatency)
+		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 		legacyregistry.MustRegister(SyncProxyRulesLastTimestamp)
-		legacyregistry.MustRegister(NetworkProgrammingLatency)
 		legacyregistry.MustRegister(EndpointChangesPending)
 		legacyregistry.MustRegister(EndpointChangesTotal)
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
-		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
-		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
+		legacyregistry.MustRegister(ProxyHealthzTotal)
+		legacyregistry.MustRegister(ProxyLivezTotal)
+
+		// FIXME: winkernel does not implement these
+		legacyregistry.MustRegister(NetworkProgrammingLatency)
+		legacyregistry.MustRegister(SyncProxyRulesNoLocalEndpointsTotal)
+
+		switch mode {
+		case kubeproxyconfig.ProxyModeIPTables:
+			legacyregistry.CustomMustRegister(iptablesCTStateInvalidDroppedMetricCollector)
+			legacyregistry.CustomMustRegister(localhostNodePortsAcceptedMetricsCollector)
+			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
+			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
+			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesPartialRestoreFailuresTotal)
+			legacyregistry.MustRegister(IPTablesRulesTotal)
+			legacyregistry.MustRegister(IPTablesRulesLastSync)
+
+		case kubeproxyconfig.ProxyModeIPVS:
+			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
+
+		case kubeproxyconfig.ProxyModeNFTables:
+			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
+			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
+
+		case kubeproxyconfig.ProxyModeKernelspace:
+			// currently no winkernel-specific metrics
+		}
 	})
 }
 
@@ -161,10 +326,45 @@ func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
-func merge(slices ...[]float64) []float64 {
-	result := make([]float64, 1)
-	for _, s := range slices {
-		result = append(result, s...)
+var _ metrics.StableCollector = &nfacctMetricCollector{}
+
+func newNFAcctMetricCollector(counter string, description *metrics.Desc) *nfacctMetricCollector {
+	client, err := nfacct.New()
+	if err != nil {
+		klog.ErrorS(err, "failed to initialize nfacct client")
 	}
-	return result
+	return &nfacctMetricCollector{
+		client:      client,
+		counter:     counter,
+		description: description,
+	}
+}
+
+type nfacctMetricCollector struct {
+	metrics.BaseStableCollector
+	client      nfacct.Interface
+	counter     string
+	description *metrics.Desc
+}
+
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (n *nfacctMetricCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- n.description
+}
+
+// CollectWithStability implements the metrics.StableCollector interface.
+func (n *nfacctMetricCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	if n.client != nil {
+		counter, err := n.client.Get(n.counter)
+		if err != nil {
+			klog.ErrorS(err, "failed to collect nfacct counter", "counter", n.counter)
+		} else {
+			metric, err := metrics.NewConstMetric(n.description, metrics.CounterValue, float64(counter.Packets))
+			if err != nil {
+				klog.ErrorS(err, "failed to create constant metric")
+			} else {
+				ch <- metric
+			}
+		}
+	}
 }

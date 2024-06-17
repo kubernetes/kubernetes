@@ -20,7 +20,7 @@ import (
 	"hash/fnv"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -416,8 +416,11 @@ func TestChooseZonesForVolume(t *testing.T) {
 
 func TestSelectZoneForVolume(t *testing.T) {
 
-	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
+	nodeWithGATopologyLabels := &v1.Node{}
+	nodeWithGATopologyLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
+
+	nodeWithBetaTopologyLabels := &v1.Node{}
+	nodeWithBetaTopologyLabels.Labels = map[string]string{v1.LabelFailureDomainBetaZone: "zoneY"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -468,7 +471,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [3] AllowedTopologies irrelevant
 		{
 			Name:        "Node_with_Zone_labels_and_Zone_parameter_present",
-			Node:        nodeWithZoneLabels,
+			Node:        nodeWithGATopologyLabels,
 			ZonePresent: true,
 			Zone:        "zoneX",
 			Reject:      true,
@@ -480,7 +483,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [3] AllowedTopologies irrelevant
 		{
 			Name:         "Node_with_Zone_labels_and_Zones_parameter_present",
-			Node:         nodeWithZoneLabels,
+			Node:         nodeWithGATopologyLabels,
 			ZonesPresent: true,
 			Zones:        "zoneX,zoneY",
 			Reject:       true,
@@ -499,7 +502,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -521,7 +524,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -530,7 +533,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// Key specified in AllowedTopologies is not LabelZoneFailureDomain [Fail]
+		// Key specified in AllowedTopologies is not LabelTopologyZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] AllowedTopologies with invalid key specified
@@ -545,7 +548,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -554,7 +557,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// AllowedTopologies without keys specifying LabelZoneFailureDomain [Fail]
+		// AllowedTopologies without keys specifying LabelTopologyZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] Invalid AllowedTopologies
@@ -610,16 +613,28 @@ func TestSelectZoneForVolume(t *testing.T) {
 			ExpectedZones: "zoneX,zoneY",
 		},
 
-		// Select zone from node label [Pass]
+		// Select zone from node ga label [Pass]
 		// [1] Node with zone labels
 		// [2] no zone/zones parameters
 		// [3] no AllowedTopology
 		{
-			Name:               "Node_with_Zone_labels_and_VolumeScheduling_enabled",
-			Node:               nodeWithZoneLabels,
+			Name:               "Node_with_GA_Zone_labels_and_VolumeScheduling_enabled",
+			Node:               nodeWithGATopologyLabels,
 			Reject:             false,
 			ExpectSpecificZone: true,
 			ExpectedZone:       "zoneX",
+		},
+
+		// Select zone from node beta label [Pass]
+		// [1] Node with zone labels
+		// [2] no zone/zones parameters
+		// [3] no AllowedTopology
+		{
+			Name:               "Node_with_Beta_Zone_labels_and_VolumeScheduling_enabled",
+			Node:               nodeWithBetaTopologyLabels,
+			Reject:             false,
+			ExpectSpecificZone: true,
+			ExpectedZone:       "zoneY",
 		},
 
 		// Select zone from node label [Pass]
@@ -628,12 +643,12 @@ func TestSelectZoneForVolume(t *testing.T) {
 		// [3] AllowedTopology with single term with multiple values specified (ignored)
 		{
 			Name: "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_and_VolumeScheduling_enabled",
-			Node: nodeWithZoneLabels,
+			Node: nodeWithGATopologyLabels,
 			AllowedTopologies: []v1.TopologySelectorTerm{
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneZ", "zoneY"},
 						},
 					},
@@ -655,7 +670,28 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
+							Values: []string{"zoneX", "zoneY"},
+						},
+					},
+				},
+			},
+			Reject:        false,
+			ExpectedZones: "zoneX,zoneY",
+		},
+
+		// Select Zone from AllowedTopologies using Beta labels [Pass]
+		// [1] nil Node
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with single term with multiple values specified
+		{
+			Name: "Nil_Node_with_Multiple_Allowed_Topology_values_Beta_label_and_VolumeScheduling_enabled",
+			Node: nil,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    v1.LabelFailureDomainBetaZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -676,7 +712,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -684,7 +720,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -706,7 +742,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -748,7 +784,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 					t.Errorf("Unexpected error from SelectZoneForVolume for %s; Error: %v", test.Name, err)
 				}
 
-				if test.ExpectSpecificZone == true {
+				if test.ExpectSpecificZone {
 					if zone != test.ExpectedZone {
 						t.Errorf("Expected zone %v does not match obtained zone %v for %s", test.ExpectedZone, zone, test.Name)
 					}
@@ -771,7 +807,7 @@ func TestSelectZoneForVolume(t *testing.T) {
 func TestSelectZonesForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelTopologyZone: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -865,7 +901,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -889,7 +925,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -898,7 +934,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// Key specified in AllowedTopologies is not LabelZoneFailureDomain [Fail]
+		// Key specified in AllowedTopologies is not LabelTopologyZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] AllowedTopologies with invalid key specified
@@ -915,7 +951,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 							Values: []string{"zoneX"},
 						},
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -924,7 +960,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 			Reject: true,
 		},
 
-		// AllowedTopologies without keys specifying LabelZoneFailureDomain [Fail]
+		// AllowedTopologies without keys specifying LabelTopologyZone [Fail]
 		// [1] nil Node
 		// [2] no Zone/Zones parameter
 		// [3] Invalid AllowedTopologies
@@ -999,7 +1035,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1123,7 +1159,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1149,7 +1185,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1176,7 +1212,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX", "zoneY", "zoneZ"},
 						},
 					},
@@ -1200,7 +1236,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1228,7 +1264,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneV"},
 						},
 					},
@@ -1236,7 +1272,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneW"},
 						},
 					},
@@ -1244,7 +1280,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1252,7 +1288,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1260,7 +1296,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -1286,7 +1322,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1294,7 +1330,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1321,7 +1357,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1329,7 +1365,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1337,7 +1373,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneZ"},
 						},
 					},
@@ -1361,7 +1397,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneX"},
 						},
 					},
@@ -1369,7 +1405,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 				{
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
-							Key:    v1.LabelZoneFailureDomain,
+							Key:    v1.LabelTopologyZone,
 							Values: []string{"zoneY"},
 						},
 					},

@@ -18,6 +18,7 @@ package editor
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -25,8 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 )
 
@@ -241,7 +243,7 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 			// operate on a copy, so we can compare the original and the modified object
 			objCopy := test.object.DeepCopyObject()
 			var infos []*resource.Info
-			o := NewEditOptions(NormalEditMode, genericclioptions.NewTestIOStreamsDiscard())
+			o := NewEditOptions(NormalEditMode, genericiooptions.NewTestIOStreamsDiscard())
 			err := o.extractManagedFields(objCopy)
 			if err != nil {
 				t.Errorf("unexpected extraction error %v", err)
@@ -273,6 +275,199 @@ func TestManagedFieldsExtractAndRestore(t *testing.T) {
 			}
 			if test.managedFields != nil && !reflect.DeepEqual(test.managedFields, o.managedFields) {
 				t.Errorf("mismatched managedFields %#v vs %#v", test.managedFields, o.managedFields)
+			}
+		})
+	}
+}
+
+type testVisitor struct {
+	updatedInfos []*resource.Info
+}
+
+func (tv *testVisitor) Visit(f resource.VisitorFunc) error {
+	var err error
+	for _, ui := range tv.updatedInfos {
+		err = f(ui, err)
+	}
+	return err
+}
+
+var unregMapping = &meta.RESTMapping{
+	Resource: schema.GroupVersionResource{
+		Group:    "a",
+		Version:  "b",
+		Resource: "c",
+	},
+	GroupVersionKind: schema.GroupVersionKind{
+		Group:   "a",
+		Version: "b",
+		Kind:    "d",
+	},
+}
+
+func TestEditOptions_visitToPatch(t *testing.T) {
+
+	expectedErr := func(err error) bool {
+		return err != nil && strings.Contains(err.Error(), "At least one of apiVersion, kind and name was changed")
+	}
+
+	type args struct {
+		originalInfos []*resource.Info
+		patchVisitor  resource.Visitor
+		results       *editResults
+	}
+	tests := []struct {
+		name     string
+		args     args
+		checkErr func(err error) bool
+	}{
+		{
+			name: "name-diff",
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "before",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "before",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "after",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1",
+									"kind":       "Thingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "after",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+		{
+			name: "kind-diff",
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "myname",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "myname",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "myname",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1",
+									"kind":       "OtherThingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "myname",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+		{
+			name: "apiver-diff",
+			args: args{
+				originalInfos: []*resource.Info{
+					{
+						Namespace: "ns",
+						Name:      "myname",
+						Object: &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Thingy",
+								"metadata": map[string]interface{}{
+									"uid":       "12345",
+									"namespace": "ns",
+									"name":      "myname",
+								},
+								"spec": map[string]interface{}{},
+							},
+						},
+						Mapping: unregMapping,
+					},
+				},
+				patchVisitor: &testVisitor{
+					updatedInfos: []*resource.Info{
+						{
+							Namespace: "ns",
+							Name:      "myname",
+							Object: &unstructured.Unstructured{
+								Object: map[string]interface{}{
+									"apiVersion": "v1alpha1",
+									"kind":       "Thingy",
+									"metadata": map[string]interface{}{
+										"uid":       "12345",
+										"namespace": "ns",
+										"name":      "myname",
+									},
+									"spec": map[string]interface{}{},
+								},
+							},
+							Mapping: unregMapping,
+						},
+					},
+				},
+				results: &editResults{},
+			},
+			checkErr: expectedErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &EditOptions{}
+			if err := o.visitToPatch(tt.args.originalInfos, tt.args.patchVisitor, tt.args.results); !tt.checkErr(err) {
+				t.Errorf("EditOptions.visitToPatch() %s error = %v", tt.name, err)
 			}
 		})
 	}

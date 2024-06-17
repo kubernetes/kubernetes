@@ -19,34 +19,36 @@ package util
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
-
-	"k8s.io/klog/v2"
-	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
-	utilstrings "k8s.io/utils/strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/io"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -56,10 +58,6 @@ const (
 	// objects that indicates attach/detach operations for the node should be
 	// managed by the attach/detach controller
 	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
-
-	// KeepTerminatedPodVolumesAnnotation is the key of the annotation on Node
-	// that decides if pod volumes are unmounted when pod is terminated
-	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
 
 	// MountsInGlobalPDPath is name of the directory appended to a volume plugin
 	// name to create the place for volume mounts in the global PD path.
@@ -72,6 +70,9 @@ const (
 	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
 	// object created dynamically
 	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
+
+	// kubernetesPluginPathPrefix is the prefix of kubernetes plugin mount paths.
+	kubernetesPluginPathPrefix = "/plugins/kubernetes.io/"
 )
 
 // IsReady checks for the existence of a regular file
@@ -114,7 +115,7 @@ func SetReady(dir string) {
 func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
-		return secret, fmt.Errorf("Cannot get kube client")
+		return secret, fmt.Errorf("cannot get kube client")
 	}
 	secrets, err := kubeClient.CoreV1().Secrets(pod.Namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
@@ -130,14 +131,14 @@ func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interf
 func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
-		return secret, fmt.Errorf("Cannot get kube client")
+		return secret, fmt.Errorf("cannot get kube client")
 	}
 	secrets, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}
 	if secrets.Type != v1.SecretType(volumePluginName) {
-		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+		return secret, fmt.Errorf("cannot get secret of type %s", volumePluginName)
 	}
 	for name, data := range secrets.Data {
 		secret[name] = string(data)
@@ -148,11 +149,11 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 // GetClassForVolume locates storage class by persistent volume
 func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	if kubeClient == nil {
-		return nil, fmt.Errorf("Cannot get kube client")
+		return nil, fmt.Errorf("cannot get kube client")
 	}
-	className := v1helper.GetPersistentVolumeClass(pv)
+	className := storagehelpers.GetPersistentVolumeClass(pv)
 	if className == "" {
-		return nil, fmt.Errorf("Volume has no storage class")
+		return nil, fmt.Errorf("volume has no storage class")
 	}
 
 	class, err := kubeClient.StorageV1().StorageClasses().Get(context.TODO(), className, metav1.GetOptions{})
@@ -162,34 +163,12 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 	return class, nil
 }
 
-// CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
-// This ensures that we don't mount a volume that doesn't belong to this node
-func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	return checkVolumeNodeAffinity(pv, nodeLabels)
-}
-
-func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	if pv.Spec.NodeAffinity == nil {
-		return nil
-	}
-
-	if pv.Spec.NodeAffinity.Required != nil {
-		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
-		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
-		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
-			return fmt.Errorf("No matching NodeSelectorTerms")
-		}
-	}
-
-	return nil
-}
-
 // LoadPodFromFile will read, decode, and return a Pod from a file.
 func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path not specified")
 	}
-	podDef, err := ioutil.ReadFile(filePath)
+	podDef, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file path %s: %+v", filePath, err)
 	}
@@ -221,27 +200,11 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	return timeout
 }
 
-// GenerateVolumeName returns a PV name with clusterName prefix. The function
-// should be used to generate a name of GCE PD or Cinder volume. It basically
-// adds "<clusterName>-dynamic-" before the PV name, making sure the resulting
-// string fits given length and cuts "dynamic" if not.
-func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
-	prefix := clusterName + "-dynamic"
-	pvLen := len(pvName)
-
-	// cut the "<clusterName>-dynamic" to fit full pvName into maxLength
-	// +1 for the '-' dash
-	if pvLen+1+len(prefix) > maxLength {
-		prefix = prefix[:maxLength-pvLen-1]
-	}
-	return prefix + "-" + pvName
-}
-
 // GetPath checks if the path from the mounter is empty.
 func GetPath(mounter volume.Mounter) (string, error) {
 	path := mounter.GetPath()
 	if path == "" {
-		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+		return "", fmt.Errorf("path is empty %s", reflect.TypeOf(mounter).String())
 	}
 	return path, nil
 }
@@ -280,7 +243,7 @@ func MountOptionFromSpec(spec *volume.Spec, options ...string) []string {
 
 // JoinMountOptions joins mount options eliminating duplicates
 func JoinMountOptions(userOptions []string, systemOptions []string) []string {
-	allMountOptions := sets.NewString()
+	allMountOptions := sets.New[string]()
 
 	for _, mountOption := range userOptions {
 		if len(mountOption) > 0 {
@@ -291,11 +254,11 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	for _, mountOption := range systemOptions {
 		allMountOptions.Insert(mountOption)
 	}
-	return allMountOptions.List()
+	return sets.List(allMountOptions)
 }
 
-// AccessModesContains returns whether the requested mode is contained by modes
-func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+// ContainsAccessMode returns whether the requested mode is contained by modes
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
@@ -304,10 +267,10 @@ func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.Persiste
 	return false
 }
 
-// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
-func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+// ContainsAllAccessModes returns whether all of the requested modes are contained by modes
+func ContainsAllAccessModes(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
 	for _, mode := range requestedModes {
-		if !AccessModesContains(indexedModes, mode) {
+		if !ContainsAccessMode(indexedModes, mode) {
 			return false
 		}
 	}
@@ -377,7 +340,10 @@ func GetUniqueVolumeNameFromSpec(
 
 // IsPodTerminated checks if pod is terminated
 func IsPodTerminated(pod *v1.Pod, podStatus v1.PodStatus) bool {
-	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
+	// TODO: the guarantees provided by kubelet status are not sufficient to guarantee it's safe to ignore a deleted pod,
+	// even if everything is notRunning (kubelet does not guarantee that when pod status is waiting that it isn't trying
+	// to start a container).
+	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.InitContainerStatuses) && notRunning(podStatus.ContainerStatuses) && notRunning(podStatus.EphemeralContainerStatuses))
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
@@ -581,22 +547,76 @@ func GetPluginMountDir(host volume.VolumeHost, name string) string {
 
 // IsLocalEphemeralVolume determines whether the argument is a local ephemeral
 // volume vs. some other type
+// Local means the volume is using storage from the local disk that is managed by kubelet.
+// Ephemeral means the lifecycle of the volume is the same as the Pod.
 func IsLocalEphemeralVolume(volume v1.Volume) bool {
 	return volume.GitRepo != nil ||
-		(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-		volume.ConfigMap != nil || volume.DownwardAPI != nil
+		(volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumDefault) ||
+		volume.ConfigMap != nil
+}
+
+// GetLocalPersistentVolumeNodeNames returns the node affinity node name(s) for
+// local PersistentVolumes. nil is returned if the PV does not have any
+// specific node affinity node selector terms and match expressions.
+// PersistentVolume with node affinity has select and match expressions
+// in the form of:
+//
+//	nodeAffinity:
+//	  required:
+//	    nodeSelectorTerms:
+//	    - matchExpressions:
+//	      - key: kubernetes.io/hostname
+//	        operator: In
+//	        values:
+//	        - <node1>
+//	        - <node2>
+func GetLocalPersistentVolumeNodeNames(pv *v1.PersistentVolume) []string {
+	if pv == nil || pv.Spec.NodeAffinity == nil || pv.Spec.NodeAffinity.Required == nil {
+		return nil
+	}
+
+	var result sets.Set[string]
+	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		var nodes sets.Set[string]
+		for _, matchExpr := range term.MatchExpressions {
+			if matchExpr.Key == v1.LabelHostname && matchExpr.Operator == v1.NodeSelectorOpIn {
+				if nodes == nil {
+					nodes = sets.New(matchExpr.Values...)
+				} else {
+					nodes = nodes.Intersection(sets.New(matchExpr.Values...))
+				}
+			}
+		}
+		result = result.Union(nodes)
+	}
+
+	return sets.List(result)
 }
 
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
-	mounts = sets.NewString()
-	devices = sets.NewString()
+// either as filesystem mount or raw block device, together with list
+// of all SELinux contexts of all containers that use the volumes.
+func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+	mounts = sets.New[string]()
+	devices = sets.New[string]()
+	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
+		var seLinuxOptions *v1.SELinuxOptions
+		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
+			if effectiveContainerSecurity != nil {
+				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
+				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
+			}
+		}
+
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
+				if seLinuxOptions != nil {
+					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
+				}
 			}
 		}
 		if container.VolumeDevices != nil {
@@ -613,8 +633,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.String, devices sets.String) {
 // attributes.
 func FsUserFrom(pod *v1.Pod) *int64 {
 	var fsUser *int64
-	// Exclude ephemeral containers because SecurityContext is not allowed.
-	podutil.VisitContainers(&pod.Spec, podutil.InitContainers|podutil.Containers, func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
 		// One container doesn't specify user or there are more than one
 		// non-root UIDs.
@@ -635,27 +654,49 @@ func FsUserFrom(pod *v1.Pod) *int64 {
 // In GCI cluster, if gci mounter is used for mounting, the container started by mounter
 // script will cause additional mounts created in the container. Since these mounts are
 // irrelevant to the original mounts, they should be not considered when checking the
-// mount references. Current solution is to filter out those mount paths that contain
-// the string of original mount path.
-// Plan to work on better approach to solve this issue.
+// mount references. The current solution is to filter out those mount paths that contain
+// the k8s plugin suffix of original mount path.
 func HasMountRefs(mountPath string, mountRefs []string) bool {
+	// A mountPath typically is like
+	//   /var/lib/kubelet/plugins/kubernetes.io/some-plugin/mounts/volume-XXXX
+	// Mount refs can look like
+	//   /home/somewhere/var/lib/kubelet/plugins/kubernetes.io/some-plugin/...
+	// but if /var/lib/kubelet is mounted to a different device a ref might be like
+	//   /mnt/some-other-place/kubelet/plugins/kubernetes.io/some-plugin/...
+	// Neither of the above should be counted as a mount ref as those are handled
+	// by the kubelet. What we're concerned about is a path like
+	//   /data/local/some/manual/mount
+	// As unmounting could interrupt usage from that mountpoint.
+	//
+	// So instead of looking for the entire /var/lib/... path, the plugins/kubernetes.io/
+	// suffix is trimmed off and searched for.
+	//
+	// If there isn't a /plugins/... path, the whole mountPath is used instead.
+	pathToFind := mountPath
+	if i := strings.Index(mountPath, kubernetesPluginPathPrefix); i > -1 {
+		pathToFind = mountPath[i:]
+	}
 	for _, ref := range mountRefs {
-		if !strings.Contains(ref, mountPath) {
+		if !strings.Contains(ref, pathToFind) {
 			return true
 		}
 	}
 	return false
 }
 
-//WriteVolumeCache flush disk data given the spcified mount path
+// WriteVolumeCache flush disk data given the specified mount path
 func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {
-		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
-		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
+		cmdString := "Get-Volume -FilePath $env:mountpath | Write-Volumecache"
+		cmd := exec.Command("powershell", "/c", cmdString)
+		env := append(os.Environ(), fmt.Sprintf("mountpath=%s", deviceMountPath))
+		cmd.SetEnv(env)
+		klog.V(8).Infof("Executing command: %q", cmdString)
+		output, err := cmd.CombinedOutput()
+		klog.Infof("command (%q) execeuted: %v, output: %q", cmdString, err, string(output))
 		if err != nil {
-			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
+			return fmt.Errorf("command (%q) failed: %v, output: %q", cmdString, err, string(output))
 		}
 	}
 	// For linux runtime, it skips because unmount will automatically flush disk data
@@ -701,4 +742,54 @@ func IsMultiAttachAllowed(volumeSpec *volume.Spec) bool {
 
 	// we don't know if it's supported or not and let the attacher fail later in cases it's not supported
 	return true
+}
+
+// IsAttachableVolume checks if the given volumeSpec is an attachable volume or not
+func IsAttachableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
+	attachableVolumePlugin, _ := volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if attachableVolumePlugin != nil {
+		volumeAttacher, err := attachableVolumePlugin.NewAttacher()
+		if err == nil && volumeAttacher != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsDeviceMountableVolume checks if the given volumeSpec is an device mountable volume or not
+func IsDeviceMountableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) bool {
+	deviceMountableVolumePlugin, _ := volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
+	if deviceMountableVolumePlugin != nil {
+		volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
+		if err == nil && volumeDeviceMounter != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetReliableMountRefs calls mounter.GetMountRefs and retries on IsInconsistentReadError.
+// To be used in volume reconstruction of volume plugins that don't have any protection
+// against mounting a single volume on multiple nodes (such as attach/detach).
+func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, error) {
+	var paths []string
+	var lastErr error
+	err := wait.PollImmediate(10*time.Millisecond, time.Minute, func() (bool, error) {
+		var err error
+		paths, err = mounter.GetMountRefs(mountPath)
+		if io.IsInconsistentReadError(err) {
+			lastErr = err
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		return nil, lastErr
+	}
+	return paths, err
 }

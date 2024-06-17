@@ -31,39 +31,82 @@ import (
 type SigningPolicy interface {
 	// not-exporting apply forces signing policy implementations to be internal
 	// to this package.
-	apply(template *x509.Certificate) error
+	apply(template *x509.Certificate, signerNotAfter time.Time) error
 }
 
 // PermissiveSigningPolicy is the signing policy historically used by the local
 // signer.
 //
-//  * It forwards all SANs from the original signing request.
-//  * It sets allowed usages as configured in the policy.
-//  * It sets NotAfter based on the TTL configured in the policy.
-//  * It zeros all extensions.
-//  * It sets BasicConstraints to true.
-//  * It sets IsCA to false.
+//   - It forwards all SANs from the original signing request.
+//   - It sets allowed usages as configured in the policy.
+//   - It zeros all extensions.
+//   - It sets BasicConstraints to true.
+//   - It sets IsCA to false.
+//   - It validates that the signer has not expired.
+//   - It sets NotBefore and NotAfter:
+//     All certificates set NotBefore = Now() - Backdate.
+//     Long-lived certificates set NotAfter = Now() + TTL - Backdate.
+//     Short-lived certificates set NotAfter = Now() + TTL.
+//     All certificates truncate NotAfter to the expiration date of the signer.
 type PermissiveSigningPolicy struct {
-	// TTL is the certificate TTL. It's used to calculate the NotAfter value of
-	// the certificate.
+	// TTL is used in certificate NotAfter calculation as described above.
 	TTL time.Duration
+
 	// Usages are the allowed usages of a certificate.
 	Usages []capi.KeyUsage
+
+	// Backdate is used in certificate NotBefore calculation as described above.
+	Backdate time.Duration
+
+	// Short is the duration used to determine if the lifetime of a certificate should be considered short.
+	Short time.Duration
+
+	// Now defaults to time.Now but can be stubbed for testing
+	Now func() time.Time
 }
 
-func (p PermissiveSigningPolicy) apply(tmpl *x509.Certificate) error {
+func (p PermissiveSigningPolicy) apply(tmpl *x509.Certificate, signerNotAfter time.Time) error {
+	var now time.Time
+	if p.Now != nil {
+		now = p.Now()
+	} else {
+		now = time.Now()
+	}
+
+	ttl := p.TTL
+
 	usage, extUsages, err := keyUsagesFromStrings(p.Usages)
 	if err != nil {
 		return err
 	}
 	tmpl.KeyUsage = usage
 	tmpl.ExtKeyUsage = extUsages
-	tmpl.NotAfter = tmpl.NotBefore.Add(p.TTL)
 
 	tmpl.ExtraExtensions = nil
 	tmpl.Extensions = nil
 	tmpl.BasicConstraintsValid = true
 	tmpl.IsCA = false
+
+	tmpl.NotBefore = now.Add(-p.Backdate)
+
+	if ttl < p.Short {
+		// do not backdate the end time if we consider this to be a short lived certificate
+		tmpl.NotAfter = now.Add(ttl)
+	} else {
+		tmpl.NotAfter = now.Add(ttl - p.Backdate)
+	}
+
+	if !tmpl.NotAfter.Before(signerNotAfter) {
+		tmpl.NotAfter = signerNotAfter
+	}
+
+	if !tmpl.NotBefore.Before(signerNotAfter) {
+		return fmt.Errorf("the signer has expired: NotAfter=%v", signerNotAfter)
+	}
+
+	if !now.Before(signerNotAfter) {
+		return fmt.Errorf("refusing to sign a certificate that expired in the past: NotAfter=%v", signerNotAfter)
+	}
 
 	return nil
 }
@@ -124,7 +167,7 @@ func keyUsagesFromStrings(usages []capi.KeyUsage) (x509.KeyUsage, []x509.ExtKeyU
 		return 0, nil, fmt.Errorf("unrecognized usage values: %q", unrecognized)
 	}
 
-	return keyUsage, []x509.ExtKeyUsage(sorted), nil
+	return keyUsage, sorted, nil
 }
 
 type sortedExtKeyUsage []x509.ExtKeyUsage

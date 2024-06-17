@@ -17,26 +17,28 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // GetKubeletPods retrieves the list of pods on the kubelet.
-func GetKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "pods")
+func GetKubeletPods(ctx context.Context, c clientset.Interface, node string) (*v1.PodList, error) {
+	return getKubeletPods(ctx, c, node, "pods")
 }
 
 // GetKubeletRunningPods retrieves the list of running pods on the kubelet. The pods
 // includes necessary information (e.g., UID, name, namespace for
 // pods/containers), but do not contain the full spec.
-func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, error) {
-	return getKubeletPods(c, node, "runningpods")
+func GetKubeletRunningPods(ctx context.Context, c clientset.Interface, node string) (*v1.PodList, error) {
+	return getKubeletPods(ctx, c, node, "runningpods")
 }
 
-func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
+func getKubeletPods(ctx context.Context, c clientset.Interface, node, resource string) (*v1.PodList, error) {
 	result := &v1.PodList{}
-	client, err := ProxyRequest(c, node, resource, framework.KubeletPort)
+	client, err := ProxyRequest(ctx, c, node, resource, framework.KubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}

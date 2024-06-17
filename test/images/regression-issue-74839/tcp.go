@@ -31,6 +31,10 @@ const (
 )
 
 const (
+	// Control Bits. 6 bits.
+	// 00    01    02    03    04    05
+	// U     A     P     R     S     F
+
 	// FIN is a TCP flag
 	FIN uint16 = 1 << iota
 	// SYN is a TCP flag
@@ -52,11 +56,16 @@ const (
 )
 
 type tcpPacket struct {
-	SrcPort    uint16 // 0
-	DestPort   uint16 // 2
-	Seq        uint32 // 4
-	Ack        uint32 // 8
-	Flags      uint16 // 13
+	SrcPort  uint16 // 0
+	DestPort uint16 // 2
+	Seq      uint32 // 4
+	Ack      uint32 // 8
+	// Flags bytes includes
+	// Data Offset. 4 bits.
+	// reserved. 3 bits. (must be zero)
+	// ECN, Explicit Congestion Notification. 3 bits.
+	// Control Bits (Real flags). 6 bits.
+	Flags      uint16 // 12
 	WindowSize uint16 // 14
 	Checksum   uint16 // 16
 	UrgentPtr  uint16 // 18
@@ -133,16 +142,29 @@ func (t *tcpPacket) encode(src, dest net.IP, data []byte) []byte {
 
 func checksumTCP(src, dest net.IP, tcpHeader, data []byte) uint16 {
 	log.Printf("calling checksumTCP: %v %v %v %v", src, dest, tcpHeader, data)
-	chk := &tcpChecksumer{}
+	chk := &tcpChecksummer{}
 
 	// Encode pseudoheader.
-	chk.add(src.To4())
-	chk.add(dest.To4())
+	if src.To4() != nil {
+		// IPv4 [ src (4) | dst (4) | rsv (1) | proto (1) | tcp length (2) ] ... | tcp header | data
+		chk.add(src.To4())
+		chk.add(dest.To4())
+		pseudoHeader := make([]byte, 4)
+		pseudoHeader[1] = tcpProtoNum
+		binary.BigEndian.PutUint16(pseudoHeader[2:], uint16(len(data)+len(tcpHeader)))
+		chk.add(pseudoHeader)
 
-	var pseudoHeader [4]byte
-	pseudoHeader[1] = tcpProtoNum
-	binary.BigEndian.PutUint16(pseudoHeader[2:], uint16(len(data)+len(tcpHeader)))
-	chk.add(pseudoHeader[:])
+	} else {
+		// https://tools.ietf.org/html/rfc2460 IPv6
+		// IPv6 [ src (16) | dst (16) | payload length (4) | Zero (3) | NH/proto (1) ] ... | tcp header | data
+		chk.add(src.To16())
+		chk.add(dest.To16())
+		pseudoHeader := make([]byte, 8)
+		binary.BigEndian.PutUint32(pseudoHeader, uint32(len(data)+len(tcpHeader)))
+		pseudoHeader[7] = tcpProtoNum
+		chk.add(pseudoHeader)
+	}
+
 	chk.add(tcpHeader)
 	chk.add(data)
 
@@ -151,13 +173,13 @@ func checksumTCP(src, dest net.IP, tcpHeader, data []byte) uint16 {
 	return chk.finalize()
 }
 
-type tcpChecksumer struct {
+type tcpChecksummer struct {
 	sum     uint32
 	oddByte byte
 	length  int
 }
 
-func (c *tcpChecksumer) finalize() uint16 {
+func (c *tcpChecksummer) finalize() uint16 {
 	ret := c.sum
 	if c.length%2 > 0 {
 		ret += uint32(c.oddByte)
@@ -171,7 +193,7 @@ func (c *tcpChecksumer) finalize() uint16 {
 	return ^uint16(ret)
 }
 
-func (c *tcpChecksumer) add(data []byte) {
+func (c *tcpChecksummer) add(data []byte) {
 	if len(data) == 0 {
 		return
 	}

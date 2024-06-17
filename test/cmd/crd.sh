@@ -27,46 +27,84 @@ run_crd_tests() {
   kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "foos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "properties": {
+              "metadata": {"type": "object"},
+              "nestedField": {
+                "type": "object",
+                "properties": {
+                  "someSubfield": {"type": "string"},
+                  "otherSubfield": {"type": "string"},
+                  "newSubfield": {"type": "string"}
+                }
+              },
+              "otherField": {"type": "string"},
+              "someField": {"type": "string"},
+              "newField": {"type": "string"},
+              "patched": {"type": "string"}
+            }
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \\\"foos.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"foos.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'foos.company.com:'
 
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "bars.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "bars",
       "kind": "Bar"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
 
   # Post-Condition: assertion object exist
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:'
 
   # This test ensures that the name printer is able to output a resource
   # in the proper "kind.group/resource_name" format, and that the
@@ -74,61 +112,80 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "resources.mygroup.example.com"
   },
   "spec": {
     "group": "mygroup.example.com",
-    "version": "v1alpha1",
     "scope": "Namespaced",
     "names": {
       "plural": "resources",
       "singular": "resource",
       "kind": "Kind",
       "listKind": "KindList"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:'
 
   # This test ensures that we can create complex validation without client-side validation complaining
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "validfoos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "validfoos",
       "kind": "ValidFoo"
     },
-    "validation": {
-      "openAPIV3Schema": {
-        "properties": {
-          "spec": {
-            "type": "array",
-            "items": {
-              "type": "number"
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "properties": {
+              "spec": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
             }
           }
         }
       }
-    }
+    ]
   }
 }
 __EOF__
 
   # Post-Condition: assertion crd with non-matching kind and resource exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\" \\\"bars.company.com\\\" \\\"resources.mygroup.example.com\\\" \\\"validfoos.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \"foos.company.com\" \"bars.company.com\" \"resources.mygroup.example.com\" \"validfoos.company.com\"}}{{$id_field}}:{{end}}{{end}}" 'bars.company.com:foos.company.com:resources.mygroup.example.com:validfoos.company.com:'
 
   run_non_native_resource_tests
 
@@ -194,14 +251,15 @@ run_non_native_resource_tests() {
   output_message=$(kubectl "${kube_flags[@]}" get kind.mygroup.example.com/myobj -o name)
   kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
 
-  # Delete the resource with cascade.
-  kubectl "${kube_flags[@]}" delete resources myobj --cascade=true
+  # Delete the resource with cascading strategy background.
+  kubectl "${kube_flags[@]}" delete resources myobj --cascade=background
 
   # Make sure it's gone
   kube::test::wait_object_assert resources "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # Test that we can create a new resource of type Foo
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo-2.yaml "${kube_flags[@]}"
 
   # Test that we can list this new custom resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -262,11 +320,19 @@ run_non_native_resource_tests() {
   kube::log::status "Testing CustomResource labeling"
   kubectl "${kube_flags[@]}" label foos --all listlabel=true
   kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+  kubectl "${kube_flags[@]}" label --all --all-namespaces foo allnsLabel=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsLabel
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsLabel
 
   # Test annotating
   kube::log::status "Testing CustomResource annotating"
   kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
   kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+  kubectl "${kube_flags[@]}" annotate --all --all-namespaces foo allnsannotation=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsannotation
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsannotation
 
   # Test describing
   kube::log::status "Testing CustomResource describing"
@@ -274,9 +340,12 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos/test
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert customresourcedefinitions events
+  kube::test::describe_resource_chunk_size_assert foos events
 
-  # Delete the resource with cascade.
-  kubectl "${kube_flags[@]}" delete foos test --cascade=true
+  # Delete the resource with cascading strategy background.
+  kubectl "${kube_flags[@]}" delete foos test --cascade=background
 
   # Make sure it's gone
   kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -313,8 +382,8 @@ run_non_native_resource_tests() {
   kill -9 "${patch_pid}"
   kube::test::if_has_string "${watch_output}" 'bar.company.com/test'
 
-  # Delete the resource without cascade.
-  kubectl "${kube_flags[@]}" delete bars test --cascade=false
+  # Delete the resource with cascading strategy orphan.
+  kubectl "${kube_flags[@]}" delete bars test --cascade=orphan
 
   # Make sure it's gone
   kube::test::wait_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
@@ -431,13 +500,13 @@ run_non_native_resource_tests() {
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # apply --prune on foo.yaml that has foo/test
-  kubectl apply --prune -l pruneGroup=true -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}" --prune-allowlist=company.com/v1/Foo --prune-allowlist=company.com/v1/Bar
   # check right crds exist
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # apply --prune on bar.yaml that has bar/test
-  kubectl apply --prune -l pruneGroup=true -f hack/testdata/CRD/bar.yaml "${kube_flags[@]}" --prune-whitelist=company.com/v1/Foo --prune-whitelist=company.com/v1/Bar
+  kubectl apply --prune -l pruneGroup=true -f hack/testdata/CRD/bar.yaml "${kube_flags[@]}" --prune-allowlist=company.com/v1/Foo --prune-allowlist=company.com/v1/Bar
   # check right crds exist
   kube::test::wait_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert bars "{{range.items}}{{$id_field}}:{{end}}" 'test:'

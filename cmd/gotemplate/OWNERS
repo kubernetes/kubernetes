@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - bentheelder
+  - dims
+  - pohly
+approvers:
+  - dims
+  - pohly
+labels:
+  - sig/testing

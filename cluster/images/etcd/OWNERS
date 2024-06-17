@@ -2,8 +2,9 @@
 
 reviewers:
   - jpbetz
-  - wenjiaswe
+  - serathius
 approvers:
   - jpbetz
+  - serathius
 labels:
-- sig/api-machinery
+  - sig/api-machinery

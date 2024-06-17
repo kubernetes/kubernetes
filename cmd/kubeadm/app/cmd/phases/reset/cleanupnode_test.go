@@ -17,15 +17,12 @@ limitations under the License.
 package phases
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func assertExists(t *testing.T, path string) {
@@ -68,6 +65,7 @@ func TestConfigDirCleaner(t *testing.T) {
 				"manifests/kube-apiserver.yaml",
 				"pki/ca.pem",
 				kubeadmconstants.AdminKubeConfigFileName,
+				kubeadmconstants.SuperAdminKubeConfigFileName,
 				kubeadmconstants.KubeletKubeConfigFileName,
 			},
 			verifyExists: []string{
@@ -142,6 +140,17 @@ func TestConfigDirCleaner(t *testing.T) {
 				"test-path",
 			},
 		},
+		"cleanup temp directory": {
+			setupDirs: []string{
+				"tmp",
+			},
+			setupFiles: []string{
+				"tmp/kubeadm-init-dryrun2845575027",
+			},
+			verifyExists: []string{
+				"tmp",
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -149,7 +158,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			t.Logf("Running test: %s", name)
 
 			// Create a temporary directory for our fake config dir:
-			tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-reset-test")
 			if err != nil {
 				t.Errorf("Unable to create temporary directory: %s", err)
 			}
@@ -173,7 +182,12 @@ func TestConfigDirCleaner(t *testing.T) {
 			if test.resetDir == "" {
 				test.resetDir = "pki"
 			}
-			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
+			dirsToClean := []string{
+				filepath.Join(tmpDir, test.resetDir),
+				filepath.Join(tmpDir, kubeadmconstants.ManifestsSubDirName),
+				filepath.Join(tmpDir, kubeadmconstants.TempDirForKubeadm),
+			}
+			resetConfigDir(tmpDir, dirsToClean, false)
 
 			// Verify the files we cleanup implicitly in every test:
 			assertExists(t, tmpDir)
@@ -181,6 +195,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			assertNotExists(t, filepath.Join(tmpDir, kubeadmconstants.KubeletKubeConfigFileName))
 			assertDirEmpty(t, filepath.Join(tmpDir, "manifests"))
 			assertDirEmpty(t, filepath.Join(tmpDir, "pki"))
+			assertDirEmpty(t, filepath.Join(tmpDir, "tmp"))
 
 			// Verify the files as requested by the test:
 			for _, path := range test.verifyExists {
@@ -193,28 +208,4 @@ func TestConfigDirCleaner(t *testing.T) {
 			os.RemoveAll(tmpDir)
 		})
 	}
-}
-
-func TestRemoveContainers(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return []byte("id1\nid2"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
-			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
-			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
-			func() ([]byte, []byte, error) { return []byte(""), nil, nil },
-		},
-	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
 }

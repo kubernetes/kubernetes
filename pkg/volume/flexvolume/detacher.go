@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -58,7 +58,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 		return nil
 	}
 	if pathErr != nil && !mount.IsCorruptedMnt(pathErr) {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+		return fmt.Errorf("error checking path: %w", pathErr)
 	}
 
 	notmnt, err := isNotMounted(d.plugin.host.GetMounter(d.plugin.GetPluginName()), deviceMountPath)
@@ -87,7 +87,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
 	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		return nil
 	}

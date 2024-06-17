@@ -25,30 +25,29 @@ import (
 	"encoding/pem"
 	"testing"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
-	certclientset "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
-	restclient "k8s.io/client-go/rest"
+	certclientset "k8s.io/client-go/kubernetes/typed/certificates/v1"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Verifies that the 'spec.signerName' field can be correctly used as a field selector on LIST requests
 func TestCSRSignerNameFieldSelector(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	csrClient := client.CertificatesV1beta1().CertificateSigningRequests()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	csrClient := client.CertificatesV1().CertificateSigningRequests()
 	csr1 := createTestingCSR(t, csrClient, "csr-1", "example.com/signer-name-1", "")
 	csr2 := createTestingCSR(t, csrClient, "csr-2", "example.com/signer-name-2", "")
 	// csr3 has the same signerName as csr2 so we can ensure multiple items are returned when running a filtered
 	// LIST call.
 	csr3 := createTestingCSR(t, csrClient, "csr-3", "example.com/signer-name-2", "")
 
-	signerOneList, err := client.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=example.com/signer-name-1"})
+	signerOneList, err := client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=example.com/signer-name-1"})
 	if err != nil {
 		t.Errorf("unable to list CSRs with spec.signerName=example.com/signer-name-1")
 		return
@@ -59,7 +58,7 @@ func TestCSRSignerNameFieldSelector(t *testing.T) {
 		t.Errorf("expected CSR named 'csr-1' to be returned but got %q", signerOneList.Items[0].Name)
 	}
 
-	signerTwoList, err := client.CertificatesV1beta1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=example.com/signer-name-2"})
+	signerTwoList, err := client.CertificatesV1().CertificateSigningRequests().List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=example.com/signer-name-2"})
 	if err != nil {
 		t.Errorf("unable to list CSRs with spec.signerName=example.com/signer-name-2")
 		return
@@ -73,7 +72,7 @@ func TestCSRSignerNameFieldSelector(t *testing.T) {
 	}
 }
 
-func createTestingCSR(t *testing.T, certClient certclientset.CertificateSigningRequestInterface, name, signerName, groupName string) *capi.CertificateSigningRequest {
+func createTestingCSR(t *testing.T, certClient certclientset.CertificateSigningRequestInterface, name, signerName, groupName string) *certv1.CertificateSigningRequest {
 	csr, err := certClient.Create(context.TODO(), buildTestingCSR(name, signerName, groupName), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create testing CSR: %v", err)
@@ -81,14 +80,16 @@ func createTestingCSR(t *testing.T, certClient certclientset.CertificateSigningR
 	return csr
 }
 
-func buildTestingCSR(name, signerName, groupName string) *capi.CertificateSigningRequest {
-	return &capi.CertificateSigningRequest{
+func buildTestingCSR(name, signerName, groupName string) *certv1.CertificateSigningRequest {
+	return &certv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: capi.CertificateSigningRequestSpec{
-			SignerName: &signerName,
+		Spec: certv1.CertificateSigningRequestSpec{
+			SignerName: signerName,
 			Request:    pemWithGroup(groupName),
+			// this is the old defaulting for usages
+			Usages: []certv1.KeyUsage{certv1.UsageDigitalSignature, certv1.UsageKeyEncipherment},
 		},
 	}
 }

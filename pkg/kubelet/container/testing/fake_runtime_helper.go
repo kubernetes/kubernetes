@@ -17,9 +17,11 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -34,7 +36,7 @@ type FakeRuntimeHelper struct {
 	Err             error
 }
 
-func (f *FakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
+func (f *FakeRuntimeHelper) GenerateRunContainerOptions(_ context.Context, pod *v1.Pod, container *v1.Container, podIP string, podIPs []string) (*kubecontainer.RunContainerOptions, func(), error) {
 	var opts kubecontainer.RunContainerOptions
 	if len(container.TerminationMessagePath) != 0 {
 		opts.PodContainerDir = f.PodContainerDir
@@ -63,5 +65,17 @@ func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 }
 
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
+	return nil
+}
+
+func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	return nil, nil
+}
+
+func (f *FakeRuntimeHelper) PrepareDynamicResources(pod *v1.Pod) error {
+	return nil
+}
+
+func (f *FakeRuntimeHelper) UnprepareDynamicResources(pod *v1.Pod) error {
 	return nil
 }

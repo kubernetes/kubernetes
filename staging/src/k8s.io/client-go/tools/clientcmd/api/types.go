@@ -67,7 +67,7 @@ type Preferences struct {
 type Cluster struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	// +k8s:conversion-gen=false
-	LocationOfOrigin string
+	LocationOfOrigin string `json:"-"`
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
 	// TLSServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
@@ -93,6 +93,11 @@ type Cluster struct {
 	// attach, port forward).
 	// +optional
 	ProxyURL string `json:"proxy-url,omitempty"`
+	// DisableCompression allows client to opt-out of response compression for all requests to the server. This is useful
+	// to speed up requests (specifically lists) when client-server network bandwidth is ample, by saving time on
+	// compression (server-side) and decompression (client-side): https://github.com/kubernetes/kubernetes/issues/112296.
+	// +optional
+	DisableCompression bool `json:"disable-compression,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
@@ -102,7 +107,7 @@ type Cluster struct {
 type AuthInfo struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	// +k8s:conversion-gen=false
-	LocationOfOrigin string
+	LocationOfOrigin string `json:"-"`
 	// ClientCertificate is the path to a client cert file for TLS.
 	// +optional
 	ClientCertificate string `json:"client-certificate,omitempty"`
@@ -114,17 +119,20 @@ type AuthInfo struct {
 	ClientKey string `json:"client-key,omitempty"`
 	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
 	// +optional
-	ClientKeyData []byte `json:"client-key-data,omitempty"`
+	ClientKeyData []byte `json:"client-key-data,omitempty" datapolicy:"security-key"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
-	Token string `json:"token,omitempty"`
+	Token string `json:"token,omitempty" datapolicy:"token"`
 	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
 	// Impersonate is the username to act-as.
 	// +optional
 	Impersonate string `json:"act-as,omitempty"`
-	// ImpersonateGroups is the groups to imperonate.
+	// ImpersonateUID is the uid to impersonate.
+	// +optional
+	ImpersonateUID string `json:"act-as-uid,omitempty"`
+	// ImpersonateGroups is the groups to impersonate.
 	// +optional
 	ImpersonateGroups []string `json:"act-as-groups,omitempty"`
 	// ImpersonateUserExtra contains additional information for impersonated user.
@@ -135,7 +143,7 @@ type AuthInfo struct {
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	// +optional
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty" datapolicy:"password"`
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
 	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
@@ -151,7 +159,7 @@ type AuthInfo struct {
 type Context struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	// +k8s:conversion-gen=false
-	LocationOfOrigin string
+	LocationOfOrigin string `json:"-"`
 	// Cluster is the name of the cluster for this context
 	Cluster string `json:"cluster"`
 	// AuthInfo is the name of the authInfo for this context
@@ -215,6 +223,63 @@ type ExecConfig struct {
 	// present. For example, `brew install foo-cli` might be a good InstallHint for
 	// foo-cli on Mac OS systems.
 	InstallHint string `json:"installHint,omitempty"`
+
+	// ProvideClusterInfo determines whether or not to provide cluster information,
+	// which could potentially contain very large CA data, to this exec plugin as a
+	// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
+	// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
+	// reading this environment variable.
+	ProvideClusterInfo bool `json:"provideClusterInfo"`
+
+	// Config holds additional config data that is specific to the exec
+	// plugin with regards to the cluster being authenticated to.
+	//
+	// This data is sourced from the clientcmd Cluster object's extensions[exec] field:
+	//
+	// clusters:
+	// - name: my-cluster
+	//   cluster:
+	//     ...
+	//     extensions:
+	//     - name: client.authentication.k8s.io/exec  # reserved extension name for per cluster exec config
+	//       extension:
+	//         audience: 06e3fbd18de8  # arbitrary config
+	//
+	// In some environments, the user config may be exactly the same across many clusters
+	// (i.e. call this exec plugin) minus some details that are specific to each cluster
+	// such as the audience.  This field allows the per cluster config to be directly
+	// specified with the cluster info.  Using this field to store secret data is not
+	// recommended as one of the prime benefits of exec plugins is that no secrets need
+	// to be stored directly in the kubeconfig.
+	// +k8s:conversion-gen=false
+	Config runtime.Object `json:"-"`
+
+	// InteractiveMode determines this plugin's relationship with standard input. Valid
+	// values are "Never" (this exec plugin never uses standard input), "IfAvailable" (this
+	// exec plugin wants to use standard input if it is available), or "Always" (this exec
+	// plugin requires standard input to function). See ExecInteractiveMode values for more
+	// details.
+	//
+	// If APIVersion is client.authentication.k8s.io/v1alpha1 or
+	// client.authentication.k8s.io/v1beta1, then this field is optional and defaults
+	// to "IfAvailable" when unset. Otherwise, this field is required.
+	// +optional
+	InteractiveMode ExecInteractiveMode `json:"interactiveMode,omitempty"`
+
+	// StdinUnavailable indicates whether the exec authenticator can pass standard
+	// input through to this exec plugin. For example, a higher level entity might be using
+	// standard input for something else and therefore it would not be safe for the exec
+	// plugin to use standard input. This is kept here in order to keep all of the exec configuration
+	// together, but it is never serialized.
+	// +k8s:conversion-gen=false
+	StdinUnavailable bool `json:"-"`
+
+	// StdinUnavailableMessage is an optional message to be displayed when the exec authenticator
+	// cannot successfully run this exec plugin because it needs to use standard input and
+	// StdinUnavailable is true. For example, a process that is already using standard input to
+	// read user instructions might set this to "used by my-program to read user instructions".
+	// +k8s:conversion-gen=false
+	StdinUnavailableMessage string `json:"-"`
 }
 
 var _ fmt.Stringer = new(ExecConfig)
@@ -237,7 +302,11 @@ func (c ExecConfig) String() string {
 	if len(c.Env) > 0 {
 		env = "[]ExecEnvVar{--- REDACTED ---}"
 	}
-	return fmt.Sprintf("api.AuthProviderConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q}", c.Command, args, env, c.APIVersion)
+	config := "runtime.Object(nil)"
+	if c.Config != nil {
+		config = "runtime.Object(--- REDACTED ---)"
+	}
+	return fmt.Sprintf("api.ExecConfig{Command: %q, Args: %#v, Env: %s, APIVersion: %q, ProvideClusterInfo: %t, Config: %s, StdinUnavailable: %t}", c.Command, args, env, c.APIVersion, c.ProvideClusterInfo, config, c.StdinUnavailable)
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based
@@ -246,6 +315,26 @@ type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+// ExecInteractiveMode is a string that describes an exec plugin's relationship with standard input.
+type ExecInteractiveMode string
+
+const (
+	// NeverExecInteractiveMode declares that this exec plugin never needs to use standard
+	// input, and therefore the exec plugin will be run regardless of whether standard input is
+	// available for user input.
+	NeverExecInteractiveMode ExecInteractiveMode = "Never"
+	// IfAvailableExecInteractiveMode declares that this exec plugin would like to use standard input
+	// if it is available, but can still operate if standard input is not available. Therefore, the
+	// exec plugin will be run regardless of whether stdin is available for user input. If standard
+	// input is available for user input, then it will be provided to this exec plugin.
+	IfAvailableExecInteractiveMode ExecInteractiveMode = "IfAvailable"
+	// AlwaysExecInteractiveMode declares that this exec plugin requires standard input in order to
+	// run, and therefore the exec plugin will only be run if standard input is available for user
+	// input. If standard input is not available for user input, then the exec plugin will not be run
+	// and an error will be returned by the exec plugin runner.
+	AlwaysExecInteractiveMode ExecInteractiveMode = "Always"
+)
 
 // NewConfig is a convenience function that returns a new Config object with non-nil maps
 func NewConfig() *Config {

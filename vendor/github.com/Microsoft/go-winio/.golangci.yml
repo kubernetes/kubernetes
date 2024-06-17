@@ -1,0 +1,144 @@
+run:
+  skip-dirs:
+    - pkg/etw/sample
+
+linters:
+  enable:
+    # style
+    - containedctx # struct contains a context
+    - dupl # duplicate code
+    - errname # erorrs are named correctly
+    - goconst # strings that should be constants
+    - godot # comments end in a period
+    - misspell
+    - nolintlint # "//nolint" directives are properly explained
+    - revive # golint replacement
+    - stylecheck # golint replacement, less configurable than revive
+    - unconvert # unnecessary conversions
+    - wastedassign
+
+    # bugs, performance, unused, etc ...
+    - contextcheck # function uses a non-inherited context
+    - errorlint # errors not wrapped for 1.13
+    - exhaustive # check exhaustiveness of enum switch statements
+    - gofmt # files are gofmt'ed
+    - gosec # security
+    - nestif # deeply nested ifs
+    - nilerr # returns nil even with non-nil error
+    - prealloc # slices that can be pre-allocated
+    - structcheck # unused struct fields
+    - unparam # unused function params
+
+issues:
+  exclude-rules:
+    # err is very often shadowed in nested scopes
+    - linters:
+        - govet
+      text: '^shadow: declaration of "err" shadows declaration'
+
+    # ignore long lines for skip autogen directives
+    - linters:
+        - revive
+      text: "^line-length-limit: "
+      source: "^//(go:generate|sys) "
+
+    # allow unjustified ignores of error checks in defer statements
+    - linters:
+        - nolintlint
+      text: "^directive `//nolint:errcheck` should provide explanation"
+      source: '^\s*defer '
+
+    # allow unjustified ignores of error lints for io.EOF
+    - linters:
+        - nolintlint
+      text: "^directive `//nolint:errorlint` should provide explanation"
+      source: '[=|!]= io.EOF'
+
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      # struct order is often for Win32 compat
+      # also, ignore pointer bytes/GC issues for now until performance becomes an issue
+      - fieldalignment
+    check-shadowing: true
+  nolintlint:
+    allow-leading-space: false
+    require-explanation: true
+    require-specific: true
+  revive:
+    # revive is more configurable than static check, so likely the preferred alternative to static-check
+    # (once the perf issue is solved: https://github.com/golangci/golangci-lint/issues/2997)
+    enable-all-rules:
+      true
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md
+    rules:
+      # rules with required arguments
+      - name: argument-limit
+        disabled: true
+      - name: banned-characters
+        disabled: true
+      - name: cognitive-complexity
+        disabled: true
+      - name: cyclomatic
+        disabled: true
+      - name: file-header
+        disabled: true
+      - name: function-length
+        disabled: true
+      - name: function-result-limit
+        disabled: true
+      - name: max-public-structs
+        disabled: true
+      # geneally annoying rules
+      - name: add-constant # complains about any and all strings and integers
+        disabled: true
+      - name: confusing-naming # we frequently use "Foo()" and "foo()" together
+        disabled: true
+      - name: flag-parameter # excessive, and a common idiom we use
+        disabled: true
+      # general config
+      - name: line-length-limit
+        arguments:
+          - 140
+      - name: var-naming
+        arguments:
+          - []
+          - - CID
+            - CRI
+            - CTRD
+            - DACL
+            - DLL
+            - DOS
+            - ETW
+            - FSCTL
+            - GCS
+            - GMSA
+            - HCS
+            - HV
+            - IO
+            - LCOW
+            - LDAP
+            - LPAC
+            - LTSC
+            - MMIO
+            - NT
+            - OCI
+            - PMEM
+            - PWSH
+            - RX
+            - SACl
+            - SID
+            - SMB
+            - TX
+            - VHD
+            - VHDX
+            - VMID
+            - VPCI
+            - WCOW
+            - WIM
+  stylecheck:
+    checks:
+      - "all"
+      - "-ST1003" # use revive's var naming

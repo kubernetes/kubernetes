@@ -89,6 +89,8 @@ type codec struct {
 	originalSchemeName string
 }
 
+var _ runtime.EncoderWithAllocator = &codec{}
+
 var identifiersMap sync.Map
 
 type codecIdentifier struct {
@@ -133,17 +135,34 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		}
 	}
 
+	var strictDecodingErrs []error
 	obj, gvk, err := c.decoder.Decode(data, defaultGVK, decodeInto)
 	if err != nil {
-		return nil, gvk, err
-	}
-
-	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
-		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{c.decoder}); err != nil {
+		if strictErr, ok := runtime.AsStrictDecodingError(err); obj != nil && ok {
+			// save the strictDecodingError and let the caller decide what to do with it
+			strictDecodingErrs = append(strictDecodingErrs, strictErr.Errors()...)
+		} else {
 			return nil, gvk, err
 		}
 	}
 
+	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
+		if err := d.DecodeNestedObjects(runtime.WithoutVersionDecoder{Decoder: c.decoder}); err != nil {
+			if strictErr, ok := runtime.AsStrictDecodingError(err); ok {
+				// save the strictDecodingError let and the caller decide what to do with it
+				strictDecodingErrs = append(strictDecodingErrs, strictErr.Errors()...)
+			} else {
+				return nil, gvk, err
+
+			}
+		}
+	}
+
+	// aggregate the strict decoding errors into one
+	var strictDecodingErr error
+	if len(strictDecodingErrs) > 0 {
+		strictDecodingErr = runtime.NewStrictDecodingError(strictDecodingErrs)
+	}
 	// if we specify a target, use generic conversion.
 	if into != nil {
 		// perform defaulting if requested
@@ -153,14 +172,14 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 		// Short-circuit conversion if the into object is same object
 		if into == obj {
-			return into, gvk, nil
+			return into, gvk, strictDecodingErr
 		}
 
 		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
 
-		return into, gvk, nil
+		return into, gvk, strictDecodingErr
 	}
 
 	// perform defaulting if requested
@@ -172,22 +191,43 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	if err != nil {
 		return nil, gvk, err
 	}
-	return out, gvk, nil
+	return out, gvk, strictDecodingErr
+}
+
+// EncodeWithAllocator ensures the provided object is output in the appropriate group and version, invoking
+// conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
+// In addition, it allows for providing a memory allocator for efficient memory usage during object serialization.
+func (c *codec) EncodeWithAllocator(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
+	return c.encode(obj, w, memAlloc)
 }
 
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
-	if co, ok := obj.(runtime.CacheableObject); ok {
-		return co.CacheEncode(c.Identifier(), c.doEncode, w)
-	}
-	return c.doEncode(obj, w)
+	return c.encode(obj, w, nil)
 }
 
-func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
+func (c *codec) encode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(c.Identifier(), func(obj runtime.Object, w io.Writer) error { return c.doEncode(obj, w, memAlloc) }, w)
+	}
+	return c.doEncode(obj, w, memAlloc)
+}
+
+func (c *codec) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.MemoryAllocator) error {
+	encodeFn := c.encoder.Encode
+	if memAlloc != nil {
+		if encoder, supportsAllocator := c.encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+			encodeFn = func(obj runtime.Object, w io.Writer) error {
+				return encoder.EncodeWithAllocator(obj, w, memAlloc)
+			}
+		} else {
+			klog.V(6).Infof("a memory allocator was provided but the encoder %s doesn't implement the runtime.EncoderWithAllocator, using regular encoder.Encode method", c.encoder.Identifier())
+		}
+	}
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
-		return c.encoder.Encode(obj, w)
+		return encodeFn(obj, w)
 	case runtime.Unstructured:
 		// An unstructured list can contain objects of multiple group version kinds. don't short-circuit just
 		// because the top-level type matches our desired destination type. actually send the object to the converter
@@ -196,14 +236,14 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
 			// avoid conversion roundtrip if GVK is the right one already or is empty (yes, this is a hack, but the old behaviour we rely on in kubectl)
 			objGVK := obj.GetObjectKind().GroupVersionKind()
 			if len(objGVK.Version) == 0 {
-				return c.encoder.Encode(obj, w)
+				return encodeFn(obj, w)
 			}
 			targetGVK, ok := c.encodeVersion.KindForGroupVersionKinds([]schema.GroupVersionKind{objGVK})
 			if !ok {
 				return runtime.NewNotRegisteredGVKErrForTarget(c.originalSchemeName, objGVK, c.encodeVersion)
 			}
 			if targetGVK == objGVK {
-				return c.encoder.Encode(obj, w)
+				return encodeFn(obj, w)
 			}
 		}
 	}
@@ -225,7 +265,7 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
 			}
 		}
 		objectKind.SetGroupVersionKind(gvks[0])
-		return c.encoder.Encode(obj, w)
+		return encodeFn(obj, w)
 	}
 
 	// Perform a conversion if necessary
@@ -241,7 +281,7 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
-	return c.encoder.Encode(out, w)
+	return encodeFn(out, w)
 }
 
 // Identifier implements runtime.Encoder interface.

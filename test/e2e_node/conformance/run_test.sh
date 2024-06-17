@@ -52,7 +52,7 @@ SKIP=${SKIP:-""}
 TEST_ARGS=${TEST_ARGS:-""}
 
 # REGISTRY is the image registry for node test image.
-REGISTRY=${REGISTRY:-"k8s.gcr.io"}
+REGISTRY=${REGISTRY:-"registry.k8s.io"}
 
 # ARCH is the architecture of current machine, the script will use this to
 # select corresponding test container image.
@@ -126,10 +126,10 @@ start_kubelet() {
   fi
 }
 
-# wait_kubelet retries for 10 times for kubelet to be ready by checking http://127.0.0.1:10255/healthz.
+# wait_kubelet retries for 10 times for kubelet to be ready by checking http://127.0.0.1:10248/healthz.
 wait_kubelet() {
   echo "Health checking kubelet..."
-  healthCheckURL=http://127.0.0.1:10255/healthz
+  healthCheckURL=http://127.0.0.1:10248/healthz
   local maxRetry=10
   local cur=1
   while [ $cur -le $maxRetry ]; do
@@ -200,11 +200,7 @@ start_kubelet --kubeconfig "${KUBELET_KUBECONFIG}" \
   --kubelet-cgroups=/kubelet \
   --system-cgroups=/system \
   --cgroup-root=/ \
-  "--network-plugin=${NETWORK_PLUGIN}" \
-  "--cni-conf-dir=${CNI_CONF_DIR}" \
-  "--cni-bin-dir=${CNI_BIN_DIR}" \
   --v=$log_level \
-  --logtostderr
 
 wait_kubelet
 

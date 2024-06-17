@@ -1,3 +1,7 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-resizer/raw/v1.10.0/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path release-1.13
+# by ./update-hostpath.sh
+#
 # This YAML file contains all RBAC objects that are necessary to run external
 # CSI resizer.
 #
@@ -29,16 +33,23 @@ rules:
   #   verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    verbs: ["get", "list", "watch", "patch"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
     resources: ["persistentvolumeclaims/status"]
-    verbs: ["update", "patch"]
+    verbs: ["patch"]
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
+  # only required if enabling the alpha volume modify feature
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattributesclasses"]
+    verbs: ["get", "list", "watch"]
 
 ---
 kind: ClusterRoleBinding
@@ -56,7 +67,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
-# Resizer must be able to work with end point in current namespace
+# Resizer must be able to work with `leases` in current namespace
 # if (and only if) leadership election is enabled
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1

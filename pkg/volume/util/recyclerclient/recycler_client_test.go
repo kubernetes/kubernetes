@@ -88,8 +88,8 @@ func TestRecyclerPod(t *testing.T) {
 				// Pod gets Running and Succeeded
 				newPodEvent(watch.Added, "podRecyclerSuccess", v1.PodPending, ""),
 				newEvent(v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"),
-				newEvent(v1.EventTypeNormal, "Pulling image \"k8s.gcr.io/busybox\""),
-				newEvent(v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""),
+				newEvent(v1.EventTypeNormal, "Pulling image \"registry.k8s.io/busybox\""),
+				newEvent(v1.EventTypeNormal, "Successfully pulled image \"registry.k8s.io/busybox\""),
 				newEvent(v1.EventTypeNormal, "Created container with docker id 83d929aeac82"),
 				newEvent(v1.EventTypeNormal, "Started container with docker id 83d929aeac82"),
 				newPodEvent(watch.Modified, "podRecyclerSuccess", v1.PodRunning, ""),
@@ -97,8 +97,8 @@ func TestRecyclerPod(t *testing.T) {
 			},
 			expectedEvents: []mockEvent{
 				{v1.EventTypeNormal, "Successfully assigned recycler-for-podRecyclerSuccess to 127.0.0.1"},
-				{v1.EventTypeNormal, "Pulling image \"k8s.gcr.io/busybox\""},
-				{v1.EventTypeNormal, "Successfully pulled image \"k8s.gcr.io/busybox\""},
+				{v1.EventTypeNormal, "Pulling image \"registry.k8s.io/busybox\""},
+				{v1.EventTypeNormal, "Successfully pulled image \"registry.k8s.io/busybox\""},
 				{v1.EventTypeNormal, "Created container with docker id 83d929aeac82"},
 				{v1.EventTypeNormal, "Started container with docker id 83d929aeac82"},
 			},
@@ -220,7 +220,7 @@ func (c *mockRecyclerClient) DeletePod(name, namespace string) error {
 }
 
 func (c *mockRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	eventCh := make(chan watch.Event, 0)
+	eventCh := make(chan watch.Event)
 	go func() {
 		for _, e := range c.events {
 			eventCh <- e

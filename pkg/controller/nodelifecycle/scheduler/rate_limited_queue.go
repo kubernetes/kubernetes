@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
-
 	"k8s.io/klog/v2"
 )
 
@@ -194,15 +193,6 @@ func (q *UniqueQueue) Clear() {
 	}
 }
 
-// SetRemove remove value from the set if value existed
-func (q *UniqueQueue) SetRemove(value string) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-	if q.set.Has(value) {
-		q.set.Delete(value)
-	}
-}
-
 // RateLimitedTimedQueue is a unique item priority queue ordered by
 // the expected next time of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
@@ -238,14 +228,14 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // function in NodeController when Node becomes Ready again) TODO:
 // figure out a good way to do garbage collection for all Nodes that
 // were removed from the cluster.
-func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
+func (q *RateLimitedTimedQueue) Try(logger klog.Logger, fn ActionFunc) {
 	val, ok := q.queue.Head()
 	q.limiterLock.Lock()
 	defer q.limiterLock.Unlock()
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			klog.V(10).Infof("Try rate limited for value: %v", val)
+			logger.V(10).Info("Try rate limited", "value", val)
 			// Try again later
 			break
 		}
@@ -287,11 +277,6 @@ func (q *RateLimitedTimedQueue) Remove(value string) bool {
 // Clear removes all items from the queue
 func (q *RateLimitedTimedQueue) Clear() {
 	q.queue.Clear()
-}
-
-// SetRemove remove value from the set of the queue
-func (q *RateLimitedTimedQueue) SetRemove(value string) {
-	q.queue.SetRemove(value)
 }
 
 // SwapLimiter safely swaps current limiter for this queue with the

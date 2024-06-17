@@ -23,12 +23,18 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/stretchr/testify/assert"
+
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -60,6 +66,20 @@ func newFakeCsiDriverClientWithVolumeStats(t *testing.T, volumeStatsSet bool) *f
 	}
 }
 
+func newFakeCsiDriverClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithVolumeStatsAndCondition(volumeStatsSet, volumeConditionSet),
+	}
+}
+
+func newFakeCsiDriverClientWithVolumeMountGroup(t *testing.T, stagingCapable, volumeMountGroupSet bool) *fakeCsiDriverClient {
+	return &fakeCsiDriverClient{
+		t:          t,
+		nodeClient: fake.NewNodeClientWithVolumeMountGroup(stagingCapable, volumeMountGroupSet),
+	}
+}
+
 func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeID string,
 	maxVolumePerNode int64,
@@ -80,15 +100,30 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		VolumeId:   volID,
 		VolumePath: targetPath,
 	}
+
+	c.nodeClient.SetNodeVolumeStatsResp(getRawVolumeInfo())
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+
 	usages := resp.GetUsage()
-	metrics := &volume.Metrics{}
 	if usages == nil {
 		return nil, nil
 	}
+
+	metrics := &volume.Metrics{}
+
+	isSupportNodeVolumeCondition, err := c.nodeSupportsVolumeCondition(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) && isSupportNodeVolumeCondition {
+		abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
+		metrics.Abnormal, metrics.Message = &abnormal, &message
+	}
+
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -110,21 +145,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 
 func (c *fakeCsiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
 	c.t.Log("calling fake.NodeSupportsVolumeStats...")
-	req := &csipbv1.NodeGetCapabilitiesRequest{}
-	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
-	if err != nil {
-		return false, err
-	}
-	capabilities := resp.GetCapabilities()
-	if capabilities == nil {
-		return false, nil
-	}
-	for _, capability := range capabilities {
-		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS {
-			return true, nil
-		}
-	}
-	return false, nil
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS)
 }
 
 func (c *fakeCsiDriverClient) NodePublishVolume(
@@ -139,6 +160,7 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 	secrets map[string]string,
 	fsType string,
 	mountOptions []string,
+	fsGroup *int64,
 ) error {
 	c.t.Log("calling fake.NodePublishVolume...")
 	req := &csipbv1.NodePublishVolumeRequest{
@@ -161,11 +183,15 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 			Block: &csipbv1.VolumeCapability_BlockVolume{},
 		}
 	} else {
+		mountVolume := &csipbv1.VolumeCapability_MountVolume{
+			FsType:     fsType,
+			MountFlags: mountOptions,
+		}
+		if fsGroup != nil {
+			mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
+		}
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
-			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType:     fsType,
-				MountFlags: mountOptions,
-			},
+			Mount: mountVolume,
 		}
 	}
 
@@ -196,6 +222,7 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	secrets map[string]string,
 	volumeContext map[string]string,
 	mountOptions []string,
+	fsGroup *int64,
 ) error {
 	c.t.Log("calling fake.NodeStageVolume...")
 	req := &csipbv1.NodeStageVolumeRequest{
@@ -215,11 +242,15 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 			Block: &csipbv1.VolumeCapability_BlockVolume{},
 		}
 	} else {
+		mountVolume := &csipbv1.VolumeCapability_MountVolume{
+			FsType:     fsType,
+			MountFlags: mountOptions,
+		}
+		if fsGroup != nil {
+			mountVolume.VolumeMountGroup = strconv.FormatInt(*fsGroup, 10 /* base */)
+		}
 		req.VolumeCapability.AccessType = &csipbv1.VolumeCapability_Mount{
-			Mount: &csipbv1.VolumeCapability_MountVolume{
-				FsType:     fsType,
-				MountFlags: mountOptions,
-			},
+			Mount: mountVolume,
 		}
 	}
 
@@ -242,28 +273,16 @@ func (c *fakeCsiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stag
 
 func (c *fakeCsiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, error) {
 	c.t.Log("calling fake.NodeSupportsNodeExpand...")
-	req := &csipbv1.NodeGetCapabilitiesRequest{}
-
-	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
-	if err != nil {
-		return false, err
-	}
-
-	capabilities := resp.GetCapabilities()
-
-	if capabilities == nil {
-		return false, nil
-	}
-	for _, capability := range capabilities {
-		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME {
-			return true, nil
-		}
-	}
-	return false, nil
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_EXPAND_VOLUME)
 }
 
 func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, error) {
 	c.t.Log("calling fake.NodeGetCapabilities for NodeSupportsStageUnstage...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME)
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsVolumeMountGroup(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeGetCapabilities for NodeSupportsVolumeMountGroup...")
 	req := &csipbv1.NodeGetCapabilitiesRequest{}
 	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
 	if err != nil {
@@ -272,16 +291,16 @@ func (c *fakeCsiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (boo
 
 	capabilities := resp.GetCapabilities()
 
-	stageUnstageSet := false
+	volumeMountGroupSet := false
 	if capabilities == nil {
 		return false, nil
 	}
 	for _, capability := range capabilities {
-		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
-			stageUnstageSet = true
+		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_VOLUME_MOUNT_GROUP {
+			volumeMountGroupSet = true
 		}
 	}
-	return stageUnstageSet, nil
+	return volumeMountGroupSet, nil
 }
 
 func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOptions) (resource.Quantity, error) {
@@ -317,6 +336,39 @@ func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResi
 	return *updatedQuantity, nil
 }
 
+func (c *fakeCsiDriverClient) nodeSupportsVolumeCondition(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.nodeSupportsVolumeCondition...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION)
+}
+
+func (c *fakeCsiDriverClient) NodeSupportsSingleNodeMultiWriterAccessMode(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.NodeSupportsSingleNodeMultiWriterAccessMode...")
+	return c.nodeSupportsCapability(ctx, csipbv1.NodeServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER)
+}
+
+func (c *fakeCsiDriverClient) nodeSupportsCapability(ctx context.Context, capabilityType csipbv1.NodeServiceCapability_RPC_Type) (bool, error) {
+	capabilities, err := c.nodeGetCapabilities(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == capabilityType {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (c *fakeCsiDriverClient) nodeGetCapabilities(ctx context.Context) ([]*csipbv1.NodeServiceCapability, error) {
+	req := &csipbv1.NodeGetCapabilitiesRequest{}
+	resp, err := c.nodeClient.NodeGetCapabilities(ctx, req)
+	if err != nil {
+		return []*csipbv1.NodeServiceCapability{}, err
+	}
+	return resp.GetCapabilities(), nil
+}
+
 func setupClient(t *testing.T, stageUnstageSet bool) csiClient {
 	return newFakeCsiDriverClient(t, stageUnstageSet)
 }
@@ -325,8 +377,16 @@ func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet b
 	return newFakeCsiDriverClientWithExpansion(t, stageUnstageSet, expansionSet)
 }
 
+func setupClientWithVolumeStatsAndCondition(t *testing.T, volumeStatsSet, volumeConditionSet bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeStatsAndCondition(t, volumeStatsSet, volumeConditionSet)
+}
+
 func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
 	return newFakeCsiDriverClientWithVolumeStats(t, volumeStatsSet)
+}
+
+func setupClientWithVolumeMountGroup(t *testing.T, stageUnstageSet bool, volumeMountGroupSet bool) csiClient {
+	return newFakeCsiDriverClientWithVolumeMountGroup(t, stageUnstageSet, volumeMountGroupSet)
 }
 
 func checkErr(t *testing.T, expectedAnError bool, actualError error) {
@@ -371,7 +431,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				nodeClient.SetNodeGetInfoResp(&csipbv1.NodeGetInfoResponse{
@@ -407,6 +467,8 @@ func TestClientNodeGetInfo(t *testing.T) {
 }
 
 func TestClientNodePublishVolume(t *testing.T) {
+	var testFSGroup int64 = 3000
+
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -415,28 +477,32 @@ func TestClientNodePublishVolume(t *testing.T) {
 	testPath := filepath.Join(tmpDir, "path")
 
 	testCases := []struct {
-		name       string
-		volID      string
-		targetPath string
-		fsType     string
-		mustFail   bool
-		err        error
+		name                     string
+		volID                    string
+		targetPath               string
+		fsType                   string
+		fsGroup                  *int64
+		expectedVolumeMountGroup string
+		mustFail                 bool
+		err                      error
 	}{
 		{name: "test ok", volID: "vol-test", targetPath: testPath},
 		{name: "missing volID", targetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", targetPath: testPath, fsType: "badfs", mustFail: true},
 		{name: "grpc error", volID: "vol-test", targetPath: testPath, mustFail: true, err: errors.New("grpc error")},
+		{name: "fsgroup", volID: "vol-test", targetPath: testPath, fsGroup: &testFSGroup, expectedVolumeMountGroup: "3000"},
 	}
 
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
+
+		nodeClient := fake.NewNodeClient(false /* stagingCapable */)
+		nodeClient.SetNextError(tc.err)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
-				nodeClient.SetNextError(tc.err)
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
@@ -453,8 +519,14 @@ func TestClientNodePublishVolume(t *testing.T) {
 			map[string]string{},
 			tc.fsType,
 			[]string{},
+			tc.fsGroup,
 		)
 		checkErr(t, tc.mustFail, err)
+
+		volumeMountGroup := nodeClient.GetNodePublishedVolumes()[tc.volID].VolumeMountGroup
+		if volumeMountGroup != tc.expectedVolumeMountGroup {
+			t.Errorf("Expected VolumeMountGroup in NodePublishVolumeRequest to be %q, got: %q", tc.expectedVolumeMountGroup, volumeMountGroup)
+		}
 
 		if !tc.mustFail {
 			fakeCloser.Check()
@@ -488,7 +560,7 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -505,6 +577,8 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestClientNodeStageVolume(t *testing.T) {
+	var testFSGroup int64 = 3000
+
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -513,30 +587,34 @@ func TestClientNodeStageVolume(t *testing.T) {
 	testPath := filepath.Join(tmpDir, "/test/path")
 
 	testCases := []struct {
-		name              string
-		volID             string
-		stagingTargetPath string
-		fsType            string
-		secrets           map[string]string
-		mountOptions      []string
-		mustFail          bool
-		err               error
+		name                     string
+		volID                    string
+		stagingTargetPath        string
+		fsType                   string
+		secrets                  map[string]string
+		mountOptions             []string
+		fsGroup                  *int64
+		expectedVolumeMountGroup string
+		mustFail                 bool
+		err                      error
 	}{
 		{name: "test ok", volID: "vol-test", stagingTargetPath: testPath, fsType: "ext4", mountOptions: []string{"unvalidated"}},
 		{name: "missing volID", stagingTargetPath: testPath, mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", stagingTargetPath: testPath, fsType: "badfs", mustFail: true},
 		{name: "grpc error", volID: "vol-test", stagingTargetPath: testPath, mustFail: true, err: errors.New("grpc error")},
+		{name: "fsgroup", volID: "vol-test", stagingTargetPath: testPath, fsGroup: &testFSGroup, expectedVolumeMountGroup: "3000"},
 	}
 
 	for _, tc := range testCases {
 		t.Logf("Running test case: %s", tc.name)
+
+		nodeClient := fake.NewNodeClientWithVolumeMountGroup(true /* stagingCapable */, true /* volumeMountGroupCapable */)
+		nodeClient.SetNextError(tc.err)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
-				nodeClient.SetNextError(tc.err)
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				return nodeClient, fakeCloser, nil
 			},
 		}
@@ -551,8 +629,14 @@ func TestClientNodeStageVolume(t *testing.T) {
 			tc.secrets,
 			map[string]string{"attr0": "val0"},
 			tc.mountOptions,
+			tc.fsGroup,
 		)
 		checkErr(t, tc.mustFail, err)
+
+		volumeMountGroup := nodeClient.GetNodeStagedVolumes()[tc.volID].VolumeMountGroup
+		if volumeMountGroup != tc.expectedVolumeMountGroup {
+			t.Errorf("expected VolumeMountGroup parameter in NodePublishVolumeRequest to be %q, got: %q", tc.expectedVolumeMountGroup, volumeMountGroup)
+		}
 
 		if !tc.mustFail {
 			fakeCloser.Check()
@@ -586,7 +670,7 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -602,6 +686,81 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		if !tc.mustFail {
 			fakeCloser.Check()
 		}
+	}
+}
+
+func TestClientNodeSupportsStageUnstage(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsStageUnstage(context.Background())
+		},
+		func(stagingCapable bool) *fake.NodeClient {
+			// Creates a staging-capable client
+			return fake.NewNodeClient(stagingCapable)
+		})
+}
+
+func TestClientNodeSupportsNodeExpand(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsNodeExpand(context.Background())
+		},
+		func(expansionCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithExpansion(false /* stageCapable */, expansionCapable)
+		})
+}
+
+func TestClientNodeSupportsVolumeStats(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsVolumeStats(context.Background())
+		},
+		func(volumeStatsCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithVolumeStats(volumeStatsCapable)
+		})
+}
+
+func TestClientNodeSupportsVolumeMountGroup(t *testing.T) {
+	testClientNodeSupportsCapabilities(t,
+		func(client *csiDriverClient) (bool, error) {
+			return client.NodeSupportsVolumeMountGroup(context.Background())
+		},
+		func(volumeMountGroupCapable bool) *fake.NodeClient {
+			return fake.NewNodeClientWithVolumeMountGroup(false /* stagingCapable */, volumeMountGroupCapable)
+		})
+}
+
+func testClientNodeSupportsCapabilities(
+	t *testing.T,
+	capabilityMethodToTest func(*csiDriverClient) (bool, error),
+	nodeClientGenerator func(bool) *fake.NodeClient) {
+
+	testCases := []struct {
+		name    string
+		capable bool
+	}{
+		{name: "positive", capable: true},
+		{name: "negative", capable: false},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test case: %s", tc.name)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := nodeClientGenerator(tc.capable)
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
+		got, _ := capabilityMethodToTest(client)
+
+		if got != tc.capable {
+			t.Errorf("Expected capability support to be %v, got: %v", tc.capable, got)
+		}
+
+		fakeCloser.Check()
 	}
 }
 
@@ -647,7 +806,7 @@ func TestNodeExpandVolume(t *testing.T) {
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
 			driverName: "Fake Driver Name",
-			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+			nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -674,13 +833,117 @@ type VolumeStatsOptions struct {
 	DeviceMountPath string
 }
 
-func TestVolumeStats(t *testing.T) {
+func TestVolumeHealthEnable(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name               string
+		volumeStatsSet     bool
+		volumeConditionSet bool
+		volumeData         VolumeStatsOptions
+		success            bool
+	}{
+		{
+			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=on",
+			volumeStatsSet:     true,
+			volumeConditionSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+		{
+			name:               "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=off",
+			volumeStatsSet:     true,
+			volumeConditionSet: false,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, tc.volumeConditionSet)
+			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if tc.success {
+				assert.Nil(t, err)
+			}
+
+			if metrics == nil {
+				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
+			} else {
+				if tc.volumeConditionSet {
+					assert.NotNil(t, metrics.Abnormal)
+					assert.NotNil(t, metrics.Message)
+				} else {
+					assert.Nil(t, metrics.Abnormal)
+					assert.Nil(t, metrics.Message)
+				}
+			}
+
+		})
+	}
+}
+
+func TestVolumeHealthDisable(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, false)
 	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
 	tests := []struct {
 		name           string
 		volumeStatsSet bool
 		volumeData     VolumeStatsOptions
 		success        bool
+	}{
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on, VolumeCondition=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStatsAndCondition(t, tc.volumeStatsSet, false)
+			metrics, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if tc.success {
+				assert.Nil(t, err)
+			}
+
+			if metrics == nil {
+				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
+			} else {
+				assert.Nil(t, metrics.Abnormal)
+				assert.Nil(t, metrics.Message)
+			}
+		})
+	}
+}
+
+func TestVolumeStats(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name               string
+		volumeStatsSet     bool
+		volumeConditionSet bool
+		volumeData         VolumeStatsOptions
+		success            bool
 	}{
 		{
 			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
@@ -749,4 +1012,84 @@ func TestVolumeStats(t *testing.T) {
 		})
 	}
 
+}
+
+func TestAccessModeMapping(t *testing.T) {
+	tests := []struct {
+		name                     string
+		singleNodeMultiWriterSet bool
+		accessMode               api.PersistentVolumeAccessMode
+		expectedMappedAccessMode csipbv1.VolumeCapability_AccessMode_Mode
+	}{
+		{
+			name:                     "with ReadWriteOnce and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteOnce,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		{
+			name:                     "with ReadOnlyMany and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadOnlyMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		},
+		{
+			name:                     "with ReadWriteMany and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOncePod and incapable driver",
+			singleNodeMultiWriterSet: false,
+			accessMode:               api.ReadWriteOncePod,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOnce and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteOnce,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadOnlyMany and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadOnlyMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+		},
+		{
+			name:                     "with ReadWriteMany and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteMany,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		},
+		{
+			name:                     "with ReadWriteOncePod and capable driver",
+			singleNodeMultiWriterSet: true,
+			accessMode:               api.ReadWriteOncePod,
+			expectedMappedAccessMode: csipbv1.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeCloser := fake.NewCloser(t)
+			client := &csiDriverClient{
+				driverName: "Fake Driver Name",
+				nodeV1ClientCreator: func(addr csiAddr, m *MetricsManager) (csipbv1.NodeClient, io.Closer, error) {
+					nodeClient := fake.NewNodeClientWithSingleNodeMultiWriter(tc.singleNodeMultiWriterSet)
+					return nodeClient, fakeCloser, nil
+				},
+			}
+
+			accessModeMapper, err := client.getNodeV1AccessModeMapper(context.Background())
+			if err != nil {
+				t.Error(err)
+			}
+
+			mappedAccessMode := accessModeMapper(tc.accessMode)
+			if mappedAccessMode != tc.expectedMappedAccessMode {
+				t.Errorf("expected access mode: %v; got: %v", tc.expectedMappedAccessMode, mappedAccessMode)
+			}
+		})
+	}
 }

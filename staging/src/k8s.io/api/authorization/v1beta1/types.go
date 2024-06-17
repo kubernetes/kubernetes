@@ -33,6 +33,8 @@ import (
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 type SubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -57,6 +59,8 @@ type SubjectAccessReview struct {
 // to check whether they can perform an action
 type SelfSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -80,6 +84,8 @@ type SelfSubjectAccessReview struct {
 // checking.
 type LocalSubjectAccessReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -146,6 +152,7 @@ type SubjectAccessReviewSpec struct {
 	User string `json:"user,omitempty" protobuf:"bytes,3,opt,name=user"`
 	// Groups is the groups you're testing for.
 	// +optional
+	// +listType=atomic
 	Groups []string `json:"group,omitempty" protobuf:"bytes,4,rep,name=group"`
 	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
 	// it needs a reflection here.
@@ -212,6 +219,8 @@ type SubjectAccessReviewStatus struct {
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
 type SelfSubjectRulesReview struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -223,6 +232,7 @@ type SelfSubjectRulesReview struct {
 	Status SubjectRulesReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// SelfSubjectRulesReviewSpec defines the specification for SelfSubjectRulesReview.
 type SelfSubjectRulesReviewSpec struct {
 	// Namespace to evaluate rules for. Required.
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
@@ -235,9 +245,11 @@ type SelfSubjectRulesReviewSpec struct {
 type SubjectRulesReviewStatus struct {
 	// ResourceRules is the list of actions the subject is allowed to perform on resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +listType=atomic
 	ResourceRules []ResourceRule `json:"resourceRules" protobuf:"bytes,1,rep,name=resourceRules"`
 	// NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
 	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	// +listType=atomic
 	NonResourceRules []NonResourceRule `json:"nonResourceRules" protobuf:"bytes,2,rep,name=nonResourceRules"`
 	// Incomplete is true when the rules returned by this call are incomplete. This is most commonly
 	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
@@ -253,28 +265,34 @@ type SubjectRulesReviewStatus struct {
 // may contain duplicates, and possibly be incomplete.
 type ResourceRule struct {
 	// Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
 	// the enumerated resources in any API group will be allowed.  "*" means all.
 	// +optional
+	// +listType=atomic
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,2,rep,name=apiGroups"`
 	// Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
 	//  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
 	// +optional
+	// +listType=atomic
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
 	// +optional
+	// +listType=atomic
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,4,rep,name=resourceNames"`
 }
 
 // NonResourceRule holds information that describes a rule for the non-resource
 type NonResourceRule struct {
 	// Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+	// +listType=atomic
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
 
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full,
 	// final step in the path.  "*" means all.
 	// +optional
+	// +listType=atomic
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,2,rep,name=nonResourceURLs"`
 }

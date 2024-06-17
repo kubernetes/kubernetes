@@ -21,16 +21,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	nodev1beta1 "k8s.io/api/node/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // makePodToVerifyCgroups returns a pod that verifies the existence of the specified cgroups.
@@ -89,12 +90,13 @@ func makePodToVerifyCgroupSize(cgroupNames []string, expectedCPU string, expecte
 	return pod
 }
 
-var _ = framework.KubeDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
+var _ = SIGDescribe("Kubelet PodOverhead handling [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("podoverhead-handling")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("PodOverhead cgroup accounting", func() {
 		ginkgo.Context("On running pod with PodOverhead defined", func() {
-			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func() {
-				if !framework.TestContext.KubeletConfig.CgroupsPerQOS {
+			ginkgo.It("Pod cgroup should be sum of overhead and resource limits", func(ctx context.Context) {
+				if !kubeletCfg.CgroupsPerQOS {
 					return
 				}
 
@@ -104,19 +106,19 @@ var _ = framework.KubeDescribe("Kubelet PodOverhead handling [LinuxOnly]", func(
 					handler       string
 				)
 				ginkgo.By("Creating a RuntimeClass with Overhead definied", func() {
-					handler = e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
-					rc := &nodev1beta1.RuntimeClass{
+					handler = e2eruntimeclass.PreconfiguredRuntimeClassHandler
+					rc := &nodev1.RuntimeClass{
 						ObjectMeta: metav1.ObjectMeta{Name: handler},
 						Handler:    handler,
-						Overhead: &nodev1beta1.Overhead{
+						Overhead: &nodev1.Overhead{
 							PodFixed: getResourceList("200m", "140Mi"),
 						},
 					}
-					_, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(context.TODO(), rc, metav1.CreateOptions{})
+					_, err := f.ClientSet.NodeV1().RuntimeClasses().Create(ctx, rc, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "failed to create RuntimeClass resource")
 				})
 				ginkgo.By("Creating a Guaranteed pod with which has Overhead defined", func() {
-					guaranteedPod = f.PodClient().CreateSync(&v1.Pod{
+					guaranteedPod = e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							GenerateName: "pod-with-overhead-",
 							Namespace:    f.Namespace.Name,
@@ -138,8 +140,8 @@ var _ = framework.KubeDescribe("Kubelet PodOverhead handling [LinuxOnly]", func(
 				ginkgo.By("Checking if the pod cgroup was created appropriately", func() {
 					cgroupsToVerify := []string{"pod" + podUID}
 					pod := makePodToVerifyCgroupSize(cgroupsToVerify, "30000", "251658240")
-					pod = f.PodClient().Create(pod)
-					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+					pod = e2epod.NewPodClient(f).Create(ctx, pod)
+					err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
 					framework.ExpectNoError(err)
 				})
 			})

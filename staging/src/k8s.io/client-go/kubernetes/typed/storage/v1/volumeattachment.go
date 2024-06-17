@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1 "k8s.io/client-go/applyconfigurations/storage/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // VolumeAttachmentsGetter has a method to return a VolumeAttachmentInterface.
@@ -47,6 +53,8 @@ type VolumeAttachmentInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.VolumeAttachmentList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.VolumeAttachment, err error)
+	Apply(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeAttachment, err error)
+	ApplyStatus(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeAttachment, err error)
 	VolumeAttachmentExpansion
 }
 
@@ -75,7 +83,26 @@ func (c *volumeAttachments) Get(ctx context.Context, name string, options metav1
 }
 
 // List takes label and field selectors, and returns the list of VolumeAttachments that match those selectors.
-func (c *volumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
+func (c *volumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (*v1.VolumeAttachmentList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for volumeattachments, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for volumeattachments", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for volumeattachments ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for volumeattachments", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of VolumeAttachments that match those selectors.
+func (c *volumeAttachments) list(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -86,6 +113,22 @@ func (c *volumeAttachments) List(ctx context.Context, opts metav1.ListOptions) (
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of VolumeAttachments
+func (c *volumeAttachments) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.VolumeAttachmentList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.VolumeAttachmentList{}
+	err = c.client.Get().
+		Resource("volumeattachments").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -177,6 +220,60 @@ func (c *volumeAttachments) Patch(ctx context.Context, name string, pt types.Pat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied volumeAttachment.
+func (c *volumeAttachments) Apply(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeAttachment, err error) {
+	if volumeAttachment == nil {
+		return nil, fmt.Errorf("volumeAttachment provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(volumeAttachment)
+	if err != nil {
+		return nil, err
+	}
+	name := volumeAttachment.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
+	}
+	result = &v1.VolumeAttachment{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("volumeattachments").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *volumeAttachments) ApplyStatus(ctx context.Context, volumeAttachment *storagev1.VolumeAttachmentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.VolumeAttachment, err error) {
+	if volumeAttachment == nil {
+		return nil, fmt.Errorf("volumeAttachment provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(volumeAttachment)
+	if err != nil {
+		return nil, err
+	}
+
+	name := volumeAttachment.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
+	}
+
+	result = &v1.VolumeAttachment{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("volumeattachments").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

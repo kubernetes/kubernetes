@@ -135,7 +135,8 @@ process_content () {
 #############################################################################
 
 # use modules, and use module info rather than the vendor dir for computing dependencies
-export GO111MODULE=on
+kube::golang::setup_env
+export GOWORK=off
 export GOFLAGS=-mod=mod
 
 # Check bash version
@@ -186,8 +187,10 @@ if [ -f "${LICENSE_ROOT}/LICENSE" ]; then
   mv "${TMP_LICENSE_FILE}" "${TMP_LICENSES_DIR}/LICENSE"
 fi
 
+# Capture all module dependencies
+modules=$(go list -m -json all | jq -r .Path | sort -f)
 # Loop through every vendored package
-for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
+for PACKAGE in ${modules}; do
   if [[ -e "staging/src/${PACKAGE}" ]]; then
     echo "${PACKAGE} is a staging package, skipping" >&2
     continue
@@ -196,20 +199,16 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
     echo "${PACKAGE} doesn't exist in ${DEPS_DIR}, skipping" >&2
     continue
   fi
-  # Skip a directory if 1) it has no files and 2) all the subdirectories contain a go.mod file.
-  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
-      misses_go_mod=false
-      while read -d "" -r SUBDIR; do
-          if [[ ! -e "${SUBDIR}/go.mod" ]]; then
-              misses_go_mod=true
-              break
-          fi
-      done < <(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d -print0)
-      if [[ $misses_go_mod = false ]]; then
-          echo "${PACKAGE} has no files, skipping" >&2
-          continue
-      fi
+
+  # if there are no files vendored under this package...
+  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}" -mindepth 1 -maxdepth 1 -type f)" ]]; then
+    # and we have at least the same number of submodules as subdirectories...
+    if [[ "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d | wc -l)" -le "$(echo "${modules}" | grep -cE "^${PACKAGE}/")" ]]; then
+      echo "Only submodules of ${PACKAGE} are vendored, skipping" >&2
+      continue
+    fi
   fi
+
   echo "${PACKAGE}"
 
   process_content "${PACKAGE}" LICENSE
@@ -253,7 +252,14 @@ __EOF__
   mv "${TMP_LICENSE_FILE}" "${dest_dir}/LICENSE"
 done
 
+# copy licenses for forked code from vendor and third_party directories
+(cd "${KUBE_ROOT}" && \
+  find vendor third_party -iname 'licen[sc]e*' -o -iname 'notice*' -o -iname 'copying*' | \
+  grep -E 'third_party|forked' | \
+  xargs tar -czf - | tar -C "${TMP_LICENSES_DIR}" -xzf -)
+
 # Leave things like OWNERS alone.
 rm -f "${LICENSES_DIR}/LICENSE"
 rm -rf "${LICENSES_DIR}/vendor"
+rm -rf "${LICENSES_DIR}/third_party"
 mv "${TMP_LICENSES_DIR}"/* "${LICENSES_DIR}"

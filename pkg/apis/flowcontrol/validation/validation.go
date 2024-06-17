@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"strings"
 
+	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
@@ -70,6 +74,14 @@ var supportedLimitResponseType = sets.NewString(
 	string(flowcontrol.LimitResponseTypeQueue),
 	string(flowcontrol.LimitResponseTypeReject),
 )
+
+// PriorityLevelValidationOptions holds the validation options for a priority level object
+type PriorityLevelValidationOptions struct {
+	// AllowZeroLimitedNominalConcurrencyShares, if true, indicates that we allow
+	// a zero value for the 'nominalConcurrencyShares' field of the 'limited'
+	// section of a priority level.
+	AllowZeroLimitedNominalConcurrencyShares bool
+}
 
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
@@ -337,30 +349,55 @@ func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fld
 }
 
 // ValidatePriorityLevelConfiguration validates priority-level-configuration.
-func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
+func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration, requestGV schema.GroupVersion, opts PriorityLevelValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
-	specPath := field.NewPath("spec")
-	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, specPath)...)
-	if mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]; ok {
-		// Check for almost exact equality.  This is a pretty
-		// strict test, and it is OK in this context because both
-		// sides of this comparison are intended to ultimately
-		// come from the same code.
-		if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
-			allErrs = append(allErrs, field.Invalid(specPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
-		}
+
+	// the roundtrip annotation is only for use in v1beta3, and after
+	// conversion, the internal object should not have the roundtrip
+	// annotation, so we should forbid it, if it's set.
+	if _, ok := pl.ObjectMeta.Annotations[flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey]; ok {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata").Child("annotations"), fmt.Sprintf("annotation '%s' is forbidden", flowcontrolv1beta3.PriorityLevelPreserveZeroConcurrencySharesKey)))
 	}
+
+	specPath := field.NewPath("spec")
+	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, requestGV, pl.Name, specPath, opts)...)
+	allErrs = append(allErrs, ValidateIfMandatoryPriorityLevelConfigurationObject(pl, specPath)...)
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-// ValidatePriorityLevelConfigurationUpdate validates the update of priority-level-configuration.
-func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
-	return ValidatePriorityLevelConfiguration(pl)
+func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.PriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]
+	if !ok {
+		return allErrs
+	}
+
+	if pl.Name == flowcontrol.PriorityLevelConfigurationNameExempt {
+		// we allow the admin to change the contents of the 'Exempt' field of
+		// the singleton 'exempt' priority level object, every other fields of
+		// the Spec should not be allowed to change.
+		want := &mand.Spec
+		have := pl.Spec.DeepCopy()
+		have.Exempt = want.Exempt
+		if !apiequality.Semantic.DeepEqual(want, have) {
+			allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' except the 'spec.exempt' field must equal the fixed value", pl.Name)))
+		}
+		return allErrs
+	}
+
+	// Check for almost exact equality.  This is a pretty
+	// strict test, and it is OK in this context because both
+	// sides of this comparison are intended to ultimately
+	// come from the same code.
+	if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
+		allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
+	}
+	return allErrs
 }
 
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
-func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
+func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, requestGV schema.GroupVersion, name string, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if (name == flowcontrol.PriorityLevelConfigurationNameExempt) != (spec.Type == flowcontrol.PriorityLevelEnablementExempt) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), spec.Type, "type must be 'Exempt' if and only if name is 'exempt'"))
@@ -370,11 +407,18 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		if spec.Limited != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("limited"), "must be nil if the type is not Limited"))
 		}
+		if spec.Exempt != nil {
+			allErrs = append(allErrs, ValidateExemptPriorityLevelConfiguration(spec.Exempt, fldPath.Child("exempt"))...)
+		}
 	case flowcontrol.PriorityLevelEnablementLimited:
+		if spec.Exempt != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("exempt"), "must be nil if the type is Limited"))
+		}
+
 		if spec.Limited == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("limited"), "must not be empty when type is Limited"))
 		} else {
-			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, fldPath.Child("limited"))...)
+			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"), opts)...)
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
@@ -383,13 +427,48 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 }
 
 // ValidateLimitedPriorityLevelConfiguration validates the configuration for an execution-limited priority level
-func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateLimitedPriorityLevelConfiguration(lplc *flowcontrol.LimitedPriorityLevelConfiguration, requestGV schema.GroupVersion, fldPath *field.Path, opts PriorityLevelValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if lplc.AssuredConcurrencyShares <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("assuredConcurrencyShares"), lplc.AssuredConcurrencyShares, "must be positive"))
+	if opts.AllowZeroLimitedNominalConcurrencyShares {
+		if lplc.NominalConcurrencyShares < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be a non-negative integer"))
+		}
+	} else {
+		if lplc.NominalConcurrencyShares <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(getVersionedFieldNameForConcurrencyShares(requestGV)), lplc.NominalConcurrencyShares, "must be positive"))
+		}
 	}
 	allErrs = append(allErrs, ValidateLimitResponse(lplc.LimitResponse, fldPath.Child("limitResponse"))...)
+
+	if lplc.LendablePercent != nil && !(*lplc.LendablePercent >= 0 && *lplc.LendablePercent <= 100) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lendablePercent"), *lplc.LendablePercent, "must be between 0 and 100, inclusive"))
+	}
+	if lplc.BorrowingLimitPercent != nil && *lplc.BorrowingLimitPercent < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("borrowingLimitPercent"), *lplc.BorrowingLimitPercent, "if specified, must be a non-negative integer"))
+	}
+
 	return allErrs
+}
+
+func ValidateExemptPriorityLevelConfiguration(eplc *flowcontrol.ExemptPriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if eplc.NominalConcurrencyShares != nil && *eplc.NominalConcurrencyShares < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("nominalConcurrencyShares"), *eplc.NominalConcurrencyShares, "must be a non-negative integer"))
+	}
+	if eplc.LendablePercent != nil && !(*eplc.LendablePercent >= 0 && *eplc.LendablePercent <= 100) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("lendablePercent"), *eplc.LendablePercent, "must be between 0 and 100, inclusive"))
+	}
+	return allErrs
+}
+
+func getVersionedFieldNameForConcurrencyShares(requestGV schema.GroupVersion) string {
+	switch {
+	case requestGV == flowcontrolv1beta1.SchemeGroupVersion ||
+		requestGV == flowcontrolv1beta2.SchemeGroupVersion:
+		return "assuredConcurrencyShares"
+	default:
+		return "nominalConcurrencyShares"
+	}
 }
 
 // ValidateLimitResponse validates a LimitResponse
@@ -468,10 +547,10 @@ func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.Priority
 }
 
 // ValidateNonResourceURLPath validates non-resource-url path by following rules:
-//   1. Slash must be the leading character of the path
-//   2. White-space is forbidden in the path
-//   3. Continuous/double slash is forbidden in the path
-//   4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
+//  1. Slash must be the leading character of the path
+//  2. White-space is forbidden in the path
+//  3. Continuous/double slash is forbidden in the path
+//  4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
 func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
 	if len(path) == 0 {
 		return field.Invalid(fldPath, path, "must not be empty")

@@ -21,41 +21,117 @@ spec:
       serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-snapshotter
-          image: gcr.io/k8s-staging-csi/csi-snapshotter:v2.0.1
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--metrics-address=:22014"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=300s"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           imagePullPolicy: Always
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: gcr.io/gke-release/csi-provisioner:v1.5.0-gke.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.4.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
             - "--feature-gates=Topology=true"
+            - "--http-endpoint=:22011"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=250s"
+            - "--extra-create-metadata"
+          # - "--run-controller-service=false"  # disable the controller service of the CSI driver
+          # - "--run-node-service=false"        # disable the node service of the CSI driver
+            - "--leader-election"
+            - "--default-fstype=ext4"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22011
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: gcr.io/gke-release/csi-attacher:v2.1.1-gke.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.0.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--http-endpoint=:22012"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--timeout=250s"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22012
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: csi-resizer
-          image: gcr.io/gke-release/csi-resizer:v0.4.0-gke.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.6.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--http-endpoint=:22013"
+            - "--leader-election"
+            - "--leader-election-namespace=$(PDCSI_NAMESPACE)"
+            - "--handle-volume-inuse-error=false"
+          env:
+            - name: PDCSI_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - containerPort: 22013
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz/leader-election
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.7.0-gke.0
+          image: registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.4.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

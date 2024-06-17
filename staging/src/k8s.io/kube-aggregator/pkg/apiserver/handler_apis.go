@@ -91,7 +91,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList)
+	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroupList, false)
 }
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
@@ -136,7 +136,7 @@ type apiGroupHandler struct {
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	apiServices, err := r.lister.List(labels.Everything())
-	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
+	if statusErr, ok := err.(*apierrors.StatusError); ok {
 		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
 		return
 	}
@@ -162,5 +162,5 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "", http.StatusNotFound)
 		return
 	}
-	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup)
+	responsewriters.WriteObjectNegotiated(r.codecs, negotiation.DefaultEndpointRestrictions, schema.GroupVersion{}, w, req, http.StatusOK, discoveryGroup, false)
 }

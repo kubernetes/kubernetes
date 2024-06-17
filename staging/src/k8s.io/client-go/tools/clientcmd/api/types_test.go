@@ -46,10 +46,12 @@ func Example_ofOptionsConfig() {
 		Server:                "https://alfa.org:8080",
 		InsecureSkipTLSVerify: true,
 		CertificateAuthority:  "path/to/my/cert-ca-filename",
+		DisableCompression:    true,
 	}
 	defaultConfig.Clusters["bravo"] = &Cluster{
 		Server:                "https://bravo.org:8080",
 		InsecureSkipTLSVerify: false,
+		DisableCompression:    false,
 	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
 		ClientCertificate: "path/to/my/client-cert-filename",
@@ -92,25 +94,21 @@ func Example_ofOptionsConfig() {
 	// Output:
 	// clusters:
 	//   alfa:
-	//     LocationOfOrigin: ""
 	//     certificate-authority: path/to/my/cert-ca-filename
+	//     disable-compression: true
 	//     insecure-skip-tls-verify: true
 	//     server: https://alfa.org:8080
 	//   bravo:
-	//     LocationOfOrigin: ""
 	//     server: https://bravo.org:8080
 	// contexts:
 	//   alfa-as-black-mage:
-	//     LocationOfOrigin: ""
 	//     cluster: alfa
 	//     namespace: zulu
 	//     user: black-mage-via-auth-provider
 	//   alfa-as-white-mage:
-	//     LocationOfOrigin: ""
 	//     cluster: alfa
 	//     user: white-mage-via-cert
 	//   bravo-as-black-mage:
-	//     LocationOfOrigin: ""
 	//     cluster: bravo
 	//     namespace: yankee
 	//     user: black-mage-via-auth-provider
@@ -119,17 +117,14 @@ func Example_ofOptionsConfig() {
 	//   colors: true
 	// users:
 	//   black-mage-via-auth-provider:
-	//     LocationOfOrigin: ""
 	//     auth-provider:
 	//       config:
 	//         foo: bar
 	//         token: s3cr3t-t0k3n
 	//       name: gcp
 	//   red-mage-via-token:
-	//     LocationOfOrigin: ""
 	//     token: my-secret-token
 	//   white-mage-via-cert:
-	//     LocationOfOrigin: ""
 	//     client-certificate: path/to/my/client-cert-filename
 	//     client-key: path/to/my/client-key-filename
 }

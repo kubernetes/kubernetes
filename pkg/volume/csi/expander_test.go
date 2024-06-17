@@ -17,27 +17,32 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"os"
+	"reflect"
 	"testing"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestNodeExpand(t *testing.T) {
 	tests := []struct {
-		name                string
-		nodeExpansion       bool
-		nodeStageSet        bool
-		volumePhase         volume.CSIVolumePhaseType
-		success             bool
-		fsVolume            bool
-		grpcError           error
-		hasVolumeInUseError bool
-		deviceStagePath     string
+		name                      string
+		nodeExpansion             bool
+		nodeStageSet              bool
+		success                   bool
+		fsVolume                  bool
+		grpcError                 error
+		hasVolumeInUseError       bool
+		deviceStagePath           string
+		enableCSINodeExpandSecret bool
+		secret                    *api.Secret
 	}{
 		{
 			name:    "when node expansion is not set",
@@ -47,37 +52,26 @@ func TestNodeExpand(t *testing.T) {
 			name:            "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
 			nodeExpansion:   true,
 			nodeStageSet:    true,
-			volumePhase:     volume.CSIVolumeStaged,
 			success:         true,
 			fsVolume:        true,
 			deviceStagePath: "/foo/bar",
 		},
 		{
-			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=staged",
-			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumeStaged,
-			success:       false,
-			fsVolume:      true,
-		},
-		{
 			name:          "when nodeExpansion=on, nodeStage=on, volumePhase=published",
 			nodeExpansion: true,
 			nodeStageSet:  true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      true,
 		},
 		{
 			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=published",
 			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      true,
 		},
 		{
 			name:          "when nodeExpansion=on, nodeStage=off, volumePhase=published, fsVolume=false",
 			nodeExpansion: true,
-			volumePhase:   volume.CSIVolumePublished,
 			success:       true,
 			fsVolume:      false,
 		},
@@ -85,7 +79,6 @@ func TestNodeExpand(t *testing.T) {
 			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has grpc volume-in-use error",
 			nodeExpansion:       true,
 			nodeStageSet:        true,
-			volumePhase:         volume.CSIVolumePublished,
 			success:             false,
 			fsVolume:            true,
 			grpcError:           status.Error(codes.FailedPrecondition, "volume-in-use"),
@@ -95,11 +88,29 @@ func TestNodeExpand(t *testing.T) {
 			name:                "when nodeExpansion=on, nodeStage=on, volumePhase=published has other grpc error",
 			nodeExpansion:       true,
 			nodeStageSet:        true,
-			volumePhase:         volume.CSIVolumePublished,
 			success:             false,
 			fsVolume:            true,
 			grpcError:           status.Error(codes.InvalidArgument, "invalid-argument"),
 			hasVolumeInUseError: false,
+		},
+		{
+			name:                      "when nodeExpansion=on, nodeStage=on, volumePhase=staged",
+			nodeExpansion:             true,
+			nodeStageSet:              true,
+			success:                   true,
+			fsVolume:                  true,
+			deviceStagePath:           "/foo/bar",
+			enableCSINodeExpandSecret: true,
+			secret: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "expand-secret",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"apiUsername": []byte("csiusername"),
+					"apiPassword": []byte("csipassword"),
+				},
+			},
 		},
 	}
 	for _, tc := range tests {
@@ -108,6 +119,12 @@ func TestNodeExpand(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
+			if tc.enableCSINodeExpandSecret {
+				spec.PersistentVolume.Spec.CSI.NodeExpandSecretRef = &api.SecretReference{
+					Name:      tc.secret.Name,
+					Namespace: tc.secret.Namespace,
+				}
+			}
 
 			newSize, _ := resource.ParseQuantity("20Gi")
 
@@ -117,13 +134,19 @@ func TestNodeExpand(t *testing.T) {
 				DeviceMountPath: "/foo/bar",
 				DeviceStagePath: "/foo/bar",
 				DevicePath:      "/mnt/foobar",
-				CSIVolumePhase:  tc.volumePhase,
 			}
 			csiSource, _ := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 			csClient := setupClientWithExpansion(t, tc.nodeStageSet, tc.nodeExpansion)
 
 			fakeCSIClient, _ := csClient.(*fakeCsiDriverClient)
 			fakeNodeClient := fakeCSIClient.nodeClient
+
+			if tc.enableCSINodeExpandSecret {
+				_, err := plug.host.GetKubeClient().CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
 
 			if tc.grpcError != nil {
 				fakeNodeClient.SetNextError(tc.grpcError)
@@ -137,7 +160,7 @@ func TestNodeExpand(t *testing.T) {
 				}
 			}
 
-			// verify device staging targer path
+			// verify device staging target path
 			stagingTargetPath := fakeNodeClient.FakeNodeExpansionRequest.GetStagingTargetPath()
 			if tc.deviceStagePath != "" && tc.deviceStagePath != stagingTargetPath {
 				t.Errorf("For %s: expected staging path %s got %s", tc.name, tc.deviceStagePath, stagingTargetPath)
@@ -164,5 +187,30 @@ func TestNodeExpand(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestNodeExpandNoClientError(t *testing.T) {
+	transientError := volumetypes.NewTransientOperationFailure("")
+	plug, tmpDir := newTestPlugin(t, nil)
+	defer os.RemoveAll(tmpDir)
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "expandable", "test-vol"), false)
+
+	newSize, _ := resource.ParseQuantity("20Gi")
+
+	resizeOptions := volume.NodeResizeOptions{
+		VolumeSpec:      spec,
+		NewSize:         newSize,
+		DeviceMountPath: "/foo/bar",
+		DeviceStagePath: "/foo/bar",
+		DevicePath:      "/mnt/foobar",
+	}
+
+	_, err := plug.NodeExpand(resizeOptions)
+
+	if err == nil {
+		t.Errorf("test should fail, but no error occurred")
+	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
+		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
 	}
 }

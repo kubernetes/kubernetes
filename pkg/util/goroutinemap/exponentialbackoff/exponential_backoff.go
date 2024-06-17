@@ -28,13 +28,13 @@ const (
 	// that GoroutineMap will refuse to allow another operation to start with
 	// the same target (if exponentialBackOffOnError is enabled). Each
 	// successive error results in a wait 2x times the previous.
-	initialDurationBeforeRetry time.Duration = 500 * time.Millisecond
+	initialDurationBeforeRetry = 500 * time.Millisecond
 
 	// maxDurationBeforeRetry is the maximum amount of time that
 	// durationBeforeRetry will grow to due to exponential backoff.
 	// Value is slightly offset from 2 minutes to make timeouts due to this
 	// constant recognizable.
-	maxDurationBeforeRetry time.Duration = 2*time.Minute + 2*time.Second
+	maxDurationBeforeRetry = 2*time.Minute + 2*time.Second
 )
 
 // ExponentialBackoff contains the last occurrence of an error and the duration
@@ -70,7 +70,7 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 }
 
 func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationName string) string {
-	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %q",
+	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %v",
 		operationName,
 		expBackoff.lastErrorTime.Add(expBackoff.durationBeforeRetry),
 		expBackoff.durationBeforeRetry,

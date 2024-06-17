@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"sync/atomic"
 )
 
 const (
@@ -74,7 +74,7 @@ type RequestHeaderAuthRequestController struct {
 	configmapInformer       cache.SharedIndexInformer
 	configmapInformerSynced cache.InformerSynced
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// exportedRequestHeaderBundle is a requestHeaderBundle that contains the last read, non-zero length content of the configmap
 	exportedRequestHeaderBundle atomic.Value
@@ -104,7 +104,10 @@ func NewRequestHeaderAuthRequestController(
 		extraHeaderPrefixesKey: extraHeaderPrefixesKey,
 		allowedClientNamesKey:  allowedClientNamesKey,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "RequestHeaderAuthRequestController"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "RequestHeaderAuthRequestController"},
+		),
 	}
 
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
@@ -162,29 +165,29 @@ func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
 }
 
 // Run starts RequestHeaderAuthRequestController controller and blocks until stopCh is closed.
-func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan struct{}) {
+func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting %s", c.name)
 	defer klog.Infof("Shutting down %s", c.name)
 
-	go c.configmapInformer.Run(stopCh)
+	go c.configmapInformer.Run(ctx.Done())
 
 	// wait for caches to fill before starting your work
-	if !cache.WaitForNamedCacheSync(c.name, stopCh, c.configmapInformerSynced) {
+	if !cache.WaitForNamedCacheSync(c.name, ctx.Done(), c.configmapInformerSynced) {
 		return
 	}
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // // RunOnce runs a single sync loop
-func (c *RequestHeaderAuthRequestController) RunOnce() error {
-	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(context.TODO(), c.configmapName, metav1.GetOptions{})
+func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error {
+	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now

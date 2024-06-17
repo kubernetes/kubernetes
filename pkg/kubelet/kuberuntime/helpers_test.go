@@ -17,19 +17,86 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"path/filepath"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
+
+type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+
+func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+	return f(uid, name, namespace)
+}
+
+func TestIsInitContainerFailed(t *testing.T) {
+	tests := []struct {
+		status      *kubecontainer.Status
+		isFailed    bool
+		description string
+	}{
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			isFailed:    true,
+			description: "Init container in exited state and non-zero exit code should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateUnknown,
+			},
+			isFailed:    true,
+			description: "Init container in unknown state should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				Reason:   "OOMKilled",
+				ExitCode: 0,
+			},
+			isFailed:    true,
+			description: "Init container which reason is OOMKilled should return true",
+		},
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			isFailed:    false,
+			description: "Init container in exited state and zero exit code should return false",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateRunning,
+			},
+			isFailed:    false,
+			description: "Init container in running state should return false",
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateCreated,
+			},
+			isFailed:    false,
+			description: "Init container in created state should return false",
+		},
+	}
+	for i, test := range tests {
+		isFailed := isInitContainerFailed(test.status)
+		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]: %s", i, test.description)
+	}
+}
 
 func TestStableKey(t *testing.T) {
 	container := &v1.Container{
@@ -62,6 +129,7 @@ func TestToKubeContainer(t *testing.T) {
 			Attempt: 1,
 		},
 		Image:    &runtimeapi.ImageSpec{Image: "test-image"},
+		ImageId:  "test-image-id",
 		ImageRef: "test-image-ref",
 		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
 		Annotations: map[string]string{
@@ -73,11 +141,13 @@ func TestToKubeContainer(t *testing.T) {
 			Type: runtimetesting.FakeRuntimeName,
 			ID:   "test-id",
 		},
-		Name:    "test-name",
-		ImageID: "test-image-ref",
-		Image:   "test-image",
-		Hash:    uint64(0x1234),
-		State:   kubecontainer.ContainerStateRunning,
+		Name:                "test-name",
+		ImageID:             "test-image-id",
+		ImageRef:            "test-image-ref",
+		Image:               "test-image",
+		ImageRuntimeHandler: "",
+		Hash:                uint64(0x1234),
+		State:               kubecontainer.ContainerStateRunning,
 	}
 
 	_, _, m, err := createTestRuntimeManager()
@@ -85,6 +155,55 @@ func TestToKubeContainer(t *testing.T) {
 	got, err := m.toKubeContainer(c)
 	assert.NoError(t, err)
 	assert.Equal(t, expect, got)
+
+	// unable to convert a nil pointer to a runtime container
+	_, err = m.toKubeContainer(nil)
+	assert.Error(t, err)
+	_, err = m.sandboxToKubeContainer(nil)
+	assert.Error(t, err)
+}
+
+func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
+	c := &runtimeapi.Container{
+		Id: "test-id",
+		Metadata: &runtimeapi.ContainerMetadata{
+			Name:    "test-name",
+			Attempt: 1,
+		},
+		Image:    &runtimeapi.ImageSpec{Image: "test-image", RuntimeHandler: "test-runtimeHandler"},
+		ImageId:  "test-image-id",
+		ImageRef: "test-image-ref",
+		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
+		Annotations: map[string]string{
+			containerHashLabel: "1234",
+		},
+	}
+	expect := &kubecontainer.Container{
+		ID: kubecontainer.ContainerID{
+			Type: runtimetesting.FakeRuntimeName,
+			ID:   "test-id",
+		},
+		Name:                "test-name",
+		ImageID:             "test-image-id",
+		ImageRef:            "test-image-ref",
+		Image:               "test-image",
+		ImageRuntimeHandler: "test-runtimeHandler",
+		Hash:                uint64(0x1234),
+		State:               kubecontainer.ContainerStateRunning,
+	}
+
+	_, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+	got, err := m.toKubeContainer(c)
+	assert.NoError(t, err)
+	assert.Equal(t, expect, got)
+
+	// unable to convert a nil pointer to a runtime container
+	_, err = m.toKubeContainer(nil)
+	assert.Error(t, err)
+	_, err = m.sandboxToKubeContainer(nil)
+	assert.Error(t, err)
 }
 
 func TestGetImageUser(t *testing.T) {
@@ -155,10 +274,11 @@ func TestGetImageUser(t *testing.T) {
 
 	i.SetFakeImages([]string{"test-image-ref1", "test-image-ref2", "test-image-ref3"})
 	for j, test := range tests {
+		ctx := context.Background()
 		i.Images[test.originalImage.name].Username = test.originalImage.username
 		i.Images[test.originalImage.name].Uid = test.originalImage.uid
 
-		uid, username, err := m.getImageUser(test.originalImage.name)
+		uid, username, err := m.getImageUser(ctx, test.originalImage.name)
 		assert.NoError(t, err, "TestCase[%d]", j)
 
 		if test.expectedImageUserValues.uid == (*int64)(nil) {
@@ -170,318 +290,154 @@ func TestGetImageUser(t *testing.T) {
 	}
 }
 
-func TestFieldProfile(t *testing.T) {
-	tests := []struct {
-		description     string
-		scmpProfile     *v1.SeccompProfile
-		rootPath        string
-		expectedProfile string
+func TestToRuntimeProtocol(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		protocol string
+		expected runtimeapi.Protocol
 	}{
 		{
-			description:     "no seccompProfile should return empty",
-			expectedProfile: "",
+			name:     "TCP protocol",
+			protocol: "TCP",
+			expected: runtimeapi.Protocol_TCP,
 		},
 		{
-			description: "type localhost without profile should return empty",
-			scmpProfile: &v1.SeccompProfile{
-				Type: v1.SeccompProfileTypeLocalhost,
-			},
-			expectedProfile: "",
+			name:     "UDP protocol",
+			protocol: "UDP",
+			expected: runtimeapi.Protocol_UDP,
 		},
 		{
-			description: "unknown type should return empty",
-			scmpProfile: &v1.SeccompProfile{
-				Type: "",
-			},
-			expectedProfile: "",
+			name:     "SCTP protocol",
+			protocol: "SCTP",
+			expected: runtimeapi.Protocol_SCTP,
 		},
 		{
-			description: "SeccompProfileTypeRuntimeDefault should return runtime/default",
-			scmpProfile: &v1.SeccompProfile{
-				Type: v1.SeccompProfileTypeRuntimeDefault,
-			},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "SeccompProfileTypeUnconfined should return unconfined",
-			scmpProfile: &v1.SeccompProfile{
-				Type: v1.SeccompProfileTypeUnconfined,
-			},
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "SeccompProfileTypeLocalhost should return unconfined",
-			scmpProfile: &v1.SeccompProfile{
-				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: utilpointer.StringPtr("profile.json"),
-			},
-			rootPath:        "/test/",
-			expectedProfile: "localhost//test/profile.json",
-		},
-	}
-
-	for i, test := range tests {
-		seccompProfile := fieldProfile(test.scmpProfile, test.rootPath)
-		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
-	}
-}
-
-func TestGetSeccompProfile(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
-	require.NoError(t, err)
-
-	tests := []struct {
-		description     string
-		annotation      map[string]string
-		podSc           *v1.PodSecurityContext
-		containerSc     *v1.SecurityContext
-		containerName   string
-		expectedProfile string
-	}{
-		{
-			description:     "no seccomp should return empty",
-			expectedProfile: "",
-		},
-		{
-			description:     "annotations: no seccomp with containerName should return empty",
-			containerName:   "container1",
-			expectedProfile: "",
-		},
-		{
-			description: "annotations: pod runtime/default seccomp profile should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod runtime/default seccomp profile with containerName should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile with containerName should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile with containerName should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			containerName:   "container1",
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod localhost seccomp profile should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "annotations: pod localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile should override pod profile",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileNameUnconfined,
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with unmatched containerName should return empty",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container2",
-			expectedProfile: "",
-		},
-		{
-			description:     "pod seccomp profile set to unconfined returns unconfined",
-			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
-			expectedProfile: "unconfined",
-		},
-		{
-			description:     "container seccomp profile set to unconfined returns unconfined",
-			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
-			expectedProfile: "unconfined",
-		},
-		{
-			description:     "pod seccomp profile set to SeccompProfileTypeRuntimeDefault returns runtime/default",
-			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description:     "container seccomp profile set to SeccompProfileTypeRuntimeDefault returns runtime/default",
-			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description:     "pod seccomp profile set to SeccompProfileTypeLocalhost returns 'localhost/' + LocalhostProfile",
-			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("filename")}},
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "filename"),
-		},
-		{
-			description:     "pod seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns empty",
-			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedProfile: "",
-		},
-		{
-			description:     "container seccomp profile set to SeccompProfileTypeLocalhost with empty LocalhostProfile returns empty",
-			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost}},
-			expectedProfile: "",
-		},
-		{
-			description:     "container seccomp profile set to SeccompProfileTypeLocalhost returns 'localhost/' + LocalhostProfile",
-			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("filename2")}},
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "filename2"),
-		},
-		{
-			description:     "prioritise container field over pod field",
-			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
-			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "prioritise container field over container annotation, pod field and pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			containerSc: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "field-cont-profile.json"),
-		},
-		{
-			description: "prioritise container annotation over pod field",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "annota-cont-profile.json"),
-		},
-		{
-			description: "prioritise pod field over pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/annota-pod-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "field-pod-profile.json"),
-		},
-	}
-
-	for i, test := range tests {
-		seccompProfile := m.getSeccompProfile(test.annotation, test.containerName, test.podSc, test.containerSc)
-		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
-	}
-}
-
-func getLocal(v string) *string {
-	return &v
-}
-
-func TestNamespacesForPod(t *testing.T) {
-	for desc, test := range map[string]struct {
-		input    *v1.Pod
-		expected *runtimeapi.NamespaceOption
-	}{
-		"nil pod -> default v1 namespaces": {
-			nil,
-			&runtimeapi.NamespaceOption{
-				Ipc:     runtimeapi.NamespaceMode_POD,
-				Network: runtimeapi.NamespaceMode_POD,
-				Pid:     runtimeapi.NamespaceMode_CONTAINER,
-			},
-		},
-		"v1.Pod default namespaces": {
-			&v1.Pod{},
-			&runtimeapi.NamespaceOption{
-				Ipc:     runtimeapi.NamespaceMode_POD,
-				Network: runtimeapi.NamespaceMode_POD,
-				Pid:     runtimeapi.NamespaceMode_CONTAINER,
-			},
-		},
-		"Host Namespaces": {
-			&v1.Pod{
-				Spec: v1.PodSpec{
-					HostIPC:     true,
-					HostNetwork: true,
-					HostPID:     true,
-				},
-			},
-			&runtimeapi.NamespaceOption{
-				Ipc:     runtimeapi.NamespaceMode_NODE,
-				Network: runtimeapi.NamespaceMode_NODE,
-				Pid:     runtimeapi.NamespaceMode_NODE,
-			},
-		},
-		"Shared Process Namespace (feature enabled)": {
-			&v1.Pod{
-				Spec: v1.PodSpec{
-					ShareProcessNamespace: &[]bool{true}[0],
-				},
-			},
-			&runtimeapi.NamespaceOption{
-				Ipc:     runtimeapi.NamespaceMode_POD,
-				Network: runtimeapi.NamespaceMode_POD,
-				Pid:     runtimeapi.NamespaceMode_POD,
-			},
-		},
-		"Shared Process Namespace, redundant flag (feature enabled)": {
-			&v1.Pod{
-				Spec: v1.PodSpec{
-					ShareProcessNamespace: &[]bool{false}[0],
-				},
-			},
-			&runtimeapi.NamespaceOption{
-				Ipc:     runtimeapi.NamespaceMode_POD,
-				Network: runtimeapi.NamespaceMode_POD,
-				Pid:     runtimeapi.NamespaceMode_CONTAINER,
-			},
+			name:     "unknown protocol",
+			protocol: "unknown",
+			expected: runtimeapi.Protocol_TCP,
 		},
 	} {
-		t.Logf("TestCase: %s", desc)
-		actual := namespacesForPod(test.input)
-		assert.Equal(t, test.expected, actual)
+		t.Run(test.name, func(t *testing.T) {
+			if result := toRuntimeProtocol(v1.Protocol(test.protocol)); result != test.expected {
+				t.Errorf("expected %d but got %d", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestToKubeContainerState(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		state    int32
+		expected kubecontainer.State
+	}{
+		{
+			name:     "container created",
+			state:    0,
+			expected: kubecontainer.ContainerStateCreated,
+		},
+		{
+			name:     "container running",
+			state:    1,
+			expected: kubecontainer.ContainerStateRunning,
+		},
+		{
+			name:     "container exited",
+			state:    2,
+			expected: kubecontainer.ContainerStateExited,
+		},
+		{
+			name:     "unknown state",
+			state:    3,
+			expected: kubecontainer.ContainerStateUnknown,
+		},
+		{
+			name:     "not supported state",
+			state:    4,
+			expected: kubecontainer.ContainerStateUnknown,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if result := toKubeContainerState(runtimeapi.ContainerState(test.state)); result != test.expected {
+				t.Errorf("expected %s but got %s", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestGetAppArmorProfile(t *testing.T) {
+	tests := []struct {
+		name               string
+		podProfile         *v1.AppArmorProfile
+		expectedProfile    *runtimeapi.SecurityProfile
+		expectedOldProfile string
+		expectError        bool
+	}{{
+		name:            "no appArmor",
+		expectedProfile: nil,
+	}, {
+		name:       "runtime default",
+		podProfile: &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeRuntimeDefault},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		},
+		expectedOldProfile: "runtime/default",
+	}, {
+		name:       "unconfined",
+		podProfile: &v1.AppArmorProfile{Type: v1.AppArmorProfileTypeUnconfined},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		},
+		expectedOldProfile: "unconfined",
+	}, {
+		name: "localhost",
+		podProfile: &v1.AppArmorProfile{
+			Type:             v1.AppArmorProfileTypeLocalhost,
+			LocalhostProfile: ptr.To("test"),
+		},
+		expectedProfile: &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: "test",
+		},
+		expectedOldProfile: "localhost/test",
+	}, {
+		name: "invalid localhost",
+		podProfile: &v1.AppArmorProfile{
+			Type: v1.AppArmorProfileTypeLocalhost,
+		},
+		expectError: true,
+	}, {
+		name: "invalid type",
+		podProfile: &v1.AppArmorProfile{
+			Type: "foo",
+		},
+		expectError: true,
+	}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						AppArmorProfile: test.podProfile,
+					},
+					Containers: []v1.Container{{Name: "foo"}},
+				},
+			}
+
+			actual, actualOld, err := getAppArmorProfile(&pod, &pod.Spec.Containers[0])
+
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, test.expectedProfile, actual, "AppArmor profile")
+			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
+		})
 	}
 }

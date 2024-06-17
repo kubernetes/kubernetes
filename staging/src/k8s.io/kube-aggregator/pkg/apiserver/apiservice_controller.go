@@ -51,7 +51,7 @@ type APIServiceRegistrationController struct {
 	// To allow injection for testing.
 	syncFn func(key string) error
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 }
 
 var _ dynamiccertificates.Listener = &APIServiceRegistrationController{}
@@ -62,7 +62,10 @@ func NewAPIServiceRegistrationController(apiServiceInformer informers.APIService
 		apiHandlerManager: apiHandlerManager,
 		apiServiceLister:  apiServiceInformer.Lister(),
 		apiServiceSynced:  apiServiceInformer.Informer().HasSynced,
-		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "APIServiceRegistrationController"),
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "APIServiceRegistrationController"},
+		),
 	}
 
 	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -94,8 +97,8 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}, handlerSy
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting APIServiceRegistrationController")
-	defer klog.Infof("Shutting down APIServiceRegistrationController")
+	klog.Info("Starting APIServiceRegistrationController")
+	defer klog.Info("Shutting down APIServiceRegistrationController")
 
 	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced) {
 		return
@@ -143,7 +146,7 @@ func (c *APIServiceRegistrationController) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	err := c.syncFn(key.(string))
+	err := c.syncFn(key)
 	if err == nil {
 		c.queue.Forget(key)
 		return true

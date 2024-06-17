@@ -153,6 +153,10 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						},
 					},
 				},
+				Distances: []uint64{
+					10,
+					12,
+				},
 			},
 			{
 				Id:     1,
@@ -260,6 +264,10 @@ func (p testSubcontainersInfoProvider) GetMachineInfo() (*info.MachineInfo, erro
 						Level: 3,
 					},
 				},
+				Distances: []uint64{
+					12,
+					10,
+				},
 			},
 		},
 	}, nil
@@ -327,15 +335,26 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 						ContainerData: info.MemoryStatsMemoryData{
 							Pgfault:    10,
 							Pgmajfault: 11,
+							NumaStats: info.MemoryNumaStats{
+								File:        map[uint8]uint64{0: 16649, 1: 10000},
+								Anon:        map[uint8]uint64{0: 10000, 1: 7109},
+								Unevictable: map[uint8]uint64{0: 8900, 1: 10000},
+							},
 						},
 						HierarchicalData: info.MemoryStatsMemoryData{
 							Pgfault:    12,
 							Pgmajfault: 13,
+							NumaStats: info.MemoryNumaStats{
+								File:        map[uint8]uint64{0: 36649, 1: 10000},
+								Anon:        map[uint8]uint64{0: 20000, 1: 7109},
+								Unevictable: map[uint8]uint64{0: 8900, 1: 20000},
+							},
 						},
-						Cache:      14,
-						RSS:        15,
-						MappedFile: 16,
-						Swap:       8192,
+						Cache:       14,
+						RSS:         15,
+						MappedFile:  16,
+						KernelUsage: 17,
+						Swap:        8192,
 					},
 					Hugetlb: map[string]info.HugetlbStats{
 						"2Mi": {
@@ -514,6 +533,21 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 							TxQueued: 0,
 						},
 					},
+					DiskIo: info.DiskIoStats{
+						IoServiceBytes: []info.PerDiskStats{{
+							Device: "/dev/sdb",
+							Major:  8,
+							Minor:  0,
+							Stats: map[string]uint64{
+								"Async":   1,
+								"Discard": 2,
+								"Read":    3,
+								"Sync":    4,
+								"Total":   5,
+								"Write":   6,
+							},
+						}},
+					},
 					Filesystem: []info.FsStats{
 						{
 							Device:          "sda1",
@@ -625,44 +659,56 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 					},
 					PerfStats: []info.PerfStat{
 						{
-							ScalingRatio: 1.0,
-							Value:        123,
-							Name:         "instructions",
-							Cpu:          0,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        123,
+								Name:         "instructions",
+							},
+							Cpu: 0,
 						},
 						{
-							ScalingRatio: 0.5,
-							Value:        456,
-							Name:         "instructions",
-							Cpu:          1,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.5,
+								Value:        456,
+								Name:         "instructions",
+							},
+							Cpu: 1,
 						},
 						{
-							ScalingRatio: 0.66666666666,
-							Value:        321,
-							Name:         "instructions_retired",
-							Cpu:          0,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.66666666666,
+								Value:        321,
+								Name:         "instructions_retired",
+							},
+							Cpu: 0,
 						},
 						{
-							ScalingRatio: 0.33333333333,
-							Value:        789,
-							Name:         "instructions_retired",
-							Cpu:          1,
+							PerfValue: info.PerfValue{
+								ScalingRatio: 0.33333333333,
+								Value:        789,
+								Name:         "instructions_retired",
+							},
+							Cpu: 1,
 						},
 					},
 					PerfUncoreStats: []info.PerfUncoreStat{
 						{
-							ScalingRatio: 1.0,
-							Value:        1231231512.0,
-							Name:         "cas_count_read",
-							Socket:       0,
-							PMU:          "uncore_imc_0",
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        1231231512.0,
+								Name:         "cas_count_read",
+							},
+							Socket: 0,
+							PMU:    "uncore_imc_0",
 						},
 						{
-							ScalingRatio: 1.0,
-							Value:        1111231331.0,
-							Name:         "cas_count_read",
-							Socket:       1,
-							PMU:          "uncore_imc_0",
+							PerfValue: info.PerfValue{
+								ScalingRatio: 1.0,
+								Value:        1111231331.0,
+								Name:         "cas_count_read",
+							},
+							Socket: 1,
+							PMU:    "uncore_imc_0",
 						},
 					},
 					ReferencedMemory: 1234,
@@ -686,6 +732,7 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 							},
 						},
 					},
+					CpuSet: info.CPUSetStats{MemoryMigrate: 1},
 				},
 			},
 		},

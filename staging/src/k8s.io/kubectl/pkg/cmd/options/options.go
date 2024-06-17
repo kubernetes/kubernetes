@@ -36,7 +36,7 @@ func NewCmdOptions(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "options",
 		Short:   i18n.T("Print the list of flags inherited by all commands"),
-		Long:    "Print the list of flags inherited by all commands",
+		Long:    i18n.T("Print the list of flags inherited by all commands"),
 		Example: optionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Usage()
@@ -48,7 +48,8 @@ func NewCmdOptions(out io.Writer) *cobra.Command {
 	// function call will fall back to stderr.
 	//
 	// See https://github.com/kubernetes/kubernetes/pull/46394 for details.
-	cmd.SetOutput(out)
+	cmd.SetOut(out)
+	cmd.SetErr(out)
 
 	templates.UseOptionsTemplates(cmd)
 	return cmd

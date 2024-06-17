@@ -1,5 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- wojtek-t
-- jimmidyson
+  - wojtek-t
+approvers:
+  - logicalhan

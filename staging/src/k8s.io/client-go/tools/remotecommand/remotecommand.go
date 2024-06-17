@@ -17,17 +17,11 @@ limitations under the License.
 package remotecommand
 
 import (
-	"fmt"
+	"context"
 	"io"
 	"net/http"
-	"net/url"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/remotecommand"
-	restclient "k8s.io/client-go/rest"
-	spdy "k8s.io/client-go/transport/spdy"
 )
 
 // StreamOptions holds information pertaining to the current streaming session:
@@ -43,11 +37,16 @@ type StreamOptions struct {
 
 // Executor is an interface for transporting shell-style streams.
 type Executor interface {
-	// Stream initiates the transport of the standard shell streams. It will transport any
-	// non-nil stream to a remote system, and return an error if a problem occurs. If tty
-	// is set, the stderr stream is not used (raw TTY manages stdout and stderr over the
-	// stdout stream).
+	// Deprecated: use StreamWithContext instead to avoid possible resource leaks.
+	// See https://github.com/kubernetes/kubernetes/pull/103177 for details.
 	Stream(options StreamOptions) error
+
+	// StreamWithContext initiates the transport of the standard shell streams. It will
+	// transport any non-nil stream to a remote system, and return an error if a problem
+	// occurs. If tty is set, the stderr stream is not used (raw TTY manages stdout and
+	// stderr over the stdout stream).
+	// The context controls the entire lifetime of stream execution.
+	StreamWithContext(ctx context.Context, options StreamOptions) error
 }
 
 type streamCreator interface {
@@ -56,87 +55,4 @@ type streamCreator interface {
 
 type streamProtocolHandler interface {
 	stream(conn streamCreator) error
-}
-
-// streamExecutor handles transporting standard shell streams over an httpstream connection.
-type streamExecutor struct {
-	upgrader  spdy.Upgrader
-	transport http.RoundTripper
-
-	method    string
-	url       *url.URL
-	protocols []string
-}
-
-// NewSPDYExecutor connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams.
-func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
-	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return nil, err
-	}
-	return NewSPDYExecutorForTransports(wrapper, upgradeRoundTripper, method, url)
-}
-
-// NewSPDYExecutorForTransports connects to the provided server using the given transport,
-// upgrades the response using the given upgrader to multiplexed bidirectional streams.
-func NewSPDYExecutorForTransports(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL) (Executor, error) {
-	return NewSPDYExecutorForProtocols(
-		transport, upgrader, method, url,
-		remotecommand.StreamProtocolV4Name,
-		remotecommand.StreamProtocolV3Name,
-		remotecommand.StreamProtocolV2Name,
-		remotecommand.StreamProtocolV1Name,
-	)
-}
-
-// NewSPDYExecutorForProtocols connects to the provided server and upgrades the connection to
-// multiplexed bidirectional streams using only the provided protocols. Exposed for testing, most
-// callers should use NewSPDYExecutor or NewSPDYExecutorForTransports.
-func NewSPDYExecutorForProtocols(transport http.RoundTripper, upgrader spdy.Upgrader, method string, url *url.URL, protocols ...string) (Executor, error) {
-	return &streamExecutor{
-		upgrader:  upgrader,
-		transport: transport,
-		method:    method,
-		url:       url,
-		protocols: protocols,
-	}, nil
-}
-
-// Stream opens a protocol streamer to the server and streams until a client closes
-// the connection or the server disconnects.
-func (e *streamExecutor) Stream(options StreamOptions) error {
-	req, err := http.NewRequest(e.method, e.url.String(), nil)
-	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
-	}
-
-	conn, protocol, err := spdy.Negotiate(
-		e.upgrader,
-		&http.Client{Transport: e.transport},
-		req,
-		e.protocols...,
-	)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	var streamer streamProtocolHandler
-
-	switch protocol {
-	case remotecommand.StreamProtocolV4Name:
-		streamer = newStreamProtocolV4(options)
-	case remotecommand.StreamProtocolV3Name:
-		streamer = newStreamProtocolV3(options)
-	case remotecommand.StreamProtocolV2Name:
-		streamer = newStreamProtocolV2(options)
-	case "":
-		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
-		fallthrough
-	case remotecommand.StreamProtocolV1Name:
-		streamer = newStreamProtocolV1(options)
-	}
-
-	return streamer.stream(conn)
 }

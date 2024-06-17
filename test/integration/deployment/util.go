@@ -19,19 +19,18 @@ package deployment
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -101,49 +100,60 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 	}
 }
 
-// dcSetup sets up necessities for Deployment integration test, including master, apiserver, informers, and clientset
-func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+// dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
+func dcSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
 
 	dc, err := deployment.NewDeploymentController(
+		ctx,
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-controller")),
 	)
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
 	}
 	rm := replicaset.NewReplicaSetController(
+		ctx,
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return s, closeFn, rm, dc, informers, clientSet
+	return server.TearDownFn, rm, dc, informers, clientSet
 }
 
-// dcSimpleSetup sets up necessities for Deployment integration test, including master, apiserver,
+// dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
-func dcSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
-	return s, closeFn, clientSet
+	return server.TearDownFn, clientSet
+}
+
+// runControllersAndInformers runs RS and deployment controllers and informers
+func runControllersAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, dc *deployment.DeploymentController, informers informers.SharedInformerFactory) func() {
+	ctx, cancelFn := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	go rm.Run(ctx, 5)
+	go dc.Run(ctx, 5)
+	return cancelFn
 }
 
 // addPodConditionReady sets given pod status to ready at given time
@@ -171,11 +181,6 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	addPodConditionReady(pod, metav1.Now())
 	_, err := c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 	return err
-}
-
-func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
-	return &intstr
 }
 
 // markUpdatedPodsReady manually marks updated Deployment pods status to ready,
@@ -293,7 +298,7 @@ func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
 	}
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, d.c.AppsV1())
+	rs, err := testutil.GetNewReplicaSet(deployment, d.c)
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving new replicaset of deployment %s: %v", d.deployment.Name, err)
 	}

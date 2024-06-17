@@ -21,18 +21,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	certificatesv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
@@ -89,11 +85,7 @@ func validateCSR(obj *certificates.CertificateSigningRequest) error {
 		return err
 	}
 	// check that the signature is valid
-	err = csr.CheckSignature()
-	if err != nil {
-		return err
-	}
-	return nil
+	return csr.CheckSignature()
 }
 
 func validateCertificate(pemData []byte) error {
@@ -139,8 +131,8 @@ func ValidateCertificateRequestName(name string, prefix bool) []string {
 	return nil
 }
 
-func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, csr, nil)
+func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(csr, nil)
 	return validateCertificateSigningRequest(csr, opts)
 }
 
@@ -182,7 +174,7 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 		allErrs = append(allErrs, field.Invalid(specPath.Child("request"), csr.Spec.Request, fmt.Sprintf("%v", err)))
 	}
 	if len(csr.Spec.Usages) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("usages"), "usages must be provided"))
+		allErrs = append(allErrs, field.Required(specPath.Child("usages"), ""))
 	}
 	if !opts.allowUnknownUsages {
 		for i, usage := range csr.Spec.Usages {
@@ -203,7 +195,10 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 	if !opts.allowLegacySignerName && csr.Spec.SignerName == certificates.LegacyUnknownSignerName {
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
-		allErrs = append(allErrs, ValidateCertificateSigningRequestSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+		allErrs = append(allErrs, apivalidation.ValidateSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+	}
+	if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds < 600 {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), *csr.Spec.ExpirationSeconds, "may not specify a duration less than 600 seconds (10 minutes)"))
 	}
 	allErrs = append(allErrs, validateConditions(field.NewPath("status", "conditions"), csr, opts)...)
 
@@ -268,95 +263,19 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 	return allErrs
 }
 
-// ensure signerName is of the form domain.com/something and up to 571 characters.
-// This length and format is specified to accommodate signerNames like:
-// <fqdn>/<resource-namespace>.<resource-name>.
-// The max length of a FQDN is 253 characters (DNS1123Subdomain max length)
-// The max length of a namespace name is 63 characters (DNS1123Label max length)
-// The max length of a resource name is 253 characters (DNS1123Subdomain max length)
-// We then add an additional 2 characters to account for the one '.' and one '/'.
-func ValidateCertificateSigningRequestSignerName(fldPath *field.Path, signerName string) field.ErrorList {
-	var el field.ErrorList
-	if len(signerName) == 0 {
-		el = append(el, field.Required(fldPath, "signerName must be provided"))
-		return el
-	}
-
-	segments := strings.Split(signerName, "/")
-	// validate that there is one '/' in the signerName.
-	// we do this after validating the domain segment to provide more info to the user.
-	if len(segments) != 2 {
-		el = append(el, field.Invalid(fldPath, signerName, "must be a fully qualified domain and path of the form 'example.com/signer-name'"))
-		// return early here as we should not continue attempting to validate a missing or malformed path segment
-		// (i.e. one containing multiple or zero `/`)
-		return el
-	}
-
-	// validate that segments[0] is less than 253 characters altogether
-	maxDomainSegmentLength := utilvalidation.DNS1123SubdomainMaxLength
-	if len(segments[0]) > maxDomainSegmentLength {
-		el = append(el, field.TooLong(fldPath, segments[0], maxDomainSegmentLength))
-	}
-	// validate that segments[0] consists of valid DNS1123 labels separated by '.'
-	domainLabels := strings.Split(segments[0], ".")
-	for _, lbl := range domainLabels {
-		// use IsDNS1123Label as we want to ensure the max length of any single label in the domain
-		// is 63 characters
-		if errs := utilvalidation.IsDNS1123Label(lbl); len(errs) > 0 {
-			for _, err := range errs {
-				el = append(el, field.Invalid(fldPath, segments[0], fmt.Sprintf("validating label %q: %s", lbl, err)))
-			}
-			// if we encounter any errors whilst parsing the domain segment, break from
-			// validation as any further error messages will be duplicates, and non-distinguishable
-			// from each other, confusing users.
-			break
-		}
-	}
-
-	// validate that there is at least one '.' in segments[0]
-	if len(domainLabels) < 2 {
-		el = append(el, field.Invalid(fldPath, segments[0], "should be a domain with at least two segments separated by dots"))
-	}
-
-	// validate that segments[1] consists of valid DNS1123 subdomains separated by '.'.
-	pathLabels := strings.Split(segments[1], ".")
-	for _, lbl := range pathLabels {
-		// use IsDNS1123Subdomain because it enforces a length restriction of 253 characters
-		// which is required in order to fit a full resource name into a single 'label'
-		if errs := utilvalidation.IsDNS1123Subdomain(lbl); len(errs) > 0 {
-			for _, err := range errs {
-				el = append(el, field.Invalid(fldPath, segments[1], fmt.Sprintf("validating label %q: %s", lbl, err)))
-			}
-			// if we encounter any errors whilst parsing the path segment, break from
-			// validation as any further error messages will be duplicates, and non-distinguishable
-			// from each other, confusing users.
-			break
-		}
-	}
-
-	// ensure that segments[1] can accommodate a dns label + dns subdomain + '.'
-	maxPathSegmentLength := utilvalidation.DNS1123SubdomainMaxLength + utilvalidation.DNS1123LabelMaxLength + 1
-	maxSignerNameLength := maxDomainSegmentLength + maxPathSegmentLength + 1
-	if len(signerName) > maxSignerNameLength {
-		el = append(el, field.TooLong(fldPath, signerName, maxSignerNameLength))
-	}
-
-	return el
-}
-
-func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
 
-func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingCertificate = true
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
 
-func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingApprovalConditions = true
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
@@ -385,7 +304,7 @@ func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.Certif
 			case len(newConditions) > len(oldConditions):
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not add a condition of type %q", t)))
 			case !apiequality.Semantic.DeepEqual(oldConditions, newConditions):
-				conditionDiff := diff.ObjectDiff(oldConditions, newConditions)
+				conditionDiff := cmp.Diff(oldConditions, newConditions)
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not modify a condition of type %q\n%v", t, conditionDiff)))
 			}
 		}
@@ -417,22 +336,17 @@ func findConditions(csr *certificates.CertificateSigningRequest, conditionType c
 // compatible with the specified version and existing CSR.
 // oldCSR may be nil if this is a create request.
 // validation options related to subresource-specific capabilities are set to false.
-func getValidationOptions(version schema.GroupVersion, newCSR, oldCSR *certificates.CertificateSigningRequest) certificateValidationOptions {
+func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest) certificateValidationOptions {
 	return certificateValidationOptions{
-		allowResettingCertificate:    allowResettingCertificate(version),
+		allowResettingCertificate:    false,
 		allowBothApprovedAndDenied:   allowBothApprovedAndDenied(oldCSR),
-		allowLegacySignerName:        allowLegacySignerName(version, oldCSR),
-		allowDuplicateConditionTypes: allowDuplicateConditionTypes(version, oldCSR),
-		allowEmptyConditionType:      allowEmptyConditionType(version, oldCSR),
-		allowArbitraryCertificate:    allowArbitraryCertificate(version, newCSR, oldCSR),
-		allowDuplicateUsages:         allowDuplicateUsages(version, oldCSR),
-		allowUnknownUsages:           allowUnknownUsages(version, oldCSR),
+		allowLegacySignerName:        allowLegacySignerName(oldCSR),
+		allowDuplicateConditionTypes: allowDuplicateConditionTypes(oldCSR),
+		allowEmptyConditionType:      allowEmptyConditionType(oldCSR),
+		allowArbitraryCertificate:    allowArbitraryCertificate(newCSR, oldCSR),
+		allowDuplicateUsages:         allowDuplicateUsages(oldCSR),
+		allowUnknownUsages:           allowUnknownUsages(oldCSR),
 	}
-}
-
-func allowResettingCertificate(version schema.GroupVersion) bool {
-	// compatibility with v1beta1
-	return version == certificatesv1beta1.SchemeGroupVersion
 }
 
 func allowBothApprovedAndDenied(oldCSR *certificates.CertificateSigningRequest) bool {
@@ -452,10 +366,8 @@ func allowBothApprovedAndDenied(oldCSR *certificates.CertificateSigningRequest) 
 	return approved && denied
 }
 
-func allowLegacySignerName(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowLegacySignerName(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && oldCSR.Spec.SignerName == certificates.LegacyUnknownSignerName:
 		return true // compatibility with existing data
 	default:
@@ -463,10 +375,8 @@ func allowLegacySignerName(version schema.GroupVersion, oldCSR *certificates.Cer
 	}
 }
 
-func allowDuplicateConditionTypes(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowDuplicateConditionTypes(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasDuplicateConditionTypes(oldCSR):
 		return true // compatibility with existing data
 	default:
@@ -484,10 +394,8 @@ func hasDuplicateConditionTypes(csr *certificates.CertificateSigningRequest) boo
 	return false
 }
 
-func allowEmptyConditionType(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowEmptyConditionType(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasEmptyConditionType(oldCSR):
 		return true // compatibility with existing data
 	default:
@@ -503,10 +411,8 @@ func hasEmptyConditionType(csr *certificates.CertificateSigningRequest) bool {
 	return false
 }
 
-func allowArbitraryCertificate(version schema.GroupVersion, newCSR, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowArbitraryCertificate(newCSR, oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case newCSR != nil && oldCSR != nil && bytes.Equal(newCSR.Status.Certificate, oldCSR.Status.Certificate):
 		return true // tolerate updates that don't touch status.certificate
 	case oldCSR != nil && validateCertificate(oldCSR.Status.Certificate) != nil:
@@ -516,10 +422,8 @@ func allowArbitraryCertificate(version schema.GroupVersion, newCSR, oldCSR *cert
 	}
 }
 
-func allowUnknownUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowUnknownUsages(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasUnknownUsage(oldCSR.Spec.Usages):
 		return true // compatibility with existing data
 	default:
@@ -536,10 +440,8 @@ func hasUnknownUsage(usages []certificates.KeyUsage) bool {
 	return false
 }
 
-func allowDuplicateUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowDuplicateUsages(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasDuplicateUsage(oldCSR.Spec.Usages):
 		return true // compatibility with existing data
 	default:
@@ -556,4 +458,117 @@ func hasDuplicateUsage(usages []certificates.KeyUsage) bool {
 		seen[usage] = true
 	}
 	return false
+}
+
+type ValidateClusterTrustBundleOptions struct {
+	SuppressBundleParsing bool
+}
+
+// ValidateClusterTrustBundle runs all validation checks on bundle.
+func ValidateClusterTrustBundle(bundle *certificates.ClusterTrustBundle, opts ValidateClusterTrustBundleOptions) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&bundle.ObjectMeta, false, apivalidation.ValidateClusterTrustBundleName(bundle.Spec.SignerName), field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	if bundle.Spec.SignerName != "" {
+		signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), bundle.Spec.SignerName)
+		allErrors = append(allErrors, signerNameErrors...)
+	}
+
+	if !opts.SuppressBundleParsing {
+		pemErrors := validateTrustBundle(field.NewPath("spec", "trustBundle"), bundle.Spec.TrustBundle)
+		allErrors = append(allErrors, pemErrors...)
+	}
+
+	return allErrors
+}
+
+// ValidateClusterTrustBundleUpdate runs all update validation checks on an
+// update.
+func ValidateClusterTrustBundleUpdate(newBundle, oldBundle *certificates.ClusterTrustBundle) field.ErrorList {
+	// If the caller isn't changing the TrustBundle field, don't parse it.
+	// This helps smoothly handle changes in Go's PEM or X.509 parsing
+	// libraries.
+	opts := ValidateClusterTrustBundleOptions{}
+	if newBundle.Spec.TrustBundle == oldBundle.Spec.TrustBundle {
+		opts.SuppressBundleParsing = true
+	}
+
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, ValidateClusterTrustBundle(newBundle, opts)...)
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newBundle.ObjectMeta, &oldBundle.ObjectMeta, field.NewPath("metadata"))...)
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newBundle.Spec.SignerName, oldBundle.Spec.SignerName, field.NewPath("spec", "signerName"))...)
+	return allErrors
+}
+
+// validateTrustBundle rejects intra-block headers, blocks
+// that don't parse as X.509 CA certificates, and duplicate trust anchors.  It
+// requires that at least one trust anchor is provided.
+func validateTrustBundle(path *field.Path, in string) field.ErrorList {
+	var allErrors field.ErrorList
+
+	if len(in) > certificates.MaxTrustBundleSize {
+		allErrors = append(allErrors, field.TooLong(path, fmt.Sprintf("<value omitted, len %d>", len(in)), certificates.MaxTrustBundleSize))
+		return allErrors
+	}
+
+	blockDedupe := map[string][]int{}
+
+	rest := []byte(in)
+	var b *pem.Block
+	i := -1
+	for {
+		b, rest = pem.Decode(rest)
+		if b == nil {
+			break
+		}
+		i++
+
+		if b.Type != "CERTIFICATE" {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has bad block type: %v", i, b.Type)))
+			continue
+		}
+
+		if len(b.Headers) != 0 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has PEM block headers", i)))
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(b.Bytes)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not parse as X.509", i)))
+			continue
+		}
+
+		if !cert.IsCA {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d does not have the CA bit set", i)))
+			continue
+		}
+
+		if !cert.BasicConstraintsValid {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("entry %d has invalid basic constraints", i)))
+			continue
+		}
+
+		blockDedupe[string(b.Bytes)] = append(blockDedupe[string(b.Bytes)], i)
+	}
+
+	// If we had a malformed block, don't also output potentially-redundant
+	// errors about duplicate or missing trust anchors.
+	if len(allErrors) != 0 {
+		return allErrors
+	}
+
+	if len(blockDedupe) == 0 {
+		allErrors = append(allErrors, field.Invalid(path, "<value omitted>", "at least one trust anchor must be provided"))
+	}
+
+	for _, indices := range blockDedupe {
+		if len(indices) > 1 {
+			allErrors = append(allErrors, field.Invalid(path, "<value omitted>", fmt.Sprintf("duplicate trust anchor (indices %v)", indices)))
+		}
+	}
+
+	return allErrors
 }

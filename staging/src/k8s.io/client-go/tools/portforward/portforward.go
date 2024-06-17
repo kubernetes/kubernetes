@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"sort"
@@ -28,14 +27,17 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	netutils "k8s.io/utils/net"
 )
 
 // PortForwardProtocolV1Name is the subprotocol used for port forwarding.
 // TODO move to API machinery and re-unify with kubelet/server/portfoward
 const PortForwardProtocolV1Name = "portforward.k8s.io"
+
+var ErrLostConnectionToPod = errors.New("lost connection to pod")
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
@@ -61,18 +63,18 @@ type ForwardedPort struct {
 }
 
 /*
-	valid port specifications:
+valid port specifications:
 
-	5000
-	- forwards from localhost:5000 to pod:5000
+5000
+- forwards from localhost:5000 to pod:5000
 
-	8888:5000
-	- forwards from localhost:8888 to pod:5000
+8888:5000
+- forwards from localhost:8888 to pod:5000
 
-	0:5000
-	:5000
-	- selects a random available local port,
-	  forwards from localhost:<random port> to pod:5000
+0:5000
+:5000
+  - selects a random available local port,
+    forwards from localhost:<random port> to pod:5000
 */
 func parsePorts(ports []string) ([]ForwardedPort, error) {
 	var forwards []ForwardedPort
@@ -131,9 +133,9 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 				ip := listenAddress{address: "::1", protocol: "tcp6", failureMode: "all"}
 				parsed[ip.address] = ip
 			}
-		} else if net.ParseIP(address).To4() != nil {
+		} else if netutils.ParseIPSloppy(address).To4() != nil {
 			parsed[address] = listenAddress{address: address, protocol: "tcp4", failureMode: "any"}
-		} else if net.ParseIP(address) != nil {
+		} else if netutils.ParseIPSloppy(address) != nil {
 			parsed[address] = listenAddress{address: address, protocol: "tcp6", failureMode: "any"}
 		} else {
 			return nil, fmt.Errorf("%s is not a valid IP", address)
@@ -189,11 +191,15 @@ func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
 	var err error
-	pf.streamConn, _, err = pf.dialer.Dial(PortForwardProtocolV1Name)
+	var protocol string
+	pf.streamConn, protocol, err = pf.dialer.Dial(PortForwardProtocolV1Name)
 	if err != nil {
 		return fmt.Errorf("error upgrading connection: %s", err)
 	}
 	defer pf.streamConn.Close()
+	if protocol != PortForwardProtocolV1Name {
+		return fmt.Errorf("unable to negotiate protocol: client supports %q, server returned %q", PortForwardProtocolV1Name, protocol)
+	}
 
 	return pf.forward()
 }
@@ -230,7 +236,7 @@ func (pf *PortForwarder) forward() error {
 	select {
 	case <-pf.stopChan:
 	case <-pf.streamConn.CloseChan():
-		runtime.HandleError(errors.New("lost connection to pod"))
+		return ErrLostConnectionToPod
 	}
 
 	return nil
@@ -299,15 +305,20 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 // the background.
 func (pf *PortForwarder) waitForConnection(listener net.Listener, port ForwardedPort) {
 	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
-			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-				runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
-			}
+		select {
+		case <-pf.streamConn.CloseChan():
 			return
+		default:
+			conn, err := listener.Accept()
+			if err != nil {
+				// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
+				if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
+					runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
+				}
+				return
+			}
+			go pf.handleConnection(conn, port)
 		}
-		go pf.handleConnection(conn, port)
 	}
 }
 
@@ -342,10 +353,11 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	}
 	// we're not writing to this stream
 	errorStream.Close()
+	defer pf.streamConn.RemoveStreams(errorStream)
 
 	errorChan := make(chan error)
 	go func() {
-		message, err := ioutil.ReadAll(errorStream)
+		message, err := io.ReadAll(errorStream)
 		switch {
 		case err != nil:
 			errorChan <- fmt.Errorf("error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
@@ -362,6 +374,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 		runtime.HandleError(fmt.Errorf("error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
+	defer pf.streamConn.RemoveStreams(dataStream)
 
 	localError := make(chan struct{})
 	remoteDone := make(chan struct{})
@@ -398,6 +411,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
+		pf.streamConn.Close()
 	}
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package featuregate
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -27,6 +28,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/naming"
+	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -109,6 +111,21 @@ type MutableFeatureGate interface {
 	SetFromMap(m map[string]bool) error
 	// Add adds features to the featureGate.
 	Add(features map[Feature]FeatureSpec) error
+	// GetAll returns a copy of the map of known feature names to feature specs.
+	GetAll() map[Feature]FeatureSpec
+	// AddMetrics adds feature enablement metrics
+	AddMetrics()
+	// OverrideDefault sets a local override for the registered default value of a named
+	// feature. If the feature has not been previously registered (e.g. by a call to Add), has a
+	// locked default, or if the gate has already registered itself with a FlagSet, a non-nil
+	// error is returned.
+	//
+	// When two or more components consume a common feature, one component can override its
+	// default at runtime in order to adopt new defaults before or after the other
+	// components. For example, a new feature can be evaluated with a limited blast radius by
+	// overriding its default to true for a limited number of components without simultaneously
+	// changing its default for all consuming components.
+	OverrideDefault(name Feature, override bool) error
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -120,9 +137,9 @@ type featureGate struct {
 	// lock guards writes to known, enabled, and reads/writes of closed
 	lock sync.Mutex
 	// known holds a map[Feature]FeatureSpec
-	known *atomic.Value
+	known atomic.Value
 	// enabled holds a map[Feature]bool
-	enabled *atomic.Value
+	enabled atomic.Value
 	// closed is set to true when AddFlag is called, and prevents subsequent calls to Add
 	closed bool
 }
@@ -160,19 +177,13 @@ func NewFeatureGate() *featureGate {
 		known[k] = v
 	}
 
-	knownValue := &atomic.Value{}
-	knownValue.Store(known)
-
-	enabled := map[Feature]bool{}
-	enabledValue := &atomic.Value{}
-	enabledValue.Store(enabled)
-
 	f := &featureGate{
 		featureGateName: naming.GetNameFromCallsite(internalPackages...),
-		known:           knownValue,
 		special:         specialFeatures,
-		enabled:         enabledValue,
 	}
+	f.known.Store(known)
+	f.enabled.Store(map[Feature]bool{})
+
 	return f
 }
 
@@ -290,6 +301,47 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	return nil
 }
 
+func (f *featureGate) OverrideDefault(name Feature, override bool) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.closed {
+		return fmt.Errorf("cannot override default for feature %q: gates already added to a flag set", name)
+	}
+
+	known := map[Feature]FeatureSpec{}
+	for name, spec := range f.known.Load().(map[Feature]FeatureSpec) {
+		known[name] = spec
+	}
+
+	spec, ok := known[name]
+	switch {
+	case !ok:
+		return fmt.Errorf("cannot override default: feature %q is not registered", name)
+	case spec.LockToDefault:
+		return fmt.Errorf("cannot override default: feature %q default is locked to %t", name, spec.Default)
+	case spec.PreRelease == Deprecated:
+		klog.Warningf("Overriding default of deprecated feature gate %s=%t. It will be removed in a future release.", name, override)
+	case spec.PreRelease == GA:
+		klog.Warningf("Overriding default of GA feature gate %s=%t. It will be removed in a future release.", name, override)
+	}
+
+	spec.Default = override
+	known[name] = spec
+	f.known.Store(known)
+
+	return nil
+}
+
+// GetAll returns a copy of the map of known feature names to feature specs.
+func (f *featureGate) GetAll() map[Feature]FeatureSpec {
+	retval := map[Feature]FeatureSpec{}
+	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {
+		retval[k] = v
+	}
+	return retval
+}
+
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
 	if v, ok := f.enabled.Load().(map[Feature]bool)[key]; ok {
@@ -316,6 +368,12 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(known, "\n"))
+}
+
+func (f *featureGate) AddMetrics() {
+	for feature, featureSpec := range f.GetAll() {
+		featuremetrics.RecordFeatureInfo(context.Background(), string(feature), string(featureSpec.PreRelease), f.Enabled(feature))
+	}
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureGate's known features.
@@ -346,19 +404,16 @@ func (f *featureGate) DeepCopy() MutableFeatureGate {
 		enabled[k] = v
 	}
 
-	// Store copied state in new atomics.
-	knownValue := &atomic.Value{}
-	knownValue.Store(known)
-	enabledValue := &atomic.Value{}
-	enabledValue.Store(enabled)
-
 	// Construct a new featureGate around the copied state.
 	// Note that specialFeatures is treated as immutable by convention,
 	// and we maintain the value of f.closed across the copy.
-	return &featureGate{
+	fg := &featureGate{
 		special: specialFeatures,
-		known:   knownValue,
-		enabled: enabledValue,
 		closed:  f.closed,
 	}
+
+	fg.known.Store(known)
+	fg.enabled.Store(enabled)
+
+	return fg
 }

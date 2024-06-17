@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
     - name: primary
-      image: gcr.io/kubernetes-e2e-test-images/agnhost:1.0
+      image: registry.k8s.io/e2e-test-images/agnhost:2.32
       env:
         - name: PRIMARY
           value: "true"
@@ -21,7 +21,7 @@ spec:
         - mountPath: /agnhost-primary-data
           name: data
     - name: sentinel
-      image: gcr.io/kubernetes-e2e-test-images/agnhost:1.0
+      image: registry.k8s.io/e2e-test-images/agnhost:2.32
       env:
         - name: SENTINEL
           value: "true"

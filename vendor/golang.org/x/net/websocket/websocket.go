@@ -5,11 +5,10 @@
 // Package websocket implements a client and server for the WebSocket protocol
 // as specified in RFC 6455.
 //
-// This package currently lacks some features found in alternative
-// and more actively maintained WebSocket packages:
+// This package currently lacks some features found in an alternative
+// and more actively maintained WebSocket package:
 //
-//     https://godoc.org/github.com/gorilla/websocket
-//     https://godoc.org/nhooyr.io/websocket
+//	https://pkg.go.dev/nhooyr.io/websocket
 package websocket // import "golang.org/x/net/websocket"
 
 import (
@@ -416,7 +415,6 @@ Trivial usage:
 	// send binary frame
 	data = []byte{0, 1, 2}
 	websocket.Message.Send(ws, data)
-
 */
 var Message = Codec{marshal, unmarshal}
 

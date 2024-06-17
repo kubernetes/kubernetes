@@ -22,6 +22,3 @@ square), and icon (which does not include the name and is square), and 5
 colors (color/black/white/all-blue/white-text) -- so over 20 versions -- in the
 CNCF [artwork](https://github.com/cncf/artwork/tree/master/projects/kubernetes)
 repo.
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/logo/usage_guidelines.md?pixel)]()

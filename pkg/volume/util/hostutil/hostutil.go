@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // FileType enumerates the known set of possible file types.
@@ -41,6 +41,10 @@ const (
 	FileTypeUnknown FileType = ""
 )
 
+var (
+	errUnknownFileType = fmt.Errorf("only recognise file, directory, socket, block device and character device")
+)
+
 // HostUtils defines the set of methods for interacting with paths on a host.
 type HostUtils interface {
 	// DeviceOpened determines if the device (e.g. /dev/sdc) is in use elsewhere
@@ -50,6 +54,7 @@ type HostUtils interface {
 	PathIsDevice(pathname string) (bool, error)
 	// GetDeviceNameFromMount finds the device name by checking the mount path
 	// to get the global mount path within its plugin directory.
+	// TODO: Remove this method once the rbd and vsphere plugins are removed from in-tree.
 	GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
@@ -68,6 +73,9 @@ type HostUtils interface {
 	GetSELinuxSupport(pathname string) (bool, error)
 	// GetMode returns permissions of the path.
 	GetMode(pathname string) (os.FileMode, error)
+	// GetSELinuxMountContext returns value of -o context=XYZ mount option on
+	// given mount point.
+	GetSELinuxMountContext(pathname string) (string, error)
 }
 
 // Compile-time check to ensure all HostUtil implementations satisfy
@@ -105,5 +113,5 @@ func getFileType(pathname string) (FileType, error) {
 		return FileTypeBlockDev, nil
 	}
 
-	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+	return pathType, errUnknownFileType
 }

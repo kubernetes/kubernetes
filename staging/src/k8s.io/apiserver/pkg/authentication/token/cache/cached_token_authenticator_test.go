@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -31,13 +32,15 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestCachedTokenAuthenticator(t *testing.T) {
@@ -52,7 +55,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 		calledWithToken = append(calledWithToken, token)
 		return &authenticator.Response{User: resultUsers[token]}, resultOk, resultErr
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -126,7 +129,7 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 		auds, _ := authenticator.AudiencesFrom(ctx)
 		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -300,24 +303,10 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				// exercise both ways of tracking audit annotations
-				r := mathrand.New(mathrand.NewSource(mathrand.Int63()))
-				randomChoice := r.Int()%2 == 0
-				ctx := context.Background()
-
-				if randomChoice {
-					ctx = audit.WithAuditAnnotations(ctx)
-				} else {
-					ctx = request.WithAuditEvent(ctx, &auditinternal.Event{Level: auditinternal.LevelMetadata})
-				}
-
+				ctx := withAudit(context.Background())
 				_, _, _ = a.AuthenticateToken(ctx, "token")
 
-				if randomChoice {
-					allAnnotations <- extractAnnotations(ctx)
-				} else {
-					allAnnotations <- request.AuditEventFrom(ctx).Annotations
-				}
+				allAnnotations <- audit.AuditEventFrom(ctx).Annotations
 			}()
 		}
 
@@ -352,9 +341,9 @@ func TestCachedAuditAnnotations(t *testing.T) {
 		allAnnotations := make([]map[string]string, 0, 10)
 
 		for i := 0; i < cap(allAnnotations); i++ {
-			ctx := audit.WithAuditAnnotations(context.Background())
+			ctx := withAudit(context.Background())
 			_, _, _ = a.AuthenticateToken(ctx, "token")
-			allAnnotations = append(allAnnotations, extractAnnotations(ctx))
+			allAnnotations = append(allAnnotations, audit.AuditEventFrom(ctx).Annotations)
 		}
 
 		if len(allAnnotations) != cap(allAnnotations) {
@@ -379,16 +368,16 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			return snorlax, true, nil
 		}), false, time.Minute, 0)
 
-		ctx1 := audit.WithAuditAnnotations(context.Background())
+		ctx1 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx1, "token1")
-		annotations1 := extractAnnotations(ctx1)
+		annotations1 := audit.AuditEventFrom(ctx1).Annotations
 
 		// guarantee different now times
 		time.Sleep(time.Second)
 
-		ctx2 := audit.WithAuditAnnotations(context.Background())
+		ctx2 := withAudit(context.Background())
 		_, _, _ = a.AuthenticateToken(ctx2, "token2")
-		annotations2 := extractAnnotations(ctx2)
+		annotations2 := audit.AuditEventFrom(ctx2).Annotations
 
 		if ok := len(annotations1) == 1 && len(annotations1["timestamp"]) > 0; !ok {
 			t.Errorf("invalid annotations 1: %v", annotations1)
@@ -401,18 +390,6 @@ func TestCachedAuditAnnotations(t *testing.T) {
 			t.Errorf("annotations should have different timestamp value: %v", annotations1)
 		}
 	})
-}
-
-func extractAnnotations(ctx context.Context) map[string]string {
-	annotationsSlice := reflect.ValueOf(ctx).Elem().FieldByName("val").Elem().Elem()
-	annotations := map[string]string{}
-	for i := 0; i < annotationsSlice.Len(); i++ {
-		annotation := annotationsSlice.Index(i)
-		key := annotation.FieldByName("key").String()
-		val := annotation.FieldByName("value").String()
-		annotations[key] = val
-	}
-	return annotations
 }
 
 func BenchmarkCachedTokenAuthenticator(b *testing.B) {
@@ -546,7 +523,7 @@ func (s *singleBenchmark) bench(b *testing.B) {
 		true,
 		4*time.Second,
 		500*time.Millisecond,
-		utilclock.RealClock{},
+		clock.RealClock{},
 	)
 
 	b.ResetTimer()
@@ -563,4 +540,122 @@ func (s *singleBenchmark) bench(b *testing.B) {
 	b.StopTimer()
 
 	b.ReportMetric(float64(lookups)/float64(b.N), "lookups/op")
+}
+
+// Add a test version of the audit context with a pre-populated event for easy annotation
+// extraction.
+func withAudit(ctx context.Context) context.Context {
+	ctx = audit.WithAuditContext(ctx)
+	ac := audit.AuditContextFrom(ctx)
+	ac.Event.Level = auditinternal.LevelMetadata
+	return ctx
+}
+
+func TestUnsafeConversions(t *testing.T) {
+	t.Parallel()
+
+	// needs to be large to force allocations so we pick a random value between [1024, 2048]
+	size := utilrand.IntnRange(1024, 2048+1)
+
+	t.Run("toBytes semantics", func(t *testing.T) {
+		t.Parallel()
+
+		s := utilrand.String(size)
+		b := toBytes(s)
+		if len(b) != size {
+			t.Errorf("unexpected length: %d", len(b))
+		}
+		if cap(b) != size {
+			t.Errorf("unexpected capacity: %d", cap(b))
+		}
+		if !bytes.Equal(b, []byte(s)) {
+			t.Errorf("unexpected equality failure: %#v", b)
+		}
+	})
+
+	t.Run("toBytes allocations", func(t *testing.T) {
+		t.Parallel()
+
+		s := utilrand.String(size)
+		f := func() {
+			b := toBytes(s)
+			if len(b) != size {
+				t.Errorf("invalid length: %d", len(b))
+			}
+		}
+		allocs := testing.AllocsPerRun(100, f)
+		if allocs > 0 {
+			t.Errorf("expected zero allocations, got %v", allocs)
+		}
+	})
+
+	t.Run("toString semantics", func(t *testing.T) {
+		t.Parallel()
+
+		b := make([]byte, size)
+		if _, err := rand.Read(b); err != nil {
+			t.Fatal(err)
+		}
+		s := toString(b)
+		if len(s) != size {
+			t.Errorf("unexpected length: %d", len(s))
+		}
+		if s != string(b) {
+			t.Errorf("unexpected equality failure: %#v", s)
+		}
+	})
+
+	t.Run("toString allocations", func(t *testing.T) {
+		t.Parallel()
+
+		b := make([]byte, size)
+		if _, err := rand.Read(b); err != nil {
+			t.Fatal(err)
+		}
+		f := func() {
+			s := toString(b)
+			if len(s) != size {
+				t.Errorf("invalid length: %d", len(s))
+			}
+		}
+		allocs := testing.AllocsPerRun(100, f)
+		if allocs > 0 {
+			t.Errorf("expected zero allocations, got %v", allocs)
+		}
+	})
+}
+
+func TestKeyFunc(t *testing.T) {
+	t.Parallel()
+
+	hashPool := &sync.Pool{
+		New: func() interface{} {
+			return hmac.New(sha256.New, []byte("098c9e46-b7f4-4358-bb3c-35cb7495b836")) // deterministic HMAC for testing
+		},
+	}
+
+	// use realistic audiences
+	auds := []string{"7daf30b7-a85c-429b-8b21-e666aecbb235", "c22aa267-bdde-4acb-8505-998be7818400", "44f9b4f3-7125-4333-b04c-1446a16c6113"}
+
+	keyWithAuds := "\"\xf7\xac\xcd\x12\xf5\x83l\xa9;@\n\xa13a;\nd\x1f\xdelL\xd1\xe1!\x8a\xdahٛ\xbb\xf0"
+
+	keyWithoutAuds := "\x054a \xa5\x8e\xea\xb2?\x8c\x88\xb9,e\n5\xe7ȵ>\xfdK\x0e\x93+\x02˿&\xf98\x1e"
+
+	t.Run("has audiences", func(t *testing.T) {
+		t.Parallel()
+
+		key := keyFunc(hashPool, auds, jwtToken)
+		if key != keyWithAuds {
+			t.Errorf("unexpected equality failure: %#v", key)
+		}
+	})
+
+	t.Run("nil audiences", func(t *testing.T) {
+		t.Parallel()
+
+		key := keyFunc(hashPool, nil, jwtToken)
+		if key != keyWithoutAuds {
+			t.Errorf("unexpected equality failure: %#v", key)
+		}
+	})
 }

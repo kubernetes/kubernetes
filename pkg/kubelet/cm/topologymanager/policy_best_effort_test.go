@@ -39,9 +39,9 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		numaNodes := []int{0, 1}
-		policy := NewBestEffortPolicy(numaNodes)
-		result := policy.(*bestEffortPolicy).canAdmitPodResult(&tc.hint)
+		numaInfo := commonNUMAInfoTwoNodes()
+		policy := &bestEffortPolicy{numaInfo: numaInfo}
+		result := policy.canAdmitPodResult(&tc.hint)
 
 		if result != tc.expected {
 			t.Errorf("Expected result to be %t, got %t", tc.expected, result)
@@ -50,11 +50,26 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 }
 
 func TestPolicyBestEffortMerge(t *testing.T) {
-	numaNodes := []int{0, 1}
-	policy := NewBestEffortPolicy(numaNodes)
+	numaInfo := commonNUMAInfoFourNodes()
+	policy := &bestEffortPolicy{numaInfo: numaInfo}
 
-	tcases := commonPolicyMergeTestCases(numaNodes)
-	tcases = append(tcases, policy.(*bestEffortPolicy).mergeTestCases(numaNodes)...)
+	tcases := commonPolicyMergeTestCases(numaInfo.Nodes)
+	tcases = append(tcases, policy.mergeTestCases(numaInfo.Nodes)...)
+	tcases = append(tcases, policy.mergeTestCasesNoPolicies(numaInfo.Nodes)...)
+
+	testPolicyMerge(policy, tcases, t)
+}
+
+func TestPolicyBestEffortMergeClosestNUMA(t *testing.T) {
+	numaInfo := commonNUMAInfoEightNodes()
+	opts := PolicyOptions{
+		PreferClosestNUMA: true,
+	}
+	policy := &bestEffortPolicy{numaInfo: numaInfo, opts: opts}
+
+	tcases := commonPolicyMergeTestCases(numaInfo.Nodes)
+	tcases = append(tcases, policy.mergeTestCases(numaInfo.Nodes)...)
+	tcases = append(tcases, policy.mergeTestCasesClosestNUMA(numaInfo.Nodes)...)
 
 	testPolicyMerge(policy, tcases, t)
 }

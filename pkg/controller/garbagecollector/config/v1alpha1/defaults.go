@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 // RecommendedDefaultGarbageCollectorControllerConfiguration defaults a pointer to a
@@ -32,7 +32,7 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultGarbageCollectorControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.GarbageCollectorControllerConfiguration) {
 	if obj.EnableGarbageCollector == nil {
-		obj.EnableGarbageCollector = utilpointer.BoolPtr(true)
+		obj.EnableGarbageCollector = pointer.Bool(true)
 	}
 	if obj.ConcurrentGCSyncs == 0 {
 		obj.ConcurrentGCSyncs = 20

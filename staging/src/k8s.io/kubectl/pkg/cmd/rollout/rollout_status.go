@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
@@ -37,13 +38,14 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	statusLong = templates.LongDesc(`
+	statusLong = templates.LongDesc(i18n.T(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -51,7 +53,7 @@ var (
 		you can use --watch=false. Note that if a new rollout starts in-between, then
 		'rollout status' will continue watching the latest revision. If you want to
 		pin to a specific revision and abort if it is rolled over by another revision,
-		use --revision=N where N is the revision you need to watch for.`)
+		use --revision=N where N is the revision you need to watch for.`))
 
 	statusExample = templates.Examples(`
 		# Watch the rollout status of a deployment
@@ -65,6 +67,7 @@ type RolloutStatusOptions struct {
 	Namespace        string
 	EnforceNamespace bool
 	BuilderArgs      []string
+	LabelSelector    string
 
 	Watch    bool
 	Revision int64
@@ -75,11 +78,11 @@ type RolloutStatusOptions struct {
 	DynamicClient  dynamic.Interface
 
 	FilenameOptions *resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewRolloutStatusOptions returns an initialized RolloutStatusOptions instance
-func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
+func NewRolloutStatusOptions(streams genericiooptions.IOStreams) *RolloutStatusOptions {
 	return &RolloutStatusOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
@@ -90,7 +93,7 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 }
 
 // NewCmdRolloutStatus returns a Command instance for the 'rollout status' sub command
-func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRolloutStatus(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
@@ -101,12 +104,12 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:                 i18n.T("Show the status of the rollout"),
 		Long:                  statusLong,
 		Example:               statusExample,
+		ValidArgsFunction:     completion.SpecifiedResourceTypeAndNameNoRepeatCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."
@@ -114,6 +117,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "Watch the status of the rollout until it's done.")
 	cmd.Flags().Int64Var(&o.Revision, "revision", o.Revision, "Pin to a specific revision for showing its status. Defaults to 0 (last revision).")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", o.Timeout, "The length of time to wait before ending watch, zero means never. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 
 	return cmd
 }
@@ -131,12 +135,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	o.BuilderArgs = args
 	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
 
-	clientConfig, err := f.ToRESTConfig()
-	if err != nil {
-		return err
-	}
-
-	o.DynamicClient, err = dynamic.NewForConfig(clientConfig)
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
@@ -162,75 +161,83 @@ func (o *RolloutStatusOptions) Run() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
+		LabelSelectorParam(o.LabelSelector).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
-		SingleResourceType().
+		ContinueOnError().
 		Latest().
+		Flatten().
 		Do()
+
 	err := r.Err()
 	if err != nil {
 		return err
 	}
 
-	infos, err := r.Infos()
-	if err != nil {
-		return err
-	}
-	if len(infos) != 1 {
-		return fmt.Errorf("rollout status is only supported on individual resources and resource collections - %d resources were found", len(infos))
-	}
-	info := infos[0]
-	mapping := info.ResourceMapping()
+	resourceFound := false
+	err = r.Visit(func(info *resource.Info, _ error) error {
+		resourceFound = true
+		mapping := info.ResourceMapping()
+		statusViewer, err := o.StatusViewerFn(mapping)
+		if err != nil {
+			return err
+		}
 
-	statusViewer, err := o.StatusViewerFn(mapping)
-	if err != nil {
-		return err
-	}
+		fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.FieldSelector = fieldSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.FieldSelector = fieldSelector
+				return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+			},
+		}
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
-		},
-	}
+		// if the rollout isn't done yet, keep watching deployment status
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+		intr := interrupt.New(nil, cancel)
+		return intr.Run(func() error {
+			_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
+				switch t := e.Type; t {
+				case watch.Added, watch.Modified:
+					status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
+					if err != nil {
+						return false, err
+					}
+					fmt.Fprintf(o.Out, "%s", status)
+					// Quit waiting if the rollout is done
+					if done {
+						return true, nil
+					}
 
-	// if the rollout isn't done yet, keep watching deployment status
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-	intr := interrupt.New(nil, cancel)
-	return intr.Run(func() error {
-		_, err = watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, nil, func(e watch.Event) (bool, error) {
-			switch t := e.Type; t {
-			case watch.Added, watch.Modified:
-				status, done, err := statusViewer.Status(e.Object.(runtime.Unstructured), o.Revision)
-				if err != nil {
-					return false, err
+					shouldWatch := o.Watch
+					if !shouldWatch {
+						return true, nil
+					}
+
+					return false, nil
+
+				case watch.Deleted:
+					// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
+					return true, fmt.Errorf("object has been deleted")
+
+				default:
+					return true, fmt.Errorf("internal error: unexpected event %#v", e)
 				}
-				fmt.Fprintf(o.Out, "%s", status)
-				// Quit waiting if the rollout is done
-				if done {
-					return true, nil
-				}
-
-				shouldWatch := o.Watch
-				if !shouldWatch {
-					return true, nil
-				}
-
-				return false, nil
-
-			case watch.Deleted:
-				// We need to abort to avoid cases of recreation and not to silently watch the wrong (new) object
-				return true, fmt.Errorf("object has been deleted")
-
-			default:
-				return true, fmt.Errorf("internal error: unexpected event %#v", e)
-			}
+			})
+			return err
 		})
-		return err
 	})
+
+	if err != nil {
+		return err
+	}
+
+	if !resourceFound {
+		fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
+	}
+
+	return nil
 }

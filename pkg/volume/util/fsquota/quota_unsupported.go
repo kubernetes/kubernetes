@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -21,7 +22,8 @@ package fsquota
 import (
 	"errors"
 
-	"k8s.io/utils/mount"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
+	"k8s.io/mount-utils"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +33,10 @@ import (
 // for volume quotas
 
 var errNotImplemented = errors.New("not implemented")
+
+func GetQuotaOnDir(_ mount.Interface, _ string) (common.QuotaID, error) {
+	return common.BadQuotaID, errNotImplemented
+}
 
 // SupportsQuotas -- dummy implementation
 func SupportsQuotas(_ mount.Interface, _ string) (bool, error) {

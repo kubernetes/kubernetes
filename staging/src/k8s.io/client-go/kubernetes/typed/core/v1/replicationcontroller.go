@@ -20,6 +20,8 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -27,8 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ReplicationControllersGetter has a method to return a ReplicationControllerInterface.
@@ -48,6 +54,8 @@ type ReplicationControllerInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicationController, err error)
+	Apply(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error)
+	ApplyStatus(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error)
 	GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -82,7 +90,26 @@ func (c *replicationControllers) Get(ctx context.Context, name string, options m
 }
 
 // List takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
-func (c *replicationControllers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ReplicationControllerList, err error) {
+func (c *replicationControllers) List(ctx context.Context, opts metav1.ListOptions) (*v1.ReplicationControllerList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for replicationcontrollers, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for replicationcontrollers", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for replicationcontrollers ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for replicationcontrollers", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ReplicationControllers that match those selectors.
+func (c *replicationControllers) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ReplicationControllerList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -94,6 +121,23 @@ func (c *replicationControllers) List(ctx context.Context, opts metav1.ListOptio
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ReplicationControllers
+func (c *replicationControllers) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ReplicationControllerList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.ReplicationControllerList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -192,6 +236,62 @@ func (c *replicationControllers) Patch(ctx context.Context, name string, pt type
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied replicationController.
+func (c *replicationControllers) Apply(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+	result = &v1.ReplicationController{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *replicationControllers) ApplyStatus(ctx context.Context, replicationController *corev1.ReplicationControllerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ReplicationController, err error) {
+	if replicationController == nil {
+		return nil, fmt.Errorf("replicationController provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(replicationController)
+	if err != nil {
+		return nil, err
+	}
+
+	name := replicationController.Name
+	if name == nil {
+		return nil, fmt.Errorf("replicationController.Name must be provided to Apply")
+	}
+
+	result = &v1.ReplicationController{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

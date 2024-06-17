@@ -20,14 +20,20 @@ package v1alpha1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rbacv1alpha1 "k8s.io/client-go/applyconfigurations/rbac/v1alpha1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ClusterRolesGetter has a method to return a ClusterRoleInterface.
@@ -46,6 +52,7 @@ type ClusterRoleInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterRole, err error)
+	Apply(ctx context.Context, clusterRole *rbacv1alpha1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
@@ -74,7 +81,26 @@ func (c *clusterRoles) Get(ctx context.Context, name string, options v1.GetOptio
 }
 
 // List takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
-func (c *clusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+func (c *clusterRoles) List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterRoleList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for clusterroles, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for clusterroles", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for clusterroles ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for clusterroles", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ClusterRoles that match those selectors.
+func (c *clusterRoles) list(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +111,22 @@ func (c *clusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *v
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ClusterRoles
+func (c *clusterRoles) watchList(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterRoleList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1alpha1.ClusterRoleList{}
+	err = c.client.Get().
+		Resource("clusterroles").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +203,31 @@ func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied clusterRole.
+func (c *clusterRoles) Apply(ctx context.Context, clusterRole *rbacv1alpha1.ClusterRoleApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterRole, err error) {
+	if clusterRole == nil {
+		return nil, fmt.Errorf("clusterRole provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(clusterRole)
+	if err != nil {
+		return nil, err
+	}
+	name := clusterRole.Name
+	if name == nil {
+		return nil, fmt.Errorf("clusterRole.Name must be provided to Apply")
+	}
+	result = &v1alpha1.ClusterRole{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("clusterroles").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

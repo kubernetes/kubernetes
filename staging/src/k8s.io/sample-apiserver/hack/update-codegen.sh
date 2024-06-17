@@ -21,21 +21,33 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
-# generate the code with:
-# --output-base    because this script should also be able to run inside the vendor dir of
-#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
-#                  instead of the $GOPATH directly. For normal projects this can be dropped.
-bash "${CODEGEN_PKG}/generate-groups.sh" all \
-  k8s.io/sample-apiserver/pkg/generated k8s.io/sample-apiserver/pkg/apis \
-  "wardle:v1alpha1,v1beta1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
+source "${CODEGEN_PKG}/kube_codegen.sh"
 
-bash "${CODEGEN_PKG}/generate-internal-groups.sh" "deepcopy,defaulter,conversion,openapi" \
-  k8s.io/sample-apiserver/pkg/generated k8s.io/sample-apiserver/pkg/apis k8s.io/sample-apiserver/pkg/apis \
-  "wardle:v1alpha1,v1beta1" \
-  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
+THIS_PKG="k8s.io/sample-apiserver"
 
-# To use your own boilerplate text append:
-#   --go-header-file "${SCRIPT_ROOT}/hack/custom-boilerplate.go.txt"
+kube::codegen::gen_helpers \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
+
+if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
+    report_filename="${API_KNOWN_VIOLATIONS_DIR}/sample_apiserver_violation_exceptions.list"
+    if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then
+        update_report="--update-report"
+    fi
+fi
+
+kube::codegen::gen_openapi \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated/openapi" \
+    --output-pkg "${THIS_PKG}/pkg/generated/openapi" \
+    --report-filename "${report_filename:-"/dev/null"}" \
+    ${update_report:+"${update_report}"} \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"
+
+kube::codegen::gen_client \
+    --with-watch \
+    --with-applyconfig \
+    --output-dir "${SCRIPT_ROOT}/pkg/generated" \
+    --output-pkg "${THIS_PKG}/pkg/generated" \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}/pkg/apis"

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -19,140 +20,18 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
-	"math/rand"
+	"context"
 	"net"
-	"os"
+	"reflect"
+	"runtime"
 	"testing"
-	"time"
 
-	winio "github.com/Microsoft/go-winio"
+	"github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/cri-client/pkg/util"
 )
-
-func TestParseEndpoint(t *testing.T) {
-	tests := []struct {
-		endpoint         string
-		expectError      bool
-		expectedProtocol string
-		expectedAddr     string
-	}{
-		{
-			endpoint:         "unix:///tmp/s1.sock",
-			expectedProtocol: "unix",
-			expectError:      true,
-		},
-		{
-			endpoint:         "tcp://localhost:15880",
-			expectedProtocol: "tcp",
-			expectedAddr:     "localhost:15880",
-		},
-		{
-			endpoint:         "npipe://./pipe/mypipe",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe",
-		},
-		{
-			endpoint:         "npipe:////./pipe/mypipe2",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe2",
-		},
-		{
-			endpoint:         "npipe:/pipe/mypipe3",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe3",
-		},
-		{
-			endpoint:         "npipe:\\\\.\\pipe\\mypipe4",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe4",
-		},
-		{
-			endpoint:         "npipe:\\pipe\\mypipe5",
-			expectedProtocol: "npipe",
-			expectedAddr:     "//./pipe/mypipe5",
-		},
-		{
-			endpoint:         "tcp1://abc",
-			expectedProtocol: "tcp1",
-			expectError:      true,
-		},
-		{
-			endpoint:    "a b c",
-			expectError: true,
-		},
-	}
-
-	for _, test := range tests {
-		protocol, addr, err := parseEndpoint(test.endpoint)
-		assert.Equal(t, test.expectedProtocol, protocol)
-		if test.expectError {
-			assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
-			continue
-		}
-		require.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
-		assert.Equal(t, test.expectedAddr, addr)
-	}
-
-}
-
-func testPipe(t *testing.T, label string) {
-	generatePipeName := func(suffixlen int) string {
-		rand.Seed(time.Now().UnixNano())
-		letter := []rune("abcdef0123456789")
-		b := make([]rune, suffixlen)
-		for i := range b {
-			b[i] = letter[rand.Intn(len(letter))]
-		}
-		return "\\\\.\\pipe\\test-pipe" + string(b)
-	}
-	testFile := generatePipeName(4)
-	pipeln, err := winio.ListenPipe(testFile, &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;BA)(A;;GA;;;SY)"})
-	defer pipeln.Close()
-
-	require.NoErrorf(t, err, "Failed to listen on named pipe for test purposes: %v while setting up: %s", err, label)
-	result, err := IsUnixDomainSocket(testFile)
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.False(t, result, "Unexpected result: true from IsUnixDomainSocket: %v for %s", result, label)
-}
-
-func testRegularFile(t *testing.T, label string, exists bool) {
-	f, err := ioutil.TempFile("", "test-file")
-	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
-	testFile := f.Name()
-	if !exists {
-		testFile = testFile + ".absent"
-	}
-	f.Close()
-	result, err := IsUnixDomainSocket(testFile)
-	os.Remove(f.Name())
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.False(t, result, "Unexpected result: true from IsUnixDomainSocket: %v for %s", result, label)
-}
-
-func testUnixDomainSocket(t *testing.T, label string) {
-	f, err := ioutil.TempFile("", "test-domain-socket")
-	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
-	testFile := f.Name()
-	f.Close()
-	os.Remove(testFile)
-	ta, err := net.ResolveUnixAddr("unix", testFile)
-	require.NoErrorf(t, err, "Failed to ResolveUnixAddr: %v while setting up: %s", err, label)
-	unixln, err := net.ListenUnix("unix", ta)
-	require.NoErrorf(t, err, "Failed to ListenUnix: %v while setting up: %s", err, label)
-	result, err := IsUnixDomainSocket(testFile)
-	unixln.Close()
-	assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
-	assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket: %v for %s", result, label)
-}
-
-func TestIsUnixDomainSocket(t *testing.T) {
-	testPipe(t, "Named Pipe")
-	testRegularFile(t, "Regular File that Exists", true)
-	testRegularFile(t, "Regular File that Does Not Exist", false)
-	testUnixDomainSocket(t, "Unix Domain Socket File")
-}
 
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {
@@ -192,4 +71,53 @@ func TestNormalizePath(t *testing.T) {
 	for _, test := range tests {
 		assert.Equal(t, test.normalizedPath, NormalizePath(test.originalpath))
 	}
+}
+
+func TestLocalEndpoint(t *testing.T) {
+	tests := []struct {
+		path             string
+		file             string
+		expectError      bool
+		expectedFullPath string
+	}{
+		{
+			path:             "/var/lib/kubelet/pod-resources",
+			file:             "kube.sock", // this is not the default, but it's not relevant here
+			expectError:      false,
+			expectedFullPath: `npipe://\\.\pipe\kubelet-pod-resources`,
+		},
+	}
+	for _, test := range tests {
+		fullPath, err := LocalEndpoint(test.path, test.file)
+		if test.expectError {
+			assert.NotNil(t, err, "expected error")
+			continue
+		}
+		assert.Nil(t, err, "expected no error")
+		assert.Equal(t, test.expectedFullPath, fullPath)
+	}
+}
+
+func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
+	return winio.DialPipeContext(ctx, addr)
+}
+
+func TestLocalEndpointRoundTrip(t *testing.T) {
+	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
+	expectedDialerName := runtime.FuncForPC(npipeDialPointer).Name()
+	expectedAddress := "//./pipe/kubelet-pod-resources"
+
+	fullPath, err := LocalEndpoint(`pod-resources`, "kubelet")
+	require.NoErrorf(t, err, "Failed to create the local endpoint path")
+
+	address, dialer, err := util.GetAddressAndDialer(fullPath)
+	require.NoErrorf(t, err, "Failed to parse the endpoint path and get back address and dialer (path=%q)", fullPath)
+
+	dialerPointer := reflect.ValueOf(dialer).Pointer()
+	actualDialerName := runtime.FuncForPC(dialerPointer).Name()
+
+	assert.Equalf(t, npipeDialPointer, dialerPointer,
+		"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
+
+	assert.Equal(t, expectedAddress, address)
 }

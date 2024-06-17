@@ -1,10 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-network-driver-approvers
+  - sig-network-approvers
 emeritus_approvers:
-- matchstick
+  - matchstick
 reviewers:
-- sig-network-reviewers
+  - sig-network-reviewers
 labels:
-- sig/network
+  - sig/network

@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -32,6 +33,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 
 	samplecontroller "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
 	"k8s.io/sample-controller/pkg/generated/clientset/versioned/fake"
@@ -81,14 +83,14 @@ func newFoo(name string, replicas *int32) *samplecontroller.Foo {
 	}
 }
 
-func (f *fixture) newController() (*Controller, informers.SharedInformerFactory, kubeinformers.SharedInformerFactory) {
+func (f *fixture) newController(ctx context.Context) (*Controller, informers.SharedInformerFactory, kubeinformers.SharedInformerFactory) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	f.kubeclient = k8sfake.NewSimpleClientset(f.kubeobjects...)
 
 	i := informers.NewSharedInformerFactory(f.client, noResyncPeriodFunc())
 	k8sI := kubeinformers.NewSharedInformerFactory(f.kubeclient, noResyncPeriodFunc())
 
-	c := NewController(f.kubeclient, f.client,
+	c := NewController(ctx, f.kubeclient, f.client,
 		k8sI.Apps().V1().Deployments(), i.Samplecontroller().V1alpha1().Foos())
 
 	c.foosSynced = alwaysReady
@@ -106,24 +108,22 @@ func (f *fixture) newController() (*Controller, informers.SharedInformerFactory,
 	return c, i, k8sI
 }
 
-func (f *fixture) run(fooName string) {
-	f.runController(fooName, true, false)
+func (f *fixture) run(ctx context.Context, fooName string) {
+	f.runController(ctx, fooName, true, false)
 }
 
-func (f *fixture) runExpectError(fooName string) {
-	f.runController(fooName, true, true)
+func (f *fixture) runExpectError(ctx context.Context, fooName string) {
+	f.runController(ctx, fooName, true, true)
 }
 
-func (f *fixture) runController(fooName string, startInformers bool, expectError bool) {
-	c, i, k8sI := f.newController()
+func (f *fixture) runController(ctx context.Context, fooName string, startInformers bool, expectError bool) {
+	c, i, k8sI := f.newController(ctx)
 	if startInformers {
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-		i.Start(stopCh)
-		k8sI.Start(stopCh)
+		i.Start(ctx.Done())
+		k8sI.Start(ctx.Done())
 	}
 
-	err := c.syncHandler(fooName)
+	err := c.syncHandler(ctx, fooName)
 	if !expectError && err != nil {
 		f.t.Errorf("error syncing foo: %v", err)
 	} else if expectError && err == nil {
@@ -236,9 +236,7 @@ func (f *fixture) expectUpdateDeploymentAction(d *apps.Deployment) {
 }
 
 func (f *fixture) expectUpdateFooStatusAction(foo *samplecontroller.Foo) {
-	action := core.NewUpdateAction(schema.GroupVersionResource{Resource: "foos"}, foo.Namespace, foo)
-	// TODO: Until #38113 is merged, we can't use Subresource
-	//action.Subresource = "status"
+	action := core.NewUpdateSubresourceAction(schema.GroupVersionResource{Resource: "foos"}, "status", foo.Namespace, foo)
 	f.actions = append(f.actions, action)
 }
 
@@ -254,6 +252,7 @@ func getKey(foo *samplecontroller.Foo, t *testing.T) string {
 func TestCreatesDeployment(t *testing.T) {
 	f := newFixture(t)
 	foo := newFoo("test", int32Ptr(1))
+	_, ctx := ktesting.NewTestContext(t)
 
 	f.fooLister = append(f.fooLister, foo)
 	f.objects = append(f.objects, foo)
@@ -262,12 +261,14 @@ func TestCreatesDeployment(t *testing.T) {
 	f.expectCreateDeploymentAction(expDeployment)
 	f.expectUpdateFooStatusAction(foo)
 
-	f.run(getKey(foo, t))
+	f.run(ctx, getKey(foo, t))
 }
 
 func TestDoNothing(t *testing.T) {
 	f := newFixture(t)
 	foo := newFoo("test", int32Ptr(1))
+	_, ctx := ktesting.NewTestContext(t)
+
 	d := newDeployment(foo)
 
 	f.fooLister = append(f.fooLister, foo)
@@ -276,12 +277,14 @@ func TestDoNothing(t *testing.T) {
 	f.kubeobjects = append(f.kubeobjects, d)
 
 	f.expectUpdateFooStatusAction(foo)
-	f.run(getKey(foo, t))
+	f.run(ctx, getKey(foo, t))
 }
 
 func TestUpdateDeployment(t *testing.T) {
 	f := newFixture(t)
 	foo := newFoo("test", int32Ptr(1))
+	_, ctx := ktesting.NewTestContext(t)
+
 	d := newDeployment(foo)
 
 	// Update replicas
@@ -295,12 +298,14 @@ func TestUpdateDeployment(t *testing.T) {
 
 	f.expectUpdateFooStatusAction(foo)
 	f.expectUpdateDeploymentAction(expDeployment)
-	f.run(getKey(foo, t))
+	f.run(ctx, getKey(foo, t))
 }
 
 func TestNotControlledByUs(t *testing.T) {
 	f := newFixture(t)
 	foo := newFoo("test", int32Ptr(1))
+	_, ctx := ktesting.NewTestContext(t)
+
 	d := newDeployment(foo)
 
 	d.ObjectMeta.OwnerReferences = []metav1.OwnerReference{}
@@ -310,7 +315,7 @@ func TestNotControlledByUs(t *testing.T) {
 	f.deploymentLister = append(f.deploymentLister, d)
 	f.kubeobjects = append(f.kubeobjects, d)
 
-	f.runExpectError(getKey(foo, t))
+	f.runExpectError(ctx, getKey(foo, t))
 }
 
 func int32Ptr(i int32) *int32 { return &i }

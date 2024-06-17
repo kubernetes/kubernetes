@@ -19,7 +19,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// Environ reads process environments from /proc/<pid>/environ
+// Environ reads process environments from `/proc/<pid>/environ`.
 func (p Proc) Environ() ([]string, error) {
 	environments := make([]string, 0)
 

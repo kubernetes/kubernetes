@@ -27,19 +27,19 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // WaitForServiceDeletedWithFinalizer waits for the service with finalizer to be deleted.
-func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
+func WaitForServiceDeletedWithFinalizer(ctx context.Context, cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
-	if err := cs.CoreV1().Services(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
+	if err := cs.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
 		framework.Failf("Failed to delete service %s/%s", namespace, name)
 	}
 
 	ginkgo.By("Wait for service to disappear")
-	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if pollErr := wait.PollUntilContextTimeout(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), true, func(ctx context.Context) (bool, error) {
+		svc, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				framework.Logf("Service %s/%s is gone.", namespace, name)
@@ -56,10 +56,10 @@ func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name 
 
 // WaitForServiceUpdatedWithFinalizer waits for the service to be updated to have or
 // don't have a finalizer.
-func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name string, hasFinalizer bool) {
+func WaitForServiceUpdatedWithFinalizer(ctx context.Context, cs clientset.Interface, namespace, name string, hasFinalizer bool) {
 	ginkgo.By(fmt.Sprintf("Wait for service to hasFinalizer=%t", hasFinalizer))
-	if pollErr := wait.PollImmediate(LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if pollErr := wait.PollUntilContextTimeout(ctx, LoadBalancerPollInterval, GetServiceLoadBalancerCreationTimeout(ctx, cs), true, func(ctx context.Context) (bool, error) {
+		svc, err := cs.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

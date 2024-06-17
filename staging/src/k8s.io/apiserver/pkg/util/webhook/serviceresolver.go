@@ -38,7 +38,8 @@ func NewDefaultServiceResolver() ServiceResolver {
 // note that the name, namespace, and port are required and by default all
 // created addresses use HTTPS scheme.
 // for example:
-//  name=ross namespace=andromeda resolves to https://ross.andromeda.svc:443
+//
+//	name=ross namespace=andromeda resolves to https://ross.andromeda.svc:443
 func (sr defaultServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	if len(name) == 0 || len(namespace) == 0 || port == 0 {
 		return nil, errors.New("cannot resolve an empty service name or namespace or port")

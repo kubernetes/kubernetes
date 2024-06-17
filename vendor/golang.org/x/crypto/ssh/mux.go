@@ -231,6 +231,12 @@ func (m *mux) onePacket() error {
 		return m.handleChannelOpen(packet)
 	case msgGlobalRequest, msgRequestSuccess, msgRequestFailure:
 		return m.handleGlobalPacket(packet)
+	case msgPing:
+		var msg pingMsg
+		if err := Unmarshal(packet, &msg); err != nil {
+			return fmt.Errorf("failed to unmarshal ping@openssh.com message: %w", err)
+		}
+		return m.sendMessage(pongMsg(msg))
 	}
 
 	// assume a channel packet.
@@ -240,7 +246,7 @@ func (m *mux) onePacket() error {
 	id := binary.BigEndian.Uint32(packet[1:])
 	ch := m.chanList.getChan(id)
 	if ch == nil {
-		return fmt.Errorf("ssh: invalid channel %d", id)
+		return m.handleUnknownChannelPacket(id, packet)
 	}
 
 	return ch.handlePacket(packet)
@@ -326,5 +332,26 @@ func (m *mux) openChannel(chanType string, extra []byte) (*channel, error) {
 		return nil, &OpenChannelError{msg.Reason, msg.Message}
 	default:
 		return nil, fmt.Errorf("ssh: unexpected packet in response to channel open: %T", msg)
+	}
+}
+
+func (m *mux) handleUnknownChannelPacket(id uint32, packet []byte) error {
+	msg, err := decode(packet)
+	if err != nil {
+		return err
+	}
+
+	switch msg := msg.(type) {
+	// RFC 4254 section 5.4 says unrecognized channel requests should
+	// receive a failure response.
+	case *channelRequestMsg:
+		if msg.WantReply {
+			return m.sendMessage(channelRequestFailureMsg{
+				PeersID: msg.PeersID,
+			})
+		}
+		return nil
+	default:
+		return fmt.Errorf("ssh: invalid channel %d", id)
 	}
 }

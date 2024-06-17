@@ -1,274 +1,68 @@
 rules:
-  - selectorRegexp: k8s[.]io/kubernetes/pkg/
-    allowedPrefixes:
-      - k8s.io/kubernetes/pkg/api/legacyscheme
-      - k8s.io/kubernetes/pkg/api/service
-      - k8s.io/kubernetes/pkg/api/v1/pod
-      - k8s.io/kubernetes/pkg/api/v1/resource
-      - k8s.io/kubernetes/pkg/api/v1/service
-      - k8s.io/kubernetes/pkg/api/pod
-      - k8s.io/kubernetes/pkg/apis/apps
-      - k8s.io/kubernetes/pkg/apis/apps/validation
-      - k8s.io/kubernetes/pkg/apis/autoscaling
-      - k8s.io/kubernetes/pkg/apis/batch
-      - k8s.io/kubernetes/pkg/apis/certificates
-      - k8s.io/kubernetes/pkg/apis/certificates/v1
-      - k8s.io/kubernetes/pkg/apis/core
-      - k8s.io/kubernetes/pkg/apis/core/helper
-      - k8s.io/kubernetes/pkg/apis/core/install
-      - k8s.io/kubernetes/pkg/apis/core/pods
-      - k8s.io/kubernetes/pkg/apis/core/v1
-      - k8s.io/kubernetes/pkg/apis/core/v1/helper
-      - k8s.io/kubernetes/pkg/apis/core/v1/helper/qos
-      - k8s.io/kubernetes/pkg/apis/core/validation
-      - k8s.io/kubernetes/pkg/apis/extensions
-      - k8s.io/kubernetes/pkg/apis/networking
-      - k8s.io/kubernetes/pkg/apis/policy
-      - k8s.io/kubernetes/pkg/apis/policy/validation
-      - k8s.io/kubernetes/pkg/apis/scheduling
-      - k8s.io/kubernetes/pkg/apis/storage/v1/util
-      - k8s.io/kubernetes/pkg/capabilities
-      - k8s.io/kubernetes/pkg/client/conditions
-      - k8s.io/kubernetes/pkg/cloudprovider/providers
-      - k8s.io/kubernetes/pkg/controller
-      - k8s.io/kubernetes/pkg/controller/deployment/util
-      - k8s.io/kubernetes/pkg/controller/nodelifecycle
-      - k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler
-      - k8s.io/kubernetes/pkg/controller/service
-      - k8s.io/kubernetes/pkg/controller/util/node
-      - k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util
-      - k8s.io/kubernetes/pkg/controller/volume/scheduling
-      - k8s.io/kubernetes/pkg/credentialprovider
-      - k8s.io/kubernetes/pkg/credentialprovider/aws
-      - k8s.io/kubernetes/pkg/credentialprovider/azure
-      - k8s.io/kubernetes/pkg/credentialprovider/gcp
-      - k8s.io/kubernetes/pkg/credentialprovider/secrets
-      - k8s.io/kubernetes/pkg/features
-      - k8s.io/kubernetes/pkg/fieldpath
-      - k8s.io/kubernetes/pkg/kubectl
-      - k8s.io/kubernetes/pkg/kubectl/apps
-      - k8s.io/kubernetes/pkg/kubectl/describe
-      - k8s.io/kubernetes/pkg/kubectl/describe/versioned
-      - k8s.io/kubernetes/pkg/kubectl/scheme
-      - k8s.io/kubernetes/pkg/kubectl/util
-      - k8s.io/kubernetes/pkg/kubectl/util/certificate
-      - k8s.io/kubernetes/pkg/kubectl/util/deployment
-      - k8s.io/kubernetes/pkg/kubectl/util/event
-      - k8s.io/kubernetes/pkg/kubectl/util/fieldpath
-      - k8s.io/kubernetes/pkg/kubectl/util/podutils
-      - k8s.io/kubernetes/pkg/kubectl/util/qos
-      - k8s.io/kubernetes/pkg/kubectl/util/rbac
-      - k8s.io/kubernetes/pkg/kubectl/util/resource
-      - k8s.io/kubernetes/pkg/kubectl/util/slice
-      - k8s.io/kubernetes/pkg/kubectl/util/storage
-      - k8s.io/kubernetes/pkg/kubelet
-      - k8s.io/kubernetes/pkg/kubelet/apis
-      - k8s.io/kubernetes/pkg/kubelet/apis/config
-      - k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1
-      - k8s.io/kubernetes/pkg/kubelet/cadvisor
-      - k8s.io/kubernetes/pkg/kubelet/certificate
-      - k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap
-      - k8s.io/kubernetes/pkg/kubelet/checkpoint
-      - k8s.io/kubernetes/pkg/kubelet/checkpointmanager
-      - k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum
-      - k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors
-      - k8s.io/kubernetes/pkg/kubelet/cloudresource
-      - k8s.io/kubernetes/pkg/kubelet/cm
-      - k8s.io/kubernetes/pkg/kubelet/cm/cpumanager
-      - k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap
-      - k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state
-      - k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology
-      - k8s.io/kubernetes/pkg/kubelet/cm/cpuset
-      - k8s.io/kubernetes/pkg/kubelet/cm/devicemanager
-      - k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint
-      - k8s.io/kubernetes/pkg/kubelet/cm/topologymanager
-      - k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask
-      - k8s.io/kubernetes/pkg/kubelet/cm/util
-      - k8s.io/kubernetes/pkg/kubelet/config
-      - k8s.io/kubernetes/pkg/kubelet/configmap
-      - k8s.io/kubernetes/pkg/kubelet/container
-      - k8s.io/kubernetes/pkg/kubelet/dockershim
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/cm
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/metrics
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics
-      - k8s.io/kubernetes/pkg/kubelet/dockershim/remote
-      - k8s.io/kubernetes/pkg/kubelet/envvars
-      - k8s.io/kubernetes/pkg/kubelet/eviction
-      - k8s.io/kubernetes/pkg/kubelet/eviction/api
-      - k8s.io/kubernetes/pkg/kubelet/events
-      - k8s.io/kubernetes/pkg/kubelet/images
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log
-      - k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/panic
-      - k8s.io/kubernetes/pkg/kubelet/kuberuntime
-      - k8s.io/kubernetes/pkg/kubelet/kuberuntime/logs
-      - k8s.io/kubernetes/pkg/kubelet/leaky
-      - k8s.io/kubernetes/pkg/kubelet/lifecycle
-      - k8s.io/kubernetes/pkg/kubelet/logs
-      - k8s.io/kubernetes/pkg/kubelet/metrics
-      - k8s.io/kubernetes/pkg/kubelet/network/dns
-      - k8s.io/kubernetes/pkg/kubelet/nodelease
-      - k8s.io/kubernetes/pkg/kubelet/nodestatus
-      - k8s.io/kubernetes/pkg/kubelet/oom
-      - k8s.io/kubernetes/pkg/kubelet/pleg
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/metrics
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta1
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2
-      - k8s.io/kubernetes/pkg/kubelet/pluginmanager/reconciler
-      - k8s.io/kubernetes/pkg/kubelet/pod
-      - k8s.io/kubernetes/pkg/kubelet/preemption
-      - k8s.io/kubernetes/pkg/kubelet/prober
-      - k8s.io/kubernetes/pkg/kubelet/prober/results
-      - k8s.io/kubernetes/pkg/kubelet/qos
-      - k8s.io/kubernetes/pkg/kubelet/remote
-      - k8s.io/kubernetes/pkg/kubelet/runtimeclass
-      - k8s.io/kubernetes/pkg/kubelet/server
-      - k8s.io/kubernetes/pkg/kubelet/server/metrics
-      - k8s.io/kubernetes/pkg/kubelet/server/portforward
-      - k8s.io/kubernetes/pkg/kubelet/server/remotecommand
-      - k8s.io/kubernetes/pkg/kubelet/server/stats
-      - k8s.io/kubernetes/pkg/kubelet/server/streaming
-      - k8s.io/kubernetes/pkg/kubelet/stats
-      - k8s.io/kubernetes/pkg/kubelet/stats/pidlimit
-      - k8s.io/kubernetes/pkg/kubelet/status
-      - k8s.io/kubernetes/pkg/kubelet/secret
-      - k8s.io/kubernetes/pkg/kubelet/sysctl
-      - k8s.io/kubernetes/pkg/kubelet/types
-      - k8s.io/kubernetes/pkg/kubelet/token
-      - k8s.io/kubernetes/pkg/kubelet/util
-      - k8s.io/kubernetes/pkg/kubelet/util/format
-      - k8s.io/kubernetes/pkg/kubelet/util/manager
-      - k8s.io/kubernetes/pkg/kubelet/util/store
-      - k8s.io/kubernetes/pkg/kubelet/volumemanager
-      - k8s.io/kubernetes/pkg/kubelet/volumemanager/cache
-      - k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics
-      - k8s.io/kubernetes/pkg/kubelet/volumemanager/populator
-      - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
-      - k8s.io/kubernetes/pkg/kubemark
-      - k8s.io/kubernetes/pkg/master/ports
-      - k8s.io/kubernetes/pkg/probe
-      - k8s.io/kubernetes/pkg/probe/exec
-      - k8s.io/kubernetes/pkg/probe/http
-      - k8s.io/kubernetes/pkg/probe/tcp
-      - k8s.io/kubernetes/pkg/proxy
-      - k8s.io/kubernetes/pkg/proxy/apis
-      - k8s.io/kubernetes/pkg/proxy/apis/config
-      - k8s.io/kubernetes/pkg/proxy/apis/config/scheme
-      - k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1
-      - k8s.io/kubernetes/pkg/proxy/apis/config/validation
-      - k8s.io/kubernetes/pkg/proxy/config
-      - k8s.io/kubernetes/pkg/proxy/healthcheck
-      - k8s.io/kubernetes/pkg/proxy/iptables
-      - k8s.io/kubernetes/pkg/proxy/ipvs
-      - k8s.io/kubernetes/pkg/proxy/metaproxier
-      - k8s.io/kubernetes/pkg/proxy/metrics
-      - k8s.io/kubernetes/pkg/proxy/userspace
-      - k8s.io/kubernetes/pkg/proxy/util
-      - k8s.io/kubernetes/pkg/registry/core/service/allocator
-      - k8s.io/kubernetes/pkg/registry/core/service/portallocator
-      - k8s.io/kubernetes/pkg/scheduler/api
-      - k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper
-      - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity
-      - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename
-      - k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports
-      - k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources
-      - k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1
-      - k8s.io/kubernetes/pkg/scheduler/framework/runtime
-      - k8s.io/kubernetes/pkg/scheduler/internal/parallelize
-      - k8s.io/kubernetes/pkg/scheduler/listers
-      - k8s.io/kubernetes/pkg/scheduler/metrics
-      - k8s.io/kubernetes/pkg/scheduler/nodeinfo
-      - k8s.io/kubernetes/pkg/scheduler/util
-      - k8s.io/kubernetes/pkg/scheduler/volumebinder
-      - k8s.io/kubernetes/pkg/security/apparmor
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl
-      - k8s.io/kubernetes/pkg/security/podsecuritypolicy/util
-      - k8s.io/kubernetes/pkg/securitycontext
-      - k8s.io/kubernetes/pkg/serviceaccount
-      - k8s.io/kubernetes/pkg/util/async
-      - k8s.io/kubernetes/pkg/util/bandwidth
-      - k8s.io/kubernetes/pkg/util/config
-      - k8s.io/kubernetes/pkg/util/configz
-      - k8s.io/kubernetes/pkg/util/conntrack
-      - k8s.io/kubernetes/pkg/util/ebtables
-      - k8s.io/kubernetes/pkg/util/env
-      - k8s.io/kubernetes/pkg/util/filesystem
-      - k8s.io/kubernetes/pkg/util/flag
-      - k8s.io/kubernetes/pkg/util/flock
-      - k8s.io/kubernetes/pkg/util/goroutinemap
-      - k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff
-      - k8s.io/kubernetes/pkg/util/hash
-      - k8s.io/kubernetes/pkg/util/ipset
-      - k8s.io/kubernetes/pkg/util/iptables
-      - k8s.io/kubernetes/pkg/util/ipvs
-      - k8s.io/kubernetes/pkg/util/labels
-      - k8s.io/kubernetes/pkg/util/node
-      - k8s.io/kubernetes/pkg/util/oom
-      - k8s.io/kubernetes/pkg/util/parsers
-      - k8s.io/kubernetes/pkg/util/pod
-      - k8s.io/kubernetes/pkg/util/procfs
-      - k8s.io/kubernetes/pkg/util/removeall
-      - k8s.io/kubernetes/pkg/util/resizefs
-      - k8s.io/kubernetes/pkg/util/rlimit
-      - k8s.io/kubernetes/pkg/util/selinux
-      - k8s.io/kubernetes/pkg/util/slice
-      - k8s.io/kubernetes/pkg/util/sysctl
-      - k8s.io/kubernetes/pkg/util/system
-      - k8s.io/kubernetes/pkg/util/tail
-      - k8s.io/kubernetes/pkg/util/taints
-      - k8s.io/kubernetes/pkg/volume
-      - k8s.io/kubernetes/pkg/volume/util
-      - k8s.io/kubernetes/pkg/volume/util/fs
-      - k8s.io/kubernetes/pkg/volume/util/fsquota
-      - k8s.io/kubernetes/pkg/volume/util/recyclerclient
-      - k8s.io/kubernetes/pkg/volume/util/subpath
-      - k8s.io/kubernetes/pkg/volume/util/types
-      - k8s.io/kubernetes/pkg/volume/util/volumepathhandler
-      # TODO: I have no idea why import-boss --include-test-files is yelling about these for k8s.io/kubernetes/test/e2e/framework/providers/kubemark
-      - k8s.io/kubernetes/pkg/apis/authentication
-      - k8s.io/kubernetes/pkg/apis/authentication/v1
-      - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
-      - k8s.io/kubernetes/pkg/scheduler/internal/cache
-  - selectorRegexp: k8s[.]io/kubernetes/test/
-    allowedPrefixes:
-      - k8s.io/kubernetes/test/e2e/framework
-      - k8s.io/kubernetes/test/e2e/framework/auth
-      - k8s.io/kubernetes/test/e2e/framework/ginkgowrapper
-      - k8s.io/kubernetes/test/e2e/framework/kubectl
-      - k8s.io/kubernetes/test/e2e/framework/log
-      - k8s.io/kubernetes/test/e2e/framework/metrics
-      - k8s.io/kubernetes/test/e2e/framework/network
-      - k8s.io/kubernetes/test/e2e/framework/node
-      - k8s.io/kubernetes/test/e2e/framework/pod
-      - k8s.io/kubernetes/test/e2e/framework/rc
-      - k8s.io/kubernetes/test/e2e/framework/resource
-      - k8s.io/kubernetes/test/e2e/framework/service
-      - k8s.io/kubernetes/test/e2e/framework/ssh
-      - k8s.io/kubernetes/test/e2e/framework/testfiles
-      - k8s.io/kubernetes/test/e2e/framework/websocket
-      - k8s.io/kubernetes/test/e2e/manifest
-      - k8s.io/kubernetes/test/e2e/perftype
-      - k8s.io/kubernetes/test/e2e/storage/utils
-      - k8s.io/kubernetes/test/e2e/system
-      - k8s.io/kubernetes/test/utils
-      - k8s.io/kubernetes/test/utils/image
-  # TODO: why is this here?
-  - selectorRegexp: k8s[.]io/kubernetes/third_party/
-    allowedPrefixes:
-    - k8s.io/kubernetes/third_party/forked/golang/expansion
+  # The core E2E framework is meant to be a normal Kubernetes client,
+  # which means that it shouldn't depend on internal code.
+  # The following packages are okay to use:
+  #
+  # public API
+  - selectorRegexp: ^k8s[.]io/(api|apimachinery|client-go|component-base|klog|pod-security-admission|utils)
+    allowedPrefixes: [ "" ]
+
+  # stdlib
+  - selectorRegexp: ^[a-z]+(/|$)
+    allowedPrefixes: [ "" ]
+
+  # stdlib x and proto
+  - selectorRegexp: ^golang.org/x|^google.golang.org/protobuf
+    allowedPrefixes: [ "" ]
+
+  # Ginkgo + Gomega
+  - selectorRegexp: ^github.com/onsi/(ginkgo|gomega)
+    allowedPrefixes: [ "" ]
+
+  # kube-openapi
+  - selectorRegexp: ^k8s.io/kube-openapi
+    allowedPrefixes: [ "" ]
+
+  # Public SIG Repos
+  - selectorRegexp: ^sigs.k8s.io/(json|yaml|structured-merge-diff)
+    allowedPrefixes: [ "" ]
+
+  # some of the shared test helpers (but not E2E sub-packages!)
+  - selectorRegexp: ^k8s[.]io/kubernetes/test/(e2e/framework/internal/|utils)
+    allowedPrefixes: [ "" ]
+
+  # Third party deps
+  - selectorRegexp: ^github.com/|^gopkg.in
+    allowedPrefixes: [
+      "gopkg.in/inf.v0",
+      "gopkg.in/yaml.v2",
+      "gopkg.in/evanphx/json-patch.v4",
+      "github.com/blang/semver/",
+      "github.com/davecgh/go-spew/spew",
+      "github.com/go-logr/logr",
+      "github.com/gogo/protobuf/proto",
+      "github.com/gogo/protobuf/sortkeys",
+      "github.com/golang/protobuf/proto",
+      "github.com/google/gnostic-models/openapiv2",
+      "github.com/google/gnostic-models/openapiv3",
+      "github.com/google/go-cmp/cmp",
+      "github.com/google/go-cmp/cmp/cmpopts",
+      "github.com/google/gofuzz",
+      "github.com/google/uuid",
+      "github.com/imdario/mergo",
+      "github.com/prometheus/client_golang/",
+      "github.com/prometheus/client_model/",
+      "github.com/prometheus/common/",
+      "github.com/prometheus/procfs",
+      "github.com/spf13/cobra",
+      "github.com/spf13/pflag",
+      "github.com/stretchr/testify/assert",
+      "github.com/stretchr/testify/require"
+    ]
+
+  # Everything else isn't.
+  #
+  # In particular importing any test/e2e/framework/* package would be a
+  # violation (sub-packages get to use the framework, not the other way
+  # around).
+  - selectorRegexp: .

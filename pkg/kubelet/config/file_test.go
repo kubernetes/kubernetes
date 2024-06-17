@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +34,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer removeAll(dirName, t)
 
 	fileName := filepath.Join(dirName, "test_pod_config")
-	err = ioutil.WriteFile(fileName, []byte{1, 2, 3}, 0555)
+	err = os.WriteFile(fileName, []byte{1, 2, 3}, 0555)
 	if err != nil {
 		t.Fatalf("unable to write test file %#v", err)
 	}
@@ -74,7 +73,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 }
 
 func mkTempDir(prefix string) (string, error) {
-	return ioutil.TempDir(os.TempDir(), prefix)
+	return os.MkdirTemp(os.TempDir(), prefix)
 }
 
 func removeAll(dir string, t *testing.T) {

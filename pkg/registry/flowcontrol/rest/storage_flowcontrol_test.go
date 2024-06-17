@@ -18,156 +18,37 @@ package rest
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/client-go/kubernetes/fake"
-	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
+	"time"
 )
 
-func TestShouldEnsurePredefinedSettings(t *testing.T) {
-	testCases := []struct {
-		name                  string
-		existingPriorityLevel *flowcontrolv1alpha1.PriorityLevelConfiguration
-		expected              bool
-	}{
-		{
-			name:                  "should ensure if exempt priority-level is absent",
-			existingPriorityLevel: nil,
-			expected:              true,
-		},
-		{
-			name:                  "should not ensure if exempt priority-level is present",
-			existingPriorityLevel: bootstrap.MandatoryPriorityLevelConfigurationExempt,
-			expected:              false,
-		},
+func TestContextFromChannelAndMaxWaitDurationWithChannelClosed(t *testing.T) {
+	stopCh := make(chan struct{})
+	ctx, cancel := contextFromChannelAndMaxWaitDuration(stopCh, time.Hour)
+	defer cancel()
+
+	select {
+	case <-ctx.Done():
+		t.Fatalf("Expected the derived context to be not cancelled, but got: %v", ctx.Err())
+	default:
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			c := fake.NewSimpleClientset()
-			if testCase.existingPriorityLevel != nil {
-				c.FlowcontrolV1alpha1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel, metav1.CreateOptions{})
-			}
-			should, err := lastMandatoryExists(c.FlowcontrolV1alpha1())
-			assert.NoError(t, err)
-			assert.Equal(t, testCase.expected, should)
-		})
+	close(stopCh)
+
+	<-ctx.Done()
+	if ctx.Err() != context.Canceled {
+		t.Errorf("Expected the context to be canceled with: %v, but got: %v", context.Canceled, ctx.Err())
 	}
 }
 
-func TestFlowSchemaHasWrongSpec(t *testing.T) {
-	fs1 := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{},
-	}
-	fs2 := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
-			MatchingPrecedence: 1,
-		},
-	}
-	fs1Defaulted := &flowcontrolv1alpha1.FlowSchema{
-		Spec: flowcontrolv1alpha1.FlowSchemaSpec{
-			MatchingPrecedence: flowcontrolapisv1alpha1.FlowSchemaDefaultMatchingPrecedence,
-		},
-	}
-	testCases := []struct {
-		name         string
-		expected     *flowcontrolv1alpha1.FlowSchema
-		actual       *flowcontrolv1alpha1.FlowSchema
-		hasWrongSpec bool
-	}{
-		{
-			name:         "identical flow-schemas should work",
-			expected:     bootstrap.MandatoryFlowSchemaCatchAll,
-			actual:       bootstrap.MandatoryFlowSchemaCatchAll,
-			hasWrongSpec: false,
-		},
-		{
-			name:         "defaulted flow-schemas should work",
-			expected:     fs1,
-			actual:       fs1Defaulted,
-			hasWrongSpec: false,
-		},
-		{
-			name:         "non-defaulted flow-schema has wrong spec",
-			expected:     fs1,
-			actual:       fs2,
-			hasWrongSpec: true,
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			w, err := flowSchemaHasWrongSpec(testCase.expected, testCase.actual)
-			require.NoError(t, err)
-			assert.Equal(t, testCase.hasWrongSpec, w)
-		})
-	}
-}
+func TestContextFromChannelAndMaxWaitDurationWithMaxWaitElapsed(t *testing.T) {
+	stopCh := make(chan struct{})
+	ctx, cancel := contextFromChannelAndMaxWaitDuration(stopCh, 100*time.Millisecond)
+	defer cancel()
 
-func TestPriorityLevelHasWrongSpec(t *testing.T) {
-	pl1 := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeReject,
-				},
-			},
-		},
-	}
-	pl2 := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: 1,
-			},
-		},
-	}
-	pl1Defaulted := &flowcontrolv1alpha1.PriorityLevelConfiguration{
-		Spec: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1alpha1.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1alpha1.LimitedPriorityLevelConfiguration{
-				AssuredConcurrencyShares: flowcontrolapisv1alpha1.PriorityLevelConfigurationDefaultAssuredConcurrencyShares,
-				LimitResponse: flowcontrolv1alpha1.LimitResponse{
-					Type: flowcontrolv1alpha1.LimitResponseTypeReject,
-				},
-			},
-		},
-	}
-	testCases := []struct {
-		name         string
-		expected     *flowcontrolv1alpha1.PriorityLevelConfiguration
-		actual       *flowcontrolv1alpha1.PriorityLevelConfiguration
-		hasWrongSpec bool
-	}{
-		{
-			name:         "identical priority-level should work",
-			expected:     bootstrap.MandatoryPriorityLevelConfigurationCatchAll,
-			actual:       bootstrap.MandatoryPriorityLevelConfigurationCatchAll,
-			hasWrongSpec: false,
-		},
-		{
-			name:         "defaulted priority-level should work",
-			expected:     pl1,
-			actual:       pl1Defaulted,
-			hasWrongSpec: false,
-		},
-		{
-			name:         "non-defaulted priority-level has wrong spec",
-			expected:     pl1,
-			actual:       pl2,
-			hasWrongSpec: true,
-		},
-	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			w, err := priorityLevelHasWrongSpec(testCase.expected, testCase.actual)
-			require.NoError(t, err)
-			assert.Equal(t, testCase.hasWrongSpec, w)
-		})
+	<-ctx.Done()
+
+	if ctx.Err() != context.Canceled {
+		t.Errorf("Expected the context to be canceled with: %v, but got: %v", context.Canceled, ctx.Err())
 	}
 }

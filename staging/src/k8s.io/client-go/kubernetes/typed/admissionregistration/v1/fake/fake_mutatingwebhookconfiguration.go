@@ -20,13 +20,15 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -35,34 +37,36 @@ type FakeMutatingWebhookConfigurations struct {
 	Fake *FakeAdmissionregistrationV1
 }
 
-var mutatingwebhookconfigurationsResource = schema.GroupVersionResource{Group: "admissionregistration.k8s.io", Version: "v1", Resource: "mutatingwebhookconfigurations"}
+var mutatingwebhookconfigurationsResource = v1.SchemeGroupVersion.WithResource("mutatingwebhookconfigurations")
 
-var mutatingwebhookconfigurationsKind = schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}
+var mutatingwebhookconfigurationsKind = v1.SchemeGroupVersion.WithKind("MutatingWebhookConfiguration")
 
 // Get takes name of the mutatingWebhookConfiguration, and returns the corresponding mutatingWebhookConfiguration object, and an error if there is any.
-func (c *FakeMutatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
+func (c *FakeMutatingWebhookConfigurations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.MutatingWebhookConfiguration, err error) {
+	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(mutatingwebhookconfigurationsResource, name), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootGetAction(mutatingwebhookconfigurationsResource, name), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
-	return obj.(*admissionregistrationv1.MutatingWebhookConfiguration), err
+	return obj.(*v1.MutatingWebhookConfiguration), err
 }
 
 // List takes label and field selectors, and returns the list of MutatingWebhookConfigurations that match those selectors.
-func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *admissionregistrationv1.MutatingWebhookConfigurationList, err error) {
+func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.MutatingWebhookConfigurationList, err error) {
+	emptyResult := &v1.MutatingWebhookConfigurationList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(mutatingwebhookconfigurationsResource, mutatingwebhookconfigurationsKind, opts), &admissionregistrationv1.MutatingWebhookConfigurationList{})
+		Invokes(testing.NewRootListAction(mutatingwebhookconfigurationsResource, mutatingwebhookconfigurationsKind, opts), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 
 	label, _, _ := testing.ExtractFromListOptions(opts)
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &admissionregistrationv1.MutatingWebhookConfigurationList{ListMeta: obj.(*admissionregistrationv1.MutatingWebhookConfigurationList).ListMeta}
-	for _, item := range obj.(*admissionregistrationv1.MutatingWebhookConfigurationList).Items {
+	list := &v1.MutatingWebhookConfigurationList{ListMeta: obj.(*v1.MutatingWebhookConfigurationList).ListMeta}
+	for _, item := range obj.(*v1.MutatingWebhookConfigurationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -71,52 +75,77 @@ func (c *FakeMutatingWebhookConfigurations) List(ctx context.Context, opts v1.Li
 }
 
 // Watch returns a watch.Interface that watches the requested mutatingWebhookConfigurations.
-func (c *FakeMutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeMutatingWebhookConfigurations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewRootWatchAction(mutatingwebhookconfigurationsResource, opts))
 }
 
 // Create takes the representation of a mutatingWebhookConfiguration and creates it.  Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *FakeMutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, opts v1.CreateOptions) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
+func (c *FakeMutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1.MutatingWebhookConfiguration, opts metav1.CreateOptions) (result *v1.MutatingWebhookConfiguration, err error) {
+	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootCreateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
-	return obj.(*admissionregistrationv1.MutatingWebhookConfiguration), err
+	return obj.(*v1.MutatingWebhookConfiguration), err
 }
 
 // Update takes the representation of a mutatingWebhookConfiguration and updates it. Returns the server's representation of the mutatingWebhookConfiguration, and an error, if there is any.
-func (c *FakeMutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
+func (c *FakeMutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1.MutatingWebhookConfiguration, opts metav1.UpdateOptions) (result *v1.MutatingWebhookConfiguration, err error) {
+	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootUpdateAction(mutatingwebhookconfigurationsResource, mutatingWebhookConfiguration), emptyResult)
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
-	return obj.(*admissionregistrationv1.MutatingWebhookConfiguration), err
+	return obj.(*v1.MutatingWebhookConfiguration), err
 }
 
 // Delete takes name of the mutatingWebhookConfiguration and deletes it. Returns an error if one occurs.
-func (c *FakeMutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeMutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(mutatingwebhookconfigurationsResource, name), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootDeleteActionWithOptions(mutatingwebhookconfigurationsResource, name, opts), &v1.MutatingWebhookConfiguration{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeMutatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeMutatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewRootDeleteCollectionAction(mutatingwebhookconfigurationsResource, listOpts)
 
-	_, err := c.Fake.Invokes(action, &admissionregistrationv1.MutatingWebhookConfigurationList{})
+	_, err := c.Fake.Invokes(action, &v1.MutatingWebhookConfigurationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched mutatingWebhookConfiguration.
-func (c *FakeMutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1.MutatingWebhookConfiguration, err error) {
+func (c *FakeMutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.MutatingWebhookConfiguration, err error) {
+	emptyResult := &v1.MutatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, pt, data, subresources...), &admissionregistrationv1.MutatingWebhookConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, name, pt, data, subresources...), emptyResult)
 	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.MutatingWebhookConfiguration), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied mutatingWebhookConfiguration.
+func (c *FakeMutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfigurationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.MutatingWebhookConfiguration, err error) {
+	if mutatingWebhookConfiguration == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(mutatingWebhookConfiguration)
+	if err != nil {
 		return nil, err
 	}
-	return obj.(*admissionregistrationv1.MutatingWebhookConfiguration), err
+	name := mutatingWebhookConfiguration.Name
+	if name == nil {
+		return nil, fmt.Errorf("mutatingWebhookConfiguration.Name must be provided to Apply")
+	}
+	emptyResult := &v1.MutatingWebhookConfiguration{}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(mutatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data), emptyResult)
+	if obj == nil {
+		return emptyResult, err
+	}
+	return obj.(*v1.MutatingWebhookConfiguration), err
 }

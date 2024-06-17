@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Cache stores the PodStatus for the pods. It represents *all* the visible
@@ -36,7 +38,10 @@ import (
 // cache entries.
 type Cache interface {
 	Get(types.UID) (*PodStatus, error)
-	Set(types.UID, *PodStatus, error, time.Time)
+	// Set updates the cache by setting the PodStatus for the pod only
+	// if the data is newer than the cache based on the provided
+	// time stamp. Returns if the cache was updated.
+	Set(types.UID, *PodStatus, error, time.Time) (updated bool)
 	// GetNewerThan is a blocking call that only returns the status
 	// when it is newer than the given time.
 	GetNewerThan(types.UID, time.Time) (*PodStatus, error)
@@ -93,12 +98,22 @@ func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error
 	return d.status, d.err
 }
 
-// Set sets the PodStatus for the pod.
-func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) {
+// Set sets the PodStatus for the pod only if the data is newer than the cache
+func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.Time) (updated bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	defer c.notify(id, timestamp)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		// Set the value in the cache only if it's not present already
+		// or the timestamp in the cache is older than the current update timestamp
+		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
+			return false
+		}
+	}
+
 	c.pods[id] = &data{status: status, err: err, modified: timestamp}
+	c.notify(id, timestamp)
+	return true
 }
 
 // Delete removes the entry of the pod.
@@ -108,8 +123,8 @@ func (c *cache) Delete(id types.UID) {
 	delete(c.pods, id)
 }
 
-//  UpdateTime modifies the global timestamp of the cache and notify
-//  subscribers if needed.
+// UpdateTime modifies the global timestamp of the cache and notify
+// subscribers if needed.
 func (c *cache) UpdateTime(timestamp time.Time) {
 	c.lock.Lock()
 	defer c.lock.Unlock()

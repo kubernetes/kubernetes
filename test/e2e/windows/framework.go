@@ -17,19 +17,29 @@ limitations under the License.
 package windows
 
 import (
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
-// SIGDescribe annotates the test with the SIG label.
-func SIGDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[sig-windows] "+text, func() {
+// sigDescribe annotates the test with the SIG label.
+// Use this together with skipUnlessWindows to define
+// tests that only run if the node OS is Windows:
+//
+//	sigDescribe("foo", skipUnlessWindows(func() { ... }))
+var sigDescribe = framework.SIGDescribe("windows")
+
+// skipUnlessWindows wraps some other Ginkgo callback such that
+// a BeforeEach runs before tests defined by that callback which
+// skips those tests unless the node OS is Windows.
+func skipUnlessWindows(cb func()) func() {
+	return func() {
 		ginkgo.BeforeEach(func() {
 			// all tests in this package are Windows specific
 			e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 		})
 
-		body()
-	})
+		cb()
+	}
 }

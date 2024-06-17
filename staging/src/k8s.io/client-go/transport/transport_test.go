@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 )
@@ -94,6 +95,13 @@ stR0Yiw0buV6DL/moUO0HIM9Bjh96HJp+LxiIS6UCdIhMPp5HoQa
 )
 
 func TestNew(t *testing.T) {
+	globalGetCert := &GetCertHolder{
+		GetCert: func() (*tls.Certificate, error) { return nil, nil },
+	}
+	globalDial := &DialHolder{
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+	}
+
 	testCases := map[string]struct {
 		Config       *Config
 		Err          bool
@@ -139,6 +147,14 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					CAFile: "invalid file",
+				},
+			},
+		},
+		"bad ca data transport": {
+			Err: true,
+			Config: &Config{
+				TLS: TLSConfig{
+					CAData: []byte(rootCACert + "this is not valid"),
 				},
 			},
 		},
@@ -201,9 +217,11 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
-					GetCert: func() (*tls.Certificate, error) {
-						crt, err := tls.X509KeyPair([]byte(certData), []byte(keyData))
-						return &crt, err
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) {
+							crt, err := tls.X509KeyPair([]byte(certData), []byte(keyData))
+							return &crt, err
+						},
 					},
 				},
 			},
@@ -215,8 +233,10 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
-					GetCert: func() (*tls.Certificate, error) {
-						return nil, errors.New("GetCert failure")
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) {
+							return nil, errors.New("GetCert failure")
+						},
 					},
 				},
 			},
@@ -227,8 +247,10 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
-					GetCert: func() (*tls.Certificate, error) {
-						return nil, nil
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) {
+							return nil, nil
+						},
 					},
 					CertData: []byte(certData),
 					KeyData:  []byte(keyData),
@@ -241,11 +263,95 @@ func TestNew(t *testing.T) {
 			Config: &Config{
 				TLS: TLSConfig{
 					CAData: []byte(rootCACert),
-					GetCert: func() (*tls.Certificate, error) {
-						return nil, nil
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) {
+							return nil, nil
+						},
 					},
 				},
 			},
+		},
+		"nil holders": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: nil,
+				},
+				DialHolder: nil,
+			},
+			Err:          false,
+			TLS:          false,
+			TLSCert:      false,
+			TLSErr:       false,
+			Default:      true,
+			Insecure:     false,
+			DefaultRoots: false,
+		},
+		"non-nil dial holder and nil internal": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: nil,
+				},
+				DialHolder: &DialHolder{},
+			},
+			Err: true,
+		},
+		"non-nil cert holder and nil internal": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: &GetCertHolder{},
+				},
+				DialHolder: nil,
+			},
+			Err: true,
+		},
+		"non-nil dial holder+internal": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: nil,
+				},
+				DialHolder: &DialHolder{
+					Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+				},
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      false,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
+		},
+		"non-nil cert holder+internal": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) { return nil, nil },
+					},
+				},
+				DialHolder: nil,
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      true,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
+		},
+		"non-nil holders+internal with global address": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCertHolder: globalGetCert,
+				},
+				DialHolder: globalDial,
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      true,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
 		},
 	}
 	for k, testCase := range testCases {

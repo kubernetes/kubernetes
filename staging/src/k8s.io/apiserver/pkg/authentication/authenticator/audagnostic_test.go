@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -219,7 +219,7 @@ func TestAuthenticate(t *testing.T) {
 							t.Errorf("Unexpected authentication. got=%v, want=%v", got, want)
 						}
 						if got, want := resp, treq.wantResp; !reflect.DeepEqual(got, want) {
-							t.Errorf("Unexpected response. diff:\n%v", diff.ObjectGoPrintDiff(got, want))
+							t.Errorf("Unexpected response. diff:\n%v", cmp.Diff(got, want))
 						}
 					})
 				}

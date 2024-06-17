@@ -17,30 +17,29 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
-	"context"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestAdmission(t *testing.T) {
-	masterConfig := framework.NewMasterConfig()
-	masterConfig.GenericConfig.EnableProfiling = true
-	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
+	tCtx := ktesting.Init(t)
+	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerConfig: func(cfg *controlplane.Config) {
+			cfg.ControlPlane.Generic.EnableProfiling = true
+			cfg.ControlPlane.Generic.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+		},
+	})
+	defer tearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("default-toleration-seconds", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(client, "default-toleration-seconds", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,7 +56,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(tCtx, &pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}

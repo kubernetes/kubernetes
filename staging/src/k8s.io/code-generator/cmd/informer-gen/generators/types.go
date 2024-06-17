@@ -16,7 +16,7 @@ limitations under the License.
 
 package generators
 
-import "k8s.io/gengo/types"
+import "k8s.io/gengo/v2/types"
 
 var (
 	apiScheme                   = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
@@ -28,6 +28,7 @@ var (
 	cacheNewGenericLister       = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewGenericLister"}
 	cacheNewSharedIndexInformer = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformer"}
 	cacheSharedIndexInformer    = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformer"}
+	cacheTransformFunc          = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "TransformFunc"}
 	listOptions                 = types.Name{Package: "k8s.io/kubernetes/pkg/apis/core", Name: "ListOptions"}
 	reflectType                 = types.Name{Package: "reflect", Name: "Type"}
 	runtimeObject               = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}

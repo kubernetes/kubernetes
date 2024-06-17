@@ -17,7 +17,19 @@ spec:
     spec:
       terminationGracePeriodSeconds: 0
       containers:
-      - image: k8s.gcr.io/nginx-ingress-controller:0.9.0-beta.1
+      - image: registry.k8s.io/ingress-nginx/controller:v0.46.0
+        args:
+        - /nginx-ingress-controller
+        - --election-id=ingress-controller-leader
+        - --ingress-class=nginx
+        securityContext:
+          capabilities:
+              drop:
+              - ALL
+              add:
+              - NET_BIND_SERVICE
+          runAsUser: 101
+          allowPrivilegeEscalation: true
         livenessProbe:
           httpGet:
             path: /healthz
@@ -41,11 +53,3 @@ spec:
           hostPort: 80
         - containerPort: 443
           hostPort: 443
-        # we expose 18080 to access nginx stats in url /nginx-status
-        # this is optional
-        - containerPort: 18080
-          hostPort: 18080
-        args:
-        - /nginx-ingress-controller
-        - --default-backend-service=kube-system/default-http-backend
-        - --publish-service=$(POD_NAMESPACE)/nginx-ingress-lb

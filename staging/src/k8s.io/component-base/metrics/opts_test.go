@@ -17,9 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestDefaultStabilityLevel(t *testing.T) {
@@ -36,9 +38,9 @@ func TestDefaultStabilityLevel(t *testing.T) {
 			expectPanic: false,
 		},
 		{
-			name:        "ALPHA remain unchanged",
-			inputValue:  ALPHA,
-			expectValue: ALPHA,
+			name:        "INTERNAL remain unchanged",
+			inputValue:  INTERNAL,
+			expectValue: INTERNAL,
 			expectPanic: false,
 		},
 		{
@@ -56,6 +58,83 @@ func TestDefaultStabilityLevel(t *testing.T) {
 
 			stability.setDefaults()
 			assert.Equalf(t, tc.expectValue, stability, "Got %s, expected: %v ", stability, tc.expectValue)
+		})
+	}
+}
+
+func TestConstrainToAllowedList(t *testing.T) {
+	allowList := &MetricLabelAllowList{
+		labelToAllowList: map[string]sets.String{
+			"label_a": sets.NewString("allow_value1", "allow_value2"),
+		},
+	}
+	labelNameList := []string{"label_a", "label_b"}
+	var tests = []struct {
+		name                 string
+		inputLabelValueList  []string
+		outputLabelValueList []string
+	}{
+		{
+			"no unexpected value",
+			[]string{"allow_value1", "label_b_value"},
+			[]string{"allow_value1", "label_b_value"},
+		},
+		{
+			"with unexpected value",
+			[]string{"not_allowed", "label_b_value"},
+			[]string{"unexpected", "label_b_value"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			allowList.ConstrainToAllowedList(labelNameList, test.inputLabelValueList)
+			if !reflect.DeepEqual(test.inputLabelValueList, test.outputLabelValueList) {
+				t.Errorf("Got %v, expected %v", test.inputLabelValueList, test.outputLabelValueList)
+			}
+		})
+	}
+}
+
+func TestConstrainLabelMap(t *testing.T) {
+	allowList := &MetricLabelAllowList{
+		labelToAllowList: map[string]sets.String{
+			"label_a": sets.NewString("allow_value1", "allow_value2"),
+		},
+	}
+	var tests = []struct {
+		name           string
+		inputLabelMap  map[string]string
+		outputLabelMap map[string]string
+	}{
+		{
+			"no unexpected value",
+			map[string]string{
+				"label_a": "allow_value1",
+				"label_b": "label_b_value",
+			},
+			map[string]string{
+				"label_a": "allow_value1",
+				"label_b": "label_b_value",
+			},
+		},
+		{
+			"with unexpected value",
+			map[string]string{
+				"label_a": "not_allowed",
+				"label_b": "label_b_value",
+			},
+			map[string]string{
+				"label_a": "unexpected",
+				"label_b": "label_b_value",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			allowList.ConstrainLabelMap(test.inputLabelMap)
+			if !reflect.DeepEqual(test.inputLabelMap, test.outputLabelMap) {
+				t.Errorf("Got %v, expected %v", test.inputLabelMap, test.outputLabelMap)
+			}
 		})
 	}
 }

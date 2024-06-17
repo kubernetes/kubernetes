@@ -1,0 +1,23 @@
+StorageClass:
+  FromExistingClassName: example
+VolumeAttributesClass:
+  FromExistingClassName: example-vac
+DriverInfo:
+  Name: example
+  RequiredAccessModes:
+  - ReadWriteOnce
+  Capabilities:
+    persistence: true
+    multipods: true
+    exec: true
+    block: true
+    fsGroup: true
+    topology: true
+    controllerExpansion: true
+    nodeExpansion: true
+    volumeLimits: false
+    snapshotDataSource: true
+  StressTestOptions:
+    NumPods: 10
+    NumRestarts: 20
+    NumSnapshots: 10

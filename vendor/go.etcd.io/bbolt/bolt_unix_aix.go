@@ -1,3 +1,4 @@
+//go:build aix
 // +build aix
 
 package bbolt

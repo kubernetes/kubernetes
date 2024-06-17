@@ -16,6 +16,10 @@ func TestEqualities(t *testing.T) {
 	type Baz struct {
 		Y Bar
 	}
+	type Zap struct {
+		A []int
+		B map[string][]int
+	}
 	err := e.AddFuncs(
 		func(a, b int) bool {
 			return a+1 == b
@@ -32,10 +36,12 @@ func TestEqualities(t *testing.T) {
 		X int
 	}
 
-	table := []struct {
+	type Case struct {
 		a, b  interface{}
 		equal bool
-	}{
+	}
+
+	table := []Case{
 		{1, 2, true},
 		{2, 1, false},
 		{"foo", "fo", false},
@@ -67,6 +73,26 @@ func TestEqualities(t *testing.T) {
 
 	for _, item := range table {
 		if e, a := item.equal, e.DeepEqual(item.a, item.b); e != a {
+			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
+		}
+	}
+
+	// Cases which hinge upon implicit nil/empty map/slice equality
+	implicitTable := []Case{
+		{map[string][]int{}, map[string][]int(nil), true},
+		{[]int{}, []int(nil), true},
+		{map[string][]int{"foo": nil}, map[string][]int{"foo": {}}, true},
+		{Zap{A: nil, B: map[string][]int{"foo": nil}}, Zap{A: []int{}, B: map[string][]int{"foo": {}}}, true},
+	}
+
+	for _, item := range implicitTable {
+		if e, a := item.equal, e.DeepEqual(item.a, item.b); e != a {
+			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
+		}
+	}
+
+	for _, item := range implicitTable {
+		if e, a := !item.equal, e.DeepEqualWithNilDifferentFromEmpty(item.a, item.b); e != a {
 			t.Errorf("Expected (%+v == %+v) == %v, but got %v", item.a, item.b, e, a)
 		}
 	}

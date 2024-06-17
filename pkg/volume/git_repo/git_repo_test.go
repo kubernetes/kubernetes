@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -36,7 +37,7 @@ import (
 )
 
 func newTestHost(t *testing.T) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "git_repo_test.")
+	tempDir, err := ioutil.TempDir("", "git_repo_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -51,7 +52,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -266,6 +267,20 @@ func TestPlugin(t *testing.T) {
 			},
 			isExpectedFailure: true,
 		},
+		{
+			name: "invalid-revision-directory-combo",
+			vol: &v1.Volume{
+				Name: "vol1",
+				VolumeSource: v1.VolumeSource{
+					GitRepo: &v1.GitRepoVolumeSource{
+						Repository: gitURL,
+						Revision:   "main",
+						Directory:  "foo/bar",
+					},
+				},
+			},
+			isExpectedFailure: true,
+		},
 	}
 
 	for _, scenario := range scenarios {
@@ -296,7 +311,7 @@ func doTestPlugin(scenario struct {
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Can't find the plugin by name"))
+			fmt.Errorf("can't find the plugin by name"))
 		return allErrs
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
@@ -304,20 +319,20 @@ func doTestPlugin(scenario struct {
 
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Failed to make a new Mounter: %v", err))
+			fmt.Errorf("failed to make a new Mounter: %w", err))
 		return allErrs
 	}
 	if mounter == nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got a nil Mounter"))
+			fmt.Errorf("got a nil Mounter"))
 		return allErrs
 	}
 
 	path := mounter.GetPath()
-	suffix := fmt.Sprintf("pods/poduid/volumes/kubernetes.io~git-repo/%v", scenario.vol.Name)
+	suffix := filepath.Join("pods/poduid/volumes/kubernetes.io~git-repo", scenario.vol.Name)
 	if !strings.HasSuffix(path, suffix) {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got unexpected path: %s", path))
+			fmt.Errorf("got unexpected path: %s", path))
 		return allErrs
 	}
 
@@ -353,18 +368,18 @@ func doTestPlugin(scenario struct {
 	unmounter, err := plug.NewUnmounter("vol1", types.UID("poduid"))
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Failed to make a new Unmounter: %v", err))
+			fmt.Errorf("failed to make a new Unmounter: %w", err))
 		return allErrs
 	}
 	if unmounter == nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got a nil Unmounter"))
+			fmt.Errorf("got a nil Unmounter"))
 		return allErrs
 	}
 
 	if err := unmounter.TearDown(); err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Expected success, got: %v", err))
+			fmt.Errorf("expected success, got: %w", err))
 		return allErrs
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -372,7 +387,7 @@ func doTestPlugin(scenario struct {
 			fmt.Errorf("TearDown() failed, volume path still exists: %s", path))
 	} else if !os.IsNotExist(err) {
 		allErrs = append(allErrs,
-			fmt.Errorf("TearDown() failed: %v", err))
+			fmt.Errorf("TearDown() failed: %w", err))
 	}
 	return allErrs
 }
@@ -390,10 +405,20 @@ func doTestSetUp(scenario struct {
 	var fakeOutputs []fakeexec.FakeAction
 	var fcmd fakeexec.FakeCmd
 	for _, expected := range expecteds {
+		expected := expected
 		if expected.cmd[1] == "clone" {
+			// Calculate the subdirectory clone would create (if any)
+			// git clone -- https://github.com/kubernetes/kubernetes.git target_dir --> target_dir
+			// git clone -- https://github.com/kubernetes/kubernetes.git            --> kubernetes
+			// git clone -- https://github.com/kubernetes/kubernetes.git .          --> .
+			// git clone -- https://github.com/kubernetes/kubernetes.git ./.        --> .
+			cloneSubdir := path.Base(expected.cmd[len(expected.cmd)-1])
+			if cloneSubdir == "kubernetes.git" {
+				cloneSubdir = "kubernetes"
+			}
 			fakeOutputs = append(fakeOutputs, func() ([]byte, []byte, error) {
 				// git clone, it creates new dir/files
-				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir), 0750)
+				os.MkdirAll(filepath.Join(fcmd.Dirs[0], expected.dir, cloneSubdir), 0750)
 				return []byte{}, nil, nil
 			})
 		} else {
@@ -415,14 +440,17 @@ func doTestSetUp(scenario struct {
 		})
 
 	}
-	fake := fakeexec.FakeExec{
+	fake := &fakeexec.FakeExec{
 		CommandScript: fakeAction,
 	}
 
 	g := mounter.(*gitRepoVolumeMounter)
-	g.exec = &fake
+	g.exec = fake
 
-	g.SetUp(volume.MounterArgs{})
+	err := g.SetUp(volume.MounterArgs{})
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,
@@ -439,7 +467,7 @@ func doTestSetUp(scenario struct {
 
 	var expectedPaths []string
 	for _, expected := range expecteds {
-		expectedPaths = append(expectedPaths, g.GetPath()+expected.dir)
+		expectedPaths = append(expectedPaths, filepath.Join(g.GetPath(), expected.dir))
 	}
 	if len(fcmd.Dirs) != len(expectedPaths) || !reflect.DeepEqual(expectedPaths, fcmd.Dirs) {
 		allErrs = append(allErrs,

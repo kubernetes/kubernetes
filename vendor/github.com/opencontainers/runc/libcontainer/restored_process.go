@@ -1,9 +1,7 @@
-// +build linux
-
 package libcontainer
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 
@@ -11,9 +9,7 @@ import (
 )
 
 func newRestoredProcess(cmd *exec.Cmd, fds []string) (*restoredProcess, error) {
-	var (
-		err error
-	)
+	var err error
 	pid := cmd.Process.Pid
 	stat, err := system.Stat(pid)
 	if err != nil {
@@ -33,7 +29,7 @@ type restoredProcess struct {
 }
 
 func (p *restoredProcess) start() error {
-	return newGenericError(fmt.Errorf("restored process cannot be started"), SystemError)
+	return errors.New("restored process cannot be started")
 }
 
 func (p *restoredProcess) pid() int {
@@ -53,7 +49,8 @@ func (p *restoredProcess) wait() (*os.ProcessState, error) {
 	// maybe use --exec-cmd in criu
 	err := p.cmd.Wait()
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); !ok {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
 			return nil, err
 		}
 	}
@@ -77,7 +74,8 @@ func (p *restoredProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *restoredProcess) forwardChildLogs() {
+func (p *restoredProcess) forwardChildLogs() chan error {
+	return nil
 }
 
 // nonChildProcess represents a process where the calling process is not
@@ -90,7 +88,7 @@ type nonChildProcess struct {
 }
 
 func (p *nonChildProcess) start() error {
-	return newGenericError(fmt.Errorf("restored process cannot be started"), SystemError)
+	return errors.New("restored process cannot be started")
 }
 
 func (p *nonChildProcess) pid() int {
@@ -98,11 +96,11 @@ func (p *nonChildProcess) pid() int {
 }
 
 func (p *nonChildProcess) terminate() error {
-	return newGenericError(fmt.Errorf("restored process cannot be terminated"), SystemError)
+	return errors.New("restored process cannot be terminated")
 }
 
 func (p *nonChildProcess) wait() (*os.ProcessState, error) {
-	return nil, newGenericError(fmt.Errorf("restored process cannot be waited on"), SystemError)
+	return nil, errors.New("restored process cannot be waited on")
 }
 
 func (p *nonChildProcess) startTime() (uint64, error) {
@@ -125,5 +123,6 @@ func (p *nonChildProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *nonChildProcess) forwardChildLogs() {
+func (p *nonChildProcess) forwardChildLogs() chan error {
+	return nil
 }

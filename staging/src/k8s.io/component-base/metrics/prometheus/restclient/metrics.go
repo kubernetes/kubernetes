@@ -17,6 +17,8 @@ limitations under the License.
 package restclient
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"net/url"
 	"time"
@@ -27,38 +29,84 @@ import (
 )
 
 var (
-	// requestLatency is a Prometheus Summary metric type partitioned by
-	// "verb" and "url" labels. It is used for the rest client latency metrics.
+	// requestLatency is a Prometheus Histogram metric type partitioned by
+	// "verb", and "host" labels. It is used for the rest client latency metrics.
 	requestLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
-			Name:    "rest_client_request_duration_seconds",
-			Help:    "Request latency in seconds. Broken down by verb and URL.",
-			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			Name:           "rest_client_request_duration_seconds",
+			Help:           "Request latency in seconds. Broken down by verb, and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
+	)
+
+	// resolverLatency is a Prometheus Histogram metric type partitioned by
+	// "host" labels. It is used for the rest client DNS resolver latency metrics.
+	resolverLatency = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_dns_resolution_duration_seconds",
+			Help:           "DNS resolver latency in seconds. Broken down by host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0},
+		},
+		[]string{"host"},
+	)
+
+	requestSize = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_request_size_bytes",
+			Help:           "Request size in bytes. Broken down by verb and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			// 64 bytes to 16MB
+			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
+		},
+		[]string{"verb", "host"},
+	)
+
+	responseSize = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_response_size_bytes",
+			Help:           "Response size in bytes. Broken down by verb and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			// 64 bytes to 16MB
+			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
+		},
+		[]string{"verb", "host"},
 	)
 
 	rateLimiterLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
-			Name:    "rest_client_rate_limiter_duration_seconds",
-			Help:    "Client side rate limiter latency in seconds. Broken down by verb and URL.",
-			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			Name:           "rest_client_rate_limiter_duration_seconds",
+			Help:           "Client side rate limiter latency in seconds. Broken down by verb, and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
 	)
 
 	requestResult = k8smetrics.NewCounterVec(
 		&k8smetrics.CounterOpts{
-			Name: "rest_client_requests_total",
-			Help: "Number of HTTP requests, partitioned by status code, method, and host.",
+			Name:           "rest_client_requests_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of HTTP requests, partitioned by status code, method, and host.",
 		},
 		[]string{"code", "method", "host"},
+	)
+
+	requestRetry = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_request_retries_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of request retries, partitioned by status code, verb, and host.",
+		},
+		[]string{"code", "verb", "host"},
 	)
 
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
 
 	execPluginCertTTL = k8smetrics.NewGaugeFunc(
-		k8smetrics.GaugeOpts{
+		&k8smetrics.GaugeOpts{
 			Name: "rest_client_exec_plugin_ttl_seconds",
 			Help: "Gauge of the shortest TTL (time-to-live) of the client " +
 				"certificate(s) managed by the auth exec plugin. The value " +
@@ -88,6 +136,7 @@ var (
 			//   - 4 hours - 1 month: captures an ideal rotation cadence.
 			//   - 3 months - 4 years: captures a rotation cadence which is
 			//     is probably too slow or much too slow.
+			StabilityLevel: k8smetrics.ALPHA,
 			Buckets: []float64{
 				600,       // 10 minutes
 				1800,      // 30 minutes
@@ -103,20 +152,64 @@ var (
 			},
 		},
 	)
+
+	execPluginCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			StabilityLevel: k8smetrics.ALPHA,
+			Name:           "rest_client_exec_plugin_call_total",
+			Help: "Number of calls to an exec plugin, partitioned by the type of " +
+				"event encountered (no_error, plugin_execution_error, plugin_not_found_error, " +
+				"client_internal_error) and an optional exit code. The exit code will " +
+				"be set to 0 if and only if the plugin call was successful.",
+		},
+		[]string{"code", "call_status"},
+	)
+
+	transportCacheEntries = k8smetrics.NewGauge(
+		&k8smetrics.GaugeOpts{
+			Name:           "rest_client_transport_cache_entries",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help:           "Number of transport entries in the internal cache.",
+		},
+	)
+
+	transportCacheCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name:           "rest_client_transport_create_calls_total",
+			StabilityLevel: k8smetrics.ALPHA,
+			Help: "Number of calls to get a new transport, partitioned by the result of the operation " +
+				"hit: obtained from the cache, miss: created and added to the cache, uncacheable: created and not cached",
+		},
+		[]string{"result"},
+	)
 )
 
 func init() {
 
 	legacyregistry.MustRegister(requestLatency)
+	legacyregistry.MustRegister(requestSize)
+	legacyregistry.MustRegister(responseSize)
+	legacyregistry.MustRegister(rateLimiterLatency)
 	legacyregistry.MustRegister(requestResult)
+	legacyregistry.MustRegister(requestRetry)
 	legacyregistry.RawMustRegister(execPluginCertTTL)
 	legacyregistry.MustRegister(execPluginCertRotation)
+	legacyregistry.MustRegister(execPluginCalls)
+	legacyregistry.MustRegister(transportCacheEntries)
+	legacyregistry.MustRegister(transportCacheCalls)
 	metrics.Register(metrics.RegisterOpts{
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
 		RequestLatency:        &latencyAdapter{m: requestLatency},
+		ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
+		RequestSize:           &sizeAdapter{m: requestSize},
+		ResponseSize:          &sizeAdapter{m: responseSize},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:         &resultAdapter{requestResult},
+		RequestRetry:          &retryAdapter{requestRetry},
+		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
+		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
+		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
 	})
 }
 
@@ -124,16 +217,32 @@ type latencyAdapter struct {
 	m *k8smetrics.HistogramVec
 }
 
-func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
-	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
+}
+
+type resolverLatencyAdapter struct {
+	m *k8smetrics.HistogramVec
+}
+
+func (l *resolverLatencyAdapter) Observe(ctx context.Context, host string, latency time.Duration) {
+	l.m.WithContext(ctx).WithLabelValues(host).Observe(latency.Seconds())
+}
+
+type sizeAdapter struct {
+	m *k8smetrics.HistogramVec
+}
+
+func (s *sizeAdapter) Observe(ctx context.Context, verb string, host string, size float64) {
+	s.m.WithContext(ctx).WithLabelValues(verb, host).Observe(size)
 }
 
 type resultAdapter struct {
 	m *k8smetrics.CounterVec
 }
 
-func (r *resultAdapter) Increment(code, method, host string) {
-	r.m.WithLabelValues(code, method, host).Inc()
+func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }
 
 type expiryToTTLAdapter struct {
@@ -150,4 +259,36 @@ type rotationAdapter struct {
 
 func (r *rotationAdapter) Observe(d time.Duration) {
 	r.m.Observe(d.Seconds())
+}
+
+type callsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *callsAdapter) Increment(code int, callStatus string) {
+	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
+}
+
+type retryAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *retryAdapter) IncrementRetry(ctx context.Context, code, method, host string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
+}
+
+type transportCacheAdapter struct {
+	m *k8smetrics.Gauge
+}
+
+func (t *transportCacheAdapter) Observe(value int) {
+	t.m.Set(float64(value))
+}
+
+type transportCacheCallsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (t *transportCacheCallsAdapter) Increment(result string) {
+	t.m.WithLabelValues(result).Inc()
 }

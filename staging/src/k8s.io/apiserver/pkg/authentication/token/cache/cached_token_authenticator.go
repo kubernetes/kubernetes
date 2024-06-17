@@ -33,12 +33,12 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 var errAuthnCrash = apierrors.NewInternalError(errors.New("authentication failed unexpectedly"))
@@ -60,6 +60,12 @@ type cacheRecord struct {
 	// based on the current time, but that may be okay since cache TTLs are generally
 	// small (seconds).
 	annotations map[string]string
+	warnings    []*cacheWarning
+}
+
+type cacheWarning struct {
+	agent string
+	text  string
 }
 
 type cachedTokenAuthenticator struct {
@@ -89,10 +95,10 @@ type cache interface {
 
 // New returns a token authenticator that caches the results of the specified authenticator. A ttl of 0 bypasses the cache.
 func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) authenticator.Token {
-	return newWithClock(authenticator, cacheErrs, successTTL, failureTTL, utilclock.RealClock{})
+	return newWithClock(authenticator, cacheErrs, successTTL, failureTTL, clock.RealClock{})
 }
 
-func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
+func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock clock.Clock) authenticator.Token {
 	randomCacheKey := make([]byte, 32)
 	if _, err := rand.Read(randomCacheKey); err != nil {
 		panic(err) // rand should never fail
@@ -129,11 +135,14 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	for key, value := range record.annotations {
 		audit.AddAuditAnnotation(ctx, key, value)
 	}
+	for _, w := range record.warnings {
+		warning.AddWarning(ctx, w.agent, w.text)
+	}
 	return record.resp, true, nil
 }
 
 func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, token string) *cacheRecord {
-	doneAuthenticating := stats.authenticating()
+	doneAuthenticating := stats.authenticating(ctx)
 
 	auds, audsOk := authenticator.AudiencesFrom(ctx)
 
@@ -145,7 +154,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 	}
 
 	// Record cache miss
-	doneBlocking := stats.blocking()
+	doneBlocking := stats.blocking(ctx)
 	defer doneBlocking()
 	defer doneAuthenticating(false)
 
@@ -153,7 +162,7 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		// always use one place to read and write the output of AuthenticateToken
 		record := &cacheRecord{}
 
-		doneFetching := stats.fetching()
+		doneFetching := stats.fetching(ctx)
 		// We're leaving the request handling stack so we need to handle crashes
 		// ourselves. Log a stack trace and return a 500 if something panics.
 		defer func() {
@@ -185,14 +194,18 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		if audsOk {
 			ctx = authenticator.WithAudiences(ctx, auds)
 		}
+		recorder := &recorder{}
+		ctx = warning.WithWarningRecorder(ctx, recorder)
 
+		ctx = audit.WithAuditContext(ctx)
+		ac := audit.AuditContextFrom(ctx)
 		// since this is shared work between multiple requests, we have no way of knowing if any
 		// particular request supports audit annotations.  thus we always attempt to record them.
-		ev := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-		ctx = request.WithAuditEvent(ctx, ev)
+		ac.Event.Level = auditinternal.LevelMetadata
 
 		record.resp, record.ok, record.err = a.authenticator.AuthenticateToken(ctx, token)
-		record.annotations = ev.Annotations
+		record.annotations = ac.Event.Annotations
+		record.warnings = recorder.extractWarnings()
 
 		if !a.cacheErrs && record.err != nil {
 			return record, nil
@@ -263,10 +276,43 @@ func writeLength(w io.Writer, b []byte, length int) {
 
 // toBytes performs unholy acts to avoid allocations
 func toBytes(s string) []byte {
-	return *(*[]byte)(unsafe.Pointer(&s))
+	// unsafe.StringData is unspecified for the empty string, so we provide a strict interpretation
+	if len(s) == 0 {
+		return nil
+	}
+	// Copied from go 1.20.1 os.File.WriteString
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/os/file.go#L246
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
 // toString performs unholy acts to avoid allocations
 func toString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	// unsafe.SliceData relies on cap whereas we want to rely on len
+	if len(b) == 0 {
+		return ""
+	}
+	// Copied from go 1.20.1 strings.Builder.String
+	// https://github.com/golang/go/blob/202a1a57064127c3f19d96df57b9f9586145e21c/src/strings/builder.go#L48
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
+
+// simple recorder that only appends warning
+type recorder struct {
+	mu       sync.Mutex
+	warnings []*cacheWarning
+}
+
+// AddWarning adds a warning to recorder.
+func (r *recorder) AddWarning(agent, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.warnings = append(r.warnings, &cacheWarning{agent: agent, text: text})
+}
+
+func (r *recorder) extractWarnings() []*cacheWarning {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	warnings := r.warnings
+	r.warnings = nil
+	return warnings
 }

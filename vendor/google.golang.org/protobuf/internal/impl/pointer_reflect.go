@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build purego || appengine
 // +build purego appengine
 
 package impl
@@ -121,6 +122,7 @@ func (p pointer) String() *string          { return p.v.Interface().(*string) }
 func (p pointer) StringPtr() **string      { return p.v.Interface().(**string) }
 func (p pointer) StringSlice() *[]string   { return p.v.Interface().(*[]string) }
 func (p pointer) Bytes() *[]byte           { return p.v.Interface().(*[]byte) }
+func (p pointer) BytesPtr() **[]byte       { return p.v.Interface().(**[]byte) }
 func (p pointer) BytesSlice() *[][]byte    { return p.v.Interface().(*[][]byte) }
 func (p pointer) WeakFields() *weakFields  { return (*weakFields)(p.v.Interface().(*WeakFields)) }
 func (p pointer) Extensions() *map[int32]ExtensionField {
@@ -155,6 +157,42 @@ func (p pointer) AppendPointerSlice(v pointer) {
 // SetPointer sets *p to v.
 func (p pointer) SetPointer(v pointer) {
 	p.v.Elem().Set(v.v)
+}
+
+func growSlice(p pointer, addCap int) {
+	// TODO: Once we only support Go 1.20 and newer, use reflect.Grow.
+	in := p.v.Elem()
+	out := reflect.MakeSlice(in.Type(), in.Len(), in.Len()+addCap)
+	reflect.Copy(out, in)
+	p.v.Elem().Set(out)
+}
+
+func (p pointer) growBoolSlice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growInt32Slice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growUint32Slice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growInt64Slice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growUint64Slice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growFloat64Slice(addCap int) {
+	growSlice(p, addCap)
+}
+
+func (p pointer) growFloat32Slice(addCap int) {
+	growSlice(p, addCap)
 }
 
 func (Export) MessageStateOf(p Pointer) *messageState     { panic("not supported") }

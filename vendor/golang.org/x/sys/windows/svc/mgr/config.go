@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build windows
+//go:build windows
 
 package mgr
 
@@ -98,6 +98,12 @@ func (s *Service) Config() (Config, error) {
 		delayedStart = true
 	}
 
+	b, err = s.queryServiceConfig2(windows.SERVICE_CONFIG_SERVICE_SID_INFO)
+	if err != nil {
+		return Config{}, err
+	}
+	sidType := *(*uint32)(unsafe.Pointer(&b[0]))
+
 	return Config{
 		ServiceType:      p.ServiceType,
 		StartType:        p.StartType,
@@ -110,6 +116,7 @@ func (s *Service) Config() (Config, error) {
 		DisplayName:      windows.UTF16PtrToString(p.DisplayName),
 		Description:      windows.UTF16PtrToString(p2.Description),
 		DelayedAutoStart: delayedStart,
+		SidType:          sidType,
 	}, nil
 }
 

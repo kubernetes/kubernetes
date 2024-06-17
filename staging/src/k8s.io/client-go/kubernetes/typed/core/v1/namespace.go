@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // NamespacesGetter has a method to return a NamespaceInterface.
@@ -46,6 +52,8 @@ type NamespaceInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NamespaceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Namespace, err error)
+	Apply(ctx context.Context, namespace *corev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error)
+	ApplyStatus(ctx context.Context, namespace *corev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error)
 	NamespaceExpansion
 }
 
@@ -74,7 +82,26 @@ func (c *namespaces) Get(ctx context.Context, name string, options metav1.GetOpt
 }
 
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
-func (c *namespaces) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NamespaceList, err error) {
+func (c *namespaces) List(ctx context.Context, opts metav1.ListOptions) (*v1.NamespaceList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for namespaces, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for namespaces", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for namespaces ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for namespaces", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Namespaces that match those selectors.
+func (c *namespaces) list(ctx context.Context, opts metav1.ListOptions) (result *v1.NamespaceList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +112,22 @@ func (c *namespaces) List(ctx context.Context, opts metav1.ListOptions) (result 
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Namespaces
+func (c *namespaces) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.NamespaceList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.NamespaceList{}
+	err = c.client.Get().
+		Resource("namespaces").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +204,60 @@ func (c *namespaces) Patch(ctx context.Context, name string, pt types.PatchType,
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied namespace.
+func (c *namespaces) Apply(ctx context.Context, namespace *corev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error) {
+	if namespace == nil {
+		return nil, fmt.Errorf("namespace provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(namespace)
+	if err != nil {
+		return nil, err
+	}
+	name := namespace.Name
+	if name == nil {
+		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
+	}
+	result = &v1.Namespace{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("namespaces").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *namespaces) ApplyStatus(ctx context.Context, namespace *corev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error) {
+	if namespace == nil {
+		return nil, fmt.Errorf("namespace provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	name := namespace.Name
+	if name == nil {
+		return nil, fmt.Errorf("namespace.Name must be provided to Apply")
+	}
+
+	result = &v1.Namespace{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("namespaces").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

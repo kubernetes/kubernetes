@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -29,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -59,10 +61,10 @@ type ClusterInfoDumpOptions struct {
 	RESTClientGetter genericclioptions.RESTClientGetter
 	LogsForObject    polymorphichelpers.LogsForObjectFunc
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdClusterInfoDump(restClientGetter genericclioptions.RESTClientGetter, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoDumpOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("json"),
 
@@ -71,11 +73,11 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmd := &cobra.Command{
 		Use:     "dump",
-		Short:   i18n.T("Dump lots of relevant info for debugging and diagnosis"),
+		Short:   i18n.T("Dump relevant information for debugging and diagnosis"),
 		Long:    dumpLong,
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Complete(restClientGetter, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -91,12 +93,12 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 var (
 	dumpLong = templates.LongDesc(i18n.T(`
-    Dumps cluster info out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
-    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, kubernetes will
-    build a set of files in that directory.  By default only dumps things in the 'kube-system' namespace, but you can
+    Dump cluster information out suitable for debugging and diagnosing cluster problems.  By default, dumps everything to
+    stdout. You can optionally specify a directory with --output-directory.  If you specify a directory, Kubernetes will
+    build a set of files in that directory.  By default, only dumps things in the current namespace and 'kube-system' namespace, but you can
     switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
 
-    The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
+    The command also dumps the logs of all of the pods in the cluster; these logs are dumped into different directories
     based on namespace and pod name.`))
 
 	dumpExample = templates.Examples(i18n.T(`
@@ -117,8 +119,8 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
 	}
-	fullFile := path.Join(dir, filename) + fileExtension
-	parent := path.Dir(fullFile)
+	fullFile := filepath.Join(dir, filename) + fileExtension
+	parent := filepath.Dir(fullFile)
 	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
 
 	file, err := os.Create(fullFile)
@@ -126,7 +128,7 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	return file
 }
 
-func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *ClusterInfoDumpOptions) Complete(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command) error {
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
 		return err
@@ -134,7 +136,7 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 
 	o.PrintObj = printer.PrintObj
 
-	config, err := f.ToRESTConfig()
+	config, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return err
 	}
@@ -154,12 +156,12 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, _, err = restClientGetter.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
-	// TODO this should eventually just be the completed kubeconfigflag struct
-	o.RESTClientGetter = f
+
+	o.RESTClientGetter = restClientGetter
 	o.LogsForObject = polymorphichelpers.LogsForObjectFn
 
 	return nil

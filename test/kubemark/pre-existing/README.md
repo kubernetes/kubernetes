@@ -32,7 +32,7 @@ master.
 ## Requirements
 
 To use the pre-existing provider, the expectation is that there's a kubemark
-master that is rechable at $MASTER_IP. The machine that the kubemark master is
+master that is reachable at $MASTER_IP. The machine that the kubemark master is
 on has to be ssh able from the host that's executing the kubemark scripts. And
 the user on that machine has to be 'kubernetes'.
 

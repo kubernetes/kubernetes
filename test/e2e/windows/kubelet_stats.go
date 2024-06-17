@@ -25,37 +25,43 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
-	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
+var _ = sigDescribe(feature.Windows, "Kubelet-Stats", framework.WithSerial(), skipUnlessWindows(func() {
+	f := framework.NewDefaultFramework("kubelet-stats-test-windows-serial")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
+
 		ginkgo.Context("when running 10 pods", func() {
 			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
-			ginkgo.It("should return within 10 seconds", func() {
+			ginkgo.It("should return within 10 seconds", func(ctx context.Context) {
 
 				ginkgo.By("Selecting a Windows node")
-				targetNode, err := findWindowsNode(f)
+				targetNode, err := findWindowsNode(ctx, f)
 				framework.ExpectNoError(err, "Error finding Windows node")
 				framework.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Scheduling 10 pods")
 				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
 				pods := newKubeletStatsTestPods(10, powershellImage, targetNode.Name)
-				f.PodClient().CreateBatch(pods)
+				e2epod.NewPodClient(f).CreateBatch(ctx, pods)
 
 				ginkgo.By("Waiting up to 3 minutes for pods to be running")
 				timeout := 3 * time.Minute
-				e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 10, 0, timeout, make(map[string]string))
+				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 10, timeout)
+				framework.ExpectNoError(err)
 
 				ginkgo.By("Getting kubelet stats 5 times and checking average duration")
 				iterations := 5
@@ -63,7 +69,7 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 
 				for i := 0; i < iterations; i++ {
 					start := time.Now()
-					nodeStats, err := e2ekubelet.GetStatsSummary(f.ClientSet, targetNode.Name)
+					nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
 					duration := time.Since(start)
 					totalDurationMs += duration.Milliseconds()
 
@@ -77,10 +83,23 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 						}
 						statsChecked = statsChecked + 1
 
-						framework.ExpectEqual(*podStats.CPU.UsageCoreNanoSeconds > 0, true, "Pod stats should not report 0 cpu usage")
-						framework.ExpectEqual(*podStats.Memory.WorkingSetBytes > 0, true, "Pod stats should not report 0 bytes for memory working set ")
+						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+						}
+						if *podStats.Memory.WorkingSetBytes <= 0 {
+							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+						}
+
+						for _, containerStats := range podStats.Containers {
+							if containerStats.Logs == nil {
+								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+							}
+							if *containerStats.Logs.AvailableBytes <= 0 {
+								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+							}
+						}
 					}
-					framework.ExpectEqual(statsChecked, 10, "Should find stats for 10 pods in kubelet stats")
+					gomega.Expect(statsChecked).To(gomega.Equal(10), "Should find stats for 10 pods in kubelet stats")
 
 					time.Sleep(5 * time.Second)
 				}
@@ -89,16 +108,110 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 
 				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
 				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
-				framework.ExpectEqual(durationMatch, true, "Collecting kubelet stats should not take longer than 10 seconds")
+				if !durationMatch {
+					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+				}
 			})
 		})
 	})
-})
+}))
+
+var _ = sigDescribe(feature.Windows, "Kubelet-Stats", skipUnlessWindows(func() {
+	f := framework.NewDefaultFramework("kubelet-stats-test-windows")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Describe("Kubelet stats collection for Windows nodes", func() {
+
+		ginkgo.Context("when windows is booted", func() {
+			ginkgo.It("should return bootid within 10 seconds", func(ctx context.Context) {
+				ginkgo.By("Selecting a Windows node")
+				targetNode, err := findWindowsNode(ctx, f)
+				framework.ExpectNoError(err, "Error finding Windows node")
+				framework.Logf("Using node: %v", targetNode.Name)
+
+				ginkgo.By("Getting bootid")
+				if len(targetNode.Status.NodeInfo.BootID) == 0 {
+					framework.Failf("expected bootId in kubelet stats, got none")
+				}
+			})
+		})
+
+		ginkgo.Context("when running 3 pods", func() {
+			// 10 seconds is the default scrape timeout for metrics-server and kube-prometheus
+			ginkgo.It("should return within 10 seconds", func(ctx context.Context) {
+
+				ginkgo.By("Selecting a Windows node")
+				targetNode, err := findWindowsNode(ctx, f)
+				framework.ExpectNoError(err, "Error finding Windows node")
+				framework.Logf("Using node: %v", targetNode.Name)
+
+				ginkgo.By("Scheduling 3 pods")
+				powershellImage := imageutils.GetConfig(imageutils.BusyBox)
+				pods := newKubeletStatsTestPods(3, powershellImage, targetNode.Name)
+				e2epod.NewPodClient(f).CreateBatch(ctx, pods)
+
+				ginkgo.By("Waiting up to 3 minutes for pods to be running")
+				timeout := 3 * time.Minute
+				err = e2epod.WaitForPodsRunningReady(ctx, f.ClientSet, f.Namespace.Name, 3, timeout)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("Getting kubelet stats 1 time")
+				iterations := 1
+				var totalDurationMs int64
+
+				for i := 0; i < iterations; i++ {
+					start := time.Now()
+					nodeStats, err := e2ekubelet.GetStatsSummary(ctx, f.ClientSet, targetNode.Name)
+					duration := time.Since(start)
+					totalDurationMs += duration.Milliseconds()
+
+					framework.ExpectNoError(err, "Error getting kubelet stats")
+
+					// Perform some basic sanity checks on retrieved stats for pods in this test's namespace
+					statsChecked := 0
+					for _, podStats := range nodeStats.Pods {
+						if podStats.PodRef.Namespace != f.Namespace.Name {
+							continue
+						}
+						statsChecked = statsChecked + 1
+
+						if *podStats.CPU.UsageCoreNanoSeconds <= 0 {
+							framework.Failf("Pod %s/%s stats report cpu usage equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.CPU.UsageCoreNanoSeconds)
+						}
+						if *podStats.Memory.WorkingSetBytes <= 0 {
+							framework.Failf("Pod %s/%s stats report bytes for memory working set equal to %v but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *podStats.Memory.WorkingSetBytes)
+						}
+
+						for _, containerStats := range podStats.Containers {
+							if containerStats.Logs == nil {
+								framework.Failf("Pod %s/%s stats should have container log stats, but it is nil", podStats.PodRef.Namespace, podStats.PodRef.Name)
+							}
+							if *containerStats.Logs.AvailableBytes <= 0 {
+								framework.Failf("Pod %s/%s container log stats report %v bytes for AvailableBytes, but it should be greater than 0", podStats.PodRef.Namespace, podStats.PodRef.Name, *containerStats.Logs.AvailableBytes)
+							}
+						}
+					}
+					gomega.Expect(statsChecked).To(gomega.Equal(3), "Should find stats for 3 pods in kubelet stats")
+
+					time.Sleep(5 * time.Second)
+				}
+
+				avgDurationMs := totalDurationMs / int64(iterations)
+
+				durationMatch := avgDurationMs <= time.Duration(10*time.Second).Milliseconds()
+				framework.Logf("Getting kubelet stats for node %v took an average of %v milliseconds over %v iterations", targetNode.Name, avgDurationMs, iterations)
+				if !durationMatch {
+					framework.Failf("Collecting kubelet stats took %v seconds but it should not take longer than 10 seconds", durationMatch)
+				}
+			})
+		})
+	})
+}))
 
 // findWindowsNode finds a Windows node that is Ready and Schedulable
-func findWindowsNode(f *framework.Framework) (v1.Node, error) {
+func findWindowsNode(ctx context.Context, f *framework.Framework) (v1.Node, error) {
 	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 
 	if err != nil {
 		return v1.Node{}, err
@@ -114,7 +227,7 @@ func findWindowsNode(f *framework.Framework) (v1.Node, error) {
 		}
 	}
 
-	if foundNode == false {
+	if !foundNode {
 		e2eskipper.Skipf("Could not find and ready and schedulable Windows nodes")
 	}
 

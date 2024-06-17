@@ -1,3 +1,4 @@
+//go:build cgo && linux
 // +build cgo,linux
 
 /*
@@ -25,30 +26,32 @@ import (
 	"path"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector]", func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, framework.WithSerial(), func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
-		pollTimeout    = 1 * time.Minute
+		pollTimeout    = 5 * time.Minute
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
@@ -68,7 +71,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 	})
 
 	// Test system log monitor. We may add other tests if we have more problem daemons in the future.
-	framework.KubeDescribe("SystemLogMonitor", func() {
+	ginkgo.Describe("SystemLogMonitor", func() {
 		const (
 			// Use test condition to avoid changing the real node condition in use.
 			// TODO(random-liu): Now node condition could be arbitrary string, consider whether we need to
@@ -76,9 +79,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 			condition = v1.NodeConditionType("TestCondition")
 
 			// File paths used in the test.
-			logFile      = "/log/test.log"
-			configFile   = "/config/testconfig.json"
-			etcLocaltime = "/etc/localtime"
+			logFile        = "/log/test.log"
+			configFile     = "/config/testconfig.json"
+			kubeConfigFile = "/config/kubeconfig"
+			etcLocaltime   = "/etc/localtime"
 
 			// Volumes used in the test.
 			configVolume    = "config"
@@ -99,7 +103,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		var lookback time.Duration
 		var eventListOptions metav1.ListOptions
 
-		ginkgo.BeforeEach(func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Calculate Lookback duration")
 			var err error
 
@@ -152,6 +156,29 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				}
 				]
 			}`
+
+			// This token is known to apiserver and its group is `system:masters`.
+			// See also the function `generateTokenFile` in `test/e2e_node/services/apiserver.go`.
+			kubeConfig := fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+users:
+- name: node-problem-detector
+  user:
+    token: %s
+clusters:
+- cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+  name: local
+contexts:
+- context:
+    cluster: local
+    user: node-problem-detector
+  name: local-context
+current-context: local-context
+`, framework.TestContext.BearerToken, framework.TestContext.Host)
+
 			ginkgo.By("Generate event list options")
 			selector := fields.Set{
 				"involvedObject.kind":      "Node",
@@ -160,24 +187,28 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				"source":                   source,
 			}.AsSelector().String()
 			eventListOptions = metav1.ListOptions{FieldSelector: selector}
-			ginkgo.By("Create the test log file")
-			framework.ExpectNoError(err)
+
 			ginkgo.By("Create config map for the node problem detector")
-			_, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
+			_, err = c.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
-				Data:       map[string]string{path.Base(configFile): config},
+				Data: map[string]string{
+					path.Base(configFile):     config,
+					path.Base(kubeConfigFile): kubeConfig,
+				},
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+
 			ginkgo.By("Create the node problem detector")
 			hostPathType := new(v1.HostPathType)
-			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
-			f.PodClient().CreateSync(&v1.Pod{
+			*hostPathType = v1.HostPathFileOrCreate
+			pod := e2epod.NewPodClient(f).CreateSync(ctx, &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
 				},
 				Spec: v1.PodSpec{
-					HostNetwork:     true,
-					SecurityContext: &v1.PodSecurityContext{},
+					HostNetwork:        true,
+					SecurityContext:    &v1.PodSecurityContext{},
+					ServiceAccountName: name,
 					Volumes: []v1.Volume{
 						{
 							Name: configVolume,
@@ -203,11 +234,39 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 							},
 						},
 					},
+					InitContainers: []v1.Container{
+						{
+							Name:    "init-log-file",
+							Image:   "debian",
+							Command: []string{"/bin/sh"},
+							Args: []string{
+								"-c",
+								fmt.Sprintf("touch %s", logFile),
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      logVolume,
+									MountPath: path.Dir(logFile),
+								},
+								{
+									Name:      localtimeVolume,
+									MountPath: etcLocaltime,
+								},
+							},
+						},
+					},
 					Containers: []v1.Container{
 						{
 							Name:    name,
 							Image:   image,
-							Command: []string{"sh", "-c", "touch " + logFile + " && /node-problem-detector --logtostderr --system-log-monitors=" + configFile + fmt.Sprintf(" --apiserver-override=%s?inClusterConfig=false", framework.TestContext.Host)},
+							Command: []string{"/node-problem-detector"},
+							Args: []string{
+								"--logtostderr",
+								fmt.Sprintf("--system-log-monitors=%s", configFile),
+								// `ServiceAccount` admission controller is disabled in node e2e tests, so we could not use
+								// inClusterConfig here.
+								fmt.Sprintf("--apiserver-override=%s?inClusterConfig=false&auth=%s", framework.TestContext.Host, kubeConfigFile),
+							},
 							Env: []v1.EnvVar{
 								{
 									Name: "NODE_NAME",
@@ -237,14 +296,12 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 					},
 				},
 			})
-			pod, err := f.PodClient().Get(context.TODO(), name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
 			// TODO: remove hardcoded kubelet volume directory path
 			// framework.TestContext.KubeVolumeDir is currently not populated for node e2e
 			hostLogFile = "/var/lib/kubelet/pods/" + string(pod.UID) + "/volumes/kubernetes.io~empty-dir" + logFile
 		})
 
-		ginkgo.It("should generate node condition and events for corresponding errors", func() {
+		ginkgo.It("should generate node condition and events for corresponding errors", func(ctx context.Context) {
 			for _, test := range []struct {
 				description      string
 				timestamp        time.Time
@@ -344,47 +401,47 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				}
 
 				ginkgo.By(fmt.Sprintf("Wait for %d temp events generated", test.tempEvents))
-				gomega.Eventually(func() error {
-					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.tempEvents, tempReason, tempMessage)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Wait for %d total events generated", test.totalEvents))
-				gomega.Eventually(func() error {
-					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyTotalEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Make sure only %d total events generated", test.totalEvents))
-				gomega.Consistently(func() error {
-					return verifyTotalEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					return verifyTotalEvents(ctx, c.CoreV1().Events(eventNamespace), eventListOptions, test.totalEvents)
 				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 
 				ginkgo.By(fmt.Sprintf("Make sure node condition %q is set", condition))
-				gomega.Eventually(func() error {
-					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				gomega.Eventually(ctx, func(ctx context.Context) error {
+					return verifyNodeCondition(ctx, c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollTimeout, pollInterval).Should(gomega.Succeed())
 				ginkgo.By(fmt.Sprintf("Make sure node condition %q is stable", condition))
-				gomega.Consistently(func() error {
-					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+				gomega.Consistently(ctx, func(ctx context.Context) error {
+					return verifyNodeCondition(ctx, c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollConsistent, pollInterval).Should(gomega.Succeed())
 			}
 		})
 
-		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
-				log, err := e2epod.GetPodLogs(c, ns, name, name)
+				log, err := e2epod.GetPodLogs(ctx, c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 				framework.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			ginkgo.By("Delete the node problem detector")
-			f.PodClient().Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(e2epod.NewPodClient(f).Delete(ctx, name, *metav1.NewDeleteOptions(0)))
 			ginkgo.By("Wait for the node problem detector to disappear")
-			gomega.Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(gomega.Succeed())
+			gomega.Expect(e2epod.WaitForPodNotFoundInNamespace(ctx, c, name, ns, pollTimeout)).To(gomega.Succeed())
 			ginkgo.By("Delete the config map")
-			c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), configName, metav1.DeleteOptions{})
+			framework.ExpectNoError(c.CoreV1().ConfigMaps(ns).Delete(ctx, configName, metav1.DeleteOptions{}))
 			ginkgo.By("Clean up the events")
-			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(context.TODO(), *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
+			gomega.Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(ctx, *metav1.NewDeleteOptions(0), eventListOptions)).To(gomega.Succeed())
 			ginkgo.By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(ctx)
 		})
 	})
 })
@@ -406,8 +463,8 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 }
 
 // verifyEvents verifies there are num specific events generated with given reason and message.
-func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
-	events, err := e.List(context.TODO(), options)
+func verifyEvents(ctx context.Context, e coreclientset.EventInterface, options metav1.ListOptions, num int, reason, message string) error {
+	events, err := e.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -425,8 +482,8 @@ func verifyEvents(e coreclientset.EventInterface, options metav1.ListOptions, nu
 }
 
 // verifyTotalEvents verifies there are num events in total.
-func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOptions, num int) error {
-	events, err := e.List(context.TODO(), options)
+func verifyTotalEvents(ctx context.Context, e coreclientset.EventInterface, options metav1.ListOptions, num int) error {
+	events, err := e.List(ctx, options)
 	if err != nil {
 		return err
 	}
@@ -441,8 +498,8 @@ func verifyTotalEvents(e coreclientset.EventInterface, options metav1.ListOption
 }
 
 // verifyNodeCondition verifies specific node condition is generated, if reason and message are empty, they will not be checked
-func verifyNodeCondition(n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
-	node, err := n.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+func verifyNodeCondition(ctx context.Context, n coreclientset.NodeInterface, condition v1.NodeConditionType, status v1.ConditionStatus, reason, message string) error {
+	node, err := n.Get(ctx, framework.TestContext.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

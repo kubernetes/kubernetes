@@ -18,9 +18,9 @@ package downwardapi
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -58,7 +58,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != downwardAPIPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -72,6 +72,11 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestDownwardAPI(t *testing.T) {
+	// Skip tests that fail on Windows, as discussed during the SIG Testing meeting from January 10, 2023
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test that fails on Windows")
+	}
+
 	labels1 := map[string]string{
 		"key1": "value1",
 		"key2": "value2",
@@ -229,7 +234,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	volumeSpec := &v1.Volume{
@@ -314,7 +319,7 @@ type stepName struct {
 func (step stepName) getName() string { return step.name }
 
 func doVerifyLinesInFile(t *testing.T, volumePath, filename string, expected string) {
-	data, err := ioutil.ReadFile(filepath.Join(volumePath, filename))
+	data, err := os.ReadFile(filepath.Join(volumePath, filename))
 	if err != nil {
 		t.Errorf(err.Error())
 		return

@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: multiple-certs
@@ -8,27 +8,39 @@ spec:
     http:
       paths:
       - path: /test
+        pathType: "ImplementationSpecific"
         backend:
-          serviceName: echoheaders-https
-          servicePort: 80
+          service:
+            name: echoheaders-https
+            port:
+              number: 80
   - host: test2.ingress.com
     http:
       paths:
       - path: /test
+        pathType: "ImplementationSpecific"
         backend:
-          serviceName: echoheaders-https
-          servicePort: 80
+          service:
+            name: echoheaders-https
+            port:
+              number: 80
   - host: test3.ingress.com
     http:
       paths:
       - path: /test
+        pathType: "ImplementationSpecific"
         backend:
-          serviceName: echoheaders-https
-          servicePort: 80
+          service:
+            name: echoheaders-https
+            port:
+              number: 80
   - host: test4.ingress.com
     http:
       paths:
       - path: /test
+        pathType: "ImplementationSpecific"
         backend:
-          serviceName: echoheaders-https
-          servicePort: 80
+          service:
+            name: echoheaders-https
+            port:
+              number: 80

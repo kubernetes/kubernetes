@@ -46,7 +46,7 @@ func ValidateLeaseSpec(spec *coordination.LeaseSpec, fldPath *field.Path) field.
 	}
 	if spec.LeaseTransitions != nil && *spec.LeaseTransitions < 0 {
 		fld := fldPath.Child("leaseTransitions")
-		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseTransitions, "must to greater or equal than 0"))
+		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseTransitions, "must be greater than or equal to 0"))
 	}
 	return allErrs
 }

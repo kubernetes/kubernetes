@@ -18,14 +18,17 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -37,13 +40,33 @@ const (
 	kubeMetricsDefaultImportName = "metrics"
 )
 
+var (
+	// env configs
+	GOOS                  string = findGOOS()
+	ALL_STABILITY_CLASSES bool
+)
+
+func findGOOS() string {
+	cmd := exec.Command("go", "env", "GOOS")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		panic(fmt.Sprintf("running `go env` failed: %v\n\n%s", err, string(out)))
+	}
+	if len(out) == 0 {
+		panic("empty result from `go env GOOS`")
+	}
+	return string(out)
+}
+
 func main() {
+
+	flag.BoolVar(&ALL_STABILITY_CLASSES, "allstabilityclasses", false, "use this flag to enable all stability classes")
 	flag.Parse()
 	if len(flag.Args()) < 1 {
 		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
-
+	stableMetricNames := map[string]struct{}{}
 	stableMetrics := []metric{}
 	errors := []error{}
 
@@ -54,7 +77,12 @@ func main() {
 			continue
 		}
 		ms, es := searchPathForStableMetrics(arg)
-		stableMetrics = append(stableMetrics, ms...)
+		for _, m := range ms {
+			if _, ok := stableMetricNames[m.Name]; !ok {
+				stableMetrics = append(stableMetrics, m)
+			}
+			stableMetricNames[m.Name] = struct{}{}
+		}
 		errors = append(errors, es...)
 	}
 	if addStdin {
@@ -74,12 +102,22 @@ func main() {
 	if len(errors) != 0 {
 		os.Exit(1)
 	}
+	if len(stableMetrics) == 0 {
+		os.Exit(0)
+	}
+	for i, m := range stableMetrics {
+		if m.StabilityLevel == "" {
+			m.StabilityLevel = "ALPHA"
+		}
+		stableMetrics[i] = m
+	}
 	sort.Sort(byFQName(stableMetrics))
 	data, err := yaml.Marshal(stableMetrics)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
+
 	fmt.Print(string(data))
 }
 
@@ -119,6 +157,11 @@ func searchFileForStableMetrics(filename string, src interface{}) ([]metric, []e
 		return []metric{}, []error{}
 	}
 	variables := globalVariableDeclarations(tree)
+
+	variables, err = importedGlobalVariableDeclaration(variables, tree.Imports)
+	if err != nil {
+		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
+	}
 
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)
 	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, variables)
@@ -168,4 +211,100 @@ func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
 		}
 	}
 	return consts
+}
+
+func findPkgDir(pkg string) (string, error) {
+	// Use Go's module mechanism.
+	cmd := exec.Command("go", "list", "-find", "-json=Dir", pkg)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("running `go list` failed: %w\n\n%s", err, string(out))
+	}
+	result := struct {
+		Dir string
+	}{}
+	if err := json.Unmarshal(out, &result); err != nil {
+		return "", fmt.Errorf("json unmarshal of `go list` failed: %w", err)
+	}
+	if result.Dir != "" {
+		return result.Dir, nil
+	}
+
+	return "", fmt.Errorf("empty respose from `go list`")
+}
+
+func importedGlobalVariableDeclaration(localVariables map[string]ast.Expr, imports []*ast.ImportSpec) (map[string]ast.Expr, error) {
+	for _, im := range imports {
+		// get imported label
+		var importAlias string
+		if im.Name == nil {
+			pathSegments := strings.Split(im.Path.Value, "/")
+			importAlias = strings.Trim(pathSegments[len(pathSegments)-1], "\"")
+		} else {
+			importAlias = im.Name.String()
+		}
+
+		// find local path on disk for listed import
+		pkg, err := strconv.Unquote(im.Path.Value)
+		if err != nil {
+			return nil, fmt.Errorf("can't handle import '%s': %w", im.Path.Value, err)
+		}
+		importDirectory, err := findPkgDir(pkg)
+		if err != nil {
+			return nil, fmt.Errorf("can't find import '%s': %w", im.Path.Value, err)
+		}
+
+		files, err := os.ReadDir(importDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read import directory %s: %w", importDirectory, err)
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				// do not grab constants from subpackages
+				continue
+			}
+
+			if strings.Contains(file.Name(), "_test") {
+				// do not parse test files
+				continue
+			}
+
+			if !strings.HasSuffix(file.Name(), ".go") {
+				// not a go code file, do not attempt to parse
+				continue
+			}
+
+			fileset := token.NewFileSet()
+			tree, err := parser.ParseFile(fileset, strings.Join([]string{importDirectory, file.Name()}, string(os.PathSeparator)), nil, parser.AllErrors)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse path %s with error %w", im.Path.Value, err)
+			}
+
+			// pass parsed filepath into globalVariableDeclarations
+			variables := globalVariableDeclarations(tree)
+
+			// add returned map into supplied map and prepend import label to all keys
+			for k, v := range variables {
+				importK := strings.Join([]string{importAlias, k}, ".")
+				if _, ok := localVariables[importK]; !ok {
+					localVariables[importK] = v
+				} else {
+					// cross-platform file that gets included in the correct OS build via OS build tags
+					// use whatever matches GOOS
+
+					if strings.Contains(file.Name(), GOOS) {
+						// assume at some point we will find the correct OS version of this file
+						// if we are running on an OS that does not have an OS specific file for something then we will include a constant we shouldn't
+						// TODO: should we include/exclude based on the build tags?
+						localVariables[importK] = v
+					}
+
+				}
+			}
+		}
+
+	}
+
+	return localVariables, nil
 }

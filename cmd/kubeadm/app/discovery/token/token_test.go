@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pmezard/go-difflib/difflib"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -27,10 +29,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	tokenjws "k8s.io/cluster-bootstrap/token/jws"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-
-	"github.com/pmezard/go-difflib/difflib"
 )
 
 func TestRetrieveValidatedConfigInfo(t *testing.T) {
@@ -247,7 +248,7 @@ users: null
 			}
 
 			// Set arbitrary discovery timeout and retry interval
-			test.cfg.Timeout = &metav1.Duration{Duration: time.Millisecond * 200}
+			timeout := time.Millisecond * 500
 			interval := time.Millisecond * 20
 
 			// Patch the JWS signature after a short delay
@@ -262,7 +263,7 @@ users: null
 			}
 
 			// Retrieve validated configuration
-			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval)
+			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout)
 			if (err != nil) != test.expectedError {
 				t.Errorf("expected error %v, got %v, error: %v", test.expectedError, err != nil, err)
 			}

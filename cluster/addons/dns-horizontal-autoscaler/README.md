@@ -9,6 +9,3 @@ ConfigMap in `kube-system` namespace.
 Learn more about:
 - Usage: http://kubernetes.io/docs/tasks/administer-cluster/dns-horizontal-autoscaling/
 - Implementation: https://github.com/kubernetes-incubator/cluster-proportional-autoscaler/
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns-horizontal-autoscaler/README.md?pixel)]()

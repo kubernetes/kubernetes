@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"testing"
 )
 
@@ -37,18 +38,30 @@ func TestTLSConfigKey(t *testing.T) {
 	}
 	for nameA, valueA := range identicalConfigurations {
 		for nameB, valueB := range identicalConfigurations {
-			keyA, err := tlsConfigKey(valueA)
+			keyA, canCache, err := tlsConfigKey(valueA)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameA, err)
 				continue
 			}
-			keyB, err := tlsConfigKey(valueB)
+			if !canCache {
+				t.Errorf("Unexpected canCache=false")
+				continue
+			}
+			keyB, canCache, err := tlsConfigKey(valueB)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameB, err)
 				continue
 			}
+			if !canCache {
+				t.Errorf("Unexpected canCache=false")
+				continue
+			}
 			if keyA != keyB {
 				t.Errorf("Expected identical cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
+				continue
+			}
+			if keyA != (tlsCacheKey{}) {
+				t.Errorf("Expected empty cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
 				continue
 			}
 		}
@@ -56,11 +69,12 @@ func TestTLSConfigKey(t *testing.T) {
 
 	// Make sure config fields that affect the tls config affect the cache key
 	dialer := net.Dialer{}
-	getCert := func() (*tls.Certificate, error) { return nil, nil }
+	getCert := &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }}
 	uniqueConfigurations := map[string]*Config{
+		"proxy":    {Proxy: func(request *http.Request) (*url.URL, error) { return nil, nil }},
 		"no tls":   {},
-		"dialer":   {Dial: dialer.DialContext},
-		"dialer2":  {Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }},
+		"dialer":   {DialHolder: &DialHolder{Dial: dialer.DialContext}},
+		"dialer2":  {DialHolder: &DialHolder{Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil }}},
 		"insecure": {TLS: TLSConfig{Insecure: true}},
 		"cadata 1": {TLS: TLSConfig{CAData: []byte{1}}},
 		"cadata 2": {TLS: TLSConfig{CAData: []byte{2}}},
@@ -111,20 +125,20 @@ func TestTLSConfigKey(t *testing.T) {
 		},
 		"getCert1": {
 			TLS: TLSConfig{
-				KeyData: []byte{1},
-				GetCert: getCert,
+				KeyData:       []byte{1},
+				GetCertHolder: getCert,
 			},
 		},
 		"getCert2": {
 			TLS: TLSConfig{
-				KeyData: []byte{1},
-				GetCert: func() (*tls.Certificate, error) { return nil, nil },
+				KeyData:       []byte{1},
+				GetCertHolder: &GetCertHolder{GetCert: func() (*tls.Certificate, error) { return nil, nil }},
 			},
 		},
 		"getCert1, key 2": {
 			TLS: TLSConfig{
-				KeyData: []byte{2},
-				GetCert: getCert,
+				KeyData:       []byte{2},
+				GetCertHolder: getCert,
 			},
 		},
 		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
@@ -132,14 +146,25 @@ func TestTLSConfigKey(t *testing.T) {
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
-			keyA, err := tlsConfigKey(valueA)
+			keyA, canCacheA, err := tlsConfigKey(valueA)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameA, err)
 				continue
 			}
-			keyB, err := tlsConfigKey(valueB)
+			keyB, canCacheB, err := tlsConfigKey(valueB)
 			if err != nil {
 				t.Errorf("Unexpected error for %q: %v", nameB, err)
+				continue
+			}
+
+			shouldCacheA := valueA.Proxy == nil
+			if shouldCacheA != canCacheA {
+				t.Errorf("Unexpected canCache=false for " + nameA)
+			}
+
+			configIsNotEmpty := !reflect.DeepEqual(*valueA, Config{})
+			if keyA == (tlsCacheKey{}) && shouldCacheA && configIsNotEmpty {
+				t.Errorf("Expected non-empty cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
 				continue
 			}
 
@@ -148,33 +173,18 @@ func TestTLSConfigKey(t *testing.T) {
 				if keyA != keyB {
 					t.Errorf("Expected identical cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
 				}
+				if canCacheA != canCacheB {
+					t.Errorf("Expected identical canCache %q and %q, got:\n\t%v\n\t%v", nameA, nameB, canCacheA, canCacheB)
+				}
 				continue
 			}
 
-			if keyA == keyB {
-				t.Errorf("Expected unique cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
-				continue
+			if canCacheA && canCacheB {
+				if keyA == keyB {
+					t.Errorf("Expected unique cache keys for %q and %q, got:\n\t%s\n\t%s", nameA, nameB, keyA, keyB)
+					continue
+				}
 			}
 		}
-	}
-}
-
-func TestTLSConfigKeyFuncPtr(t *testing.T) {
-	keys := make(map[tlsCacheKey]struct{})
-	makeKey := func(p func(*http.Request) (*url.URL, error)) tlsCacheKey {
-		key, err := tlsConfigKey(&Config{Proxy: p})
-		if err != nil {
-			t.Fatalf("Unexpected error creating cache key: %v", err)
-		}
-		return key
-	}
-
-	keys[makeKey(http.ProxyFromEnvironment)] = struct{}{}
-	keys[makeKey(http.ProxyFromEnvironment)] = struct{}{}
-	keys[makeKey(http.ProxyURL(nil))] = struct{}{}
-	keys[makeKey(nil)] = struct{}{}
-
-	if got, want := len(keys), 3; got != want {
-		t.Fatalf("Unexpected number of keys: got=%d want=%d", got, want)
 	}
 }

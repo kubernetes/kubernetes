@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,79 +17,91 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
+	"sync"
+
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
-func Convert_v1_LegacyExtender_To_config_Extender(in *v1.LegacyExtender, out *config.Extender, s conversion.Scope) error {
-	out.URLPrefix = in.URLPrefix
-	out.FilterVerb = in.FilterVerb
-	out.PreemptVerb = in.PreemptVerb
-	out.PrioritizeVerb = in.PrioritizeVerb
-	out.Weight = in.Weight
-	out.BindVerb = in.BindVerb
-	out.EnableHTTPS = in.EnableHTTPS
-	out.HTTPTimeout.Duration = in.HTTPTimeout
-	out.NodeCacheCapable = in.NodeCacheCapable
-	out.Ignorable = in.Ignorable
+var (
+	// pluginArgConversionScheme is a scheme with internal and v1 registered,
+	// used for defaulting/converting typed PluginConfig Args.
+	// Access via getPluginArgConversionScheme()
+	pluginArgConversionScheme     *runtime.Scheme
+	initPluginArgConversionScheme sync.Once
+)
 
-	if in.TLSConfig != nil {
-		out.TLSConfig = &config.ExtenderTLSConfig{}
-		if err := Convert_v1_ExtenderTLSConfig_To_config_ExtenderTLSConfig(in.TLSConfig, out.TLSConfig, s); err != nil {
-			return err
-		}
-	} else {
-		out.TLSConfig = nil
+func GetPluginArgConversionScheme() *runtime.Scheme {
+	initPluginArgConversionScheme.Do(func() {
+		// set up the scheme used for plugin arg conversion
+		pluginArgConversionScheme = runtime.NewScheme()
+		utilruntime.Must(AddToScheme(pluginArgConversionScheme))
+		utilruntime.Must(config.AddToScheme(pluginArgConversionScheme))
+	})
+	return pluginArgConversionScheme
+}
+
+func Convert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
+		return err
 	}
+	return convertToInternalPluginConfigArgs(out)
+}
 
-	if in.ManagedResources != nil {
-		out.ManagedResources = make([]config.ExtenderManagedResource, len(in.ManagedResources))
-		for i, res := range in.ManagedResources {
-			err := Convert_v1_ExtenderManagedResource_To_config_ExtenderManagedResource(&res, &out.ManagedResources[i], s)
-			if err != nil {
-				return err
+// convertToInternalPluginConfigArgs converts PluginConfig#Args into internal
+// types using a scheme, after applying defaults.
+func convertToInternalPluginConfigArgs(out *config.KubeSchedulerConfiguration) error {
+	scheme := GetPluginArgConversionScheme()
+	for i := range out.Profiles {
+		prof := &out.Profiles[i]
+		for j := range prof.PluginConfig {
+			args := prof.PluginConfig[j].Args
+			if args == nil {
+				continue
 			}
+			if _, isUnknown := args.(*runtime.Unknown); isUnknown {
+				continue
+			}
+			internalArgs, err := scheme.ConvertToVersion(args, config.SchemeGroupVersion)
+			if err != nil {
+				return fmt.Errorf("converting .Profiles[%d].PluginConfig[%d].Args into internal type: %w", i, j, err)
+			}
+			prof.PluginConfig[j].Args = internalArgs
 		}
-	} else {
-		out.ManagedResources = nil
 	}
-
 	return nil
 }
 
-func Convert_config_Extender_To_v1_LegacyExtender(in *config.Extender, out *v1.LegacyExtender, s conversion.Scope) error {
-	out.URLPrefix = in.URLPrefix
-	out.FilterVerb = in.FilterVerb
-	out.PreemptVerb = in.PreemptVerb
-	out.PrioritizeVerb = in.PrioritizeVerb
-	out.Weight = in.Weight
-	out.BindVerb = in.BindVerb
-	out.EnableHTTPS = in.EnableHTTPS
-	out.HTTPTimeout = in.HTTPTimeout.Duration
-	out.NodeCacheCapable = in.NodeCacheCapable
-	out.Ignorable = in.Ignorable
-
-	if in.TLSConfig != nil {
-		out.TLSConfig = &v1.ExtenderTLSConfig{}
-		if err := Convert_config_ExtenderTLSConfig_To_v1_ExtenderTLSConfig(in.TLSConfig, out.TLSConfig, s); err != nil {
-			return err
-		}
-	} else {
-		out.TLSConfig = nil
+func Convert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfiguration(in, out, s); err != nil {
+		return err
 	}
+	return convertToExternalPluginConfigArgs(out)
+}
 
-	if in.ManagedResources != nil {
-		out.ManagedResources = make([]v1.ExtenderManagedResource, len(in.ManagedResources))
-		for i, res := range in.ManagedResources {
-			err := Convert_config_ExtenderManagedResource_To_v1_ExtenderManagedResource(&res, &out.ManagedResources[i], s)
+// convertToExternalPluginConfigArgs converts PluginConfig#Args into
+// external (versioned) types using a scheme.
+func convertToExternalPluginConfigArgs(out *v1.KubeSchedulerConfiguration) error {
+	scheme := GetPluginArgConversionScheme()
+	for i := range out.Profiles {
+		for j := range out.Profiles[i].PluginConfig {
+			args := out.Profiles[i].PluginConfig[j].Args
+			if args.Object == nil {
+				continue
+			}
+			if _, isUnknown := args.Object.(*runtime.Unknown); isUnknown {
+				continue
+			}
+			externalArgs, err := scheme.ConvertToVersion(args.Object, SchemeGroupVersion)
 			if err != nil {
 				return err
 			}
+			out.Profiles[i].PluginConfig[j].Args.Object = externalArgs
 		}
-	} else {
-		out.ManagedResources = nil
 	}
-
 	return nil
 }

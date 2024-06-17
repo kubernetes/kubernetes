@@ -1,10 +1,10 @@
 approvers:
-- bowei
-- rramkumar1
-- mrhohn
-- freehan
+  - bowei
+  - mrhohn
+  - freehan
 reviewers:
-- bowei
-- rramkumar1
-- mrhohn
-- freehan
+  - bowei
+  - mrhohn
+  - freehan
+emeritus_approvers:
+  - rramkumar1

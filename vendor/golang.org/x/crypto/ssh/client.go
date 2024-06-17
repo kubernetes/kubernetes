@@ -77,12 +77,12 @@ func NewClientConn(c net.Conn, addr string, config *ClientConfig) (Conn, <-chan 
 	}
 
 	conn := &connection{
-		sshConn: sshConn{conn: c},
+		sshConn: sshConn{conn: c, user: fullConf.User},
 	}
 
 	if err := conn.clientHandshake(addr, &fullConf); err != nil {
 		c.Close()
-		return nil, nil, nil, fmt.Errorf("ssh: handshake failed: %v", err)
+		return nil, nil, nil, fmt.Errorf("ssh: handshake failed: %w", err)
 	}
 	conn.mux = newMux(conn.transport)
 	return conn, conn.mux.incomingChannels, conn.mux.incomingRequests, nil
@@ -113,12 +113,16 @@ func (c *connection) clientHandshake(dialAddress string, config *ClientConfig) e
 	return c.clientAuthenticate(config)
 }
 
-// verifyHostKeySignature verifies the host key obtained in the key
-// exchange.
-func verifyHostKeySignature(hostKey PublicKey, result *kexResult) error {
+// verifyHostKeySignature verifies the host key obtained in the key exchange.
+// algo is the negotiated algorithm, and may be a certificate type.
+func verifyHostKeySignature(hostKey PublicKey, algo string, result *kexResult) error {
 	sig, rest, ok := parseSignatureBody(result.Signature)
 	if len(rest) > 0 || !ok {
 		return errors.New("ssh: signature parse error")
+	}
+
+	if a := underlyingAlgo(algo); sig.Format != a {
+		return fmt.Errorf("ssh: invalid signature algorithm %q, expected %q", sig.Format, a)
 	}
 
 	return hostKey.Verify(result.H, sig)
@@ -224,11 +228,11 @@ type ClientConfig struct {
 	// be used for the connection. If empty, a reasonable default is used.
 	ClientVersion string
 
-	// HostKeyAlgorithms lists the key types that the client will
-	// accept from the server as host key, in order of
+	// HostKeyAlgorithms lists the public key algorithms that the client will
+	// accept from the server for host key authentication, in order of
 	// preference. If empty, a reasonable default is used. Any
-	// string returned from PublicKey.Type method may be used, or
-	// any of the CertAlgoXxxx and KeyAlgoXxxx constants.
+	// string returned from a PublicKey.Type method may be used, or
+	// any of the CertAlgo and KeyAlgo constants.
 	HostKeyAlgorithms []string
 
 	// Timeout is the maximum amount of time for the TCP connection to establish.

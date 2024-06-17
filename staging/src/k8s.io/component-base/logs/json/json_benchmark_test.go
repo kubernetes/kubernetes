@@ -14,56 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package json
 
 import (
-	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
+
+	"go.uber.org/zap/zapcore"
 )
 
-var record = struct {
-	Error   error                  `json:"err"`
-	Level   int                    `json:"v"`
-	Message string                 `json:"msg"`
-	Time    time.Time              `json:"ts"`
-	Fields  map[string]interface{} `json:"fields"`
-}{
-	Error:   fmt.Errorf("test for error:%s", "default"),
-	Level:   2,
-	Message: "test",
-	Time:    time.Unix(0, 123),
-	Fields: map[string]interface{}{
-		"str":     "foo",
-		"int64-1": int64(1),
-		"int64-2": int64(1),
-		"float64": float64(1.0),
-		"string1": "\n",
-		"string2": "💩",
-		"string3": "🤔",
-		"string4": "🙊",
-		"bool":    true,
-		"request": struct {
-			Method  string `json:"method"`
-			Timeout int    `json:"timeout"`
-			secret  string `json:"secret"`
-		}{
-			Method:  "GET",
-			Timeout: 10,
-			secret:  "pony",
-		},
-	},
-}
+var writer = zapcore.AddSync(&writeSyncer{})
 
 func BenchmarkInfoLoggerInfo(b *testing.B) {
+	logger, _ := NewJSONLogger(0, writer, nil, nil)
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(nil)
-			jLogger.Info("test",
+			logger.Info("test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",
@@ -73,35 +43,27 @@ func BenchmarkInfoLoggerInfo(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,
 					secret:  "pony",
 				},
 			)
-		}
-	})
-}
-
-func BenchmarkInfoLoggerInfoStandardJSON(b *testing.B) {
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			json.Marshal(record)
 		}
 	})
 }
 
 func BenchmarkZapLoggerError(b *testing.B) {
+	logger, _ := NewJSONLogger(0, writer, nil, nil)
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(nil)
-			jLogger.Error(fmt.Errorf("test for error:%s", "default"),
+			logger.Error(fmt.Errorf("test for error:%s", "default"),
 				"test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",
@@ -111,33 +73,26 @@ func BenchmarkZapLoggerError(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,
 					secret:  "pony",
 				},
 			)
-		}
-	})
-}
-func BenchmarkZapLoggerErrorStandardJSON(b *testing.B) {
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			json.Marshal(record)
 		}
 	})
 }
 
 func BenchmarkZapLoggerV(b *testing.B) {
+	logger, _ := NewJSONLogger(1, writer, nil, nil)
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			jLogger := NewJSONLogger(nil)
-			jLogger.V(1).Info("test",
+			logger.V(1).Info("test",
 				"str", "foo",
-				"int64-1", int64(1),
-				"int64-2", int64(1),
+				"int64A", int64(1),
+				"int64B", int64(1),
 				"float64", float64(1.0),
 				"string1", "\n",
 				"string2", "💩",
@@ -147,7 +102,7 @@ func BenchmarkZapLoggerV(b *testing.B) {
 				"request", struct {
 					Method  string `json:"method"`
 					Timeout int    `json:"timeout"`
-					secret  string `json:"secret"`
+					secret  string
 				}{
 					Method:  "GET",
 					Timeout: 10,
@@ -156,4 +111,16 @@ func BenchmarkZapLoggerV(b *testing.B) {
 			)
 		}
 	})
+}
+
+type writeSyncer struct{}
+
+var _ zapcore.WriteSyncer = (*writeSyncer)(nil)
+
+func (w writeSyncer) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
+
+func (w writeSyncer) Sync() error {
+	return nil
 }

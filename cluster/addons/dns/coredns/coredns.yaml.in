@@ -28,11 +28,12 @@ rules:
   - list
   - watch
 - apiGroups:
-  - ""
+  - discovery.k8s.io
   resources:
-  - nodes
+  - endpointslices
   verbs:
-  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -67,7 +68,7 @@ data:
             lameduck 5s
         }
         ready
-        kubernetes {{ pillar['dns_domain'] }} in-addr.arpa ip6.arpa {
+        kubernetes dns_domain in-addr.arpa ip6.arpa {
             pods insecure
             fallthrough in-addr.arpa ip6.arpa
             ttl 30
@@ -108,9 +109,10 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-cluster-critical
       serviceAccountName: coredns
       affinity:
@@ -131,11 +133,11 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.7.0
+        image: registry.k8s.io/coredns/coredns:v1.11.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            memory: {{ pillar['dns_memory_limit'] }}
+            memory: 'dns_memory_limit'
           requests:
             cpu: 100m
             memory: 70Mi
@@ -174,7 +176,7 @@ spec:
             add:
             - NET_BIND_SERVICE
             drop:
-            - all
+            - ALL
           readOnlyRootFilesystem: true
       dnsPolicy: Default
       volumes:
@@ -201,7 +203,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: {{ pillar['dns_server'] }}
+  clusterIP: 'dns_server'
   ports:
   - name: dns
     port: 53

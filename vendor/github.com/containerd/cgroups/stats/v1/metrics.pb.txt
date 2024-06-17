@@ -63,6 +63,22 @@ file {
       type_name: ".io.containerd.cgroups.v1.NetworkStat"
       json_name: "network"
     }
+    field {
+      name: "cgroup_stats"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.CgroupStats"
+      json_name: "cgroupStats"
+    }
+    field {
+      name: "memory_oom_control"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".io.containerd.cgroups.v1.MemoryOomControl"
+      json_name: "memoryOomControl"
+    }
   }
   message_type {
     name: "HugetlbStat"
@@ -495,6 +511,30 @@ file {
     }
   }
   message_type {
+    name: "MemoryOomControl"
+    field {
+      name: "oom_kill_disable"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "oomKillDisable"
+    }
+    field {
+      name: "under_oom"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "underOom"
+    }
+    field {
+      name: "oom_kill"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "oomKill"
+    }
+  }
+  message_type {
     name: "BlkIOStat"
     field {
       name: "io_service_bytes_recursive"
@@ -706,6 +746,44 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_UINT64
       json_name: "txDropped"
+    }
+  }
+  message_type {
+    name: "CgroupStats"
+    field {
+      name: "nr_sleeping"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrSleeping"
+    }
+    field {
+      name: "nr_running"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrRunning"
+    }
+    field {
+      name: "nr_stopped"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrStopped"
+    }
+    field {
+      name: "nr_uninterruptible"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrUninterruptible"
+    }
+    field {
+      name: "nr_io_wait"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "nrIoWait"
     }
   }
   syntax: "proto3"

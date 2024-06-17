@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
@@ -35,7 +36,7 @@ func CheckQueueEq(lhs []string, rhs TimedQueue) bool {
 }
 
 func CheckSetEq(lhs, rhs sets.String) bool {
-	return lhs.HasAll(rhs.List()...) && rhs.HasAll(lhs.List()...)
+	return lhs.IsSuperset(rhs) && rhs.IsSuperset(lhs)
 }
 
 func TestAddNode(t *testing.T) {
@@ -144,7 +145,8 @@ func TestTry(t *testing.T) {
 	evictor.Remove("second")
 
 	deletedMap := sets.NewString()
-	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+	logger, _ := ktesting.NewTestContext(t)
+	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		deletedMap.Insert(value.Value)
 		return true, 0
 	})
@@ -180,7 +182,8 @@ func TestTryOrdering(t *testing.T) {
 	order := []string{}
 	count := 0
 	hasQueued := false
-	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+	logger, _ := ktesting.NewTestContext(t)
+	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		count++
 		t.Logf("eviction %d", count)
 		if value.ProcessAt.IsZero() {
@@ -242,8 +245,8 @@ func TestTryRemovingWhileTry(t *testing.T) {
 		evictor.Remove("second")
 		close(wait)
 	}()
-
-	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+	logger, _ := ktesting.NewTestContext(t)
+	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		count++
 		if value.AddedAt.IsZero() {
 			t.Fatalf("added should not be zero")
@@ -282,17 +285,6 @@ func TestClear(t *testing.T) {
 	}
 }
 
-func TestSetRemove(t *testing.T) {
-	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first", "11111")
-
-	evictor.SetRemove("first")
-
-	if evictor.queue.set.Len() != 0 {
-		t.Fatalf("SetRemove should remove element from the set.")
-	}
-}
-
 func TestSwapLimiter(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
 	fakeAlways := flowcontrol.NewFakeAlwaysRateLimiter()
@@ -324,7 +316,8 @@ func TestAddAfterTry(t *testing.T) {
 	evictor.Remove("second")
 
 	deletedMap := sets.NewString()
-	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+	logger, _ := ktesting.NewTestContext(t)
+	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		deletedMap.Insert(value.Value)
 		return true, 0
 	})
@@ -338,7 +331,7 @@ func TestAddAfterTry(t *testing.T) {
 	}
 
 	evictor.Add("first", "11111")
-	evictor.Try(func(value TimedValue) (bool, time.Duration) {
+	evictor.Try(logger, func(value TimedValue) (bool, time.Duration) {
 		t.Errorf("We shouldn't process the same value if the explicit remove wasn't called.")
 		return true, 0
 	})

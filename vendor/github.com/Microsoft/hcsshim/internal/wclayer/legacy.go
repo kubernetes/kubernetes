@@ -15,6 +15,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/longpath"
 	"github.com/Microsoft/hcsshim/internal/safefile"
+	"github.com/Microsoft/hcsshim/internal/winapi"
 )
 
 var errorIterationCanceled = errors.New("")
@@ -341,7 +342,7 @@ type legacyLayerWriter struct {
 	backupWriter    *winio.BackupFileWriter
 	Tombstones      []string
 	HasUtilityVM    bool
-	uvmDi           []dirInfo
+	changedDi       []dirInfo
 	addedFiles      map[string]bool
 	PendingLinks    []pendingLink
 	pendingDirs     []pendingDir
@@ -389,7 +390,7 @@ func (w *legacyLayerWriter) CloseRoots() {
 		w.destRoot = nil
 	}
 	for i := range w.parentRoots {
-		w.parentRoots[i].Close()
+		_ = w.parentRoots[i].Close()
 	}
 	w.parentRoots = nil
 }
@@ -472,8 +473,8 @@ func copyFileWithMetadata(srcRoot, destRoot *os.File, subPath string, isDir bool
 		srcRoot,
 		syscall.GENERIC_READ|winio.ACCESS_SYSTEM_SECURITY,
 		syscall.FILE_SHARE_READ,
-		safefile.FILE_OPEN,
-		safefile.FILE_OPEN_REPARSE_POINT)
+		winapi.FILE_OPEN,
+		winapi.FILE_OPEN_REPARSE_POINT)
 	if err != nil {
 		return nil, err
 	}
@@ -488,14 +489,14 @@ func copyFileWithMetadata(srcRoot, destRoot *os.File, subPath string, isDir bool
 
 	extraFlags := uint32(0)
 	if isDir {
-		extraFlags |= safefile.FILE_DIRECTORY_FILE
+		extraFlags |= winapi.FILE_DIRECTORY_FILE
 	}
 	dest, err := safefile.OpenRelative(
 		subPath,
 		destRoot,
 		syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
 		syscall.FILE_SHARE_READ,
-		safefile.FILE_CREATE,
+		winapi.FILE_CREATE,
 		extraFlags)
 	if err != nil {
 		return nil, err
@@ -555,7 +556,7 @@ func cloneTree(srcRoot *os.File, destRoot *os.File, subPath string, mutatedFiles
 			if err != nil {
 				return err
 			}
-			if isDir && !isReparsePoint {
+			if isDir {
 				di = append(di, dirInfo{path: relPath, fileInfo: *fi})
 			}
 		} else {
@@ -583,6 +584,10 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		return w.initUtilityVM()
 	}
 
+	if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
+		w.changedDi = append(w.changedDi, dirInfo{path: name, fileInfo: *fileInfo})
+	}
+
 	name = filepath.Clean(name)
 	if hasPathPrefix(name, utilityVMPath) {
 		if !w.HasUtilityVM {
@@ -591,7 +596,7 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		if !hasPathPrefix(name, utilityVMFilesPath) && name != utilityVMFilesPath {
 			return errors.New("invalid UtilityVM layer")
 		}
-		createDisposition := uint32(safefile.FILE_OPEN)
+		createDisposition := uint32(winapi.FILE_OPEN)
 		if (fileInfo.FileAttributes & syscall.FILE_ATTRIBUTE_DIRECTORY) != 0 {
 			st, err := safefile.LstatRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
@@ -612,16 +617,13 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 					return err
 				}
 			}
-			if fileInfo.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
-				w.uvmDi = append(w.uvmDi, dirInfo{path: name, fileInfo: *fileInfo})
-			}
 		} else {
 			// Overwrite any existing hard link.
 			err := safefile.RemoveRelative(name, w.destRoot)
 			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
-			createDisposition = safefile.FILE_CREATE
+			createDisposition = winapi.FILE_CREATE
 		}
 
 		f, err := safefile.OpenRelative(
@@ -630,7 +632,7 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 			syscall.GENERIC_READ|syscall.GENERIC_WRITE|winio.WRITE_DAC|winio.WRITE_OWNER|winio.ACCESS_SYSTEM_SECURITY,
 			syscall.FILE_SHARE_READ,
 			createDisposition,
-			safefile.FILE_OPEN_REPARSE_POINT,
+			winapi.FILE_OPEN_REPARSE_POINT,
 		)
 		if err != nil {
 			return err
@@ -638,7 +640,7 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		defer func() {
 			if f != nil {
 				f.Close()
-				safefile.RemoveRelative(name, w.destRoot)
+				_ = safefile.RemoveRelative(name, w.destRoot)
 			}
 		}()
 
@@ -667,14 +669,14 @@ func (w *legacyLayerWriter) Add(name string, fileInfo *winio.FileBasicInfo) erro
 		w.currentIsDir = true
 	}
 
-	f, err := safefile.OpenRelative(fname, w.root, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, safefile.FILE_CREATE, 0)
+	f, err := safefile.OpenRelative(fname, w.root, syscall.GENERIC_READ|syscall.GENERIC_WRITE, syscall.FILE_SHARE_READ, winapi.FILE_CREATE, 0)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if f != nil {
 			f.Close()
-			safefile.RemoveRelative(fname, w.root)
+			_ = safefile.RemoveRelative(fname, w.root)
 		}
 	}()
 
@@ -801,12 +803,6 @@ func (w *legacyLayerWriter) Close() error {
 	}
 	for _, pd := range w.pendingDirs {
 		err := safefile.MkdirRelative(pd.Path, pd.Root)
-		if err != nil {
-			return err
-		}
-	}
-	if w.HasUtilityVM {
-		err := reapplyDirectoryTimes(w.destRoot, w.uvmDi)
 		if err != nil {
 			return err
 		}

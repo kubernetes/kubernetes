@@ -63,10 +63,7 @@ func normalizeWebhookConfig(config *imagePolicyWebhookConfig) (err error) {
 		return err
 	}
 	config.DenyTTL, err = normalizeConfigDuration("deny cache", time.Second, config.DenyTTL, minDenyTTL, maxDenyTTL, defaultDenyTTL)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func normalizeConfigDuration(name string, scale, value, min, max, defaultValue time.Duration) (time.Duration, error) {

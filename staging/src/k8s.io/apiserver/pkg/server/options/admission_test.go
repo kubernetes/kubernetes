@@ -28,7 +28,7 @@ import (
 func TestEnabledPluginNames(t *testing.T) {
 	scenarios := []struct {
 		expectedPluginNames       []string
-		setDefaultOffPlugins      sets.String
+		setDefaultOffPlugins      sets.Set[string]
 		setRecommendedPluginOrder []string
 		setEnablePlugins          []string
 		setDisablePlugins         []string
@@ -36,28 +36,28 @@ func TestEnabledPluginNames(t *testing.T) {
 	}{
 		// scenario 0: check if a call to enabledPluginNames sets expected values.
 		{
-			expectedPluginNames: []string{"NamespaceLifecycle", "MutatingAdmissionWebhook", "ValidatingAdmissionWebhook"},
+			expectedPluginNames: []string{"NamespaceLifecycle", "MutatingAdmissionWebhook", "ValidatingAdmissionPolicy", "ValidatingAdmissionWebhook"},
 		},
 
 		// scenario 1: use default off plugins if no specified
 		{
 			expectedPluginNames:       []string{"pluginB"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginA", "pluginC", "pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginA", "pluginC", "pluginD"),
 		},
 
 		// scenario 2: use default off plugins and with RecommendedPluginOrder
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginB", "pluginC", "pluginD"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString(),
+			setDefaultOffPlugins:      sets.Set[string]{},
 		},
 
 		// scenario 3: use default off plugins and specified by enable-admission-plugins with RecommendedPluginOrder
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginB", "pluginC", "pluginD"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginC", "pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginC", "pluginD"),
 			setEnablePlugins:          []string{"pluginD", "pluginC"},
 		},
 
@@ -65,7 +65,7 @@ func TestEnabledPluginNames(t *testing.T) {
 		{
 			expectedPluginNames:       []string{"pluginB"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginC", "pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginC", "pluginD"),
 			setDisablePlugins:         []string{"pluginA"},
 		},
 
@@ -73,7 +73,7 @@ func TestEnabledPluginNames(t *testing.T) {
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginC"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginC", "pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginC", "pluginD"),
 			setEnablePlugins:          []string{"pluginC"},
 			setDisablePlugins:         []string{"pluginB"},
 		},
@@ -82,7 +82,7 @@ func TestEnabledPluginNames(t *testing.T) {
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginB", "pluginC"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginD"),
 			setAdmissionControl:       []string{"pluginA", "pluginB"},
 		},
 
@@ -90,7 +90,7 @@ func TestEnabledPluginNames(t *testing.T) {
 		{
 			expectedPluginNames:       []string{"pluginA", "pluginB", "pluginC"},
 			setRecommendedPluginOrder: []string{"pluginA", "pluginB", "pluginC", "pluginD"},
-			setDefaultOffPlugins:      sets.NewString("pluginC", "pluginD"),
+			setDefaultOffPlugins:      sets.New("pluginC", "pluginD"),
 			setAdmissionControl:       []string{"pluginA", "pluginB", "pluginC"},
 		},
 	}
@@ -208,7 +208,7 @@ func TestValidate(t *testing.T) {
 	for index, scenario := range scenarios {
 		t.Run(fmt.Sprintf("scenario %d", index), func(t *testing.T) {
 			options := NewAdmissionOptions()
-			options.DefaultOffPlugins = sets.NewString("pluginC", "pluginD")
+			options.DefaultOffPlugins = sets.New("pluginC", "pluginD")
 			options.RecommendedPluginOrder = []string{"pluginA", "pluginB", "pluginC", "pluginD"}
 			options.Plugins = &admission.Plugins{}
 			for _, plugin := range options.RecommendedPluginOrder {

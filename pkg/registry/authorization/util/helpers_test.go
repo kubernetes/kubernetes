@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
@@ -71,4 +72,102 @@ func TestResourceAttributesFrom(t *testing.T) {
 		}
 		return false
 	})
+}
+
+func TestAuthorizationAttributesFrom(t *testing.T) {
+	type args struct {
+		spec authorizationapi.SubjectAccessReviewSpec
+	}
+	tests := []struct {
+		name string
+		args args
+		want authorizer.AttributesRecord
+	}{
+		{
+			name: "nonresource",
+			args: args{
+				spec: authorizationapi.SubjectAccessReviewSpec{
+					User:                  "bob",
+					Groups:                []string{user.AllAuthenticated},
+					NonResourceAttributes: &authorizationapi.NonResourceAttributes{Verb: "get", Path: "/mypath"},
+					Extra:                 map[string]authorizationapi.ExtraValue{"scopes": {"scope-a", "scope-b"}},
+				},
+			},
+			want: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name:   "bob",
+					Groups: []string{user.AllAuthenticated},
+					Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
+				},
+				Verb: "get",
+				Path: "/mypath",
+			},
+		},
+		{
+			name: "resource",
+			args: args{
+				spec: authorizationapi.SubjectAccessReviewSpec{
+					User: "bob",
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Namespace:   "myns",
+						Verb:        "create",
+						Group:       "extensions",
+						Version:     "v1beta1",
+						Resource:    "deployments",
+						Subresource: "scale",
+						Name:        "mydeployment",
+					},
+				},
+			},
+			want: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name: "bob",
+				},
+				APIGroup:        "extensions",
+				APIVersion:      "v1beta1",
+				Namespace:       "myns",
+				Verb:            "create",
+				Resource:        "deployments",
+				Subresource:     "scale",
+				Name:            "mydeployment",
+				ResourceRequest: true,
+			},
+		},
+		{
+			name: "resource with no version",
+			args: args{
+				spec: authorizationapi.SubjectAccessReviewSpec{
+					User: "bob",
+					ResourceAttributes: &authorizationapi.ResourceAttributes{
+						Namespace:   "myns",
+						Verb:        "create",
+						Group:       "extensions",
+						Resource:    "deployments",
+						Subresource: "scale",
+						Name:        "mydeployment",
+					},
+				},
+			},
+			want: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{
+					Name: "bob",
+				},
+				APIGroup:        "extensions",
+				APIVersion:      "*",
+				Namespace:       "myns",
+				Verb:            "create",
+				Resource:        "deployments",
+				Subresource:     "scale",
+				Name:            "mydeployment",
+				ResourceRequest: true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := AuthorizationAttributesFrom(tt.args.spec); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("AuthorizationAttributesFrom() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

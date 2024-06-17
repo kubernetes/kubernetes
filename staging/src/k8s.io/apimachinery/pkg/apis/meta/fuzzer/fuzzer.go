@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -186,15 +187,17 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.UID = types.UID(c.RandString())
 
-			var sec, nsec int64
+			// Fuzzing sec and nsec in a smaller range (uint32 instead of int64),
+			// so that the result Unix time is a valid date and can be parsed into RFC3339 format.
+			var sec, nsec uint32
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 
 			if j.DeletionTimestamp != nil {
 				c.Fuzz(&sec)
 				c.Fuzz(&nsec)
-				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				t := metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 				j.DeletionTimestamp = &t
 			}
 
@@ -247,8 +250,9 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 
 			if j.MatchExpressions != nil {
-				// NB: the label selector parser code sorts match expressions by key, and sorts the values,
-				// so we need to make sure ours are sorted as well here to preserve round-trip comparison.
+				// NB: the label selector parser code sorts match expressions by key, and
+				// sorts and deduplicates the values, so we need to make sure ours are
+				// sorted and deduplicated as well here to preserve round-trip comparison.
 				// In practice, not sorting doesn't hurt anything...
 
 				for i := range j.MatchExpressions {
@@ -264,7 +268,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 						for i := range req.Values {
 							req.Values[i] = randomLabelPart(c, true)
 						}
-						sort.Strings(req.Values)
+						req.Values = sets.List(sets.New(req.Values...))
 					} else {
 						req.Values = nil
 					}

@@ -31,6 +31,10 @@ retry() {
   "$@"
 }
 
+# The root of the build/dist directory
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+export KUBE_ROOT
+
 # Runs benchmark integration tests, producing pretty-printed results
 # in ${WORKSPACE}/artifacts. This script can also be run within a
 # kubekins-test container with a kubernetes repo mounted (at the path
@@ -44,10 +48,8 @@ export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 export GO111MODULE=off
 
 # Install tools we need
-pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/cespare/prettybench
-  GO111MODULE=on go install gotest.tools/gotestsum
-popd >/dev/null
+GO111MODULE=on go -C "${KUBE_ROOT}/hack/tools" install github.com/cespare/prettybench
+GO111MODULE=on go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
@@ -62,7 +64,8 @@ cd "${GOPATH}/src/k8s.io/kubernetes"
 ./hack/install-etcd.sh
 
 # Run the benchmark tests and pretty-print the results into a separate file.
-make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=${TEST_PREFIX:-.} -benchtime=${BENCHTIME:-1s} -benchmem  -alsologtostderr=false -logtostderr=false -data-items-dir=${ARTIFACTS}" \
+# Log output of the tests go to stderr.
+make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=${TEST_PREFIX:-.} -benchtime=${BENCHTIME:-1s} -benchmem  -data-items-dir=${ARTIFACTS}" \
   | (go run test/integration/benchmark/extractlog/main.go) \
   | tee \
    >(prettybench -no-passthrough > "${ARTIFACTS}/BenchmarkResults.txt") \

@@ -17,15 +17,15 @@ limitations under the License.
 package get
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
-	"k8s.io/kubectl/pkg/util/openapi"
+	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 // PrintFlags composes common printer flag structs
@@ -72,35 +72,6 @@ func (f *PrintFlags) AllowedFormats() []string {
 	formats = append(formats, f.CustomColumnsFlags.AllowedFormats()...)
 	formats = append(formats, f.HumanReadableFlags.AllowedFormats()...)
 	return formats
-}
-
-// UseOpenAPIColumns modifies the output format, as well as the
-// "allowMissingKeys" option for template printers, to values
-// defined in the OpenAPI schema of a resource.
-func (f *PrintFlags) UseOpenAPIColumns(api openapi.Resources, mapping *meta.RESTMapping) error {
-	// Found openapi metadata for this resource
-	schema := api.LookupResource(mapping.GroupVersionKind)
-	if schema == nil {
-		// Schema not found, return empty columns
-		return nil
-	}
-
-	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
-	if !found {
-		// Extension not found, return empty columns
-		return nil
-	}
-
-	parts := strings.SplitN(columns, "=", 2)
-	if len(parts) < 2 {
-		return nil
-	}
-
-	allowMissingKeys := true
-	f.OutputFormat = &parts[0]
-	f.TemplateFlags.TemplateArgument = &parts[1]
-	f.TemplateFlags.AllowMissingKeys = &allowMissingKeys
-	return nil
 }
 
 // ToPrinter attempts to find a composed set of PrintFlags suitable for
@@ -160,7 +131,19 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.CustomColumnsFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf(`Output format. One of: (%s). See custom columns [https://kubernetes.io/docs/reference/kubectl/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [https://kubernetes.io/docs/reference/kubectl/jsonpath/].`, strings.Join(f.AllowedFormats(), ", ")))
+		util.CheckErr(cmd.RegisterFlagCompletionFunc(
+			"output",
+			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+				var comps []string
+				for _, format := range f.AllowedFormats() {
+					if strings.HasPrefix(format, toComplete) {
+						comps = append(comps, format)
+					}
+				}
+				return comps, cobra.ShellCompDirectiveNoFileComp
+			},
+		))
 	}
 	if f.NoHeaders != nil {
 		cmd.Flags().BoolVar(f.NoHeaders, "no-headers", *f.NoHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")

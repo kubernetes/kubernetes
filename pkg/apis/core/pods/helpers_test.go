@@ -21,15 +21,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestVisitContainersWithPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	testCases := []struct {
 		description string
 		path        *field.Path
@@ -206,6 +201,20 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 			label:         "status.podIPs",
 			value:         "10.244.0.6",
 			expectedLabel: "status.podIPs",
+			expectedValue: "10.244.0.6",
+		},
+		{
+			version:       "v1",
+			label:         "status.hostIPs",
+			value:         "10.244.0.6,fd00::6",
+			expectedLabel: "status.hostIPs",
+			expectedValue: "10.244.0.6,fd00::6",
+		},
+		{
+			version:       "v1",
+			label:         "status.hostIPs",
+			value:         "10.244.0.6",
+			expectedLabel: "status.hostIPs",
 			expectedValue: "10.244.0.6",
 		},
 	}

@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -856,17 +857,17 @@ func TestConvertToVersion(t *testing.T) {
 
 			if test.same {
 				if !reflect.DeepEqual(original, test.in) {
-					t.Fatalf("unexpected mutation of input: %s", diff.ObjectReflectDiff(original, test.in))
+					t.Fatalf("unexpected mutation of input: %s", cmp.Diff(original, test.in))
 				}
 				if !reflect.DeepEqual(out, test.out) {
-					t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(out, test.out))
+					t.Fatalf("unexpected out: %s", cmp.Diff(out, test.out))
 				}
 				unsafe, err := test.scheme.UnsafeConvertToVersion(test.in, test.gv)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}
 				if !reflect.DeepEqual(unsafe, test.out) {
-					t.Fatalf("unexpected unsafe: %s", diff.ObjectReflectDiff(unsafe, test.out))
+					t.Fatalf("unexpected unsafe: %s", cmp.Diff(unsafe, test.out))
 				}
 				if unsafe != test.in {
 					t.Fatalf("UnsafeConvertToVersion should return same object: %#v", unsafe)
@@ -874,7 +875,7 @@ func TestConvertToVersion(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(out, test.out) {
-				t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(out, test.out))
+				t.Fatalf("unexpected out: %s", cmp.Diff(out, test.out))
 			}
 		})
 	}
@@ -917,7 +918,7 @@ func TestConvert(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(test.into, test.out) {
-				t.Fatalf("unexpected out: %s", diff.ObjectReflectDiff(test.into, test.out))
+				t.Fatalf("unexpected out: %s", cmp.Diff(test.into, test.out))
 			}
 		})
 	}
@@ -943,8 +944,6 @@ func TestMetaValues(t *testing.T) {
 	simple := &runtimetesting.InternalSimple{
 		TestString: "foo",
 	}
-
-	s.Log(t)
 
 	out, err := s.ConvertToVersion(simple, externalGV)
 	if err != nil {

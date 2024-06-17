@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/code-generator/cmd/client-gen/types"
 )
 
@@ -120,7 +121,7 @@ func NewGroupVersionsBuilder(groups *[]types.GroupVersions) *groupVersionsBuilde
 func (p *groupVersionsBuilder) update() error {
 	var seenGroups = make(map[types.Group]*types.GroupVersions)
 	for _, v := range p.groups {
-		pth, gvString := parsePathGroupVersion(v)
+		pth, gvString := util.ParsePathGroupVersion(v)
 		gv, err := types.ToGroupVersion(gvString)
 		if err != nil {
 			return err
@@ -128,7 +129,9 @@ func (p *groupVersionsBuilder) update() error {
 
 		versionPkg := types.PackageVersion{Package: path.Join(p.importBasePath, pth, gv.Group.NonEmpty(), gv.Version.String()), Version: gv.Version}
 		if group, ok := seenGroups[gv.Group]; ok {
-			seenGroups[gv.Group].Versions = append(group.Versions, versionPkg)
+			vers := group.Versions
+			vers = append(vers, versionPkg)
+			seenGroups[gv.Group].Versions = vers
 		} else {
 			seenGroups[gv.Group] = &types.GroupVersions{
 				PackageName: gv.Group.NonEmpty(),
@@ -149,17 +152,6 @@ func (p *groupVersionsBuilder) update() error {
 	}
 
 	return nil
-}
-
-func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
-	subs := strings.Split(pgvString, "/")
-	length := len(subs)
-	switch length {
-	case 0, 1, 2:
-		return "", pgvString
-	default:
-		return strings.Join(subs[:length-2], "/"), strings.Join(subs[length-2:], "/")
-	}
 }
 
 func readAsCSV(val string) ([]string, error) {

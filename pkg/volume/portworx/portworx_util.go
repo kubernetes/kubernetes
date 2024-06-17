@@ -19,6 +19,8 @@ package portworx
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 
 	osdapi "github.com/libopenstorage/openstorage/api"
 	osdclient "github.com/libopenstorage/openstorage/api/client"
@@ -30,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog/v2"
+
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -214,9 +217,9 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	tBytes, ok := newSize.AsInt64()
-	if !ok {
-		return fmt.Errorf("quantity %v is too great, overflows int64", newSize)
+	tBytes, err := volumehelpers.RoundUpToB(newSize)
+	if err != nil {
+		return err
 	}
 	newSizeInBytes := uint64(tBytes)
 	if vol.Spec.Size >= newSizeInBytes {
@@ -265,7 +268,7 @@ func isClientValid(client *osdclient.Client) (bool, error) {
 }
 
 func createDriverClient(hostname string, port int32) (*osdclient.Client, error) {
-	client, err := volumeclient.NewDriverClient(fmt.Sprintf("http://%s:%d", hostname, port),
+	client, err := volumeclient.NewDriverClient(fmt.Sprintf("http://%s", net.JoinHostPort(hostname, strconv.Itoa(int(port)))),
 		pxdDriverName, osdDriverVersion, pxDriverName)
 	if err != nil {
 		return nil, err
@@ -279,9 +282,10 @@ func createDriverClient(hostname string, port int32) (*osdclient.Client, error) 
 }
 
 // getPortworxDriver returns a Portworx volume driver which can be used for cluster wide operations.
-//   Operations like create and delete volume don't need to be restricted to local volume host since
-//   any node in the Portworx cluster can co-ordinate the create/delete request and forward the operations to
-//   the Portworx node that will own/owns the data.
+//
+//	Operations like create and delete volume don't need to be restricted to local volume host since
+//	any node in the Portworx cluster can coordinate the create/delete request and forward the operations to
+//	the Portworx node that will own/owns the data.
 func (util *portworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost) (volumeapi.VolumeDriver, error) {
 	// check if existing saved client is valid
 	if isValid, _ := isClientValid(util.portworxClient); isValid {
@@ -316,10 +320,11 @@ func (util *portworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost) 
 }
 
 // getLocalPortworxDriver returns driver connected to Portworx API server on volume host.
-//   This is required to force certain operations (mount, unmount, detach, attach) to
-//   go to the volume host instead of the k8s service which might route it to any host. This pertains to how
-//   Portworx mounts and attaches a volume to the running container. The node getting these requests needs to
-//   see the pod container mounts (specifically /var/lib/kubelet/pods/<pod_id>)
+//
+//	This is required to force certain operations (mount, unmount, detach, attach) to
+//	go to the volume host instead of the k8s service which might route it to any host. This pertains to how
+//	Portworx mounts and attaches a volume to the running container. The node getting these requests needs to
+//	see the pod container mounts (specifically /var/lib/kubelet/pods/<pod_id>)
 func (util *portworxVolumeUtil) getLocalPortworxDriver(volumeHost volume.VolumeHost) (volumeapi.VolumeDriver, error) {
 	if util.portworxClient != nil {
 		// check if existing saved client is valid
@@ -360,7 +365,7 @@ func lookupPXAPIPortFromService(svc *v1.Service) int32 {
 func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		err := fmt.Errorf("Failed to get kubeclient when creating portworx client")
+		err := fmt.Errorf("failed to get kubeclient when creating portworx client")
 		klog.Errorf(err.Error())
 		return nil, err
 	}
@@ -373,7 +378,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	}
 
 	if svc == nil {
-		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
+		err = fmt.Errorf("service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}

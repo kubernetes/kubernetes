@@ -20,15 +20,14 @@ package grpc
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"strconv"
-	"strings"
+	"reflect"
 	"time"
 
-	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/internal"
+	internalserviceconfig "google.golang.org/grpc/internal/serviceconfig"
 	"google.golang.org/grpc/serviceconfig"
 )
 
@@ -40,29 +39,7 @@ const maxInt = int(^uint(0) >> 1)
 // Deprecated: Users should not use this struct. Service config should be received
 // through name resolver, as specified here
 // https://github.com/grpc/grpc/blob/master/doc/service_config.md
-type MethodConfig struct {
-	// WaitForReady indicates whether RPCs sent to this method should wait until
-	// the connection is ready by default (!failfast). The value specified via the
-	// gRPC client API will override the value set here.
-	WaitForReady *bool
-	// Timeout is the default timeout for RPCs sent to this method. The actual
-	// deadline used will be the minimum of the value specified here and the value
-	// set by the application via the gRPC client API.  If either one is not set,
-	// then the other will be used.  If neither is set, then the RPC has no deadline.
-	Timeout *time.Duration
-	// MaxReqSize is the maximum allowed payload size for an individual request in a
-	// stream (client->server) in bytes. The size which is measured is the serialized
-	// payload after per-message compression (but before stream compression) in bytes.
-	// The actual value used is the minimum of the value specified here and the value set
-	// by the application via the gRPC client API. If either one is not set, then the other
-	// will be used.  If neither is set, then the built-in default is used.
-	MaxReqSize *int
-	// MaxRespSize is the maximum allowed payload size for an individual response in a
-	// stream (server->client) in bytes.
-	MaxRespSize *int
-	// RetryPolicy configures retry options for the method.
-	retryPolicy *retryPolicy
-}
+type MethodConfig = internalserviceconfig.MethodConfig
 
 type lbConfig struct {
 	name string
@@ -78,10 +55,9 @@ type lbConfig struct {
 type ServiceConfig struct {
 	serviceconfig.Config
 
-	// LB is the load balancer the service providers recommends. The balancer
-	// specified via grpc.WithBalancer will override this.  This is deprecated;
-	// lbConfigs is preferred.  If lbConfig and LB are both present, lbConfig
-	// will be used.
+	// LB is the load balancer the service providers recommends.  This is
+	// deprecated; lbConfigs is preferred.  If lbConfig and LB are both present,
+	// lbConfig will be used.
 	LB *string
 
 	// lbConfig is the service config's load balancing configuration.  If
@@ -126,38 +102,10 @@ type healthCheckConfig struct {
 	ServiceName string
 }
 
-// retryPolicy defines the go-native version of the retry policy defined by the
-// service config here:
-// https://github.com/grpc/proposal/blob/master/A6-client-retries.md#integration-with-service-config
-type retryPolicy struct {
-	// MaxAttempts is the maximum number of attempts, including the original RPC.
-	//
-	// This field is required and must be two or greater.
-	maxAttempts int
-
-	// Exponential backoff parameters. The initial retry attempt will occur at
-	// random(0, initialBackoff). In general, the nth attempt will occur at
-	// random(0,
-	//   min(initialBackoff*backoffMultiplier**(n-1), maxBackoff)).
-	//
-	// These fields are required and must be greater than zero.
-	initialBackoff    time.Duration
-	maxBackoff        time.Duration
-	backoffMultiplier float64
-
-	// The set of status codes which may be retried.
-	//
-	// Status codes are specified as strings, e.g., "UNAVAILABLE".
-	//
-	// This field is required and must be non-empty.
-	// Note: a set is used to store this for easy lookup.
-	retryableStatusCodes map[codes.Code]bool
-}
-
 type jsonRetryPolicy struct {
 	MaxAttempts          int
-	InitialBackoff       string
-	MaxBackoff           string
+	InitialBackoff       internalserviceconfig.Duration
+	MaxBackoff           internalserviceconfig.Duration
 	BackoffMultiplier    float64
 	RetryableStatusCodes []codes.Code
 }
@@ -179,89 +127,51 @@ type retryThrottlingPolicy struct {
 	TokenRatio float64
 }
 
-func parseDuration(s *string) (*time.Duration, error) {
-	if s == nil {
-		return nil, nil
-	}
-	if !strings.HasSuffix(*s, "s") {
-		return nil, fmt.Errorf("malformed duration %q", *s)
-	}
-	ss := strings.SplitN((*s)[:len(*s)-1], ".", 3)
-	if len(ss) > 2 {
-		return nil, fmt.Errorf("malformed duration %q", *s)
-	}
-	// hasDigits is set if either the whole or fractional part of the number is
-	// present, since both are optional but one is required.
-	hasDigits := false
-	var d time.Duration
-	if len(ss[0]) > 0 {
-		i, err := strconv.ParseInt(ss[0], 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("malformed duration %q: %v", *s, err)
-		}
-		d = time.Duration(i) * time.Second
-		hasDigits = true
-	}
-	if len(ss) == 2 && len(ss[1]) > 0 {
-		if len(ss[1]) > 9 {
-			return nil, fmt.Errorf("malformed duration %q", *s)
-		}
-		f, err := strconv.ParseInt(ss[1], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("malformed duration %q: %v", *s, err)
-		}
-		for i := 9; i > len(ss[1]); i-- {
-			f *= 10
-		}
-		d += time.Duration(f)
-		hasDigits = true
-	}
-	if !hasDigits {
-		return nil, fmt.Errorf("malformed duration %q", *s)
-	}
-
-	return &d, nil
-}
-
 type jsonName struct {
-	Service *string
-	Method  *string
+	Service string
+	Method  string
 }
 
-func (j jsonName) generatePath() (string, bool) {
-	if j.Service == nil {
-		return "", false
+var (
+	errDuplicatedName             = errors.New("duplicated name")
+	errEmptyServiceNonEmptyMethod = errors.New("cannot combine empty 'service' and non-empty 'method'")
+)
+
+func (j jsonName) generatePath() (string, error) {
+	if j.Service == "" {
+		if j.Method != "" {
+			return "", errEmptyServiceNonEmptyMethod
+		}
+		return "", nil
 	}
-	res := "/" + *j.Service + "/"
-	if j.Method != nil {
-		res += *j.Method
+	res := "/" + j.Service + "/"
+	if j.Method != "" {
+		res += j.Method
 	}
-	return res, true
+	return res, nil
 }
 
 // TODO(lyuxuan): delete this struct after cleaning up old service config implementation.
 type jsonMC struct {
 	Name                    *[]jsonName
 	WaitForReady            *bool
-	Timeout                 *string
+	Timeout                 *internalserviceconfig.Duration
 	MaxRequestMessageBytes  *int64
 	MaxResponseMessageBytes *int64
 	RetryPolicy             *jsonRetryPolicy
 }
 
-type loadBalancingConfig map[string]json.RawMessage
-
 // TODO(lyuxuan): delete this struct after cleaning up old service config implementation.
 type jsonSC struct {
 	LoadBalancingPolicy *string
-	LoadBalancingConfig *[]loadBalancingConfig
+	LoadBalancingConfig *internalserviceconfig.BalancerConfig
 	MethodConfig        *[]jsonMC
 	RetryThrottling     *retryThrottlingPolicy
 	HealthCheckConfig   *healthCheckConfig
 }
 
 func init() {
-	internal.ParseServiceConfigForTesting = parseServiceConfig
+	internal.ParseServiceConfig = parseServiceConfig
 }
 func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	if len(js) == 0 {
@@ -270,7 +180,7 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	var rsc jsonSC
 	err := json.Unmarshal([]byte(js), &rsc)
 	if err != nil {
-		grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+		logger.Warningf("grpc: unmarshaling service config %s: %v", js, err)
 		return &serviceconfig.ParseResult{Err: err}
 	}
 	sc := ServiceConfig{
@@ -280,62 +190,29 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 		healthCheckConfig: rsc.HealthCheckConfig,
 		rawJSONString:     js,
 	}
-	if rsc.LoadBalancingConfig != nil {
-		for i, lbcfg := range *rsc.LoadBalancingConfig {
-			if len(lbcfg) != 1 {
-				err := fmt.Errorf("invalid loadBalancingConfig: entry %v does not contain exactly 1 policy/config pair: %q", i, lbcfg)
-				grpclog.Warningf(err.Error())
-				return &serviceconfig.ParseResult{Err: err}
-			}
-			var name string
-			var jsonCfg json.RawMessage
-			for name, jsonCfg = range lbcfg {
-			}
-			builder := balancer.Get(name)
-			if builder == nil {
-				continue
-			}
-			sc.lbConfig = &lbConfig{name: name}
-			if parser, ok := builder.(balancer.ConfigParser); ok {
-				var err error
-				sc.lbConfig.cfg, err = parser.ParseConfig(jsonCfg)
-				if err != nil {
-					return &serviceconfig.ParseResult{Err: fmt.Errorf("error parsing loadBalancingConfig for policy %q: %v", name, err)}
-				}
-			} else if string(jsonCfg) != "{}" {
-				grpclog.Warningf("non-empty balancer configuration %q, but balancer does not implement ParseConfig", string(jsonCfg))
-			}
-			break
-		}
-		if sc.lbConfig == nil {
-			// We had a loadBalancingConfig field but did not encounter a
-			// supported policy.  The config is considered invalid in this
-			// case.
-			err := fmt.Errorf("invalid loadBalancingConfig: no supported policies found")
-			grpclog.Warningf(err.Error())
-			return &serviceconfig.ParseResult{Err: err}
+	if c := rsc.LoadBalancingConfig; c != nil {
+		sc.lbConfig = &lbConfig{
+			name: c.Name,
+			cfg:  c.Config,
 		}
 	}
 
 	if rsc.MethodConfig == nil {
 		return &serviceconfig.ParseResult{Config: &sc}
 	}
+
+	paths := map[string]struct{}{}
 	for _, m := range *rsc.MethodConfig {
 		if m.Name == nil {
 			continue
 		}
-		d, err := parseDuration(m.Timeout)
-		if err != nil {
-			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
-			return &serviceconfig.ParseResult{Err: err}
-		}
 
 		mc := MethodConfig{
 			WaitForReady: m.WaitForReady,
-			Timeout:      d,
+			Timeout:      (*time.Duration)(m.Timeout),
 		}
-		if mc.retryPolicy, err = convertRetryPolicy(m.RetryPolicy); err != nil {
-			grpclog.Warningf("grpc: parseServiceConfig error unmarshaling %s due to %v", js, err)
+		if mc.RetryPolicy, err = convertRetryPolicy(m.RetryPolicy); err != nil {
+			logger.Warningf("grpc: unmarshaling service config %s: %v", js, err)
 			return &serviceconfig.ParseResult{Err: err}
 		}
 		if m.MaxRequestMessageBytes != nil {
@@ -352,10 +229,20 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 				mc.MaxRespSize = newInt(int(*m.MaxResponseMessageBytes))
 			}
 		}
-		for _, n := range *m.Name {
-			if path, valid := n.generatePath(); valid {
-				sc.Methods[path] = mc
+		for i, n := range *m.Name {
+			path, err := n.generatePath()
+			if err != nil {
+				logger.Warningf("grpc: error unmarshaling service config %s due to methodConfig[%d]: %v", js, i, err)
+				return &serviceconfig.ParseResult{Err: err}
 			}
+
+			if _, ok := paths[path]; ok {
+				err = errDuplicatedName
+				logger.Warningf("grpc: error unmarshaling service config %s due to methodConfig[%d]: %v", js, i, err)
+				return &serviceconfig.ParseResult{Err: err}
+			}
+			paths[path] = struct{}{}
+			sc.Methods[path] = mc
 		}
 	}
 
@@ -370,41 +257,33 @@ func parseServiceConfig(js string) *serviceconfig.ParseResult {
 	return &serviceconfig.ParseResult{Config: &sc}
 }
 
-func convertRetryPolicy(jrp *jsonRetryPolicy) (p *retryPolicy, err error) {
+func convertRetryPolicy(jrp *jsonRetryPolicy) (p *internalserviceconfig.RetryPolicy, err error) {
 	if jrp == nil {
 		return nil, nil
 	}
-	ib, err := parseDuration(&jrp.InitialBackoff)
-	if err != nil {
-		return nil, err
-	}
-	mb, err := parseDuration(&jrp.MaxBackoff)
-	if err != nil {
-		return nil, err
-	}
 
 	if jrp.MaxAttempts <= 1 ||
-		*ib <= 0 ||
-		*mb <= 0 ||
+		jrp.InitialBackoff <= 0 ||
+		jrp.MaxBackoff <= 0 ||
 		jrp.BackoffMultiplier <= 0 ||
 		len(jrp.RetryableStatusCodes) == 0 {
-		grpclog.Warningf("grpc: ignoring retry policy %v due to illegal configuration", jrp)
+		logger.Warningf("grpc: ignoring retry policy %v due to illegal configuration", jrp)
 		return nil, nil
 	}
 
-	rp := &retryPolicy{
-		maxAttempts:          jrp.MaxAttempts,
-		initialBackoff:       *ib,
-		maxBackoff:           *mb,
-		backoffMultiplier:    jrp.BackoffMultiplier,
-		retryableStatusCodes: make(map[codes.Code]bool),
+	rp := &internalserviceconfig.RetryPolicy{
+		MaxAttempts:          jrp.MaxAttempts,
+		InitialBackoff:       time.Duration(jrp.InitialBackoff),
+		MaxBackoff:           time.Duration(jrp.MaxBackoff),
+		BackoffMultiplier:    jrp.BackoffMultiplier,
+		RetryableStatusCodes: make(map[codes.Code]bool),
 	}
-	if rp.maxAttempts > 5 {
+	if rp.MaxAttempts > 5 {
 		// TODO(retry): Make the max maxAttempts configurable.
-		rp.maxAttempts = 5
+		rp.MaxAttempts = 5
 	}
 	for _, code := range jrp.RetryableStatusCodes {
-		rp.retryableStatusCodes[code] = true
+		rp.RetryableStatusCodes[code] = true
 	}
 	return rp, nil
 }
@@ -431,4 +310,38 @@ func getMaxSize(mcMax, doptMax *int, defaultVal int) *int {
 
 func newInt(b int) *int {
 	return &b
+}
+
+func init() {
+	internal.EqualServiceConfigForTesting = equalServiceConfig
+}
+
+// equalServiceConfig compares two configs. The rawJSONString field is ignored,
+// because they may diff in white spaces.
+//
+// If any of them is NOT *ServiceConfig, return false.
+func equalServiceConfig(a, b serviceconfig.Config) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	aa, ok := a.(*ServiceConfig)
+	if !ok {
+		return false
+	}
+	bb, ok := b.(*ServiceConfig)
+	if !ok {
+		return false
+	}
+	aaRaw := aa.rawJSONString
+	aa.rawJSONString = ""
+	bbRaw := bb.rawJSONString
+	bb.rawJSONString = ""
+	defer func() {
+		aa.rawJSONString = aaRaw
+		bb.rawJSONString = bbRaw
+	}()
+	// Using reflect.DeepEqual instead of cmp.Equal because many balancer
+	// configs are unexported, and cmp.Equal cannot compare unexported fields
+	// from unexported structs.
+	return reflect.DeepEqual(aa, bb)
 }

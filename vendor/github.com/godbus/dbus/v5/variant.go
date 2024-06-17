@@ -49,7 +49,7 @@ func ParseVariant(s string, sig Signature) (Variant, error) {
 }
 
 // format returns a formatted version of v and whether this string can be parsed
-// unambigously.
+// unambiguously.
 func (v Variant) format() (string, bool) {
 	switch v.sig.str[0] {
 	case 'b', 'i':
@@ -141,4 +141,10 @@ func (v Variant) String() string {
 // Value returns the underlying value of v.
 func (v Variant) Value() interface{} {
 	return v.value
+}
+
+// Store converts the variant into a native go type using the same
+// mechanism as the "Store" function.
+func (v Variant) Store(value interface{}) error {
+	return storeInterfaces(v.value, value)
 }

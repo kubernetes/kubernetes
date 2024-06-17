@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
@@ -130,7 +131,7 @@ func VerifyAdmissionResponse(uid types.UID, mutating bool, review runtime.Object
 
 // CreateAdmissionObjects returns the unique request uid, the AdmissionReview object to send the webhook and to decode the response into,
 // or an error if the webhook does not support receiving any of the admission review versions we know to send
-func CreateAdmissionObjects(versionedAttributes *generic.VersionedAttributes, invocation *generic.WebhookInvocation) (uid types.UID, request, response runtime.Object, err error) {
+func CreateAdmissionObjects(versionedAttributes *admission.VersionedAttributes, invocation *generic.WebhookInvocation) (uid types.UID, request, response runtime.Object, err error) {
 	for _, version := range invocation.Webhook.GetAdmissionReviewVersions() {
 		switch version {
 		case admissionv1.SchemeGroupVersion.Version:
@@ -151,7 +152,7 @@ func CreateAdmissionObjects(versionedAttributes *generic.VersionedAttributes, in
 }
 
 // CreateV1AdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func CreateV1AdmissionReview(uid types.UID, versionedAttributes *generic.VersionedAttributes, invocation *generic.WebhookInvocation) *admissionv1.AdmissionReview {
+func CreateV1AdmissionReview(uid types.UID, versionedAttributes *admission.VersionedAttributes, invocation *generic.WebhookInvocation) *admissionv1.AdmissionReview {
 	attr := versionedAttributes.Attributes
 	gvk := invocation.Kind
 	gvr := invocation.Resource
@@ -217,7 +218,7 @@ func CreateV1AdmissionReview(uid types.UID, versionedAttributes *generic.Version
 }
 
 // CreateV1beta1AdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func CreateV1beta1AdmissionReview(uid types.UID, versionedAttributes *generic.VersionedAttributes, invocation *generic.WebhookInvocation) *admissionv1beta1.AdmissionReview {
+func CreateV1beta1AdmissionReview(uid types.UID, versionedAttributes *admission.VersionedAttributes, invocation *generic.WebhookInvocation) *admissionv1beta1.AdmissionReview {
 	attr := versionedAttributes.Attributes
 	gvk := invocation.Kind
 	gvr := invocation.Resource

@@ -18,8 +18,10 @@ package legacyregistry
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"k8s.io/component-base/metrics"
@@ -29,40 +31,45 @@ var (
 	defaultRegistry = metrics.NewKubeRegistry()
 	// DefaultGatherer exposes the global registry gatherer
 	DefaultGatherer metrics.Gatherer = defaultRegistry
+	// Reset calls reset on the global registry
+	Reset = defaultRegistry.Reset
+	// MustRegister registers registerable metrics but uses the global registry.
+	MustRegister = defaultRegistry.MustRegister
+	// RawMustRegister registers prometheus collectors but uses the global registry, this
+	// bypasses the metric stability framework
+	//
+	// Deprecated
+	RawMustRegister = defaultRegistry.RawMustRegister
+
+	// Register registers a collectable metric but uses the global registry
+	Register = defaultRegistry.Register
+
+	// Registerer exposes the global registerer
+	Registerer = defaultRegistry.Registerer
+
+	processStart time.Time
 )
 
 func init() {
-	RawMustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
-	RawMustRegister(prometheus.NewGoCollector())
+	RawMustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+	RawMustRegister(collectors.NewGoCollector(collectors.WithGoCollectorRuntimeMetrics(collectors.MetricsAll)))
+	defaultRegistry.RegisterMetaMetrics()
+	processStart = time.Now()
 }
 
 // Handler returns an HTTP handler for the DefaultGatherer. It is
 // already instrumented with InstrumentHandler (using "prometheus" as handler
 // name).
-//
-// Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
-	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{ProcessStartTime: processStart}))
 }
 
-// Register registers a collectable metric but uses the global registry
-func Register(c metrics.Registerable) error {
-	err := defaultRegistry.Register(c)
-	return err
-}
-
-// MustRegister registers registerable metrics but uses the global registry.
-func MustRegister(cs ...metrics.Registerable) {
-	defaultRegistry.MustRegister(cs...)
-}
-
-// RawMustRegister registers prometheus collectors but uses the global registry, this
-// bypasses the metric stability framework
-//
-// Deprecated
-func RawMustRegister(cs ...prometheus.Collector) {
-	defaultRegistry.RawMustRegister(cs...)
+// HandlerWithReset returns an HTTP handler for the DefaultGatherer but invokes
+// registry reset if the http method is DELETE.
+func HandlerWithReset() http.Handler {
+	return promhttp.InstrumentMetricHandler(
+		prometheus.DefaultRegisterer,
+		metrics.HandlerWithReset(defaultRegistry, metrics.HandlerOpts{ProcessStartTime: processStart}))
 }
 
 // CustomRegister registers a custom collector but uses the global registry.

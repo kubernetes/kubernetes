@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -21,6 +22,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -29,194 +31,99 @@ import (
 	_ "net/http/pprof"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/component-base/configz"
-	"k8s.io/component-base/metrics"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
-	"k8s.io/kubernetes/pkg/proxy/winuserspace"
-	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
 )
 
-// NewProxyServer returns a new ProxyServer.
-func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+// platformApplyDefaults is called after parsing command-line flags and/or reading the
+// config file, to apply platform-specific default values to config.
+func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
+	if config.Mode == "" {
+		config.Mode = proxyconfigapi.ProxyModeKernelspace
+	}
+	if config.Winkernel.RootHnsEndpointName == "" {
+		config.Winkernel.RootHnsEndpointName = "cbr0"
+	}
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
-	if config == nil {
-		return nil, errors.New("config is required")
-	}
-
-	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
-		c.Set(config)
+// platformSetup is called after setting up the ProxyServer, but before creating the
+// Proxier. It should fill in any platform-specific fields and perform other
+// platform-specific setup.
+func (s *ProxyServer) platformSetup(ctx context.Context) error {
+	// Preserve backward-compatibility with the old secondary IP behavior
+	if s.PrimaryIPFamily == v1.IPv4Protocol {
+		s.NodeIPs[v1.IPv6Protocol] = net.IPv6zero
 	} else {
-		return nil, fmt.Errorf("unable to register configz: %s", err)
+		s.NodeIPs[v1.IPv4Protocol] = net.IPv4zero
 	}
+	return nil
+}
 
-	// We omit creation of pretty much everything if we run in cleanup mode
-	if cleanupAndExit {
-		return &ProxyServer{}, nil
-	}
-
-	if len(config.ShowHiddenMetricsForVersion) > 0 {
-		metrics.SetShowHidden()
-	}
-
-	client, eventClient, err := createClients(config.ClientConnection, master)
+// platformCheckSupported is called immediately before creating the Proxier, to check
+// what IP families are supported (and whether the configuration is usable at all).
+func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
+	// Check if Kernel proxier can be used at all
+	_, err = winkernel.CanUseWinKernelProxier(winkernel.WindowsKernelCompatTester{})
 	if err != nil {
-		return nil, err
+		return false, false, false, err
 	}
 
-	// Create event recorder
-	hostname, err := utilnode.GetHostname(config.HostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(proxyconfigscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+	// winkernel always supports both single-stack IPv4 and single-stack IPv6, but may
+	// not support dual-stack.
+	ipv4Supported = true
+	ipv6Supported = true
 
-	nodeRef := &v1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
-	}
+	compatTester := winkernel.DualStackCompatTester{}
+	dualStackSupported = compatTester.DualStackCompatible(s.Config.Winkernel.NetworkName)
 
-	var healthzServer healthcheck.ProxierHealthUpdater
-	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
+	return
+}
+
+// createProxier creates the proxy.Provider
+func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+	if initOnly {
+		return nil, fmt.Errorf("--init-only is not implemented on Windows")
 	}
 
 	var proxier proxy.Provider
+	var err error
 
-	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
-	if proxyMode == proxyModeKernelspace {
-		klog.V(0).Info("Using Kernelspace Proxier.")
-		isIPv6DualStackEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
-		if isIPv6DualStackEnabled {
-			klog.V(0).Info("creating dualStackProxier for Windows kernel.")
-
-			proxier, err = winkernel.NewDualStackProxier(
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
-				config.ClusterCIDR,
-				hostname,
-				nodeIPTuple(config.BindAddress),
-				recorder,
-				healthzServer,
-				config.Winkernel,
-			)
-		} else {
-
-			proxier, err = winkernel.NewProxier(
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
-				config.ClusterCIDR,
-				hostname,
-				utilnode.GetNodeIP(client, hostname),
-				recorder,
-				healthzServer,
-				config.Winkernel,
-			)
-
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-	} else {
-		klog.V(0).Info("Using userspace Proxier.")
-		execer := exec.New()
-		var netshInterface utilnetsh.Interface
-		netshInterface = utilnetsh.New(execer)
-
-		proxier, err = winuserspace.NewProxier(
-			winuserspace.NewLoadBalancerRR(),
-			net.ParseIP(config.BindAddress),
-			netshInterface,
-			*utilnet.ParsePortRangeOrDie(config.PortRange),
-			// TODO @pires replace below with default values, if applicable
+	if dualStackMode {
+		proxier, err = winkernel.NewDualStackProxier(
 			config.IPTables.SyncPeriod.Duration,
-			config.UDPIdleTimeout.Duration,
+			config.IPTables.MinSyncPeriod.Duration,
+			s.Hostname,
+			s.NodeIPs,
+			s.Recorder,
+			s.HealthzServer,
+			config.HealthzBindAddress,
+			config.Winkernel,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create proxier: %v", err)
-		}
-	}
-
-	return &ProxyServer{
-		Client:              client,
-		EventClient:         eventClient,
-		Proxier:             proxier,
-		Broadcaster:         eventBroadcaster,
-		Recorder:            recorder,
-		ProxyMode:           proxyMode,
-		NodeRef:             nodeRef,
-		MetricsBindAddress:  config.MetricsBindAddress,
-		BindAddressHardFail: config.BindAddressHardFail,
-		EnableProfiling:     config.EnableProfiling,
-		OOMScoreAdj:         config.OOMScoreAdj,
-		ConfigSyncPeriod:    config.ConfigSyncPeriod.Duration,
-		HealthzServer:       healthzServer,
-		UseEndpointSlices:   utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying),
-	}, nil
-}
-
-func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
-	if proxyMode == proxyModeUserspace {
-		return proxyModeUserspace
-	} else if proxyMode == proxyModeKernelspace {
-		return tryWinKernelSpaceProxy(kcompat)
-	}
-	return proxyModeUserspace
-}
-
-func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
-	// Check for Windows Kernel Version if we can support Kernel Space proxy
-	// Check for Windows Version
-
-	// guaranteed false on error, error only necessary for debugging
-	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
-	if err != nil {
-		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
-		return proxyModeUserspace
-	}
-	if useWinKernelProxy {
-		return proxyModeKernelspace
-	}
-	// Fallback.
-	klog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
-	return proxyModeUserspace
-}
-
-// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
-// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
-// will have "any" address (0.0.0.0 or ::) inserted.
-func nodeIPTuple(bindAddress string) [2]net.IP {
-	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
-
-	adr := net.ParseIP(bindAddress)
-	if utilsnet.IsIPv6(adr) {
-		nodes[1] = adr
 	} else {
-		nodes[0] = adr
+		proxier, err = winkernel.NewProxier(
+			s.PrimaryIPFamily,
+			config.IPTables.SyncPeriod.Duration,
+			config.IPTables.MinSyncPeriod.Duration,
+			s.Hostname,
+			s.NodeIPs[s.PrimaryIPFamily],
+			s.Recorder,
+			s.HealthzServer,
+			config.HealthzBindAddress,
+			config.Winkernel,
+		)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to create proxier: %v", err)
 	}
 
-	return nodes
+	return proxier, nil
+}
+
+// platformCleanup removes stale kube-proxy rules that can be safely removed.
+func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
+	if cleanupAndExit {
+		return errors.New("--cleanup-and-exit is not implemented on Windows")
+	}
+	return nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -41,9 +42,11 @@ type GCPolicy struct {
 // Implementation is thread-compatible.
 type GC interface {
 	// Garbage collect containers.
-	GarbageCollect() error
+	GarbageCollect(ctx context.Context) error
 	// Deletes all unused containers, including containers belonging to pods that are terminated but not deleted
-	DeleteAllUnusedContainers() error
+	DeleteAllUnusedContainers(ctx context.Context) error
+	// IsContainerFsSeparateFromImageFs tells if writeable layer and read-only layer are separate.
+	IsContainerFsSeparateFromImageFs(ctx context.Context) bool
 }
 
 // SourcesReadyProvider knows how to determine if configuration sources are ready
@@ -77,11 +80,30 @@ func NewContainerGC(runtime Runtime, policy GCPolicy, sourcesReadyProvider Sourc
 	}, nil
 }
 
-func (cgc *realContainerGC) GarbageCollect() error {
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
+func (cgc *realContainerGC) GarbageCollect(ctx context.Context) error {
+	return cgc.runtime.GarbageCollect(ctx, cgc.policy, cgc.sourcesReadyProvider.AllReady(), false)
 }
 
-func (cgc *realContainerGC) DeleteAllUnusedContainers() error {
-	klog.Infof("attempting to delete unused containers")
-	return cgc.runtime.GarbageCollect(cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
+func (cgc *realContainerGC) DeleteAllUnusedContainers(ctx context.Context) error {
+	klog.InfoS("Attempting to delete unused containers")
+	return cgc.runtime.GarbageCollect(ctx, cgc.policy, cgc.sourcesReadyProvider.AllReady(), true)
+}
+
+func (cgc *realContainerGC) IsContainerFsSeparateFromImageFs(ctx context.Context) bool {
+	resp, err := cgc.runtime.ImageFsInfo(ctx)
+	if err != nil {
+		return false
+	}
+	// These fields can be empty if CRI implementation didn't populate.
+	if resp.ContainerFilesystems == nil || resp.ImageFilesystems == nil || len(resp.ContainerFilesystems) == 0 || len(resp.ImageFilesystems) == 0 {
+		return false
+	}
+	// KEP 4191 explains that multiple filesystems for images and containers is not
+	// supported at the moment.
+	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4191-split-image-filesystem#comment-on-future-extensions
+	// for work needed to support multiple filesystems.
+	if resp.ContainerFilesystems[0].FsId != nil && resp.ImageFilesystems[0].FsId != nil {
+		return resp.ContainerFilesystems[0].FsId.Mountpoint != resp.ImageFilesystems[0].FsId.Mountpoint
+	}
+	return false
 }

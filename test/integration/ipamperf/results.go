@@ -30,7 +30,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 // Config represents the test configuration that is being run
@@ -150,7 +150,7 @@ func (o *Observer) monitor() {
 	nodeInformer := sharedInformer.Core().V1().Nodes().Informer()
 
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) (err error) {
+		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) (err error) {
 			name := node.GetName()
 			if node.Spec.PodCIDR != "" {
 				// ignore nodes that have PodCIDR (might be hold over from previous runs that did not get cleaned up)
@@ -162,7 +162,7 @@ func (o *Observer) monitor() {
 			o.numAdded = o.numAdded + 1
 			return
 		}),
-		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) (err error) {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(oldNode, newNode *v1.Node) (err error) {
 			name := newNode.GetName()
 			nTime, found := o.timing[name]
 			if !found {

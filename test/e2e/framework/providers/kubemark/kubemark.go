@@ -75,7 +75,9 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 		framework.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
-		framework.ExpectEqual(p.controller.WaitForCacheSync(p.closeChannel), true)
+		if !p.controller.WaitForCacheSync(p.closeChannel) {
+			framework.Failf("Unable to sync caches for %v", p.controller)
+		}
 		go p.controller.Run(p.closeChannel)
 	}
 }

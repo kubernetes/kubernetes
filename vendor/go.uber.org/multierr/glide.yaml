@@ -1,8 +1,0 @@
-package: go.uber.org/multierr
-import:
-- package: go.uber.org/atomic
-  version: ^1
-testImport:
-- package: github.com/stretchr/testify
-  subpackages:
-  - assert

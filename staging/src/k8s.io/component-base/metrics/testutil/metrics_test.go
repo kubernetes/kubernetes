@@ -19,11 +19,14 @@ package testutil
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"testing"
 
-	"k8s.io/utils/pointer"
-
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	dto "github.com/prometheus/client_model/go"
+	"k8s.io/component-base/metrics"
+	"k8s.io/utils/pointer"
 )
 
 func samples2Histogram(samples []float64, upperBounds []float64) Histogram {
@@ -118,48 +121,6 @@ func TestHistogramQuantile(t *testing.T) {
 				t.Errorf("Expected q999999 to be less than %v, got %v instead", lastUpperBound, q999999)
 			}
 		})
-	}
-}
-
-func TestHistogramClear(t *testing.T) {
-	samples := []float64{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6}
-	bounds := []float64{1, 2, 4, 8}
-	h := samples2Histogram(samples, bounds)
-
-	if *h.SampleCount == 0 {
-		t.Errorf("Expected histogram .SampleCount to be non-zero")
-	}
-	if *h.SampleSum == 0 {
-		t.Errorf("Expected histogram .SampleSum to be non-zero")
-	}
-
-	for _, b := range h.Bucket {
-		if b.CumulativeCount != nil {
-			if *b.CumulativeCount == 0 {
-				t.Errorf("Expected histogram bucket to have non-zero comulative count")
-			}
-		}
-	}
-
-	h.Clear()
-
-	if *h.SampleCount != 0 {
-		t.Errorf("Expected histogram .SampleCount to be zero, have %v instead", *h.SampleCount)
-	}
-
-	if *h.SampleSum != 0 {
-		t.Errorf("Expected histogram .SampleSum to be zero, have %v instead", *h.SampleSum)
-	}
-
-	for _, b := range h.Bucket {
-		if b.CumulativeCount != nil {
-			if *b.CumulativeCount != 0 {
-				t.Errorf("Expected histogram bucket to have zero comulative count, have %v instead", *b.CumulativeCount)
-			}
-		}
-		if b.UpperBound != nil {
-			*b.UpperBound = 0
-		}
 	}
 }
 
@@ -349,6 +310,283 @@ func TestLabelsMatch(t *testing.T) {
 			got := LabelsMatch(tt.metric, tt.labelFilter)
 			if got != tt.expectedMatch {
 				t.Errorf("Expected %v, got %v instead", tt.expectedMatch, got)
+			}
+		})
+	}
+}
+
+func TestHistogramVec_GetAggregatedSampleCount(t *testing.T) {
+	tests := []struct {
+		name string
+		vec  HistogramVec
+		want uint64
+	}{
+		{
+			name: "nil case",
+			want: 0,
+		},
+		{
+			name: "zero case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: pointer.Float64Ptr(0.0)}},
+			},
+			want: 0,
+		},
+		{
+			name: "standard case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: pointer.Float64Ptr(4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(4), SampleSum: pointer.Float64Ptr(8.0)}},
+			},
+			want: 7,
+		},
+		{
+			name: "mixed case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: pointer.Float64Ptr(0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: pointer.Float64Ptr(4.0)}},
+			},
+			want: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.vec.GetAggregatedSampleCount(); got != tt.want {
+				t.Errorf("GetAggregatedSampleCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHistogramVec_GetAggregatedSampleSum(t *testing.T) {
+	tests := []struct {
+		name string
+		vec  HistogramVec
+		want float64
+	}{
+		{
+			name: "nil case",
+			want: 0.0,
+		},
+		{
+			name: "zero case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: pointer.Float64Ptr(0.0)}},
+			},
+			want: 0.0,
+		},
+		{
+			name: "standard case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: pointer.Float64Ptr(4.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(4), SampleSum: pointer.Float64Ptr(8.0)}},
+			},
+			want: 14.0,
+		},
+		{
+			name: "mixed case",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(2.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(0), SampleSum: pointer.Float64Ptr(0.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: pointer.Float64Ptr(4.0)}},
+			},
+			want: 6.0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.vec.GetAggregatedSampleSum(); got != tt.want {
+				t.Errorf("GetAggregatedSampleSum() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHistogramVec_Quantile(t *testing.T) {
+	tests := []struct {
+		name     string
+		samples  [][]float64
+		bounds   []float64
+		quantile float64
+		want     []float64
+	}{
+		{
+			name: "duplicated histograms",
+			samples: [][]float64{
+				{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6},
+				{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6},
+				{0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 3, 3, 3, 3, 6, 6, 6, 6},
+			},
+			bounds: []float64{1, 2, 4, 8},
+			want:   []float64{2, 6.4, 7.2, 7.84},
+		},
+		{
+			name: "random numbers",
+			samples: [][]float64{
+				{8, 35, 47, 61, 56, 69, 66, 74, 35, 69, 5, 38, 58, 40, 36, 12},
+				{79, 44, 57, 46, 11, 8, 53, 77, 13, 35, 38, 47, 73, 16, 26, 29},
+				{51, 76, 22, 55, 20, 63, 59, 66, 34, 58, 64, 16, 79, 7, 58, 28},
+			},
+			bounds: []float64{10, 20, 40, 80},
+			want:   []float64{44.44, 72.89, 76.44, 79.29},
+		},
+		{
+			name: "single histogram",
+			samples: [][]float64{
+				{6, 34, 30, 10, 20, 18, 26, 31, 4, 2, 33, 17, 30, 1, 18, 29},
+			},
+			bounds: []float64{10, 20, 40, 80},
+			want:   []float64{20, 36, 38, 39.6},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var vec HistogramVec
+			for _, sample := range tt.samples {
+				histogram := samples2Histogram(sample, tt.bounds)
+				vec = append(vec, &histogram)
+			}
+			var got []float64
+			for _, q := range []float64{0.5, 0.9, 0.95, 0.99} {
+				got = append(got, math.Round(vec.Quantile(q)*100)/100)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Quantile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHistogramVec_Validate(t *testing.T) {
+	tests := []struct {
+		name string
+		vec  HistogramVec
+		want error
+	}{
+		{
+			name: "nil SampleCount",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(1.0)}},
+				&Histogram{&dto.Histogram{SampleSum: pointer.Float64Ptr(2.0)}},
+			},
+			want: fmt.Errorf("nil or empty histogram SampleCount"),
+		},
+		{
+			name: "valid HistogramVec",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(1), SampleSum: pointer.Float64Ptr(1.0)}},
+				&Histogram{&dto.Histogram{SampleCount: uint64Ptr(2), SampleSum: pointer.Float64Ptr(2.0)}},
+			},
+		},
+		{
+			name: "different bucket size",
+			vec: HistogramVec{
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(4),
+					SampleSum:   pointer.Float64Ptr(10.0),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(1)},
+						{CumulativeCount: uint64Ptr(2), UpperBound: pointer.Float64Ptr(2)},
+						{CumulativeCount: uint64Ptr(5), UpperBound: pointer.Float64Ptr(4)},
+					},
+				}},
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(3),
+					SampleSum:   pointer.Float64Ptr(8.0),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(2)},
+						{CumulativeCount: uint64Ptr(3), UpperBound: pointer.Float64Ptr(4)},
+					},
+				}},
+			},
+			want: fmt.Errorf("found different bucket size: expect 3, but got 2 at index 1"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.vec.Validate(); fmt.Sprintf("%v", got) != fmt.Sprintf("%v", tt.want) {
+				t.Errorf("Validate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetHistogramVecFromGatherer(t *testing.T) {
+	tests := []struct {
+		name    string
+		lvMap   map[string]string
+		wantVec HistogramVec
+	}{
+		{
+			name:  "filter with one label",
+			lvMap: map[string]string{"label1": "value1-0"},
+			wantVec: HistogramVec{
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(1.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(2.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+			},
+		},
+		{
+			name:  "filter with two labels",
+			lvMap: map[string]string{"label1": "value1-0", "label2": "value2-1"},
+			wantVec: HistogramVec{
+				&Histogram{&dto.Histogram{
+					SampleCount: uint64Ptr(1),
+					SampleSum:   pointer.Float64Ptr(2.5),
+					Bucket: []*dto.Bucket{
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(0.5)},
+						{CumulativeCount: uint64Ptr(0), UpperBound: pointer.Float64Ptr(2.0)},
+						{CumulativeCount: uint64Ptr(1), UpperBound: pointer.Float64Ptr(5.0)},
+					},
+				}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buckets := []float64{.5, 2, 5}
+			// HistogramVec has two labels defined.
+			labels := []string{"label1", "label2"}
+			HistogramOpts := &metrics.HistogramOpts{
+				Namespace: "namespace",
+				Name:      "metric_test_name",
+				Subsystem: "subsystem",
+				Help:      "histogram help message",
+				Buckets:   buckets,
+			}
+			vec := metrics.NewHistogramVec(HistogramOpts, labels)
+			// Use local registry
+			var registry = metrics.NewKubeRegistry()
+			var gather metrics.Gatherer = registry
+			registry.MustRegister(vec)
+			// Observe two metrics with same value for label1 but different value of label2.
+			vec.WithLabelValues("value1-0", "value2-0").Observe(1.5)
+			vec.WithLabelValues("value1-0", "value2-1").Observe(2.5)
+			vec.WithLabelValues("value1-1", "value2-0").Observe(3.5)
+			vec.WithLabelValues("value1-1", "value2-1").Observe(4.5)
+			metricName := fmt.Sprintf("%s_%s_%s", HistogramOpts.Namespace, HistogramOpts.Subsystem, HistogramOpts.Name)
+			histogramVec, _ := GetHistogramVecFromGatherer(gather, metricName, tt.lvMap)
+			if diff := cmp.Diff(tt.wantVec, histogramVec, cmpopts.IgnoreFields(dto.Histogram{}, "state", "sizeCache", "unknownFields", "CreatedTimestamp"), cmpopts.IgnoreFields(dto.Bucket{}, "state", "sizeCache", "unknownFields")); diff != "" {
+				t.Errorf("Got unexpected HistogramVec (-want +got):\n%s", diff)
 			}
 		})
 	}

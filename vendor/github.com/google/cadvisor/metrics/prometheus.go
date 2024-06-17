@@ -25,6 +25,7 @@ import (
 	v2 "github.com/google/cadvisor/info/v2"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -377,6 +378,13 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					return metricValues{{value: float64(s.Memory.RSS), timestamp: s.Timestamp}}
 				},
 			}, {
+				name:      "container_memory_kernel_usage",
+				help:      "Size of kernel memory allocated in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.KernelUsage), timestamp: s.Timestamp}}
+				},
+			}, {
 				name:      "container_memory_mapped_file",
 				help:      "Size of memory mapped files in bytes.",
 				valueType: prometheus.GaugeValue,
@@ -422,7 +430,8 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Memory.WorkingSet), timestamp: s.Timestamp}}
 				},
-			}, {
+			},
+			{
 				name:        "container_memory_failures_total",
 				help:        "Cumulative count of memory allocation failures.",
 				valueType:   prometheus.CounterValue,
@@ -454,54 +463,38 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
-	if includedMetrics.Has(container.AcceleratorUsageMetrics) {
+	if includedMetrics.Has(container.CPUSetMetrics) {
+		c.containerMetrics = append(c.containerMetrics, containerMetric{
+			name:      "container_memory_migrate",
+			help:      "Memory migrate status.",
+			valueType: prometheus.GaugeValue,
+			getValues: func(s *info.ContainerStats) metricValues {
+				return metricValues{{value: float64(s.CpuSet.MemoryMigrate), timestamp: s.Timestamp}}
+			},
+		})
+	}
+	if includedMetrics.Has(container.MemoryNumaMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
 			{
-				name:        "container_accelerator_memory_total_bytes",
-				help:        "Total accelerator memory.",
+				name:        "container_memory_numa_pages",
+				help:        "Number of used pages per NUMA node",
 				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
+				extraLabels: []string{"type", "scope", "node"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.MemoryTotal),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			}, {
-				name:        "container_accelerator_memory_used_bytes",
-				help:        "Total accelerator memory allocated.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.MemoryUsed),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			}, {
-				name:        "container_accelerator_duty_cycle",
-				help:        "Percent of time over the past sample period during which the accelerator was actively processing.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"make", "model", "acc_id"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.Accelerators))
-					for _, value := range s.Accelerators {
-						values = append(values, metricValue{
-							value:     float64(value.DutyCycle),
-							labels:    []string{value.Make, value.Model, value.ID},
-							timestamp: s.Timestamp,
-						})
-					}
+					values := make(metricValues, 0)
+					values = append(values, getNumaStatsPerNode(s.Memory.ContainerData.NumaStats.File,
+						[]string{"file", "container"}, s.Timestamp)...)
+					values = append(values, getNumaStatsPerNode(s.Memory.ContainerData.NumaStats.Anon,
+						[]string{"anon", "container"}, s.Timestamp)...)
+					values = append(values, getNumaStatsPerNode(s.Memory.ContainerData.NumaStats.Unevictable,
+						[]string{"unevictable", "container"}, s.Timestamp)...)
+
+					values = append(values, getNumaStatsPerNode(s.Memory.HierarchicalData.NumaStats.File,
+						[]string{"file", "hierarchy"}, s.Timestamp)...)
+					values = append(values, getNumaStatsPerNode(s.Memory.HierarchicalData.NumaStats.Anon,
+						[]string{"anon", "hierarchy"}, s.Timestamp)...)
+					values = append(values, getNumaStatsPerNode(s.Memory.HierarchicalData.NumaStats.Unevictable,
+						[]string{"unevictable", "hierarchy"}, s.Timestamp)...)
 					return values
 				},
 			},
@@ -727,6 +720,28 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
 						return float64(fs.WeightedIoTime) / float64(time.Second)
 					}, s.Timestamp)
+				},
+			},
+			{
+				name:        "container_blkio_device_usage_total",
+				help:        "Blkio Device bytes usage",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device", "major", "minor", "operation"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					var values metricValues
+					for _, diskStat := range s.DiskIo.IoServiceBytes {
+						for operation, value := range diskStat.Stats {
+							values = append(values, metricValue{
+								value: float64(value),
+								labels: []string{diskStat.Device,
+									strconv.Itoa(int(diskStat.Major)),
+									strconv.Itoa(int(diskStat.Minor)),
+									operation},
+								timestamp: s.Timestamp,
+							})
+						}
+					}
+					return values
 				},
 			},
 		}...)
@@ -1549,41 +1564,48 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 		}...)
 	}
 	if includedMetrics.Has(container.PerfMetrics) {
+		if includedMetrics.Has(container.PerCpuUsageMetrics) {
+			c.containerMetrics = append(c.containerMetrics, []containerMetric{
+				{
+					name:        "container_perf_events_total",
+					help:        "Perf event metric.",
+					valueType:   prometheus.CounterValue,
+					extraLabels: []string{"cpu", "event"},
+					getValues: func(s *info.ContainerStats) metricValues {
+						return getPerCPUCorePerfEvents(s)
+					},
+				},
+				{
+					name:        "container_perf_events_scaling_ratio",
+					help:        "Perf event metric scaling ratio.",
+					valueType:   prometheus.GaugeValue,
+					extraLabels: []string{"cpu", "event"},
+					getValues: func(s *info.ContainerStats) metricValues {
+						return getPerCPUCoreScalingRatio(s)
+					},
+				}}...)
+		} else {
+			c.containerMetrics = append(c.containerMetrics, []containerMetric{
+				{
+					name:        "container_perf_events_total",
+					help:        "Perf event metric.",
+					valueType:   prometheus.CounterValue,
+					extraLabels: []string{"cpu", "event"},
+					getValues: func(s *info.ContainerStats) metricValues {
+						return getAggregatedCorePerfEvents(s)
+					},
+				},
+				{
+					name:        "container_perf_events_scaling_ratio",
+					help:        "Perf event metric scaling ratio.",
+					valueType:   prometheus.GaugeValue,
+					extraLabels: []string{"cpu", "event"},
+					getValues: func(s *info.ContainerStats) metricValues {
+						return getMinCoreScalingRatio(s)
+					},
+				}}...)
+		}
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
-			{
-				name:        "container_perf_events_total",
-				help:        "Perf event metric.",
-				valueType:   prometheus.CounterValue,
-				extraLabels: []string{"cpu", "event"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.PerfStats))
-					for _, metric := range s.PerfStats {
-						values = append(values, metricValue{
-							value:     float64(metric.Value),
-							labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			},
-			{
-				name:        "container_perf_events_scaling_ratio",
-				help:        "Perf event metric scaling ratio.",
-				valueType:   prometheus.GaugeValue,
-				extraLabels: []string{"cpu", "event"},
-				getValues: func(s *info.ContainerStats) metricValues {
-					values := make(metricValues, 0, len(s.PerfStats))
-					for _, metric := range s.PerfStats {
-						values = append(values, metricValue{
-							value:     metric.ScalingRatio,
-							labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
-							timestamp: s.Timestamp,
-						})
-					}
-					return values
-				},
-			},
 			{
 				name:        "container_perf_uncore_events_total",
 				help:        "Perf uncore event metric.",
@@ -1690,6 +1712,17 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.OOMMetrics) {
+		c.containerMetrics = append(c.containerMetrics, containerMetric{
+			name:      "container_oom_events_total",
+			help:      "Count of out of memory events observed for the container",
+			valueType: prometheus.CounterValue,
+			getValues: func(s *info.ContainerStats) metricValues {
+				return metricValues{{value: float64(s.OOMEvents), timestamp: s.Timestamp}}
+			},
+		})
+	}
+
 	return c
 }
 
@@ -1758,7 +1791,7 @@ func DefaultContainerLabels(container *info.ContainerInfo) map[string]string {
 }
 
 // BaseContainerLabels returns a ContainerLabelsFunc that exports the container
-// name, first alias, image name as well as white listed label values.
+// name, first alias, image name as well as all its white listed env and label values.
 func BaseContainerLabels(whiteList []string) func(container *info.ContainerInfo) map[string]string {
 	whiteListMap := make(map[string]struct{}, len(whiteList))
 	for _, k := range whiteList {
@@ -1777,6 +1810,9 @@ func BaseContainerLabels(whiteList []string) func(container *info.ContainerInfo)
 			if _, ok := whiteListMap[k]; ok {
 				set[ContainerLabelPrefix+k] = v
 			}
+		}
+		for k, v := range container.Spec.Envs {
+			set[ContainerEnvPrefix+k] = v
 		}
 		return set
 	}
@@ -1902,4 +1938,80 @@ var invalidNameCharRE = regexp.MustCompile(`[^a-zA-Z0-9_]`)
 // client_label.LabelNameRE with an underscore.
 func sanitizeLabelName(name string) string {
 	return invalidNameCharRE.ReplaceAllString(name, "_")
+}
+
+func getNumaStatsPerNode(nodeStats map[uint8]uint64, labels []string, timestamp time.Time) metricValues {
+	mValues := make(metricValues, 0, len(nodeStats))
+	for node, stat := range nodeStats {
+		nodeLabels := append(labels, strconv.FormatUint(uint64(node), 10))
+		mValues = append(mValues, metricValue{value: float64(stat), labels: nodeLabels, timestamp: timestamp})
+	}
+	return mValues
+}
+
+func getPerCPUCorePerfEvents(s *info.ContainerStats) metricValues {
+	values := make(metricValues, 0, len(s.PerfStats))
+	for _, metric := range s.PerfStats {
+		values = append(values, metricValue{
+			value:     float64(metric.Value),
+			labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
+			timestamp: s.Timestamp,
+		})
+	}
+	return values
+}
+
+func getPerCPUCoreScalingRatio(s *info.ContainerStats) metricValues {
+	values := make(metricValues, 0, len(s.PerfStats))
+	for _, metric := range s.PerfStats {
+		values = append(values, metricValue{
+			value:     metric.ScalingRatio,
+			labels:    []string{strconv.Itoa(metric.Cpu), metric.Name},
+			timestamp: s.Timestamp,
+		})
+	}
+	return values
+}
+
+func getAggregatedCorePerfEvents(s *info.ContainerStats) metricValues {
+	values := make(metricValues, 0)
+
+	perfEventStatAgg := make(map[string]uint64)
+	// aggregate by event
+	for _, perfStat := range s.PerfStats {
+		perfEventStatAgg[perfStat.Name] += perfStat.Value
+	}
+	// create aggregated metrics
+	for perfEvent, perfValue := range perfEventStatAgg {
+		values = append(values, metricValue{
+			value:     float64(perfValue),
+			labels:    []string{"", perfEvent},
+			timestamp: s.Timestamp,
+		})
+	}
+	return values
+}
+
+func getMinCoreScalingRatio(s *info.ContainerStats) metricValues {
+	values := make(metricValues, 0)
+	perfEventStatMin := make(map[string]float64)
+	// search for minimal value of scalin ratio for specific event
+	for _, perfStat := range s.PerfStats {
+		if _, ok := perfEventStatMin[perfStat.Name]; !ok {
+			// found a new event
+			perfEventStatMin[perfStat.Name] = perfStat.ScalingRatio
+		} else if perfStat.ScalingRatio < perfEventStatMin[perfStat.Name] {
+			// found a lower value of scaling ration so replace the minimal value
+			perfEventStatMin[perfStat.Name] = perfStat.ScalingRatio
+		}
+	}
+
+	for perfEvent, perfScalingRatio := range perfEventStatMin {
+		values = append(values, metricValue{
+			value:     perfScalingRatio,
+			labels:    []string{"", perfEvent},
+			timestamp: s.Timestamp,
+		})
+	}
+	return values
 }

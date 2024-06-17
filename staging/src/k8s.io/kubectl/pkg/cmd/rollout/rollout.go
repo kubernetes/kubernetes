@@ -20,22 +20,29 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	rolloutLong = templates.LongDesc(`
-		Manage the rollout of a resource.` + rolloutValidResources)
+	rolloutLong = templates.LongDesc(i18n.T(`
+		Manage the rollout of one or many resources.`) + rolloutValidResources)
 
 	rolloutExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
 		# Check the rollout status of a daemonset
-		kubectl rollout status daemonset/foo`)
+		kubectl rollout status daemonset/foo
+
+		# Restart a deployment
+		kubectl rollout restart deployment/abc
+
+		# Restart deployments with the 'app=nginx' label
+		kubectl rollout restart deployment --selector=app=nginx`)
 
 	rolloutValidResources = dedent.Dedent(`
 		Valid resource types include:
@@ -47,7 +54,7 @@ var (
 )
 
 // NewCmdRollout returns a Command instance for 'rollout' sub command
-func NewCmdRollout(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdRollout(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "rollout SUBCOMMAND",
 		DisableFlagsInUseLine: true,

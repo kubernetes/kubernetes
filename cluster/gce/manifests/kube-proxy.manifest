@@ -19,10 +19,11 @@ spec:
     effect: "NoSchedule"
   containers:
   - name: kube-proxy
-    image: {{pillar['kube_docker_registry']}}/kube-proxy-amd64:{{pillar['kube-proxy_docker_tag']}}
+    image: {{pillar['kube_docker_registry']}}/kube-proxy-{{pillar['host_arch']}}:{{pillar['kube-proxy_docker_tag']}}
     resources:
       requests:
         cpu: {{ cpurequest }}
+        memory: {{ memoryrequest }}
     command:
     - /bin/sh
     - -c
@@ -30,6 +31,10 @@ spec:
     {{container_env}}
     {{kube_cache_mutation_detector_env_name}}
       {{kube_cache_mutation_detector_env_value}}
+    {{kube_watchlist_inconsistency_detector_env_name}}
+      {{kube_watchlist_inconsistency_detector_env_value}}
+    {{kube_list_from_cache_inconsistency_detector_env_name}}
+      {{kube_list_from_cache_inconsistency_detector_env_value}}
     securityContext:
       privileged: true
     volumeMounts:

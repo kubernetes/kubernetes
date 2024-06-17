@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
@@ -42,6 +43,27 @@ func (autoscalerStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"autoscaling/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"autoscaling/v2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"autoscaling/v2beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"autoscaling/v2beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
@@ -54,6 +76,11 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	return validation.ValidateHorizontalPodAutoscaler(autoscaler)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (autoscalerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -78,6 +105,11 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	return validation.ValidateHorizontalPodAutoscalerUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (autoscalerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -89,6 +121,27 @@ type autoscalerStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = autoscalerStatusStrategy{Strategy}
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (autoscalerStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"autoscaling/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"autoscaling/v2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"autoscaling/v2beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"autoscaling/v2beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
+
 func (autoscalerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newAutoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldAutoscaler := old.(*autoscaling.HorizontalPodAutoscaler)
@@ -98,4 +151,9 @@ func (autoscalerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 func (autoscalerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateHorizontalPodAutoscalerStatusUpdate(obj.(*autoscaling.HorizontalPodAutoscaler), old.(*autoscaling.HorizontalPodAutoscaler))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

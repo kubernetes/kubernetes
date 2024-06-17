@@ -19,7 +19,6 @@ package get
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -32,7 +31,7 @@ import (
 func TestPrinterSupportsExpectedCustomColumnFormats(t *testing.T) {
 	testObject := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 
-	customColumnsFile, err := ioutil.TempFile("", "printers_jsonpath_flags")
+	customColumnsFile, err := os.CreateTemp(os.TempDir(), "printers_jsonpath_flags")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

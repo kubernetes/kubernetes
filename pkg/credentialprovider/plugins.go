@@ -30,9 +30,10 @@ var providers = make(map[string]DockerConfigProvider)
 
 // RegisterCredentialProvider is called by provider implementations on
 // initialization to register themselves, like so:
-//   func init() {
-//    	RegisterCredentialProvider("name", &myProvider{...})
-//   }
+//
+//	func init() {
+//	 	RegisterCredentialProvider("name", &myProvider{...})
+//	}
 func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()

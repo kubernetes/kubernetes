@@ -17,12 +17,18 @@ limitations under the License.
 package tail
 
 import (
-	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
 
-func TestTail(t *testing.T) {
+func TestReadAtMost(t *testing.T) {
+	file, err := os.CreateTemp("", "TestFileReadAtMost")
+	if err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	defer os.Remove(file.Name())
+
 	line := strings.Repeat("a", blockSize)
 	testBytes := []byte(line + "\n" +
 		line + "\n" +
@@ -30,23 +36,55 @@ func TestTail(t *testing.T) {
 		line + "\n" +
 		line[blockSize/2:]) // incomplete line
 
-	for c, test := range []struct {
-		n     int64
-		start int64
+	file.Write(testBytes)
+	testCases := []struct {
+		name          string
+		max           int64
+		longerThanMax bool
+		expected      string
 	}{
-		{n: -1, start: 0},
-		{n: 0, start: int64(len(line)+1) * 4},
-		{n: 1, start: int64(len(line)+1) * 3},
-		{n: 9999, start: 0},
-	} {
-		t.Logf("TestCase #%d: %+v", c, test)
-		r := bytes.NewReader(testBytes)
-		s, err := FindTailLineStartIndex(r, test.n)
+		{
+			name:          "the max is negative",
+			max:           -1,
+			longerThanMax: true,
+			expected:      "",
+		},
+		{
+			name:          "the max is zero",
+			max:           0,
+			longerThanMax: true,
+			expected:      "",
+		},
+		{
+			name:          "the file length is longer than max",
+			max:           1,
+			longerThanMax: true,
+			expected:      "a",
+		},
+		{
+			name:          "the file length is longer than max and contains newlines",
+			max:           blockSize,
+			longerThanMax: true,
+			expected:      strings.Repeat("a", blockSize/2-1) + "\n" + strings.Repeat("a", blockSize/2),
+		},
+		{
+			name:          "the max is longer than file length ",
+			max:           4613,
+			longerThanMax: false,
+			expected:      string(testBytes),
+		},
+	}
+
+	for _, test := range testCases {
+		readAtMostBytes, longerThanMax, err := ReadAtMost(file.Name(), test.max)
 		if err != nil {
-			t.Error(err)
+			t.Fatalf("Unexpected failure %v", err)
 		}
-		if s != test.start {
-			t.Errorf("%d != %d", s, test.start)
+		if test.longerThanMax != longerThanMax {
+			t.Fatalf("Unexpected result on whether the file length longer than the max, want: %t, got: %t", test.longerThanMax, longerThanMax)
+		}
+		if test.expected != string(readAtMostBytes) {
+			t.Fatalf("Unexpected most max bytes, want: %s, got: %s", test.expected, readAtMostBytes)
 		}
 	}
 }

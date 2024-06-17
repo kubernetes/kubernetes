@@ -19,7 +19,7 @@ cli client. That client will eventually move here too.
 
 - No dependence on `k8s.io/kubernetes`. Dependence on other repositories is fine.
 
-- Code must be usefully [commented](https://golang.org/doc/effective_go.html#commentary).
+- Code must be usefully [commented](https://go.dev/doc/effective_go#commentary).
   Not only for developers on the project, but also for external users of these packages.
 
 - When reviewing PRs, you are encouraged to use Golang's [code review
@@ -35,3 +35,4 @@ See [this document](https://github.com/kubernetes/community/tree/master/sig-cli)
 ### Code of conduct
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).
+

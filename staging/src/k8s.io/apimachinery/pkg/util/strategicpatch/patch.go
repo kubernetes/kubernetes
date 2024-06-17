@@ -987,10 +987,10 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 		return nil
 	}
 
-	var nonDeleteList, toDeleteList []interface{}
+	var nonDeleteList []interface{}
 	var err error
 	if len(mergeKey) > 0 {
-		nonDeleteList, toDeleteList, err = extractToDeleteItems(typedPatchList)
+		nonDeleteList, _, err = extractToDeleteItems(typedPatchList)
 		if err != nil {
 			return err
 		}
@@ -1018,7 +1018,6 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 	if patchIndex < len(nonDeleteList) && setOrderIndex >= len(typedSetOrderList) {
 		return fmt.Errorf("The order in patch list:\n%v\n doesn't match %s list:\n%v\n", typedPatchList, setElementOrderDirectivePrefix, setOrderList)
 	}
-	typedPatchList = append(nonDeleteList, toDeleteList...)
 	return nil
 }
 
@@ -1107,7 +1106,7 @@ func applyRetainKeysDirective(original, patch map[string]interface{}, options Me
 // Then, sort them by the relative order in setElementOrder, patch list and live list.
 // The precedence is $setElementOrder > order in patch list > order in live list.
 // This function will delete the item after merging it to prevent process it again in the future.
-// Ref: https://git.k8s.io/community/contributors/design-proposals/cli/preserve-order-in-strategic-merge-patch.md
+// Ref: https://git.k8s.io/design-proposals-archive/cli/preserve-order-in-strategic-merge-patch.md
 func mergePatchIntoOriginal(original, patch map[string]interface{}, schema LookupPatchMeta, mergeOptions MergeOptions) error {
 	for key, patchV := range patch {
 		// Do nothing if there is no ordering directive
@@ -1183,7 +1182,13 @@ func mergePatchIntoOriginal(original, patch map[string]interface{}, schema Looku
 			merged = originalFieldValue
 		case !foundOriginal && foundPatch:
 			// list was added
-			merged = patchFieldValue
+			v, keep := removeDirectives(patchFieldValue)
+			if !keep {
+				// Shouldn't be possible since patchFieldValue is a slice
+				continue
+			}
+
+			merged = v.([]interface{})
 		case foundOriginal && foundPatch:
 			merged, err = mergeSliceHandler(originalList, patchList, subschema,
 				patchStrategy, patchMeta.GetPatchMergeKey(), false, mergeOptions)
@@ -1271,6 +1276,42 @@ func partitionMapsByPresentInList(original, partitionBy []interface{}, mergeKey 
 	return patch, serverOnly, nil
 }
 
+// Removes directives from an object and returns value to use instead and whether
+// or not the field/index should even be kept
+// May modify input
+func removeDirectives(obj interface{}) (interface{}, bool) {
+	if obj == nil {
+		return obj, true
+	} else if typedV, ok := obj.(map[string]interface{}); ok {
+		if _, hasDirective := typedV[directiveMarker]; hasDirective {
+			return nil, false
+		}
+
+		for k, v := range typedV {
+			var keep bool
+			typedV[k], keep = removeDirectives(v)
+			if !keep {
+				delete(typedV, k)
+			}
+		}
+		return typedV, true
+	} else if typedV, ok := obj.([]interface{}); ok {
+		var res []interface{}
+		if typedV != nil {
+			// Make sure res is non-nil if patch is non-nil
+			res = []interface{}{}
+		}
+		for _, v := range typedV {
+			if newV, keep := removeDirectives(v); keep {
+				res = append(res, newV)
+			}
+		}
+		return res, true
+	} else {
+		return obj, true
+	}
+}
+
 // Merge fields from a patch map into the original map. Note: This may modify
 // both the original map and the patch because getting a deep copy of a map in
 // golang is highly non-trivial.
@@ -1329,15 +1370,31 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 
 		_, ok := original[k]
 		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
+			if !isDeleteList {
+				// If it's not in the original document, just take the patch value.
+				if mergeOptions.IgnoreUnmatchedNulls {
+					discardNullValuesFromPatch(patchV)
+				}
+				original[k], ok = removeDirectives(patchV)
+				if !ok {
+					delete(original, k)
+				}
+			}
 			continue
 		}
 
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
 		if originalType != patchType {
-			original[k] = patchV
+			if !isDeleteList {
+				if mergeOptions.IgnoreUnmatchedNulls {
+					discardNullValuesFromPatch(patchV)
+				}
+				original[k], ok = removeDirectives(patchV)
+				if !ok {
+					delete(original, k)
+				}
+			}
 			continue
 		}
 		// If they're both maps or lists, recurse into the value.
@@ -1363,13 +1420,36 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 			}
 			original[k], err = mergeSliceHandler(original[k], patchV, subschema, patchStrategy, patchMeta.GetPatchMergeKey(), isDeleteList, mergeOptions)
 		default:
-			original[k] = patchV
+			original[k], ok = removeDirectives(patchV)
+			if !ok {
+				// if patchV itself is a directive, then don't keep it
+				delete(original, k)
+			}
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
 	return original, nil
+}
+
+// discardNullValuesFromPatch discards all null property values from patch.
+// It traverses all slices and map types.
+func discardNullValuesFromPatch(patchV interface{}) {
+	switch patchV := patchV.(type) {
+	case map[string]interface{}:
+		for k, v := range patchV {
+			if v == nil {
+				delete(patchV, k)
+			} else {
+				discardNullValuesFromPatch(v)
+			}
+		}
+	case []interface{}:
+		for _, v := range patchV {
+			discardNullValuesFromPatch(v)
+		}
+	}
 }
 
 // mergeMapHandler handles how to merge `patchV` whose key is `key` with `original` respecting
@@ -1397,7 +1477,8 @@ func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 		return nil, err
 	}
 
-	if fieldPatchStrategy == mergeDirective {
+	// Delete lists are handled the same way regardless of what the field's patch strategy is
+	if fieldPatchStrategy == mergeDirective || isDeleteList {
 		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, mergeOptions, isDeleteList)
 	} else {
 		return typedPatch, nil

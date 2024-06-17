@@ -22,15 +22,16 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
-	storageetcd3 "k8s.io/apiserver/pkg/storage/etcd3"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/clock"
 )
 
 // GetObjectTTLFunc defines a function to get value of TTL.
@@ -42,6 +43,7 @@ type GetObjectFunc func(string, string, metav1.GetOptions) (runtime.Object, erro
 type objectKey struct {
 	namespace string
 	name      string
+	uid       types.UID
 }
 
 // objectStoreItems is a single item stored in objectStore.
@@ -85,12 +87,12 @@ func isObjectOlder(newObject, oldObject runtime.Object) bool {
 	if newObject == nil || oldObject == nil {
 		return false
 	}
-	newVersion, _ := storageetcd3.Versioner.ObjectResourceVersion(newObject)
-	oldVersion, _ := storageetcd3.Versioner.ObjectResourceVersion(oldObject)
+	newVersion, _ := storage.APIObjectVersioner{}.ObjectResourceVersion(newObject)
+	oldVersion, _ := storage.APIObjectVersioner{}.ObjectResourceVersion(oldObject)
 	return newVersion < oldVersion
 }
 
-func (s *objectStore) AddReference(namespace, name string) {
+func (s *objectStore) AddReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod, thus it needs to be efficient.
@@ -112,7 +114,7 @@ func (s *objectStore) AddReference(namespace, name string) {
 	item.data = nil
 }
 
-func (s *objectStore) DeleteReference(namespace, name string) {
+func (s *objectStore) DeleteReference(namespace, name string, _ types.UID) {
 	key := objectKey{namespace: namespace, name: name}
 
 	s.lock.Lock()
@@ -208,7 +210,7 @@ func (s *objectStore) Get(namespace, name string) (runtime.Object, error) {
 // (e.g. ttl-based implementation vs watch-based implementation).
 type cacheBasedManager struct {
 	objectStore          Store
-	getReferencedObjects func(*v1.Pod) sets.String
+	getReferencedObjects func(*v1.Pod) sets.Set[string]
 
 	lock           sync.Mutex
 	registeredPods map[objectKey]*v1.Pod
@@ -222,35 +224,43 @@ func (c *cacheBasedManager) RegisterPod(pod *v1.Pod) {
 	names := c.getReferencedObjects(pod)
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	for name := range names {
-		c.objectStore.AddReference(pod.Namespace, name)
-	}
 	var prev *v1.Pod
-	key := objectKey{namespace: pod.Namespace, name: pod.Name}
+	key := objectKey{namespace: pod.Namespace, name: pod.Name, uid: pod.UID}
 	prev = c.registeredPods[key]
 	c.registeredPods[key] = pod
-	if prev != nil {
-		for name := range c.getReferencedObjects(prev) {
-			// On an update, the .Add() call above will have re-incremented the
-			// ref count of any existing object, so any objects that are in both
-			// names and prev need to have their ref counts decremented. Any that
-			// are only in prev need to be completely removed. This unconditional
-			// call takes care of both cases.
-			c.objectStore.DeleteReference(prev.Namespace, name)
+	// To minimize unnecessary API requests to the API server for the configmap/secret get API
+	// only invoke AddReference the first time RegisterPod is called for a pod.
+	if prev == nil {
+		for name := range names {
+			c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+		}
+	} else {
+		prevNames := c.getReferencedObjects(prev)
+		// Add new references
+		for name := range names {
+			if !prevNames.Has(name) {
+				c.objectStore.AddReference(pod.Namespace, name, pod.UID)
+			}
+		}
+		// Remove dropped references
+		for prevName := range prevNames {
+			if !names.Has(prevName) {
+				c.objectStore.DeleteReference(pod.Namespace, prevName, pod.UID)
+			}
 		}
 	}
 }
 
 func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 	var prev *v1.Pod
-	key := objectKey{namespace: pod.Namespace, name: pod.Name}
+	key := objectKey{namespace: pod.Namespace, name: pod.Name, uid: pod.UID}
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	prev = c.registeredPods[key]
 	delete(c.registeredPods, key)
 	if prev != nil {
 		for name := range c.getReferencedObjects(prev) {
-			c.objectStore.DeleteReference(prev.Namespace, name)
+			c.objectStore.DeleteReference(prev.Namespace, name, prev.UID)
 		}
 	}
 }
@@ -258,12 +268,12 @@ func (c *cacheBasedManager) UnregisterPod(pod *v1.Pod) {
 // NewCacheBasedManager creates a manager that keeps a cache of all objects
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, the cached versions of all objects
-//   is referencing are invalidated
-// - every GetObject() call tries to fetch the value from local cache; if it is
-//   not there, invalidated or too old, we fetch it from apiserver and refresh the
-//   value in cache; otherwise it is just fetched from cache
-func NewCacheBasedManager(objectStore Store, getReferencedObjects func(*v1.Pod) sets.String) Manager {
+//   - whenever a pod is created or updated, the cached versions of all objects
+//     is referencing are invalidated
+//   - every GetObject() call tries to fetch the value from local cache; if it is
+//     not there, invalidated or too old, we fetch it from apiserver and refresh the
+//     value in cache; otherwise it is just fetched from cache
+func NewCacheBasedManager(objectStore Store, getReferencedObjects func(*v1.Pod) sets.Set[string]) Manager {
 	return &cacheBasedManager{
 		objectStore:          objectStore,
 		getReferencedObjects: getReferencedObjects,

@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // CSINodesGetter has a method to return a CSINodeInterface.
@@ -46,6 +52,7 @@ type CSINodeInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CSINodeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSINode, err error)
+	Apply(ctx context.Context, cSINode *storagev1beta1.CSINodeApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CSINode, err error)
 	CSINodeExpansion
 }
 
@@ -74,7 +81,26 @@ func (c *cSINodes) Get(ctx context.Context, name string, options v1.GetOptions) 
 }
 
 // List takes label and field selectors, and returns the list of CSINodes that match those selectors.
-func (c *cSINodes) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CSINodeList, err error) {
+func (c *cSINodes) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CSINodeList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for csinodes, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for csinodes", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for csinodes ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for csinodes", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of CSINodes that match those selectors.
+func (c *cSINodes) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CSINodeList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +111,22 @@ func (c *cSINodes) List(ctx context.Context, opts v1.ListOptions) (result *v1bet
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of CSINodes
+func (c *cSINodes) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CSINodeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.CSINodeList{}
+	err = c.client.Get().
+		Resource("csinodes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +203,31 @@ func (c *cSINodes) Patch(ctx context.Context, name string, pt types.PatchType, d
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied cSINode.
+func (c *cSINodes) Apply(ctx context.Context, cSINode *storagev1beta1.CSINodeApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CSINode, err error) {
+	if cSINode == nil {
+		return nil, fmt.Errorf("cSINode provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(cSINode)
+	if err != nil {
+		return nil, err
+	}
+	name := cSINode.Name
+	if name == nil {
+		return nil, fmt.Errorf("cSINode.Name must be provided to Apply")
+	}
+	result = &v1beta1.CSINode{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("csinodes").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -19,9 +19,9 @@ package metrics
 import (
 	"testing"
 
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/endpointslice/util"
 )
 
 func TestNumEndpointsAndSlices(t *testing.T) {
@@ -30,8 +30,8 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	p80 := int32(80)
 	p443 := int32(443)
 
-	pmKey80443 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
-	pmKey80 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
+	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
 	spCacheEfficient := NewEndpointPortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})

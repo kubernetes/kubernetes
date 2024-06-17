@@ -21,11 +21,11 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
-	expected := "/etc/kubernetes/manifests"
+	expected := filepath.FromSlash("/etc/kubernetes/manifests")
 	actual := GetStaticPodDirectory()
 
 	if actual != expected {
@@ -50,21 +50,8 @@ func TestGetAdminKubeConfigPath(t *testing.T) {
 	}
 }
 
-func TestGetBootstrapKubeletKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/bootstrap-kubelet.conf"
-	actual := GetBootstrapKubeletKubeConfigPath()
-
-	if actual != expected {
-		t.Errorf(
-			"failed GetBootstrapKubeletKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
-			expected,
-			actual,
-		)
-	}
-}
-
 func TestGetKubeletKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/kubelet.conf"
+	expected := filepath.FromSlash("/etc/kubernetes/kubelet.conf")
 	actual := GetKubeletKubeConfigPath()
 
 	if actual != expected {
@@ -99,7 +86,8 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.componentName, func(t *testing.T) {
 			actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
-			if actual != rt.expected {
+			expected := filepath.FromSlash(rt.expected)
+			if actual != expected {
 				t.Errorf(
 					"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
 					rt.expected,
@@ -110,46 +98,15 @@ func TestGetStaticPodFilepath(t *testing.T) {
 	}
 }
 
-func TestAddSelfHostedPrefix(t *testing.T) {
-	var tests = []struct {
-		componentName, expected string
-	}{
-		{
-			componentName: "kube-apiserver",
-			expected:      "self-hosted-kube-apiserver",
-		},
-		{
-			componentName: "kube-controller-manager",
-			expected:      "self-hosted-kube-controller-manager",
-		},
-		{
-			componentName: "kube-scheduler",
-			expected:      "self-hosted-kube-scheduler",
-		},
-		{
-			componentName: "foo",
-			expected:      "self-hosted-foo",
-		},
-	}
-	for _, rt := range tests {
-		t.Run(rt.componentName, func(t *testing.T) {
-			actual := AddSelfHostedPrefix(rt.componentName)
-			if actual != rt.expected {
-				t.Errorf(
-					"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
-					rt.expected,
-					actual,
-				)
-			}
-		})
+func TestEtcdSupportedVersionLength(t *testing.T) {
+	const max = 3
+	if len(SupportedEtcdVersion) > max {
+		t.Fatalf("SupportedEtcdVersion must not include more than %d versions", max)
 	}
 }
 
 func TestEtcdSupportedVersion(t *testing.T) {
 	var supportedEtcdVersion = map[uint8]string{
-		13: "3.2.24",
-		14: "3.3.10",
-		15: "3.3.10",
 		16: "3.3.17-0",
 		17: "3.4.3-0",
 		18: "3.4.3-0",
@@ -168,7 +125,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 		{
 			kubernetesVersion: "1.10.1",
-			expectedVersion:   version.MustParseSemantic("3.2.24"),
+			expectedVersion:   version.MustParseSemantic("3.3.17-0"),
 			expectedWarning:   true,
 			expectedError:     false,
 		},
@@ -207,34 +164,6 @@ func TestEtcdSupportedVersion(t *testing.T) {
 	}
 }
 
-func TestGetKubeDNSVersion(t *testing.T) {
-	var tests = []struct {
-		dns      kubeadmapi.DNSAddOnType
-		expected string
-	}{
-		{
-			dns:      kubeadmapi.KubeDNS,
-			expected: KubeDNSVersion,
-		},
-		{
-			dns:      kubeadmapi.CoreDNS,
-			expected: CoreDNSVersion,
-		},
-	}
-	for _, rt := range tests {
-		t.Run(string(rt.dns), func(t *testing.T) {
-			actualDNSVersion := GetDNSVersion(rt.dns)
-			if actualDNSVersion != rt.expected {
-				t.Errorf(
-					"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
-					rt.expected,
-					actualDNSVersion,
-				)
-			}
-		})
-	}
-}
-
 func TestGetKubernetesServiceCIDR(t *testing.T) {
 	var tests = []struct {
 		svcSubnetList string
@@ -245,35 +174,30 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 	}{
 		{
 			svcSubnetList: "192.168.10.0/24",
-			isDualStack:   false,
 			expected:      "192.168.10.0/24",
 			expectedError: false,
 			name:          "valid: valid IPv4 range from single-stack",
 		},
 		{
 			svcSubnetList: "fd03::/112",
-			isDualStack:   false,
 			expected:      "fd03::/112",
 			expectedError: false,
 			name:          "valid: valid IPv6 range from single-stack",
 		},
 		{
 			svcSubnetList: "192.168.10.0/24,fd03::/112",
-			isDualStack:   true,
 			expected:      "192.168.10.0/24",
 			expectedError: false,
 			name:          "valid: valid <IPv4,IPv6> ranges from dual-stack",
 		},
 		{
 			svcSubnetList: "fd03::/112,192.168.10.0/24",
-			isDualStack:   true,
 			expected:      "fd03::/112",
 			expectedError: false,
 			name:          "valid: valid <IPv6,IPv4> ranges from dual-stack",
 		},
 		{
 			svcSubnetList: "192.168.10.0/24,fd03:x::/112",
-			isDualStack:   true,
 			expected:      "",
 			expectedError: true,
 			name:          "invalid: failed to parse subnet range for dual-stack",
@@ -282,7 +206,7 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList, rt.isDualStack)
+			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList)
 			if rt.expectedError {
 				if actualError == nil {
 					t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected error, but got no error")
@@ -294,6 +218,183 @@ func TestGetKubernetesServiceCIDR(t *testing.T) {
 					t.Errorf(
 						"failed GetKubernetesServiceCIDR:\n\texpected: %s\n\t  actual: %s",
 						rt.expected,
+						actual.String(),
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
+	tests := []struct {
+		name           string
+		versionInfo    *apimachineryversion.Info
+		n              int
+		expectedResult *version.Version
+	}{
+		{
+			name:           "invalid versionInfo; placeholder version is returned",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: DefaultKubernetesPlaceholderVersion,
+		},
+		{
+			name:           "valid skew of -1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              -1,
+			expectedResult: version.MustParseSemantic("v1.22.0"),
+		},
+		{
+			name:           "valid skew of 0",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              0,
+			expectedResult: version.MustParseSemantic("v1.23.0"),
+		},
+		{
+			name:           "valid skew of +1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              1,
+			expectedResult: version.MustParseSemantic("v1.24.0"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n)
+			if cmp, _ := result.Compare(tc.expectedResult.String()); cmp != 0 {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestGetAPIServerVirtualIP(t *testing.T) {
+	var tests = []struct {
+		name, svcSubnet, expectedIP string
+		expectedErr                 bool
+	}{
+		{
+			name:        "subnet mask 24",
+			svcSubnet:   "10.96.0.12/24",
+			expectedIP:  "10.96.0.1",
+			expectedErr: false,
+		},
+		{
+			name:        "subnet mask 12",
+			svcSubnet:   "10.96.0.0/12",
+			expectedIP:  "10.96.0.1",
+			expectedErr: false,
+		},
+		{
+			name:        "subnet mask 26",
+			svcSubnet:   "10.87.116.64/26",
+			expectedIP:  "10.87.116.65",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack ipv4 primary, subnet mask 26",
+			svcSubnet:   "10.87.116.64/26,fd03::/112",
+			expectedIP:  "10.87.116.65",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack, subnet mask 26 , missing first ip segment",
+			svcSubnet:   ",10.87.116.64/26",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack ipv4 primary, subnet mask 26, missing second ip segment",
+			svcSubnet:   "10.87.116.64/26,",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack ipv6 primary, subnet mask 112",
+			svcSubnet:   "fd03::/112,10.87.116.64/26",
+			expectedIP:  "fd03::1",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack, subnet mask 26, missing first ip segment",
+			svcSubnet:   ",fd03::/112",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack, subnet mask 26, missing second ip segment",
+			svcSubnet:   "fd03::/112,",
+			expectedErr: true,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			virtualIP, err := GetAPIServerVirtualIP(rt.svcSubnet)
+			if (err != nil) != rt.expectedErr {
+				t.Errorf("failed APIServerVirtualIP:\n\texpectedErr: %v, got: %v", rt.expectedErr, err)
+			} else if !rt.expectedErr {
+				if virtualIP.String() != rt.expectedIP {
+					t.Errorf(
+						"failed APIServerVirtualIP:\n\texpected: %s\n\t  actual: %s",
+						rt.expectedIP,
+						virtualIP.String(),
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestGetDNSIP(t *testing.T) {
+	tests := []struct {
+		name          string
+		svcSubnetList string
+		expected      string
+		expectedError bool
+	}{
+		{
+			name:          "valid IPv4 range from single-stack",
+			svcSubnetList: "192.168.10.0/24",
+			expected:      "192.168.10.10",
+			expectedError: false,
+		},
+		{
+			name:          "valid IPv6 range from single-stack",
+			svcSubnetList: "fd03::/112",
+			expected:      "fd03::a",
+			expectedError: false,
+		},
+		{
+			name:          "valid <IPv4,IPv6> ranges from dual-stack",
+			svcSubnetList: "192.168.10.0/24,fd03::/112",
+			expected:      "192.168.10.10",
+			expectedError: false,
+		},
+		{
+			name:          "valid <IPv6,IPv4> ranges from dual-stack",
+			svcSubnetList: "fd03::/112,192.168.10.0/24",
+			expected:      "fd03::a",
+			expectedError: false,
+		},
+		{
+			name:          "invalid subnet range from dual-stack",
+			svcSubnetList: "192.168.10.0/24,fd03:x::/112",
+			expected:      "",
+			expectedError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, actualError := GetDNSIP(tt.svcSubnetList)
+			if tt.expectedError {
+				if actualError == nil {
+					t.Errorf("failed GetDNSIP:\n\texpected error, but got no error")
+				}
+			} else if !tt.expectedError && actualError != nil {
+				t.Errorf("failed GetDNSIP:\n\texpected no error, but got: %v", actualError)
+			} else {
+				if actual.String() != tt.expected {
+					t.Errorf(
+						"failed GetDNSIP:\n\texpected: %s\n\t  actual: %s",
+						tt.expected,
 						actual.String(),
 					)
 				}

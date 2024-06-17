@@ -62,10 +62,6 @@ run_template_output_tests() {
   output_message=$(kubectl "${kube_flags[@]:?}" expose -f hack/testdata/redis-slave-replicaset.yaml --save-config --port=80 --target-port=8000 --dry-run=client --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'redis-slave:'
 
-  # check that convert command supports --template output
-  output_message=$(kubectl "${kube_flags[@]:?}" convert -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1beta1 --template="{{ .metadata.name }}:")
-  kube::test::if_has_string "${output_message}" 'nginx:'
-
   # check that run command supports --template output
   output_message=$(kubectl "${kube_flags[@]:?}" run --dry-run=client --template="{{ .metadata.name }}:" pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)')
   kube::test::if_has_string "${output_message}" 'pi:'
@@ -103,7 +99,7 @@ run_template_output_tests() {
 
   # check that "create job" command supports --template output
   kubectl create "${kube_flags[@]:?}" -f - <<EOF
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: pi
@@ -205,7 +201,7 @@ EOF
   output_message=$(kubectl "${kube_flags[@]:?}" create service nodeport foo --dry-run=client --tcp=8080 --template="{{ .metadata.name }}:")
   kube::test::if_has_string "${output_message}" 'foo:'
 
-  # check that "config view" ouputs "yaml" as its default output format
+  # check that "config view" outputs "yaml" as its default output format
   output_message=$(kubectl "${kube_flags[@]:?}" config view)
   kube::test::if_has_string "${output_message}" 'kind: Config'
 

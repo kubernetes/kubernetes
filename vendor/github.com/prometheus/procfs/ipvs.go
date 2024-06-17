@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -84,7 +83,7 @@ func parseIPVSStats(r io.Reader) (IPVSStats, error) {
 		stats       IPVSStats
 	)
 
-	statContent, err := ioutil.ReadAll(r)
+	statContent, err := io.ReadAll(r)
 	if err != nil {
 		return IPVSStats{}, err
 	}
@@ -222,15 +221,16 @@ func parseIPPort(s string) (net.IP, uint16, error) {
 	case 46:
 		ip = net.ParseIP(s[1:40])
 		if ip == nil {
-			return nil, 0, fmt.Errorf("invalid IPv6 address: %s", s[1:40])
+			return nil, 0, fmt.Errorf("%s: Invalid IPv6 addr %s: %w", ErrFileParse, s[1:40], err)
 		}
 	default:
-		return nil, 0, fmt.Errorf("unexpected IP:Port: %s", s)
+		return nil, 0, fmt.Errorf("%s: Unexpected IP:Port %s: %w", ErrFileParse, s, err)
 	}
 
 	portString := s[len(s)-4:]
 	if len(portString) != 4 {
-		return nil, 0, fmt.Errorf("unexpected port string format: %s", portString)
+		return nil, 0,
+			fmt.Errorf("%s: Unexpected port string format %s: %w", ErrFileParse, portString, err)
 	}
 	port, err := strconv.ParseUint(portString, 16, 16)
 	if err != nil {

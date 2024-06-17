@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -22,7 +23,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -98,6 +103,12 @@ func TestIsCgroupPod(t *testing.T) {
 			expectedResult: false,
 			expectedUID:    types.UID(""),
 		},
+		{
+			// contains reserved word "pod" in cgroup name
+			input:          NewCgroupName(RootCgroupName, GetPodCgroupNameSuffix("this-uid-contains-reserved-word-pod")),
+			expectedResult: false,
+			expectedUID:    types.UID(""),
+		},
 	}
 	for _, cgroupDriver := range []string{"cgroupfs", "systemd"} {
 		pcm := &podContainerManagerImpl{
@@ -106,13 +117,15 @@ func TestIsCgroupPod(t *testing.T) {
 			qosContainersInfo: qosContainersInfo,
 		}
 		for _, testCase := range testCases {
-			// give the right cgroup structure based on driver
-			cgroupfs := testCase.input.ToCgroupfs()
+			// Give the right cgroup structure based on whether systemd is enabled.
+			var name string
 			if cgroupDriver == "systemd" {
-				cgroupfs = testCase.input.ToSystemd()
+				name = testCase.input.ToSystemd()
+			} else {
+				name = testCase.input.ToCgroupfs()
 			}
 			// check if this is a pod or not with the literal cgroupfs input
-			result, resultUID := pcm.IsPodCgroup(cgroupfs)
+			result, resultUID := pcm.IsPodCgroup(name)
 			if result != testCase.expectedResult {
 				t.Errorf("Unexpected result for driver: %v, input: %v, expected: %v, actual: %v", cgroupDriver, testCase.input, testCase.expectedResult, result)
 			}
@@ -121,5 +134,162 @@ func TestIsCgroupPod(t *testing.T) {
 			}
 
 		}
+	}
+}
+
+func TestGetPodContainerName(t *testing.T) {
+	newGuaranteedPodWithUID := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: uid,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1G"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1G"),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	newBurstablePodWithUID := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: uid,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("1000m"),
+								v1.ResourceMemory: resource.MustParse("1G"),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	newBestEffortPodWithUID := func(uid types.UID) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: uid,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container",
+					},
+				},
+			},
+		}
+	}
+
+	qosContainersInfo := QOSContainersInfo{
+		Guaranteed: RootCgroupName,
+		Burstable:  NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBurstable))),
+		BestEffort: NewCgroupName(RootCgroupName, strings.ToLower(string(v1.PodQOSBestEffort))),
+	}
+
+	type fields struct {
+		cgroupManager CgroupManager
+	}
+	type args struct {
+		pod *v1.Pod
+	}
+
+	tests := []struct {
+		name                string
+		fields              fields
+		args                args
+		wantCgroupName      CgroupName
+		wantLiteralCgroupfs string
+	}{
+		{
+			name: "pod with qos guaranteed and cgroupfs",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+			},
+			args: args{
+				pod: newGuaranteedPodWithUID("fake-uid-1"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.Guaranteed, "podfake-uid-1"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.Guaranteed, "podfake-uid-1").ToCgroupfs(),
+		}, {
+			name: "pod with qos guaranteed and systemd",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "systemd"),
+			},
+			args: args{
+				pod: newGuaranteedPodWithUID("fake-uid-2"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.Guaranteed, "podfake-uid-2"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.Guaranteed, "podfake-uid-2").ToSystemd(),
+		}, {
+			name: "pod with qos burstable and cgroupfs",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+			},
+			args: args{
+				pod: newBurstablePodWithUID("fake-uid-3"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.Burstable, "podfake-uid-3"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.Burstable, "podfake-uid-3").ToCgroupfs(),
+		}, {
+			name: "pod with qos burstable and systemd",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "systemd"),
+			},
+			args: args{
+				pod: newBurstablePodWithUID("fake-uid-4"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.Burstable, "podfake-uid-4"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.Burstable, "podfake-uid-4").ToSystemd(),
+		}, {
+			name: "pod with qos best-effort and cgroupfs",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "cgroupfs"),
+			},
+			args: args{
+				pod: newBestEffortPodWithUID("fake-uid-5"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-5"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-5").ToCgroupfs(),
+		}, {
+			name: "pod with qos best-effort and systemd",
+			fields: fields{
+				cgroupManager: NewCgroupManager(nil, "systemd"),
+			},
+			args: args{
+				pod: newBestEffortPodWithUID("fake-uid-6"),
+			},
+			wantCgroupName:      NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-6"),
+			wantLiteralCgroupfs: NewCgroupName(qosContainersInfo.BestEffort, "podfake-uid-6").ToSystemd(),
+		},
+	}
+
+	for _, tt := range tests {
+		pcm := &podContainerManagerImpl{
+			cgroupManager:     tt.fields.cgroupManager,
+			qosContainersInfo: qosContainersInfo,
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			actualCgroupName, actualLiteralCgroupfs := pcm.GetPodContainerName(tt.args.pod)
+			require.Equalf(t, tt.wantCgroupName, actualCgroupName, "Unexpected cgroup name for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+			require.Equalf(t, tt.wantLiteralCgroupfs, actualLiteralCgroupfs, "Unexpected literal cgroupfs for pod with UID %s, container resources: %v", tt.args.pod.UID, tt.args.pod.Spec.Containers[0].Resources)
+		})
 	}
 }

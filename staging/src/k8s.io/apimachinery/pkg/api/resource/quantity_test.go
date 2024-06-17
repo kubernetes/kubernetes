@@ -18,14 +18,26 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
+	"math/big"
 	"math/rand"
+	"os"
 	"strings"
 	"testing"
 	"unicode"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-
+	"github.com/spf13/pflag"
 	inf "gopkg.in/inf.v0"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+)
+
+var (
+	bigMostPositive = big.NewInt(mostPositive)
+	bigMostNegative = big.NewInt(mostNegative)
 )
 
 func dec(i int64, exponent int) infDecAmount {
@@ -33,8 +45,17 @@ func dec(i int64, exponent int) infDecAmount {
 	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
 }
 
+func bigDec(i *big.Int, exponent int) infDecAmount {
+	// See the below test-- scale is the negative of an exponent.
+	return infDecAmount{inf.NewDecBig(i, inf.Scale(-exponent))}
+}
+
 func decQuantity(i int64, exponent int, format Format) Quantity {
 	return Quantity{d: dec(i, exponent), Format: format}
+}
+
+func bigDecQuantity(i *big.Int, exponent int, format Format) Quantity {
+	return Quantity{d: bigDec(i, exponent), Format: format}
 }
 
 func intQuantity(i int64, exponent Scale, format Format) Quantity {
@@ -54,6 +75,38 @@ func TestDec(t *testing.T) {
 		{dec(1, -1), "0.1"},
 		{dec(3, -2), "0.03"},
 		{dec(4, -3), "0.004"},
+	}
+
+	for _, item := range table {
+		if e, a := item.expect, item.got.Dec.String(); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}
+
+func TestBigDec(t *testing.T) {
+	table := []struct {
+		got    infDecAmount
+		expect string
+	}{
+		{bigDec(big.NewInt(1), 0), "1"},
+		{bigDec(big.NewInt(1), 1), "10"},
+		{bigDec(big.NewInt(5), 2), "500"},
+		{bigDec(big.NewInt(8), 3), "8000"},
+		{bigDec(big.NewInt(2), 0), "2"},
+		{bigDec(big.NewInt(1), -1), "0.1"},
+		{bigDec(big.NewInt(3), -2), "0.03"},
+		{bigDec(big.NewInt(4), -3), "0.004"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 0), "9223372036854775808"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 1), "92233720368547758080"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 2), "922337203685477580800"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), -1), "922337203685477580.8"},
+		{bigDec(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), -2), "92233720368547758.08"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 0), "-9223372036854775809"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 1), "-92233720368547758090"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), 2), "-922337203685477580900"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), -1), "-922337203685477580.9"},
+		{bigDec(big.NewInt(0).Sub(bigMostNegative, big.NewInt(1)), -2), "-92233720368547758.09"},
 	}
 
 	for _, item := range table {
@@ -388,6 +441,16 @@ func TestQuantityParse(t *testing.T) {
 
 			if asDec {
 				got.AsDec()
+			}
+
+			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
+				// ensure we are not simply checking pointer equality by creating a new inf.Dec
+				var copied inf.Dec
+				copied.Add(inf.NewDec(0, inf.Scale(0)), got.AsDec())
+				q := NewDecimalQuantity(copied, format)
+				if c := q.Cmp(got); c != 0 {
+					t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
+				}
 			}
 
 			// verify that we can decompose the input and get the same result by building up from the base.
@@ -1123,6 +1186,58 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+func TestMul(t *testing.T) {
+	tests := []struct {
+		a        Quantity
+		b        int64
+		expected Quantity
+		ok       bool
+	}{
+		{decQuantity(10, 0, DecimalSI), 10, decQuantity(100, 0, DecimalSI), true},
+		{decQuantity(10, 0, DecimalSI), 1, decQuantity(10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), 1, decQuantity(10, 0, BinarySI), true},
+		{Quantity{Format: DecimalSI}, 50, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, 0, decQuantity(0, 0, DecimalSI), true},
+
+		{decQuantity(10, 0, DecimalSI), -10, decQuantity(-100, 0, DecimalSI), true},
+		{decQuantity(-10, 0, DecimalSI), 1, decQuantity(-10, 0, DecimalSI), true},
+		{decQuantity(10, 0, BinarySI), -1, decQuantity(-10, 0, BinarySI), true},
+		{decQuantity(-50, 0, DecimalSI), 0, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(-50, 0, DecimalSI), -50, decQuantity(2500, 0, DecimalSI), true},
+		{Quantity{Format: DecimalSI}, -50, decQuantity(0, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 0, decQuantity(0, 1, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 1, decQuantity(mostPositive, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), -1, decQuantity(-mostPositive, 0, DecimalSI), true},
+		{decQuantity(mostPositive/2, 0, DecimalSI), 2, decQuantity((mostPositive/2)*2, 0, DecimalSI), true},
+		{decQuantity(mostPositive/-2, 0, DecimalSI), -2, decQuantity((mostPositive/2)*2, 0, DecimalSI), true},
+		{decQuantity(mostPositive, 0, DecimalSI), 2,
+			bigDecQuantity(big.NewInt(0).Mul(bigMostPositive, big.NewInt(2)), 0, DecimalSI), false},
+		{decQuantity(mostPositive, 0, DecimalSI), 10, decQuantity(mostPositive, 1, DecimalSI), false},
+		{decQuantity(mostPositive, 0, DecimalSI), -10, decQuantity(-mostPositive, 1, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), 0, decQuantity(0, 1, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), 1, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), -1,
+			bigDecQuantity(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 0, DecimalSI), false},
+		{decQuantity(mostNegative/2, 0, DecimalSI), 2, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative/-2, 0, DecimalSI), -2, decQuantity(mostNegative, 0, DecimalSI), true},
+		{decQuantity(mostNegative, 0, DecimalSI), 2,
+			bigDecQuantity(big.NewInt(0).Mul(bigMostNegative, big.NewInt(2)), 0, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), 10, decQuantity(mostNegative, 1, DecimalSI), false},
+		{decQuantity(mostNegative, 0, DecimalSI), -10,
+			bigDecQuantity(big.NewInt(0).Add(bigMostPositive, big.NewInt(1)), 1, DecimalSI), false},
+	}
+
+	for i, test := range tests {
+		if ok := test.a.Mul(test.b); test.ok != ok {
+			t.Errorf("[%d] Expected ok: %t, got ok: %t", i, test.ok, ok)
+		}
+		if test.a.Cmp(test.expected) != 0 {
+			t.Errorf("[%d] Expected %q, got %q", i, test.expected.AsDec().String(), test.a.AsDec().String())
+		}
+	}
+}
+
 func TestAddSubRoundTrip(t *testing.T) {
 	for k := -10; k <= 10; k++ {
 		q := Quantity{Format: DecimalSI}
@@ -1177,6 +1292,111 @@ func TestNegateRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestQuantityAsApproximateFloat64(t *testing.T) {
+	table := []struct {
+		in  Quantity
+		out float64
+	}{
+		{decQuantity(0, 0, DecimalSI), 0.0},
+		{decQuantity(0, 0, DecimalExponent), 0.0},
+		{decQuantity(0, 0, BinarySI), 0.0},
+
+		{decQuantity(1, 0, DecimalSI), 1},
+		{decQuantity(1, 0, DecimalExponent), 1},
+		{decQuantity(1, 0, BinarySI), 1},
+
+		// Binary suffixes
+		{decQuantity(1024, 0, BinarySI), 1024},
+		{decQuantity(8*1024, 0, BinarySI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, BinarySI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(100000000)},
+
+		{decQuantity(1024, 0, DecimalSI), 1024},
+		{decQuantity(8*1024, 0, DecimalSI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalSI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalSI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalSI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalSI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalSI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, DecimalSI), (7 * 1024 * 1024) / float64(100000000)},
+
+		{decQuantity(1024, 0, DecimalExponent), 1024},
+		{decQuantity(8*1024, 0, DecimalExponent), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalExponent), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalExponent), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalExponent), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalExponent), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalExponent), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
+
+		// very large numbers
+		{Quantity{d: maxAllowed, Format: DecimalSI}, math.MaxInt64},
+		{Quantity{d: maxAllowed, Format: BinarySI}, math.MaxInt64},
+		{decQuantity(12, 18, DecimalSI), 1.2e19},
+
+		// infinities caused due to float64 overflow
+		{decQuantity(12, 500, DecimalSI), math.Inf(0)},
+		{decQuantity(-12, 500, DecimalSI), math.Inf(-1)},
+	}
+
+	for _, item := range table {
+		t.Run(fmt.Sprintf("%s %s", item.in.Format, item.in.String()), func(t *testing.T) {
+			out := item.in.AsApproximateFloat64()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if item.in.d.Dec != nil {
+				if i, ok := item.in.AsInt64(); ok {
+					q := intQuantity(i, 0, item.in.Format)
+					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStringQuantityAsApproximateFloat64(t *testing.T) {
+	table := []struct {
+		in  string
+		out float64
+	}{
+		{"2Ki", 2048},
+		{"1.1Ki", 1126.4e+0},
+		{"1Mi", 1.048576e+06},
+		{"2Gi", 2.147483648e+09},
+	}
+
+	for _, item := range table {
+		t.Run(item.in, func(t *testing.T) {
+			in, err := ParseQuantity(item.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := in.AsApproximateFloat64()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if in.d.Dec != nil {
+				if i, ok := in.AsInt64(); ok {
+					q := intQuantity(i, 0, in.Format)
+					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
 func benchmarkQuantities() []Quantity {
 	return []Quantity{
 		intQuantity(1024*1024*1024, 0, BinarySI),
@@ -1345,4 +1565,140 @@ func BenchmarkQuantityCmp(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+}
+
+func BenchmarkQuantityAsApproximateFloat64(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		if q.AsApproximateFloat64() == -1 {
+			b.Fatal(q)
+		}
+	}
+	b.StopTimer()
+}
+
+var _ pflag.Value = &QuantityValue{}
+
+func TestQuantityValueSet(t *testing.T) {
+	q := QuantityValue{}
+
+	if err := q.Set("invalid"); err == nil {
+
+		t.Error("'invalid' did not trigger a parse error")
+	}
+
+	if err := q.Set("1Mi"); err != nil {
+		t.Errorf("parsing 1Mi should have worked, got: %v", err)
+	}
+	if q.Value() != 1024*1024 {
+		t.Errorf("quantity should have been set to 1Mi, got: %v", q)
+	}
+
+	data, err := json.Marshal(q)
+	if err != nil {
+		t.Errorf("unexpected encoding error: %v", err)
+	}
+	expected := `"1Mi"`
+	if string(data) != expected {
+		t.Errorf("expected 1Mi value to be encoded as %q, got: %q", expected, string(data))
+	}
+}
+
+func ExampleQuantityValue() {
+	q := QuantityValue{
+		Quantity: MustParse("1Mi"),
+	}
+	fs := pflag.FlagSet{}
+	fs.SetOutput(os.Stdout)
+	fs.Var(&q, "mem", "sets amount of memory")
+	fs.PrintDefaults()
+	// Output:
+	// --mem quantity   sets amount of memory (default 1Mi)
+}
+
+func TestQuantityUnmarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		in         []byte
+		want       Quantity
+		errMessage string
+	}{
+		{
+			name: "null",
+			in:   []byte{0xf6}, // null
+			want: Quantity{},
+		},
+		{
+			name: "text string input",
+			in:   []byte("\x621M"), // "1M"
+			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+		},
+		{
+			name: "byte string input",
+			in:   []byte("\x421M"), // '1M'
+			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+		},
+		{
+			name: "whitespace",
+			in:   []byte("\x4a \t\n\r1M \t\n\r"), // h'20090a0d314d20090a0d'
+			want: Quantity{i: int64Amount{value: 1, scale: 6}},
+		},
+		{
+			name:       "empty byte string",
+			in:         []byte{0x40},
+			errMessage: ErrFormatWrong.Error(),
+		},
+		{
+			name:       "empty text string",
+			in:         []byte{0x60},
+			errMessage: ErrFormatWrong.Error(),
+		},
+		{
+			name:       "unsupported input type",
+			in:         []byte{0x07}, // 7
+			errMessage: "cbor: cannot unmarshal positive integer into Go value of type string",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got Quantity
+			if err := got.UnmarshalCBOR(tc.in); err != nil {
+				if tc.errMessage == "" {
+					t.Fatalf("want nil error, got: %v", err)
+				} else if gotMessage := err.Error(); tc.errMessage != gotMessage {
+					t.Fatalf("want error: %q, got: %q", tc.errMessage, gotMessage)
+				}
+			} else if tc.errMessage != "" {
+				t.Fatalf("got nil error, want: %s", tc.errMessage)
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("unexpected diff:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestQuantityRoundtripCBOR(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		var initial, final Quantity
+		fuzzer.Fuzz(&initial)
+		b, err := cbor.Marshal(initial)
+		if err != nil {
+			t.Errorf("error encoding %v: %v", initial, err)
+			continue
+		}
+		err = cbor.Unmarshal(b, &final)
+		if err != nil {
+			t.Errorf("%v: error decoding %v: %v", initial, string(b), err)
+		}
+		if final.Cmp(initial) != 0 {
+			diag, err := cbor.Diagnose(b)
+			if err != nil {
+				t.Logf("failed to produce diagnostic encoding of 0x%x: %v", b, err)
+			}
+			t.Errorf("Expected equal: %v, %v (cbor was '%s')", initial, final, diag)
+		}
+	}
 }

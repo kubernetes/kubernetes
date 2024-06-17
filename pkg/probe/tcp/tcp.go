@@ -38,7 +38,7 @@ type Prober interface {
 
 type tcpProber struct{}
 
-// Probe returns a ProbeRunner capable of running an TCP check.
+// Probe checks that a TCP connection to the address can be opened.
 func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
@@ -48,7 +48,9 @@ func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.R
 // If the socket fails to open, it returns Failure.
 // This is exported because some other packages may want to do direct TCP probes.
 func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error) {
-	conn, err := net.DialTimeout("tcp", addr, timeout)
+	d := probe.ProbeDialer()
+	d.Timeout = timeout
+	conn, err := d.Dial("tcp", addr)
 	if err != nil {
 		// Convert errors to failures to handle timeouts.
 		return probe.Failure, err.Error(), nil

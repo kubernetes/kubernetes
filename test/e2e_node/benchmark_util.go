@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -21,13 +22,13 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"sort"
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -50,7 +51,7 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
-	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
+	if err := os.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
 		framework.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
 	}
 }

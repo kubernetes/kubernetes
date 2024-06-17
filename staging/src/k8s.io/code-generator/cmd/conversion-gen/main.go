@@ -28,23 +28,39 @@ limitations under the License.
 // that efficiently convert between same-name types in the two
 // (internal, external) packages.  The generated functions include
 // ones named
-//     autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
+//
+//	autoConvert_<pkg1>_<type>_To_<pkg2>_<type>
+//
 // for each such pair of types --- both with (pkg1,pkg2) =
-// (internal,external) and (pkg1,pkg2) = (external,internal).
-// Additionally: if the destination package does not contain one in a
-// non-generated file then a function named
-//     Convert_<pkg1>_<type>_To_<pkg2>_<type>
-// is also generated and it simply calls the `autoConvert...`
-// function.  The generated conversion functions use standard value
-// assignment wherever possible.  For compound types, the generated
-// conversion functions call the `Convert...` functions for the
-// subsidiary types.  Thus developers can override the behavior for
-// selected types.  For a top-level object type (i.e., the type of an
-// object that will be input to an apiserver), for such an override to
-// be used by the apiserver the developer-maintained conversion
-// functions must also be registered by invoking the
-// `AddConversionFunc`/`AddGeneratedConversionFunc` method of the
-// relevant `Scheme` object from k8s.io/apimachinery/pkg/runtime.
+// (internal,external) and (pkg1,pkg2) = (external,internal).  The
+// generated conversion functions recurse on the structure of the data
+// types.  For structs, source and destination fields are matched up
+// according to name; if a source field has no corresponding
+// destination or there is a fundamental mismatch in the type of the
+// field then the generated autoConvert_... function has just a
+// warning comment about that field.  The generated conversion
+// functions use standard value assignment wherever possible.  For
+// compound types, the generated conversion functions call the
+// `Convert...` functions for the subsidiary types.
+//
+// For each pair of types `conversion-gen` will also generate a
+// function named
+//
+//	Convert_<pkg1>_<type>_To_<pkg2>_<type>
+//
+// if both of two conditions are met: (1) the destination package does
+// not contain a function of that name in a non-generated file and (2)
+// the generation of the corresponding autoConvert_...  function did
+// not run into trouble with a missing or fundamentally differently
+// typed field.  A generated Convert_... function simply calls the
+// corresponding `autoConvert...` function.  `conversion_gen` also
+// generates a function that updates a given `runtime.Scheme` by
+// registering all the Convert_... functions found and generated.
+// Thus developers can override the generated behavior for selected
+// type pairs by putting the desired Convert_... functions in
+// non-generated files.  Further, developers are practically required
+// to override the generated behavior when there are missing or
+// fundamentally differently typed fields.
 //
 // `conversion-gen` will scan its `--input-dirs`, looking at the
 // package defined in each of those directories for comment tags that
@@ -53,12 +69,16 @@ limitations under the License.
 // package's `doc.go` file (currently anywhere in that file is
 // acceptable, but the recommended location is above the `package`
 // statement), of the form:
-//   // +k8s:conversion-gen=<import-path-of-internal-package>
+//
+//	// +k8s:conversion-gen=<import-path-of-internal-package>
+//
 // This introduces a conversion task, for which the destination
 // package is the one containing the file with the tag and the tag
 // identifies a package containing internal types.  If there is also a
 // tag of the form
-//   // +k8s:conversion-gen-external-types=<import-path-of-external-package>
+//
+//	// +k8s:conversion-gen-external-types=<import-path-of-external-package>
+//
 // then it identifies the package containing the external types;
 // otherwise they are in the destination package.
 //
@@ -70,54 +90,46 @@ limitations under the License.
 //
 // When generating for a package, individual types or fields of structs may opt
 // out of Conversion generation by specifying a comment on the of the form:
-//   // +k8s:conversion-gen=false
+//
+//	// +k8s:conversion-gen=false
 package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/conversion-gen/args"
 	"k8s.io/code-generator/cmd/conversion-gen/generators"
-	"k8s.io/code-generator/pkg/util"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
 )
 
 func main() {
 	klog.InitFlags(nil)
-	genericArgs, customArgs := generatorargs.NewDefaults()
+	args := generatorargs.New()
 
-	// Override defaults.
-	// TODO: move this out of conversion-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
-
-	genericArgs.AddFlags(pflag.CommandLine)
-	customArgs.AddFlags(pflag.CommandLine)
+	args.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	// k8s.io/apimachinery/pkg/runtime contains a number of manual conversions,
-	// that we need to generate conversions.
-	// Packages being dependencies of explicitly requested packages are only
-	// partially scanned - only types explicitly used are being traversed.
-	// Not used functions or types are omitted.
-	// Adding this explicitly to InputDirs ensures that the package is fully
-	// scanned and all functions are parsed and processed.
-	genericArgs.InputDirs = append(genericArgs.InputDirs, "k8s.io/apimachinery/pkg/runtime")
-
-	if err := generatorargs.Validate(genericArgs); err != nil {
+	if err := args.Validate(); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
 
+	myTargets := func(context *generator.Context) []generator.Target {
+		return generators.GetTargets(context, args)
+	}
+
 	// Run it.
-	if err := genericArgs.Execute(
+	if err := gengo.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
-		generators.Packages,
+		myTargets,
+		gengo.StdBuildTag,
+		pflag.Args(),
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}

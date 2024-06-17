@@ -190,10 +190,10 @@ func (b *bufferedBackend) processIncomingEvents(stopCh <-chan struct{}) {
 // The following things can cause collectEvents to stop and return the list
 // of events:
 //
-//   * Maximum number of events for a batch.
-//   * Timer has passed.
-//   * Buffer channel is closed and empty.
-//   * stopCh is closed.
+//   - Maximum number of events for a batch.
+//   - Timer has passed.
+//   - Buffer channel is closed and empty.
+//   - stopCh is closed.
 func (b *bufferedBackend) collectEvents(timer <-chan time.Time, stopCh <-chan struct{}) []*auditinternal.Event {
 	var events []*auditinternal.Event
 

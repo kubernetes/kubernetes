@@ -19,40 +19,31 @@ package strict
 import (
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-// VerifyUnmarshalStrict takes a YAML byte slice and a GroupVersionKind and verifies if the YAML
-// schema is known and if it unmarshals with strict mode.
-//
-// TODO(neolit123): The returned error here is currently ignored everywhere and a klog warning is thrown instead.
-// We don't want to turn this into an actual error yet. Eventually this can be controlled with an optional CLI flag.
-func VerifyUnmarshalStrict(bytes []byte, gvk schema.GroupVersionKind) error {
-
-	var (
-		iface interface{}
-		err   error
-	)
-
-	iface, err = scheme.Scheme.New(gvk)
-	if err != nil {
-		iface, err = componentconfigs.Scheme.New(gvk)
-		if err != nil {
-			err := errors.Errorf("unknown configuration %#v for scheme definitions in %q and %q",
-				gvk, scheme.Scheme.Name(), componentconfigs.Scheme.Name())
-			klog.Warning(err.Error())
-			return err
+// VerifyUnmarshalStrict takes a slice of schems, a JSON/YAML byte slice and a GroupVersionKind
+// and verifies if the schema is known and if the byte slice unmarshals with strict mode.
+func VerifyUnmarshalStrict(schemes []*runtime.Scheme, gvk schema.GroupVersionKind, bytes []byte) error {
+	var scheme *runtime.Scheme
+	for _, s := range schemes {
+		if _, err := s.New(gvk); err == nil {
+			scheme = s
+			break
 		}
 	}
-
-	if err := yaml.UnmarshalStrict(bytes, iface); err != nil {
-		err := errors.Wrapf(err, "error unmarshaling configuration %#v", gvk)
-		klog.Warning(err.Error())
-		return err
+	if scheme == nil {
+		return errors.Errorf("unknown configuration %#v", gvk)
 	}
+
+	opt := json.SerializerOptions{Yaml: true, Pretty: false, Strict: true}
+	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, opt)
+	_, _, err := serializer.Decode(bytes, &gvk, nil)
+	if err != nil {
+		return errors.Wrapf(err, "error unmarshaling configuration %#v", gvk)
+	}
+
 	return nil
 }

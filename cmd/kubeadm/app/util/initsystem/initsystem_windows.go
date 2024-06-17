@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -22,6 +23,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 )
@@ -45,14 +47,14 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 
 	s, err := m.OpenService(service)
 	if err != nil {
-		return fmt.Errorf("could not access service %s: %v", service, err)
+		return errors.Wrapf(err, "could not access service %s", service)
 	}
 	defer s.Close()
 
 	// Check if service is already started
 	status, err := s.Query()
 	if err != nil {
-		return fmt.Errorf("could not query service %s: %v", service, err)
+		return errors.Wrapf(err, "could not query service %s", service)
 	}
 
 	if status.State != svc.Stopped && status.State != svc.StopPending {
@@ -62,35 +64,35 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	timeout := time.Now().Add(10 * time.Second)
 	for status.State != svc.Stopped {
 		if timeout.Before(time.Now()) {
-			return fmt.Errorf("timeout waiting for %s service to stop", service)
+			return errors.Errorf("timeout waiting for %s service to stop", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()
 		if err != nil {
-			return fmt.Errorf("could not retrieve %s service status: %v", service, err)
+			return errors.Wrapf(err, "could not retrieve %s service status", service)
 		}
 	}
 
 	// Start the service
 	err = s.Start("is", "manual-started")
 	if err != nil {
-		return fmt.Errorf("could not start service %s: %v", service, err)
+		return errors.Wrapf(err, "could not start service %s", service)
 	}
 
 	// Check that the start was successful
 	status, err = s.Query()
 	if err != nil {
-		return fmt.Errorf("could not query service %s: %v", service, err)
+		return errors.Wrapf(err, "could not query service %s", service)
 	}
 	timeout = time.Now().Add(10 * time.Second)
 	for status.State != svc.Running {
 		if timeout.Before(time.Now()) {
-			return fmt.Errorf("timeout waiting for %s service to start", service)
+			return errors.Errorf("timeout waiting for %s service to start", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()
 		if err != nil {
-			return fmt.Errorf("could not retrieve %s service status: %v", service, err)
+			return errors.Wrapf(err, "could not retrieve %s service status", service)
 		}
 	}
 	return nil
@@ -99,10 +101,10 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 // ServiceRestart tries to reload the environment and restart the specific service
 func (sysd WindowsInitSystem) ServiceRestart(service string) error {
 	if err := sysd.ServiceStop(service); err != nil {
-		return fmt.Errorf("couldn't stop service %s: %v", service, err)
+		return errors.Wrapf(err, "couldn't stop service %s", service)
 	}
 	if err := sysd.ServiceStart(service); err != nil {
-		return fmt.Errorf("couldn't start service %s: %v", service, err)
+		return errors.Wrapf(err, "couldn't start service %s", service)
 	}
 
 	return nil
@@ -119,14 +121,14 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 
 	s, err := m.OpenService(service)
 	if err != nil {
-		return fmt.Errorf("could not access service %s: %v", service, err)
+		return errors.Wrapf(err, "could not access service %s", service)
 	}
 	defer s.Close()
 
 	// Check if service is already stopped
 	status, err := s.Query()
 	if err != nil {
-		return fmt.Errorf("could not query service %s: %v", service, err)
+		return errors.Wrapf(err, "could not query service %s", service)
 	}
 
 	if status.State == svc.Stopped {
@@ -138,12 +140,12 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 		timeout := time.Now().Add(10 * time.Second)
 		for status.State != svc.Stopped {
 			if timeout.Before(time.Now()) {
-				return fmt.Errorf("timeout waiting for %s service to stop", service)
+				return errors.Errorf("timeout waiting for %s service to stop", service)
 			}
 			time.Sleep(300 * time.Millisecond)
 			status, err = s.Query()
 			if err != nil {
-				return fmt.Errorf("could not retrieve %s service status: %v", service, err)
+				return errors.Wrapf(err, "could not retrieve %s service status", service)
 			}
 		}
 		return nil
@@ -152,23 +154,23 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 	// Stop the service
 	status, err = s.Control(svc.Stop)
 	if err != nil {
-		return fmt.Errorf("could not stop service %s: %v", service, err)
+		return errors.Wrapf(err, "could not stop service %s", service)
 	}
 
 	// Check that the stop was successful
 	status, err = s.Query()
 	if err != nil {
-		return fmt.Errorf("could not query service %s: %v", service, err)
+		return errors.Wrapf(err, "could not query service %s", service)
 	}
 	timeout := time.Now().Add(10 * time.Second)
 	for status.State != svc.Stopped {
 		if timeout.Before(time.Now()) {
-			return fmt.Errorf("timeout waiting for %s service to stop", service)
+			return errors.Errorf("timeout waiting for %s service to stop", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()
 		if err != nil {
-			return fmt.Errorf("could not retrieve %s service status: %v", service, err)
+			return errors.Wrapf(err, "could not retrieve %s service status", service)
 		}
 	}
 	return nil
@@ -238,7 +240,7 @@ func (sysd WindowsInitSystem) ServiceIsActive(service string) bool {
 func GetInitSystem() (InitSystem, error) {
 	m, err := mgr.Connect()
 	if err != nil {
-		return nil, fmt.Errorf("no supported init system detected: %v", err)
+		return nil, errors.Wrap(err, "no supported init system detected")
 	}
 	defer m.Disconnect()
 	return &WindowsInitSystem{}, nil

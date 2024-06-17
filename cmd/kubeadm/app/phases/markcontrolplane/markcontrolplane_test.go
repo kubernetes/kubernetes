@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -38,49 +39,44 @@ func TestMarkControlPlane(t *testing.T) {
 	// future.
 	tests := []struct {
 		name           string
-		existingLabel  string
+		existingLabels []string
 		existingTaints []v1.Taint
 		newTaints      []v1.Taint
 		expectedPatch  string
 	}{
 		{
-			name:           "control-plane label and taint missing",
-			existingLabel:  "",
-			existingTaints: nil,
-			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}},"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
-		},
-		{
-			name:           "control-plane label and taint missing but taint not wanted",
-			existingLabel:  "",
+			name:           "apply default labels",
+			existingLabels: []string{""},
 			existingTaints: nil,
 			newTaints:      nil,
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}}}`,
+			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/control-plane":"","node.kubernetes.io/exclude-from-external-load-balancers":""}}}`,
 		},
 		{
-			name:           "control-plane label missing",
-			existingLabel:  "",
-			existingTaints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			expectedPatch:  `{"metadata":{"labels":{"node-role.kubernetes.io/master":""}}}`,
-		},
-		{
-			name:           "control-plane taint missing",
-			existingLabel:  kubeadmconstants.LabelNodeRoleMaster,
+			name: "control-plane taint missing",
+			existingLabels: []string{
+				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
+			},
 			existingTaints: nil,
 			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			expectedPatch:  `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"}]}}`,
+			expectedPatch:  `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/control-plane"}]}}`,
 		},
 		{
-			name:           "nothing missing",
-			existingLabel:  kubeadmconstants.LabelNodeRoleMaster,
+			name: "nothing missing",
+			existingLabels: []string{
+				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
+			},
 			existingTaints: []v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			newTaints:      []v1.Taint{kubeadmconstants.ControlPlaneTaint},
 			expectedPatch:  `{}`,
 		},
 		{
-			name:          "has taint and no new taints wanted",
-			existingLabel: kubeadmconstants.LabelNodeRoleMaster,
+			name: "has taint and no new taints wanted",
+			existingLabels: []string{
+				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
+			},
 			existingTaints: []v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
@@ -91,8 +87,11 @@ func TestMarkControlPlane(t *testing.T) {
 			expectedPatch: `{}`,
 		},
 		{
-			name:          "has taint and should merge with wanted taint",
-			existingLabel: kubeadmconstants.LabelNodeRoleMaster,
+			name: "has taint and should merge with wanted taint",
+			existingLabels: []string{
+				kubeadmconstants.LabelNodeRoleControlPlane,
+				kubeadmconstants.LabelExcludeFromExternalLB,
+			},
 			existingTaints: []v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
@@ -100,7 +99,7 @@ func TestMarkControlPlane(t *testing.T) {
 				},
 			},
 			newTaints:     []v1.Taint{kubeadmconstants.ControlPlaneTaint},
-			expectedPatch: `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/master"},{"effect":"NoSchedule","key":"node.cloudprovider.kubernetes.io/uninitialized"}]}}`,
+			expectedPatch: `{"spec":{"taints":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/control-plane"},{"effect":"NoSchedule","key":"node.cloudprovider.kubernetes.io/uninitialized"}]}}`,
 		},
 	}
 
@@ -116,8 +115,8 @@ func TestMarkControlPlane(t *testing.T) {
 				},
 			}
 
-			if tc.existingLabel != "" {
-				controlPlaneNode.ObjectMeta.Labels[tc.existingLabel] = ""
+			for _, label := range tc.existingLabels {
+				controlPlaneNode.ObjectMeta.Labels[label] = ""
 			}
 
 			if tc.existingTaints != nil {

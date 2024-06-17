@@ -18,9 +18,10 @@ package config
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"testing"
+
+	utiltesting "k8s.io/client-go/util/testing"
 
 	"reflect"
 
@@ -55,11 +56,11 @@ func TestSetConfigCurrentContext(t *testing.T) {
 }
 
 func (test setConfigTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile("", "")
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer os.Remove(fakeKubeFile.Name())
+	defer utiltesting.CloseAndRemove(t, fakeKubeFile)
 	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

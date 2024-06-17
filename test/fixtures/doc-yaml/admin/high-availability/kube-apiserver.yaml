@@ -6,12 +6,12 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-apiserver
-    image: k8s.gcr.io/kube-apiserver:9680e782e08a1a1c94c656190011bd02
+    image: registry.k8s.io/kube-apiserver:9680e782e08a1a1c94c656190011bd02
     command:
     - /bin/sh
     - -c
     - /usr/local/bin/kube-apiserver --address=127.0.0.1 --etcd-servers=http://127.0.0.1:4001
-      --cloud-provider=gce   --admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      --cloud-provider=gce   --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
       --service-cluster-ip-range=10.0.0.0/16 --client-ca-file=/srv/kubernetes/ca.crt
       --cluster-name=e2e-test-bburns
       --tls-cert-file=/srv/kubernetes/server.cert --tls-private-key-file=/srv/kubernetes/server.key

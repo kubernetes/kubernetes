@@ -17,13 +17,11 @@ limitations under the License.
 package helper
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -41,7 +39,7 @@ func IsExtendedResourceName(name v1.ResourceName) bool {
 	}
 	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
 	nameForQuota := fmt.Sprintf("%s%s", v1.DefaultResourceRequestsPrefix, string(name))
-	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+	if errs := validation.IsQualifiedName(nameForQuota); len(errs) != 0 {
 		return false
 	}
 	return true
@@ -136,60 +134,28 @@ func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// IsScalarResourceName validates the resource for Extended, Hugepages, Native and AttachableVolume resources
-func IsScalarResourceName(name v1.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
-		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
-}
-
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
-// LoadBalancerStatusEqual evaluates the given load balancers' ingress IP addresses
-// and hostnames and returns true if equal or false if otherwise
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
-	return ingressSliceEqual(l.Ingress, r.Ingress)
-}
-
-func ingressSliceEqual(lhs, rhs []v1.LoadBalancerIngress) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	for i := range lhs {
-		if !ingressEqual(&lhs[i], &rhs[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
-	if lhs.IP != rhs.IP {
-		return false
-	}
-	if lhs.Hostname != rhs.Hostname {
-		return false
-	}
-	return true
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
-// modes, when present, are always in the same order: RWO,ROX,RWX.
+// modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
-	if containsAccessMode(modes, v1.ReadWriteOnce) {
+	if ContainsAccessMode(modes, v1.ReadWriteOnce) {
 		modesStr = append(modesStr, "RWO")
 	}
-	if containsAccessMode(modes, v1.ReadOnlyMany) {
+	if ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		modesStr = append(modesStr, "ROX")
 	}
-	if containsAccessMode(modes, v1.ReadWriteMany) {
+	if ContainsAccessMode(modes, v1.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
+	}
+	if ContainsAccessMode(modes, v1.ReadWriteOncePod) {
+		modesStr = append(modesStr, "RWOP")
 	}
 	return strings.Join(modesStr, ",")
 }
@@ -207,6 +173,8 @@ func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 			accessModes = append(accessModes, v1.ReadOnlyMany)
 		case s == "RWX":
 			accessModes = append(accessModes, v1.ReadWriteMany)
+		case s == "RWOP":
+			accessModes = append(accessModes, v1.ReadWriteOncePod)
 		}
 	}
 	return accessModes
@@ -216,86 +184,20 @@ func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 func removeDuplicateAccessModes(modes []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	accessModes := []v1.PersistentVolumeAccessMode{}
 	for _, m := range modes {
-		if !containsAccessMode(accessModes, m) {
+		if !ContainsAccessMode(accessModes, m) {
 			accessModes = append(accessModes, m)
 		}
 	}
 	return accessModes
 }
 
-func containsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true
 		}
 	}
 	return false
-}
-
-// NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
-// labels.Selector.
-func NodeSelectorRequirementsAsSelector(nsm []v1.NodeSelectorRequirement) (labels.Selector, error) {
-	if len(nsm) == 0 {
-		return labels.Nothing(), nil
-	}
-	selector := labels.NewSelector()
-	for _, expr := range nsm {
-		var op selection.Operator
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			op = selection.In
-		case v1.NodeSelectorOpNotIn:
-			op = selection.NotIn
-		case v1.NodeSelectorOpExists:
-			op = selection.Exists
-		case v1.NodeSelectorOpDoesNotExist:
-			op = selection.DoesNotExist
-		case v1.NodeSelectorOpGt:
-			op = selection.GreaterThan
-		case v1.NodeSelectorOpLt:
-			op = selection.LessThan
-		default:
-			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
-		}
-		r, err := labels.NewRequirement(expr.Key, op, expr.Values)
-		if err != nil {
-			return nil, err
-		}
-		selector = selector.Add(*r)
-	}
-	return selector, nil
-}
-
-// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
-// fields.Selector.
-func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (fields.Selector, error) {
-	if len(nsm) == 0 {
-		return fields.Nothing(), nil
-	}
-
-	selectors := []fields.Selector{}
-	for _, expr := range nsm {
-		switch expr.Operator {
-		case v1.NodeSelectorOpIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
-
-		case v1.NodeSelectorOpNotIn:
-			if len(expr.Values) != 1 {
-				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
-					len(expr.Values), expr.Operator)
-			}
-			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
-
-		default:
-			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
-		}
-	}
-
-	return fields.AndSelectors(selectors...), nil
 }
 
 // NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
@@ -309,39 +211,6 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 			}
 		}
 	}
-	return false
-}
-
-// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
-// nil or empty term matches no objects.
-func MatchNodeSelectorTerms(
-	nodeSelectorTerms []v1.NodeSelectorTerm,
-	nodeLabels labels.Set,
-	nodeFields fields.Set,
-) bool {
-	for _, req := range nodeSelectorTerms {
-		// nil or empty term selects no objects
-		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
-			continue
-		}
-
-		if len(req.MatchExpressions) != 0 {
-			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
-			if err != nil || !labelSelector.Matches(nodeLabels) {
-				continue
-			}
-		}
-
-		if len(req.MatchFields) != 0 {
-			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
-			if err != nil || !fieldSelector.Matches(nodeFields) {
-				continue
-			}
-		}
-
-		return true
-	}
-
 	return false
 }
 
@@ -417,59 +286,6 @@ func AddOrUpdateTolerationInPodSpec(spec *v1.PodSpec, toleration *v1.Toleration)
 	return true
 }
 
-// AddOrUpdateTolerationInPod tries to add a toleration to the pod's toleration list.
-// Returns true if something was updated, false otherwise.
-func AddOrUpdateTolerationInPod(pod *v1.Pod, toleration *v1.Toleration) bool {
-	return AddOrUpdateTolerationInPodSpec(&pod.Spec, toleration)
-}
-
-// TolerationsTolerateTaint checks if taint is tolerated by any of the tolerations.
-func TolerationsTolerateTaint(tolerations []v1.Toleration, taint *v1.Taint) bool {
-	for i := range tolerations {
-		if tolerations[i].ToleratesTaint(taint) {
-			return true
-		}
-	}
-	return false
-}
-
-type taintsFilterFunc func(*v1.Taint) bool
-
-// TolerationsTolerateTaintsWithFilter checks if given tolerations tolerates
-// all the taints that apply to the filter in given taint list.
-// DEPRECATED: Please use FindMatchingUntoleratedTaint instead.
-func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v1.Taint, applyFilter taintsFilterFunc) bool {
-	_, isUntolerated := FindMatchingUntoleratedTaint(taints, tolerations, applyFilter)
-	return !isUntolerated
-}
-
-// FindMatchingUntoleratedTaint checks if the given tolerations tolerates
-// all the filtered taints, and returns the first taint without a toleration
-func FindMatchingUntoleratedTaint(taints []v1.Taint, tolerations []v1.Toleration, inclusionFilter taintsFilterFunc) (v1.Taint, bool) {
-	filteredTaints := getFilteredTaints(taints, inclusionFilter)
-	for _, taint := range filteredTaints {
-		if !TolerationsTolerateTaint(tolerations, &taint) {
-			return taint, true
-		}
-	}
-	return v1.Taint{}, false
-}
-
-// getFilteredTaints returns a list of taints satisfying the filter predicate
-func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1.Taint {
-	if inclusionFilter == nil {
-		return taints
-	}
-	filteredTaints := []v1.Taint{}
-	for _, taint := range taints {
-		if !inclusionFilter(&taint) {
-			continue
-		}
-		filteredTaints = append(filteredTaints, taint)
-	}
-	return filteredTaints
-}
-
 // GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
@@ -493,44 +309,6 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 		}
 	}
 	return true, result
-}
-
-// GetAvoidPodsFromNodeAnnotations scans the list of annotations and
-// returns the pods that needs to be avoided for this node from scheduling
-func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
-	var avoidPods v1.AvoidPods
-	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
-		err := json.Unmarshal([]byte(annotations[v1.PreferAvoidPodsAnnotationKey]), &avoidPods)
-		if err != nil {
-			return avoidPods, err
-		}
-	}
-	return avoidPods, nil
-}
-
-// GetPersistentVolumeClass returns StorageClassName.
-func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
-	// Use beta annotation first
-	if class, found := volume.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
-	return volume.Spec.StorageClassName
-}
-
-// GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
-// requested, it returns "".
-func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[v1.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
-	if claim.Spec.StorageClassName != nil {
-		return *claim.Spec.StorageClassName
-	}
-
-	return ""
 }
 
 // ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements

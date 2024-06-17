@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
@@ -37,6 +36,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/node"
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // NodeStorage includes storage for nodes and all sub resources.
@@ -65,6 +65,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &api.Node{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -77,25 +83,34 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &api.Node{} },
-		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:            node.MatchNode,
-		DefaultQualifiedResource: api.Resource("nodes"),
+		NewFunc:                   func() runtime.Object { return &api.Node{} },
+		NewListFunc:               func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:             node.MatchNode,
+		DefaultQualifiedResource:  api.Resource("nodes"),
+		SingularQualifiedResource: api.Resource("node"),
 
-		CreateStrategy: node.Strategy,
-		UpdateStrategy: node.Strategy,
-		DeleteStrategy: node.Strategy,
-		ExportStrategy: node.Strategy,
+		CreateStrategy:      node.Strategy,
+		UpdateStrategy:      node.Strategy,
+		DeleteStrategy:      node.Strategy,
+		ResetFieldsStrategy: node.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{
 		RESTOptions: optsGetter,
 		AttrFunc:    node.GetAttrs,
-		TriggerFunc: map[string]storage.IndexerFunc{"metadata.name": node.NameTriggerFunc},
 	}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
@@ -103,6 +118,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 
 	statusStore := *store
 	statusStore.UpdateStrategy = node.StatusStrategy
+	statusStore.ResetFieldsStrategy = node.StatusStrategy
 
 	// Set up REST handlers
 	nodeREST := &REST{Store: store, proxyTransport: proxyTransport}

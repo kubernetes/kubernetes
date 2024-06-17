@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ControllerRevisionsGetter has a method to return a ControllerRevisionInterface.
@@ -46,6 +52,7 @@ type ControllerRevisionInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.ControllerRevisionList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ControllerRevision, err error)
+	Apply(ctx context.Context, controllerRevision *appsv1.ControllerRevisionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *controllerRevisions) Get(ctx context.Context, name string, options meta
 }
 
 // List takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
-func (c *controllerRevisions) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ControllerRevisionList, err error) {
+func (c *controllerRevisions) List(ctx context.Context, opts metav1.ListOptions) (*v1.ControllerRevisionList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for controllerrevisions, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for controllerrevisions", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for controllerrevisions ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for controllerrevisions", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ControllerRevisions that match those selectors.
+func (c *controllerRevisions) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ControllerRevisionList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *controllerRevisions) List(ctx context.Context, opts metav1.ListOptions)
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ControllerRevisions
+func (c *controllerRevisions) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ControllerRevisionList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.ControllerRevisionList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("controllerrevisions").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.P
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied controllerRevision.
+func (c *controllerRevisions) Apply(ctx context.Context, controllerRevision *appsv1.ControllerRevisionApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ControllerRevision, err error) {
+	if controllerRevision == nil {
+		return nil, fmt.Errorf("controllerRevision provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(controllerRevision)
+	if err != nil {
+		return nil, err
+	}
+	name := controllerRevision.Name
+	if name == nil {
+		return nil, fmt.Errorf("controllerRevision.Name must be provided to Apply")
+	}
+	result = &v1.ControllerRevision{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("controllerrevisions").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

@@ -1,14 +1,540 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: felixconfigurations.crd.projectcalico.org
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
+  name: felixconfigurations.crd.projectcalico.org
 spec:
-  scope: Cluster
   group: crd.projectcalico.org
-  version: v1
   names:
     kind: FelixConfiguration
+    listKind: FelixConfigurationList
     plural: felixconfigurations
     singular: felixconfiguration
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: Felix Configuration contains the configuration for Felix.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FelixConfigurationSpec contains the values of the Felix configuration.
+            properties:
+              allowIPIPPacketsFromWorkloads:
+                description: 'AllowIPIPPacketsFromWorkloads controls whether Felix
+                  will add a rule to drop IPIP encapsulated traffic from workloads
+                  [Default: false]'
+                type: boolean
+              allowVXLANPacketsFromWorkloads:
+                description: 'AllowVXLANPacketsFromWorkloads controls whether Felix
+                  will add a rule to drop VXLAN encapsulated traffic from workloads
+                  [Default: false]'
+                type: boolean
+              awsSrcDstCheck:
+                description: 'Set source-destination-check on AWS EC2 instances. Accepted
+                  value must be one of "DoNothing", "Enabled" or "Disabled". [Default:
+                  DoNothing]'
+                enum:
+                - DoNothing
+                - Enable
+                - Disable
+                type: string
+              bpfConnectTimeLoadBalancingEnabled:
+                description: 'BPFConnectTimeLoadBalancingEnabled when in BPF mode,
+                  controls whether Felix installs the connection-time load balancer.  The
+                  connect-time load balancer is required for the host to be able to
+                  reach Kubernetes services and it improves the performance of pod-to-service
+                  connections.  The only reason to disable it is for debugging purposes.  [Default:
+                  true]'
+                type: boolean
+              bpfDataIfacePattern:
+                description: 'BPFDataIfacePattern is a regular expression that controls
+                  which interfaces Felix should attach BPF programs to in order to
+                  catch traffic to/from the network.  This needs to match the interfaces
+                  that Calico workload traffic flows over as well as any interfaces
+                  that handle incoming traffic to nodeports and services from outside
+                  the cluster.  It should not match the workload interfaces (usually
+                  named cali...). [Default: ^(en.*|eth.*|tunl0$)]'
+                type: string
+              bpfDisableUnprivileged:
+                description: 'BPFDisableUnprivileged, if enabled, Felix sets the kernel.unprivileged_bpf_disabled
+                  sysctl to disable unprivileged use of BPF.  This ensures that unprivileged
+                  users cannot access Calico''s BPF maps and cannot insert their own
+                  BPF programs to interfere with Calico''s. [Default: true]'
+                type: boolean
+              bpfEnabled:
+                description: 'BPFEnabled, if enabled Felix will use the BPF dataplane.
+                  [Default: false]'
+                type: boolean
+              bpfExternalServiceMode:
+                description: 'BPFExternalServiceMode in BPF mode, controls how connections
+                  from outside the cluster to services (node ports and cluster IPs)
+                  are forwarded to remote workloads.  If set to "Tunnel" then both
+                  request and response traffic is tunneled to the remote node.  If
+                  set to "DSR", the request traffic is tunneled but the response traffic
+                  is sent directly from the remote node.  In "DSR" mode, the remote
+                  node appears to use the IP of the ingress node; this requires a
+                  permissive L2 network.  [Default: Tunnel]'
+                type: string
+              bpfKubeProxyEndpointSlicesEnabled:
+                description: BPFKubeProxyEndpointSlicesEnabled in BPF mode, controls
+                  whether Felix's embedded kube-proxy accepts EndpointSlices or not.
+                type: boolean
+              bpfKubeProxyIptablesCleanupEnabled:
+                description: 'BPFKubeProxyIptablesCleanupEnabled, if enabled in BPF
+                  mode, Felix will proactively clean up the upstream Kubernetes kube-proxy''s
+                  iptables chains.  Should only be enabled if kube-proxy is not running.  [Default:
+                  true]'
+                type: boolean
+              bpfKubeProxyMinSyncPeriod:
+                description: 'BPFKubeProxyMinSyncPeriod, in BPF mode, controls the
+                  minimum time between updates to the dataplane for Felix''s embedded
+                  kube-proxy.  Lower values give reduced set-up latency.  Higher values
+                  reduce Felix CPU usage by batching up more work.  [Default: 1s]'
+                type: string
+              bpfLogLevel:
+                description: 'BPFLogLevel controls the log level of the BPF programs
+                  when in BPF dataplane mode.  One of "Off", "Info", or "Debug".  The
+                  logs are emitted to the BPF trace pipe, accessible with the command
+                  `tc exec bpf debug`. [Default: Off].'
+                type: string
+              chainInsertMode:
+                description: 'ChainInsertMode controls whether Felix hooks the kernel’s
+                  top-level iptables chains by inserting a rule at the top of the
+                  chain or by appending a rule at the bottom. insert is the safe default
+                  since it prevents Calico’s rules from being bypassed. If you switch
+                  to append mode, be sure that the other rules in the chains signal
+                  acceptance by falling through to the Calico rules, otherwise the
+                  Calico policy will be bypassed. [Default: insert]'
+                type: string
+              dataplaneDriver:
+                type: string
+              debugDisableLogDropping:
+                type: boolean
+              debugMemoryProfilePath:
+                type: string
+              debugSimulateCalcGraphHangAfter:
+                type: string
+              debugSimulateDataplaneHangAfter:
+                type: string
+              defaultEndpointToHostAction:
+                description: 'DefaultEndpointToHostAction controls what happens to
+                  traffic that goes from a workload endpoint to the host itself (after
+                  the traffic hits the endpoint egress policy). By default Calico
+                  blocks traffic from workload endpoints to the host itself with an
+                  iptables “DROP” action. If you want to allow some or all traffic
+                  from endpoint to host, set this parameter to RETURN or ACCEPT. Use
+                  RETURN if you have your own rules in the iptables “INPUT” chain;
+                  Calico will insert its rules at the top of that chain, then “RETURN”
+                  packets to the “INPUT” chain once it has completed processing workload
+                  endpoint egress policy. Use ACCEPT to unconditionally accept packets
+                  from workloads after processing workload endpoint egress policy.
+                  [Default: Drop]'
+                type: string
+              deviceRouteProtocol:
+                description: This defines the route protocol added to programmed device
+                  routes, by default this will be RTPROT_BOOT when left blank.
+                type: integer
+              deviceRouteSourceAddress:
+                description: This is the source address to use on programmed device
+                  routes. By default the source address is left blank, leaving the
+                  kernel to choose the source address used.
+                type: string
+              disableConntrackInvalidCheck:
+                type: boolean
+              endpointReportingDelay:
+                type: string
+              endpointReportingEnabled:
+                type: boolean
+              externalNodesList:
+                description: ExternalNodesCIDRList is a list of CIDR's of external-non-calico-nodes
+                  which may source tunnel traffic and have the tunneled traffic be
+                  accepted at calico nodes.
+                items:
+                  type: string
+                type: array
+              failsafeInboundHostPorts:
+                description: 'FailsafeInboundHostPorts is a comma-delimited list of
+                  UDP/TCP ports that Felix will allow incoming traffic to host endpoints
+                  on irrespective of the security policy. This is useful to avoid
+                  accidentally cutting off a host with incorrect configuration. Each
+                  port should be specified as tcp:<port-number> or udp:<port-number>.
+                  For back-compatibility, if the protocol is not specified, it defaults
+                  to “tcp”. To disable all inbound host ports, use the value none.
+                  The default value allows ssh access and DHCP. [Default: tcp:22,
+                  udp:68, tcp:179, tcp:2379, tcp:2380, tcp:6443, tcp:6666, tcp:6667]'
+                items:
+                  description: ProtoPort is combination of protocol and port, both
+                    must be specified.
+                  properties:
+                    port:
+                      type: integer
+                    protocol:
+                      type: string
+                  required:
+                  - port
+                  - protocol
+                  type: object
+                type: array
+              failsafeOutboundHostPorts:
+                description: 'FailsafeOutboundHostPorts is a comma-delimited list
+                  of UDP/TCP ports that Felix will allow outgoing traffic from host
+                  endpoints to irrespective of the security policy. This is useful
+                  to avoid accidentally cutting off a host with incorrect configuration.
+                  Each port should be specified as tcp:<port-number> or udp:<port-number>.
+                  For back-compatibility, if the protocol is not specified, it defaults
+                  to “tcp”. To disable all outbound host ports, use the value none.
+                  The default value opens etcd’s standard ports to ensure that Felix
+                  does not get cut off from etcd as well as allowing DHCP and DNS.
+                  [Default: tcp:179, tcp:2379, tcp:2380, tcp:6443, tcp:6666, tcp:6667,
+                  udp:53, udp:67]'
+                items:
+                  description: ProtoPort is combination of protocol and port, both
+                    must be specified.
+                  properties:
+                    port:
+                      type: integer
+                    protocol:
+                      type: string
+                  required:
+                  - port
+                  - protocol
+                  type: object
+                type: array
+              featureDetectOverride:
+                description: FeatureDetectOverride is used to override the feature
+                  detection. Values are specified in a comma separated list with no
+                  spaces, example; "SNATFullyRandom=true,MASQFullyRandom=false,RestoreSupportsLock=".
+                  "true" or "false" will force the feature, empty or omitted values
+                  are auto-detected.
+                type: string
+              genericXDPEnabled:
+                description: 'GenericXDPEnabled enables Generic XDP so network cards
+                  that don''t support XDP offload or driver modes can use XDP. This
+                  is not recommended since it doesn''t provide better performance
+                  than iptables. [Default: false]'
+                type: boolean
+              healthEnabled:
+                type: boolean
+              healthHost:
+                type: string
+              healthPort:
+                type: integer
+              interfaceExclude:
+                description: 'InterfaceExclude is a comma-separated list of interfaces
+                  that Felix should exclude when monitoring for host endpoints. The
+                  default value ensures that Felix ignores Kubernetes'' IPVS dummy
+                  interface, which is used internally by kube-proxy. If you want to
+                  exclude multiple interface names using a single value, the list
+                  supports regular expressions. For regular expressions you must wrap
+                  the value with ''/''. For example having values ''/^kube/,veth1''
+                  will exclude all interfaces that begin with ''kube'' and also the
+                  interface ''veth1''. [Default: kube-ipvs0]'
+                type: string
+              interfacePrefix:
+                description: 'InterfacePrefix is the interface name prefix that identifies
+                  workload endpoints and so distinguishes them from host endpoint
+                  interfaces. Note: in environments other than bare metal, the orchestrators
+                  configure this appropriately. For example our Kubernetes and Docker
+                  integrations set the ‘cali’ value, and our OpenStack integration
+                  sets the ‘tap’ value. [Default: cali]'
+                type: string
+              interfaceRefreshInterval:
+                description: InterfaceRefreshInterval is the period at which Felix
+                  rescans local interfaces to verify their state. The rescan can be
+                  disabled by setting the interval to 0.
+                type: string
+              ipipEnabled:
+                type: boolean
+              ipipMTU:
+                description: 'IPIPMTU is the MTU to set on the tunnel device. See
+                  Configuring MTU [Default: 1440]'
+                type: integer
+              ipsetsRefreshInterval:
+                description: 'IpsetsRefreshInterval is the period at which Felix re-checks
+                  all iptables state to ensure that no other process has accidentally
+                  broken Calico’s rules. Set to 0 to disable iptables refresh. [Default:
+                  90s]'
+                type: string
+              iptablesBackend:
+                description: IptablesBackend specifies which backend of iptables will
+                  be used. The default is legacy.
+                type: string
+              iptablesFilterAllowAction:
+                type: string
+              iptablesLockFilePath:
+                description: 'IptablesLockFilePath is the location of the iptables
+                  lock file. You may need to change this if the lock file is not in
+                  its standard location (for example if you have mapped it into Felix’s
+                  container at a different path). [Default: /run/xtables.lock]'
+                type: string
+              iptablesLockProbeInterval:
+                description: 'IptablesLockProbeInterval is the time that Felix will
+                  wait between attempts to acquire the iptables lock if it is not
+                  available. Lower values make Felix more responsive when the lock
+                  is contended, but use more CPU. [Default: 50ms]'
+                type: string
+              iptablesLockTimeout:
+                description: 'IptablesLockTimeout is the time that Felix will wait
+                  for the iptables lock, or 0, to disable. To use this feature, Felix
+                  must share the iptables lock file with all other processes that
+                  also take the lock. When running Felix inside a container, this
+                  requires the /run directory of the host to be mounted into the calico/node
+                  or calico/felix container. [Default: 0s disabled]'
+                type: string
+              iptablesMangleAllowAction:
+                type: string
+              iptablesMarkMask:
+                description: 'IptablesMarkMask is the mask that Felix selects its
+                  IPTables Mark bits from. Should be a 32 bit hexadecimal number with
+                  at least 8 bits set, none of which clash with any other mark bits
+                  in use on the system. [Default: 0xff000000]'
+                format: int32
+                type: integer
+              iptablesNATOutgoingInterfaceFilter:
+                type: string
+              iptablesPostWriteCheckInterval:
+                description: 'IptablesPostWriteCheckInterval is the period after Felix
+                  has done a write to the dataplane that it schedules an extra read
+                  back in order to check the write was not clobbered by another process.
+                  This should only occur if another application on the system doesn’t
+                  respect the iptables lock. [Default: 1s]'
+                type: string
+              iptablesRefreshInterval:
+                description: 'IptablesRefreshInterval is the period at which Felix
+                  re-checks the IP sets in the dataplane to ensure that no other process
+                  has accidentally broken Calico’s rules. Set to 0 to disable IP sets
+                  refresh. Note: the default for this value is lower than the other
+                  refresh intervals as a workaround for a Linux kernel bug that was
+                  fixed in kernel version 4.11. If you are using v4.11 or greater
+                  you may want to set this to, a higher value to reduce Felix CPU
+                  usage. [Default: 10s]'
+                type: string
+              ipv6Support:
+                type: boolean
+              kubeNodePortRanges:
+                description: 'KubeNodePortRanges holds list of port ranges used for
+                  service node ports. Only used if felix detects kube-proxy running
+                  in ipvs mode. Felix uses these ranges to separate host and workload
+                  traffic. [Default: 30000:32767].'
+                items:
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  pattern: ^.*
+                  x-kubernetes-int-or-string: true
+                type: array
+              logFilePath:
+                description: 'LogFilePath is the full path to the Felix log. Set to
+                  none to disable file logging. [Default: /var/log/calico/felix.log]'
+                type: string
+              logPrefix:
+                description: 'LogPrefix is the log prefix that Felix uses when rendering
+                  LOG rules. [Default: calico-packet]'
+                type: string
+              logSeverityFile:
+                description: 'LogSeverityFile is the log severity above which logs
+                  are sent to the log file. [Default: Info]'
+                type: string
+              logSeverityScreen:
+                description: 'LogSeverityScreen is the log severity above which logs
+                  are sent to the stdout. [Default: Info]'
+                type: string
+              logSeveritySys:
+                description: 'LogSeveritySys is the log severity above which logs
+                  are sent to the syslog. Set to None for no logging to syslog. [Default:
+                  Info]'
+                type: string
+              maxIpsetSize:
+                type: integer
+              metadataAddr:
+                description: 'MetadataAddr is the IP address or domain name of the
+                  server that can answer VM queries for cloud-init metadata. In OpenStack,
+                  this corresponds to the machine running nova-api (or in Ubuntu,
+                  nova-api-metadata). A value of none (case insensitive) means that
+                  Felix should not set up any NAT rule for the metadata path. [Default:
+                  127.0.0.1]'
+                type: string
+              metadataPort:
+                description: 'MetadataPort is the port of the metadata server. This,
+                  combined with global.MetadataAddr (if not ‘None’), is used to set
+                  up a NAT rule, from 169.254.169.254:80 to MetadataAddr:MetadataPort.
+                  In most cases this should not need to be changed [Default: 8775].'
+                type: integer
+              natOutgoingAddress:
+                description: NATOutgoingAddress specifies an address to use when performing
+                  source NAT for traffic in a natOutgoing pool that is leaving the
+                  network. By default the address used is an address on the interface
+                  the traffic is leaving on (ie it uses the iptables MASQUERADE target)
+                type: string
+              natPortRange:
+                anyOf:
+                - type: integer
+                - type: string
+                description: NATPortRange specifies the range of ports that is used
+                  for port mapping when doing outgoing NAT. When unset the default
+                  behavior of the network stack is used.
+                pattern: ^.*
+                x-kubernetes-int-or-string: true
+              netlinkTimeout:
+                type: string
+              openstackRegion:
+                description: 'OpenstackRegion is the name of the region that a particular
+                  Felix belongs to. In a multi-region Calico/OpenStack deployment,
+                  this must be configured somehow for each Felix (here in the datamodel,
+                  or in felix.cfg or the environment on each compute node), and must
+                  match the [calico] openstack_region value configured in neutron.conf
+                  on each node. [Default: Empty]'
+                type: string
+              policySyncPathPrefix:
+                description: 'PolicySyncPathPrefix is used to by Felix to communicate
+                  policy changes to external services, like Application layer policy.
+                  [Default: Empty]'
+                type: string
+              prometheusGoMetricsEnabled:
+                description: 'PrometheusGoMetricsEnabled disables Go runtime metrics
+                  collection, which the Prometheus client does by default, when set
+                  to false. This reduces the number of metrics reported, reducing
+                  Prometheus load. [Default: true]'
+                type: boolean
+              prometheusMetricsEnabled:
+                description: 'PrometheusMetricsEnabled enables the Prometheus metrics
+                  server in Felix if set to true. [Default: false]'
+                type: boolean
+              prometheusMetricsHost:
+                description: 'PrometheusMetricsHost is the host that the Prometheus
+                  metrics server should bind to. [Default: empty]'
+                type: string
+              prometheusMetricsPort:
+                description: 'PrometheusMetricsPort is the TCP port that the Prometheus
+                  metrics server should bind to. [Default: 9091]'
+                type: integer
+              prometheusProcessMetricsEnabled:
+                description: 'PrometheusProcessMetricsEnabled disables process metrics
+                  collection, which the Prometheus client does by default, when set
+                  to false. This reduces the number of metrics reported, reducing
+                  Prometheus load. [Default: true]'
+                type: boolean
+              removeExternalRoutes:
+                description: Whether or not to remove device routes that have not
+                  been programmed by Felix. Disabling this will allow external applications
+                  to also add device routes. This is enabled by default which means
+                  we will remove externally added routes.
+                type: boolean
+              reportingInterval:
+                description: 'ReportingInterval is the interval at which Felix reports
+                  its status into the datastore or 0 to disable. Must be non-zero
+                  in OpenStack deployments. [Default: 30s]'
+                type: string
+              reportingTTL:
+                description: 'ReportingTTL is the time-to-live setting for process-wide
+                  status reports. [Default: 90s]'
+                type: string
+              routeRefreshInterval:
+                description: 'RouterefreshInterval is the period at which Felix re-checks
+                  the routes in the dataplane to ensure that no other process has
+                  accidentally broken Calico’s rules. Set to 0 to disable route refresh.
+                  [Default: 90s]'
+                type: string
+              routeSource:
+                description: 'RouteSource configures where Felix gets its routing
+                  information. - WorkloadIPs: use workload endpoints to construct
+                  routes. - CalicoIPAM: the default - use IPAM data to construct routes.'
+                type: string
+              routeTableRange:
+                description: Calico programs additional Linux route tables for various
+                  purposes.  RouteTableRange specifies the indices of the route tables
+                  that Calico should use.
+                properties:
+                  max:
+                    type: integer
+                  min:
+                    type: integer
+                required:
+                - max
+                - min
+                type: object
+              sidecarAccelerationEnabled:
+                description: 'SidecarAccelerationEnabled enables experimental sidecar
+                  acceleration [Default: false]'
+                type: boolean
+              usageReportingEnabled:
+                description: 'UsageReportingEnabled reports anonymous Calico version
+                  number and cluster size to projectcalico.org. Logs warnings returned
+                  by the usage server. For example, if a significant security vulnerability
+                  has been discovered in the version of Calico being used. [Default:
+                  true]'
+                type: boolean
+              usageReportingInitialDelay:
+                description: 'UsageReportingInitialDelay controls the minimum delay
+                  before Felix makes a report. [Default: 300s]'
+                type: string
+              usageReportingInterval:
+                description: 'UsageReportingInterval controls the interval at which
+                  Felix makes reports. [Default: 86400s]'
+                type: string
+              useInternalDataplaneDriver:
+                type: boolean
+              vxlanEnabled:
+                type: boolean
+              vxlanMTU:
+                description: 'VXLANMTU is the MTU to set on the tunnel device. See
+                  Configuring MTU [Default: 1440]'
+                type: integer
+              vxlanPort:
+                type: integer
+              vxlanVNI:
+                type: integer
+              wireguardEnabled:
+                description: 'WireguardEnabled controls whether Wireguard is enabled.
+                  [Default: false]'
+                type: boolean
+              wireguardInterfaceName:
+                description: 'WireguardInterfaceName specifies the name to use for
+                  the Wireguard interface. [Default: wg.calico]'
+                type: string
+              wireguardListeningPort:
+                description: 'WireguardListeningPort controls the listening port used
+                  by Wireguard. [Default: 51820]'
+                type: integer
+              wireguardMTU:
+                description: 'WireguardMTU controls the MTU on the Wireguard interface.
+                  See Configuring MTU [Default: 1420]'
+                type: integer
+              wireguardRoutingRulePriority:
+                description: 'WireguardRoutingRulePriority controls the priority value
+                  to use for the Wireguard routing rule. [Default: 99]'
+                type: integer
+              xdpEnabled:
+                description: 'XDPEnabled enables XDP acceleration for suitable untracked
+                  incoming deny rules. [Default: true]'
+                type: boolean
+              xdpRefreshInterval:
+                description: 'XDPRefreshInterval is the period at which Felix re-checks
+                  all XDP state to ensure that no other process has accidentally broken
+                  Calico''s BPF maps or attached programs. Set to 0 to disable XDP
+                  refresh. [Default: 90s]'
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

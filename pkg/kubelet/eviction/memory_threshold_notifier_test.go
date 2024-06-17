@@ -23,8 +23,9 @@ import (
 	"testing"
 	"time"
 
+	gomock "go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/resource"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -129,22 +130,23 @@ func TestUpdateThreshold(t *testing.T) {
 		},
 	}
 
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			notifierFactory := &MockNotifierFactory{}
-			notifier := &MockCgroupNotifier{}
+			notifierFactory := NewMockNotifierFactory(mockCtrl)
+			notifier := NewMockCgroupNotifier(mockCtrl)
+
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
-			notifierFactory.On("NewCgroupNotifier", testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr)
+			notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
 			var events chan<- struct{} = m.events
-			notifier.On("Start", events).Return()
+			notifier.EXPECT().Start(events).Return().AnyTimes()
 			err := m.UpdateThreshold(nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
 				t.Errorf("Unexpected error updating threshold: %v", err)
 			} else if err == nil && tc.expectErr {
 				t.Errorf("Expected error updating threshold, but got nil")
-			}
-			if !tc.expectErr {
-				notifierFactory.AssertNumberOfCalls(t, "NewCgroupNotifier", 1)
 			}
 		})
 	}
@@ -159,30 +161,32 @@ func TestStart(t *testing.T) {
 			Quantity: &noResources,
 		},
 	}
-	notifier := &MockCgroupNotifier{}
-	notifierFactory := &MockNotifierFactory{}
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	notifierFactory := NewMockNotifierFactory(mockCtrl)
+	notifier := NewMockCgroupNotifier(mockCtrl)
 
 	var wg sync.WaitGroup
 	wg.Add(4)
 	m := newTestMemoryThresholdNotifier(threshold, notifierFactory, func(string) {
 		wg.Done()
 	})
-	notifierFactory.On("NewCgroupNotifier", testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil)
+	notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil).Times(1)
+
 	var events chan<- struct{} = m.events
-	notifier.On("Start", events).Return()
-	notifier.On("Stop").Return()
+	notifier.EXPECT().Start(events).DoAndReturn(func(events chan<- struct{}) {
+		for i := 0; i < 4; i++ {
+			events <- struct{}{}
+		}
+	})
 
 	err := m.UpdateThreshold(nodeSummary(noResources, noResources, noResources, isAllocatableEvictionThreshold(threshold)))
 	if err != nil {
 		t.Errorf("Unexpected error updating threshold: %v", err)
 	}
-	notifierFactory.AssertNumberOfCalls(t, "NewCgroupNotifier", 1)
 
 	go m.Start()
 
-	for i := 0; i < 4; i++ {
-		m.events <- struct{}{}
-	}
 	wg.Wait()
 }
 

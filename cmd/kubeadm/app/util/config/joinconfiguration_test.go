@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,7 +26,7 @@ import (
 
 func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}
@@ -44,42 +43,21 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Invalid v1beta1 causes error",
+			name: "Invalid v1beta4 causes error",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: kubeadm.k8s.io/v1beta4
 				kind: JoinConfiguration
 			`),
 			expectErr: true,
 		},
 		{
-			name: "valid v1beta1 is loaded",
+			name: "valid v1beta4 is loaded",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: kubeadm.k8s.io/v1beta4
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
-				discovery:
-				  bootstrapToken:
-				    apiServerEndpoint: kube-apiserver:6443
-				    token: abcdef.0123456789abcdef
-				    unsafeSkipCAVerification: true
-				  timeout: 5m0s
-				  tlsBootstrapToken: abcdef.0123456789abcdef
-			`),
-		},
-		{
-			name: "Invalid v1beta2 causes error",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
-				kind: JoinConfiguration
-			`),
-			expectErr: true,
-		},
-		{
-			name: "valid v1beta2 is loaded",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
-				kind: JoinConfiguration
-				caCertPath: /etc/kubernetes/pki/ca.crt
+				nodeRegistration:
+				  criSocket: "unix:///var/run/unknown.sock"
 				discovery:
 				  bootstrapToken:
 				    apiServerEndpoint: kube-apiserver:6443
@@ -94,13 +72,17 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := ioutil.WriteFile(cfgPath, []byte(rt.fileContents), 0644)
+			err := os.WriteFile(cfgPath, []byte(rt.fileContents), 0644)
 			if err != nil {
 				t.Errorf("Couldn't create file: %v", err)
 				return
 			}
 
-			obj, err := LoadJoinConfigurationFromFile(cfgPath)
+			opts := LoadOrDefaultConfigurationOptions{
+				SkipCRIDetect: true,
+			}
+
+			obj, err := LoadJoinConfigurationFromFile(cfgPath, opts)
 			if rt.expectErr {
 				if err == nil {
 					t.Error("Unexpected success")

@@ -23,7 +23,7 @@ import (
 	"errors"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -79,9 +79,9 @@ func addSecretExpiration(s *v1.Secret, expiration string) {
 }
 
 // TimeStringFromNow returns the time as a string from now.
-// e.g: 2019-12-03T14:30:40+08:00.
+// e.g: 2019-12-03T06:30:40Z.
 func TimeStringFromNow(delta time.Duration) string {
-	return time.Now().Add(delta).Format(time.RFC3339)
+	return time.Now().Add(delta).UTC().Format(time.RFC3339)
 }
 
 // WaitforSignedClusterInfoByBootStrapToken waits for signed cluster info by bootstrap token.
@@ -159,7 +159,7 @@ func WaitForBootstrapTokenSecretNotDisappear(c clientset.Interface, tokenID stri
 		}
 		return true, err
 	})
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		return nil
 	}
 	return err

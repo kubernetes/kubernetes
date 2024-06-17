@@ -21,7 +21,7 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// LoadAvg represents an entry in /proc/loadavg
+// LoadAvg represents an entry in /proc/loadavg.
 type LoadAvg struct {
 	Load1  float64
 	Load5  float64
@@ -44,14 +44,14 @@ func parseLoad(loadavgBytes []byte) (*LoadAvg, error) {
 	loads := make([]float64, 3)
 	parts := strings.Fields(string(loadavgBytes))
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("malformed loadavg line: too few fields in loadavg string: %s", string(loadavgBytes))
+		return nil, fmt.Errorf("%w: Malformed line %q", ErrFileParse, string(loadavgBytes))
 	}
 
 	var err error
 	for i, load := range parts[0:3] {
 		loads[i], err = strconv.ParseFloat(load, 64)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse load '%s': %s", load, err)
+			return nil, fmt.Errorf("%s: Cannot parse load: %f: %w", ErrFileParse, loads[i], err)
 		}
 	}
 	return &LoadAvg{

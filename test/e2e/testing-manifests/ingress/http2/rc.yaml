@@ -14,6 +14,12 @@ spec:
     spec:
       containers:
       - name: echoheaders
-        image: gcr.io/kubernetes-e2e-test-images/echoserver:2.2
+        image: registry.k8s.io/e2e-test-images/agnhost:2.39
+        command:
+        - /agnhost
+        - netexec
+        - --http-port=8443
+        - --tls-cert-file=/localhost.crt
+        - --tls-private-key-file=/localhost.key
         ports:
         - containerPort: 8443

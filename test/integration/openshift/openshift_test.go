@@ -20,21 +20,26 @@ import (
 	"testing"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 )
 
-// This test references methods that OpenShift uses to customize the master on startup, that
-// are not referenced directly by a master.
-func TestMasterExportsSymbols(t *testing.T) {
-	_ = &master.Config{
-		GenericConfig: &genericapiserver.Config{
-			EnableMetrics: true,
-		},
-		ExtraConfig: master.ExtraConfig{
-			EnableLogsSupport: false,
+// This test references methods that OpenShift uses to customize the apiserver on startup, that
+// are not referenced directly by an instance.
+func TestApiserverExportsSymbols(t *testing.T) {
+	_ = &controlplane.Config{
+		ControlPlane: controlplaneapiserver.Config{
+			Generic: &genericapiserver.Config{
+				EnableMetrics: true,
+			},
+			Extra: controlplaneapiserver.Extra{
+				EnableLogsSupport: false,
+			},
 		},
 	}
-	_ = &master.Master{
-		GenericAPIServer: &genericapiserver.GenericAPIServer{},
+	_ = &controlplane.Instance{
+		ControlPlane: &controlplaneapiserver.Server{
+			GenericAPIServer: &genericapiserver.GenericAPIServer{},
+		},
 	}
 }

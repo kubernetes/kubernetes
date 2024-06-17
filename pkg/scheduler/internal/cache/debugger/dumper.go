@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
@@ -36,45 +36,47 @@ type CacheDumper struct {
 }
 
 // DumpAll writes cached nodes and scheduling queue information to the scheduler logs.
-func (d *CacheDumper) DumpAll() {
-	d.dumpNodes()
-	d.dumpSchedulingQueue()
+func (d *CacheDumper) DumpAll(logger klog.Logger) {
+	d.dumpNodes(logger)
+	d.dumpSchedulingQueue(logger)
 }
 
 // dumpNodes writes NodeInfo to the scheduler logs.
-func (d *CacheDumper) dumpNodes() {
+func (d *CacheDumper) dumpNodes(logger klog.Logger) {
 	dump := d.cache.Dump()
-	klog.Info("Dump of cached NodeInfo")
-	for _, nodeInfo := range dump.Nodes {
-		klog.Info(d.printNodeInfo(nodeInfo))
+	nodeInfos := make([]string, 0, len(dump.Nodes))
+	for name, nodeInfo := range dump.Nodes {
+		nodeInfos = append(nodeInfos, d.printNodeInfo(name, nodeInfo))
 	}
+	// Extra blank line added between node entries for readability.
+	logger.Info("Dump of cached NodeInfo", "nodes", strings.Join(nodeInfos, "\n\n"))
 }
 
 // dumpSchedulingQueue writes pods in the scheduling queue to the scheduler logs.
-func (d *CacheDumper) dumpSchedulingQueue() {
-	pendingPods := d.podQueue.PendingPods()
+func (d *CacheDumper) dumpSchedulingQueue(logger klog.Logger) {
+	pendingPods, s := d.podQueue.PendingPods()
 	var podData strings.Builder
 	for _, p := range pendingPods {
 		podData.WriteString(printPod(p))
 	}
-	klog.Infof("Dump of scheduling queue:\n%s", podData.String())
+	logger.Info("Dump of scheduling queue", "summary", s, "pods", podData.String())
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
-func (d *CacheDumper) printNodeInfo(n *framework.NodeInfo) string {
+func (d *CacheDumper) printNodeInfo(name string, n *framework.NodeInfo) string {
 	var nodeData strings.Builder
-	nodeData.WriteString(fmt.Sprintf("\nNode name: %+v\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
-		n.Node().Name, n.Requested, n.Allocatable, len(n.Pods)))
+	nodeData.WriteString(fmt.Sprintf("Node name: %s\nDeleted: %t\nRequested Resources: %+v\nAllocatable Resources:%+v\nScheduled Pods(number: %v):\n",
+		name, n.Node() == nil, n.Requested, n.Allocatable, len(n.Pods)))
 	// Dumping Pod Info
 	for _, p := range n.Pods {
 		nodeData.WriteString(printPod(p.Pod))
 	}
 	// Dumping nominated pods info on the node
-	nominatedPods := d.podQueue.NominatedPodsForNode(n.Node().Name)
-	if len(nominatedPods) != 0 {
-		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPods)))
-		for _, p := range nominatedPods {
-			nodeData.WriteString(printPod(p))
+	nominatedPodInfos := d.podQueue.NominatedPodsForNode(name)
+	if len(nominatedPodInfos) != 0 {
+		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPodInfos)))
+		for _, pi := range nominatedPodInfos {
+			nodeData.WriteString(printPod(pi.Pod))
 		}
 	}
 	return nodeData.String()

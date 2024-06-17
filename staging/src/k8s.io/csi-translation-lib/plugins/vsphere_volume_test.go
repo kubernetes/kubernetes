@@ -28,14 +28,22 @@ import (
 
 func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
-	topologySelectorTerm := v1.TopologySelectorTerm{[]v1.TopologySelectorLabelRequirement{
+	topologySelectorTerm := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
-			Key:    v1.LabelZoneFailureDomain,
+			Key:    v1.LabelTopologyZone,
 			Values: []string{"zone-a"},
 		},
+	}}
+	topologySelectorTermWithBetaLabels := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
-			Key:    v1.LabelZoneRegion,
-			Values: []string{"region-a"},
+			Key:    v1.LabelFailureDomainBetaZone,
+			Values: []string{"zone-a"},
+		},
+	}}
+	expectedTopologySelectorTerm := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+		{
+			Key:    vSphereCSITopologyZoneKey,
+			Values: []string{"zone-a"},
 		},
 	}}
 	cases := []struct {
@@ -78,22 +86,27 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 		{
 			name:  "translate with no parameter and allowedTopology",
 			sc:    NewStorageClass(map[string]string{}, []v1.TopologySelectorTerm{topologySelectorTerm}),
-			expSc: NewStorageClass(map[string]string{paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
+			expSc: NewStorageClass(map[string]string{paramcsiMigration: "true"}, []v1.TopologySelectorTerm{expectedTopologySelectorTerm}),
 		},
 		{
 			name:  "translate with storagepolicyname and allowedTopology",
 			sc:    NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
-			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
+			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{expectedTopologySelectorTerm}),
+		},
+		{
+			name:  "translate with storagepolicyname and allowedTopology beta labels",
+			sc:    NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name"}, []v1.TopologySelectorTerm{topologySelectorTermWithBetaLabels}),
+			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{expectedTopologySelectorTerm}),
 		},
 		{
 			name:  "translate with raw vSAN policy parameters, datastore and diskformat",
 			sc:    NewStorageClass(map[string]string{"hostfailurestotolerate": "2", "datastore": "vsanDatastore", "diskformat": "thin"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
-			expSc: NewStorageClass(map[string]string{"hostfailurestotolerate-migrationparam": "2", "datastore-migrationparam": "vsanDatastore", "diskformat-migrationparam": "thin", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
+			expSc: NewStorageClass(map[string]string{"hostfailurestotolerate-migrationparam": "2", "datastore-migrationparam": "vsanDatastore", "diskformat-migrationparam": "thin", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{expectedTopologySelectorTerm}),
 		},
 		{
 			name:  "translate with all parameters",
 			sc:    NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", "datastore": "test-datastore-name", "fstype": "ext4", "diskformat": "thin", "hostfailurestotolerate": "1", "forceprovisioning": "yes", "cachereservation": "25", "diskstripes": "4", "objectspacereservation": "10", "iopslimit": "32"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
-			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", "datastore-migrationparam": "test-datastore-name", "csi.storage.k8s.io/fstype": "ext4", "diskformat-migrationparam": "thin", "hostfailurestotolerate-migrationparam": "1", "forceprovisioning-migrationparam": "yes", "cachereservation-migrationparam": "25", "diskstripes-migrationparam": "4", "objectspacereservation-migrationparam": "10", "iopslimit-migrationparam": "32", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{topologySelectorTerm}),
+			expSc: NewStorageClass(map[string]string{"storagepolicyname": "test-policy-name", "datastore-migrationparam": "test-datastore-name", "csi.storage.k8s.io/fstype": "ext4", "diskformat-migrationparam": "thin", "hostfailurestotolerate-migrationparam": "1", "forceprovisioning-migrationparam": "yes", "cachereservation-migrationparam": "25", "diskstripes-migrationparam": "4", "objectspacereservation-migrationparam": "10", "iopslimit-migrationparam": "32", paramcsiMigration: "true"}, []v1.TopologySelectorTerm{expectedTopologySelectorTerm}),
 		},
 	}
 	for _, tc := range cases {
@@ -179,6 +192,84 @@ func TestTranslateVSphereCSIPVToInTree(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name: "translate valid vSphere CSI PV with topology Node Affinity rules to vSphere CSI PV with topology labels",
+			csiPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:       VSphereDriverName,
+							VolumeHandle: "e4073a6d-642e-4dff-8f4a-b4e3a47c4bbd",
+							FSType:       "ext4",
+							VolumeAttributes: map[string]string{
+								paramStoragePolicyName:         "vSAN Default Storage Policy",
+								AttributeInitialVolumeFilepath: "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							},
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "topology.csi.vmware.com/zone",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"z1"},
+										},
+										{
+											Key:      "topology.csi.vmware.com/region",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"r1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			intreePV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+					Labels: map[string]string{"topology.kubernetes.io/zone": "z1", "topology.kubernetes.io/region": "r1"},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath: "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							FSType:     "ext4",
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "topology.kubernetes.io/zone",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"z1"},
+										},
+										{
+											Key:      "topology.kubernetes.io/region",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"r1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -249,6 +340,124 @@ func TestTranslateVSphereInTreePVToCSI(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name: "translate valid vSphere in-tree PV with beta topology labels to vSphere CSI PV",
+			intreePV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+					Labels: map[string]string{"failure-domain.beta.kubernetes.io/zone": "z1", "failure-domain.beta.kubernetes.io/region": "r1"},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath:        "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							FSType:            "ext4",
+							StoragePolicyName: "vSAN Default Storage Policy",
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				},
+			},
+			csiPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+					Labels: map[string]string{"failure-domain.beta.kubernetes.io/zone": "z1", "failure-domain.beta.kubernetes.io/region": "r1"},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:       VSphereDriverName,
+							VolumeHandle: "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							FSType:       "ext4",
+							VolumeAttributes: map[string]string{
+								paramStoragePolicyName: "vSAN Default Storage Policy",
+							},
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "topology.csi.vmware.com/zone",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"z1"},
+										},
+										{
+											Key:      "topology.csi.vmware.com/region",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"r1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "translate valid vSphere in-tree PV with GA topology labels to vSphere CSI PV",
+			intreePV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+					Labels: map[string]string{"topology.kubernetes.io/zone": "z1", "topology.kubernetes.io/region": "r1"},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						VsphereVolume: &v1.VsphereVirtualDiskVolumeSource{
+							VolumePath:        "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							FSType:            "ext4",
+							StoragePolicyName: "vSAN Default Storage Policy",
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				},
+			},
+			csiPV: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pvc-d8b4475f-2c47-486e-9b57-43ae006f9b59",
+					Labels: map[string]string{"topology.kubernetes.io/zone": "z1", "topology.kubernetes.io/region": "r1"},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:       VSphereDriverName,
+							VolumeHandle: "[vsanDatastore] 6785a85e-268e-6352-a2e8-02008b7afadd/kubernetes-dynamic-pvc-68734c9f-a679-42e6-a694-39632c51e31f.vmdk",
+							FSType:       "ext4",
+							VolumeAttributes: map[string]string{
+								paramStoragePolicyName: "vSAN Default Storage Policy",
+							},
+						},
+					},
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					NodeAffinity: &v1.VolumeNodeAffinity{
+						Required: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "topology.csi.vmware.com/zone",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"z1"},
+										},
+										{
+											Key:      "topology.csi.vmware.com/region",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{"r1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
 	}
 
 	for _, tc := range cases {
@@ -314,7 +523,7 @@ func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inlinevolume)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inlinevolume, "")
 		if err == nil && tc.expErr {
 			t.Errorf("Expected error, but did not get one.")
 			continue

@@ -17,7 +17,9 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra/doc"
@@ -77,7 +79,7 @@ func main() {
 		pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
 		// generate docs for kubeadm
-		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), io.Discard, io.Discard)
 		doc.GenMarkdownTree(kubeadm, outDir)
 
 		// cleanup generated code for usage as include in the website

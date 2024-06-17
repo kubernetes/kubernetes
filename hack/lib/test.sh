@@ -18,11 +18,12 @@
 
 # A set of helpers for tests
 
-readonly reset=$(tput sgr0)
-readonly  bold=$(tput bold)
-readonly black=$(tput setaf 0)
-readonly   red=$(tput setaf 1)
-readonly green=$(tput setaf 2)
+reset=$(tput sgr0)
+bold=$(tput bold)
+black=$(tput setaf 0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
+readonly reset bold black red green
 
 kube::test::clear_all() {
   if kube::test::if_supports_resource "rc" ; then
@@ -81,8 +82,8 @@ kube::test::object_assert() {
 
   for j in $(seq 1 "${tries}"); do
     # shellcheck disable=SC2086
-    # Disabling because "args" needs to allow for expansion here
-    res=$(eval kubectl get "${kube_flags[@]}" ${args} "${object}" -o go-template=\""${request}"\")
+    # Disabling because to allow for expansion here
+    res=$(kubectl get "${kube_flags[@]}" ${args} ${object} -o go-template="${request}")
     if [[ "${res}" =~ ^$expected$ ]]; then
         echo -n "${green}"
         echo "$(kube::test::get_caller 3): Successful get ${object} ${request}: ${res}"
@@ -109,7 +110,9 @@ kube::test::get_object_jsonpath_assert() {
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" "${object}" -o jsonpath=\""${request}"\")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  res=$(kubectl get "${kube_flags[@]}" ${object} -o jsonpath=${request})
 
   if [[ "${res}" =~ ^$expected$ ]]; then
       echo -n "${green}"
@@ -134,7 +137,9 @@ kube::test::describe_object_assert() {
   local object=$2
   local matches=( "${@:3}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  result=$(kubectl describe "${kube_flags[@]}" ${resource} ${object})
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
@@ -165,10 +170,12 @@ kube::test::describe_object_events_assert() {
     local object=$2
     local showevents=${3:-"true"}
 
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
     if [[ -z "${3:-}" ]]; then
-        result=$(eval kubectl describe "${kube_flags[@]}" "${resource}" "${object}")
+        result=$(kubectl describe "${kube_flags[@]}" ${resource} ${object})
     else
-        result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}" "${object}")
+        result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource} ${object})
     fi
 
     if grep -q "No events.\|Events:" <<< "${result}"; then
@@ -202,7 +209,9 @@ kube::test::describe_resource_assert() {
   local resource=$1
   local matches=( "${@:2}" )
 
-  result=$(eval kubectl describe "${kube_flags[@]}" "${resource}")
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  result=$(kubectl describe "${kube_flags[@]}" ${resource})
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
@@ -232,7 +241,9 @@ kube::test::describe_resource_events_assert() {
     local resource=$1
     local showevents=${2:-"true"}
 
-    result=$(eval kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" "${resource}")
+    # shellcheck disable=SC2086
+    # Disabling to allow for expansion here
+    result=$(kubectl describe "${kube_flags[@]}" "--show-events=${showevents}" ${resource})
 
     if grep -q "No events.\|Events:" <<< "${result}"; then
         local has_events="true"
@@ -260,6 +271,65 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
+kube::test::describe_resource_chunk_size_assert() {
+  # $1: the target resource
+  local resource=$1
+  # $2: comma-separated list of additional resources that will be listed
+  local additionalResources=${2:-}
+  # Remaining args are flags to pass to kubectl
+  local args=${3:-}
+
+  # Expect list requests for the target resource and the additional resources
+  local expectLists
+  IFS="," read -r -a expectLists <<< "${resource},${additionalResources}"
+
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  defaultResult=$(kubectl describe ${resource} --show-events=true -v=6 ${args} "${kube_flags[@]}" 2>&1 >/dev/null)
+  for r in "${expectLists[@]}"; do
+    if grep -q "${r}?.*limit=500" <<< "${defaultResult}"; then
+      echo "query for ${r} had limit param"
+    else
+      echo "${bold}${red}"
+      echo "FAIL!"
+      echo "Describe ${resource}"
+      echo "  Expected limit param on request for: ${r}"
+      echo "  Not found in:"
+      echo "${defaultResult}"
+      echo "${reset}${red}"
+      caller
+      echo "${reset}"
+      return 1
+    fi
+  done
+
+  # shellcheck disable=SC2086
+  # Disabling to allow for expansion here
+  # Try a non-default chunk size
+  customResult=$(kubectl describe ${resource} --show-events=false --chunk-size=10 -v=6 ${args} "${kube_flags[@]}" 2>&1 >/dev/null)
+  if grep -q "${resource}?limit=10" <<< "${customResult}"; then
+    echo "query for ${resource} had user-specified limit param"
+  else
+    echo "${bold}${red}"
+    echo "FAIL!"
+    echo "Describe ${resource}"
+    echo "  Expected limit param on request for: ${r}"
+    echo "  Not found in:"
+    echo "${customResult}"
+    echo "${reset}${red}"
+    caller
+    echo "${reset}"
+    return 1
+  fi
+
+  echo -n "${green}"
+  echo "Successful describe ${resource} verbose logs:"
+  echo "${defaultResult}"
+  echo -n "${reset}"
+
+  return 0
+}
+
 # Compare sort-by resource name output (first column, skipping first line) with expected order specify in the last parameter
 kube::test::if_sort_by_has_correct_order() {
   local var
@@ -272,12 +342,16 @@ kube::test::if_has_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     return 0
   else
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     caller
@@ -290,13 +364,17 @@ kube::test::if_has_not_string() {
   local match=$2
 
   if grep -q "${match}" <<< "${message}"; then
+    echo -n "${bold}${red}"
     echo "FAIL!"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has:${match}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     echo "message:${message}"
     echo "has not:${match}"
     return 0
@@ -306,11 +384,16 @@ kube::test::if_has_not_string() {
 kube::test::if_empty_string() {
   local match=$1
   if [ -n "${match}" ]; then
+    echo -n "${bold}${red}"
+    echo "FAIL!"
     echo "${match} is not empty"
+    echo -n "${reset}"
     caller
     return 1
   else
+    echo -n "${green}"
     echo "Successful"
+    echo -n "${reset}"
     return 0
   fi
 }
@@ -333,14 +416,13 @@ kube::test::if_supports_resource() {
   return 1
 }
 
-
 kube::test::version::object_to_file() {
   name=$1
   flags=${2:-""}
   file=$3
   # shellcheck disable=SC2086
   # Disabling because "flags" needs to allow for expansion here
-  kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: version.Info{"/'/' -e s/'}'/'/' -e s/', '/','/g -e s/':'/'=/g' -e s/'"'/""/g | tr , '\n' > "${file}"
+  kubectl version ${flags} | grep "${name} Version:" | sed -e s/"${name} Version: "/""/g > "${file}"
 }
 
 kube::test::version::json_object_to_file() {
@@ -395,10 +477,16 @@ kube::test::version::diff_assert() {
         return 1
   fi
 
-  sort "${original}" > "${original}.sorted"
-  sort "${latest}" > "${latest}.sorted"
+  if [ "${comparator}" == "exact" ]; then
+      # Skip sorting of file content for exact comparison.
+      cp "${original}" "${original}.sorted"
+      cp "${latest}" "${latest}.sorted"
+  else
+      sort "${original}" > "${original}.sorted"
+      sort "${latest}" > "${latest}.sorted"
+  fi
 
-  if [ "${comparator}" == "eq" ]; then
+  if [ "${comparator}" == "eq" ] || [ "${comparator}" == "exact" ]; then
     if [ "$(diff -iwB "${original}".sorted "${latest}".sorted)" == "" ] ; then
         echo -n "${green}"
         echo "Successful: ${diff_msg}"
@@ -437,3 +525,47 @@ kube::test::version::diff_assert() {
   fi
 }
 
+# Force exact match of kubectl stdout, stderr, and return code.
+# $1: file with actual stdout
+# $2: file with actual stderr
+# $3: the actual return code
+# $4: file with expected stdout
+# $5: file with expected stderr
+# $6: expected return code
+# $7: additional message describing the invocation
+kube::test::results::diff() {
+  local actualstdout=$1
+  local actualstderr=$2
+  local actualcode=$3
+  local expectedstdout=$4
+  local expectedstderr=$5
+  local expectedcode=$6
+  local message=$7
+  local result=0
+
+  if ! kube::test::version::diff_assert "${expectedstdout}" "exact" "${actualstdout}" "stdout for ${message}"; then
+      result=1
+  fi
+  if ! kube::test::version::diff_assert "${expectedstderr}" "exact" "${actualstderr}" "stderr for ${message}"; then
+      result=1
+  fi
+  if [ "${actualcode}" -ne "${expectedcode}" ]; then
+      echo "${bold}${red}"
+      echo "$(kube::test::get_caller): FAIL!"
+      echo "Return code for ${message}"
+      echo "  Expected: ${expectedcode}"
+      echo "  Got:      ${actualcode}"
+      echo "${reset}${red}"
+      caller
+      echo "${reset}"
+      result=1
+  fi
+
+  if [ "${result}" -eq 0 ]; then
+     echo -n "${green}"
+     echo "$(kube::test::get_caller): Successful: ${message}"
+     echo -n "${reset}"
+  fi
+
+  return "$result"
+}

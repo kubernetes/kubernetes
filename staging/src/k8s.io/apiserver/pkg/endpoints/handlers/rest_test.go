@@ -20,14 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,17 +39,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 var (
@@ -97,12 +102,100 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &testPatchType{}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !apiequality.Semantic.DeepEqual(actual, expected) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+func TestLimitedReadBody(t *testing.T) {
+	defer legacyregistry.Reset()
+	legacyregistry.Register(metrics.RequestBodySizes)
+
+	testcases := []struct {
+		desc            string
+		requestBody     io.Reader
+		limit           int64
+		expectedMetrics string
+		expectedErr     bool
+	}{
+		{
+			desc:            "aaaa with limit 1",
+			requestBody:     strings.NewReader("aaaa"),
+			limit:           1,
+			expectedMetrics: "",
+			expectedErr:     true,
+		},
+		{
+			desc:        "aaaa with limit 5",
+			requestBody: strings.NewReader("aaaa"),
+			limit:       5,
+			expectedMetrics: `
+        # HELP apiserver_request_body_size_bytes [ALPHA] Apiserver request body size in bytes broken out by resource and verb.
+        # TYPE apiserver_request_body_size_bytes histogram
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="50000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="150000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="250000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="350000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="450000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="550000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="650000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="750000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="850000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="950000"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.15e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.25e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.35e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.45e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.55e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.65e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.75e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.85e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="1.95e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.15e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.25e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.35e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.45e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.55e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.65e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.75e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.85e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="2.95e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="3.05e+06"} 1
+        apiserver_request_body_size_bytes_bucket{resource="resource.group",verb="create",le="+Inf"} 1
+        apiserver_request_body_size_bytes_sum{resource="resource.group",verb="create"} 4
+        apiserver_request_body_size_bytes_count{resource="resource.group",verb="create"} 1
+`,
+			expectedErr: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			// reset metrics
+			defer metrics.RequestBodySizes.Reset()
+			defer legacyregistry.Reset()
+
+			req, err := http.NewRequest("POST", "/", tc.requestBody)
+			if err != nil {
+				t.Errorf("err not expected: got %v", err)
+			}
+			_, err = limitedReadBodyWithRecordMetric(context.Background(), req, tc.limit, "resource.group", metrics.Create)
+			if tc.expectedErr {
+				if err == nil {
+					t.Errorf("err expected: got nil")
+				}
+				return
+			}
+			if err = testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedMetrics), "apiserver_request_body_size_bytes"); err != nil {
+				t.Errorf("unexpected err: %v", err)
+			}
+		})
 	}
 }
 
@@ -119,11 +212,11 @@ func TestStrategicMergePatchInvalid(t *testing.T) {
 	expectedError := "invalid character 'b' looking for beginning of value"
 
 	actual := &testPatchType{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &testPatchType{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &testPatchType{}, "")
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
 	}
 }
@@ -151,6 +244,10 @@ func TestJSONPatch(t *testing.T) {
 			expectedError:     "the server rejected our request due to an error in our request",
 			expectedErrorType: metav1.StatusReasonInvalid,
 		},
+		{
+			name:  "valid-negative-index-patch",
+			patch: `[{"op": "test", "value": "foo", "path": "/metadata/finalizers/-1"}]`,
+		},
 	} {
 		p := &patcher{
 			patchType:  types.JSONPatchType,
@@ -160,18 +257,19 @@ func TestJSONPatch(t *testing.T) {
 		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
 		pod := &examplev1.Pod{}
 		pod.Name = "podA"
+		pod.ObjectMeta.Finalizers = []string{"foo"}
 		versionedJS, err := runtime.Encode(codec, pod)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
 			continue
 		}
-		_, err = jp.applyJSPatch(versionedJS)
+		_, _, err = jp.applyJSPatch(versionedJS)
 		if err != nil {
 			if len(test.expectedError) == 0 {
 				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
 				continue
 			}
-			if err.Error() != test.expectedError {
+			if !strings.Contains(err.Error(), test.expectedError) {
 				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
 			}
 			if test.expectedErrorType != apierrors.ReasonForError(err) {
@@ -205,7 +303,7 @@ func TestPatchCustomResource(t *testing.T) {
 	expectedError := "strategic merge patch format is not supported"
 
 	actual := &unstructured.Unstructured{}
-	err := strategicPatchObject(defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
+	err := strategicPatchObject(context.TODO(), defaulter, original, []byte(patch), actual, &unstructured.Unstructured{}, "")
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
@@ -299,22 +397,6 @@ func (p *testNamer) ObjectName(obj runtime.Object) (namespace, name string, err 
 	return p.namespace, p.name, nil
 }
 
-// SetSelfLink sets the provided URL onto the object. The method should return nil if the object
-// does not support selfLinks.
-func (p *testNamer) SetSelfLink(obj runtime.Object, url string) error {
-	return errors.New("not implemented")
-}
-
-// GenerateLink creates a path and query for a given runtime object that represents the canonical path.
-func (p *testNamer) GenerateLink(requestInfo *request.RequestInfo, obj runtime.Object) (uri string, err error) {
-	return "", errors.New("not implemented")
-}
-
-// GenerateListLink creates a path and query for a list that represents the canonical path.
-func (p *testNamer) GenerateListLink(req *http.Request) (uri string, err error) {
-	return "", errors.New("not implemented")
-}
-
 type patchTestCase struct {
 	name string
 
@@ -375,6 +457,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	schemaReferenceObj := &examplev1.Pod{}
 	hubVersion := example.SchemeGroupVersion
 
+	fieldmanager, err := managedfields.NewDefaultFieldManager(
+		managedfields.NewDeducedTypeConverter(),
+		convertor, defaulter, creater, kind, hubVersion, "", nil)
+
+	if err != nil {
+		t.Fatalf("failed to create field manager: %v", err)
+	}
 	for _, patchType := range []types.PatchType{types.JSONPatchType, types.MergePatchType, types.StrategicMergePatchType} {
 		// This needs to be reset on each iteration.
 		testPatcher := &testPatcher{
@@ -456,17 +545,21 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 			codec: codec,
 
-			timeout: 1 * time.Second,
-
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patch,
-
-			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
+			options: &metav1.PatchOptions{
+				FieldManager: "test-manager",
+			},
 		}
 
-		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		resultObj, _, err := p.patchResource(ctx, &RequestScope{
+			FieldManager: fieldmanager,
+		})
+		cancel()
+
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -508,7 +601,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 		reallyExpectedPod := expectedObj.(*example.Pod)
 
 		if !reflect.DeepEqual(*reallyExpectedPod, *resultPod) {
-			t.Errorf("%s mismatch: %v\n", tc.name, diff.ObjectGoPrintDiff(reallyExpectedPod, resultPod))
+			t.Errorf("%s mismatch: %v\n", tc.name, cmp.Diff(reallyExpectedPod, resultPod))
 			continue
 		}
 	}
@@ -533,7 +626,7 @@ func TestNumberConversion(t *testing.T) {
 
 	patchJS := []byte(`{"spec":{"terminationGracePeriodSeconds":42,"activeDeadlineSeconds":120}}`)
 
-	err := strategicPatchObject(defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj)
+	err := strategicPatchObject(context.TODO(), defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, schemaReferenceObj, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -825,129 +918,6 @@ func TestHasUID(t *testing.T) {
 	}
 }
 
-func TestParseTimeout(t *testing.T) {
-	if d := parseTimeout(""); d != 34*time.Second {
-		t.Errorf("blank timeout produces %v", d)
-	}
-	if d := parseTimeout("not a timeout"); d != 34*time.Second {
-		t.Errorf("bad timeout produces %v", d)
-	}
-	if d := parseTimeout("10s"); d != 10*time.Second {
-		t.Errorf("10s timeout produced: %v", d)
-	}
-}
-
-func TestFinishRequest(t *testing.T) {
-	exampleObj := &example.Pod{}
-	exampleErr := fmt.Errorf("error")
-	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
-	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
-	testcases := []struct {
-		name          string
-		timeout       time.Duration
-		fn            resultFunc
-		expectedObj   runtime.Object
-		expectedErr   error
-		expectedPanic string
-
-		expectedPanicObj interface{}
-	}{
-		{
-			name:    "Expected obj is returned",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return exampleObj, nil
-			},
-			expectedObj: exampleObj,
-			expectedErr: nil,
-		},
-		{
-			name:    "Expected error is returned",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return nil, exampleErr
-			},
-			expectedObj: nil,
-			expectedErr: exampleErr,
-		},
-		{
-			name:    "Successful status object is returned as expected",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return successStatusObj, nil
-			},
-			expectedObj: successStatusObj,
-			expectedErr: nil,
-		},
-		{
-			name:    "Error status object is converted to StatusError",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return errorStatusObj, nil
-			},
-			expectedObj: nil,
-			expectedErr: apierrors.FromObject(errorStatusObj),
-		},
-		{
-			name:    "Panic is propagated up",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				panic("my panic")
-			},
-			expectedObj:   nil,
-			expectedErr:   nil,
-			expectedPanic: "my panic",
-		},
-		{
-			name:    "Panic is propagated with stack",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				panic("my panic")
-			},
-			expectedObj:   nil,
-			expectedErr:   nil,
-			expectedPanic: "rest_test.go",
-		},
-		{
-			name:    "http.ErrAbortHandler panic is propagated without wrapping with stack",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				panic(http.ErrAbortHandler)
-			},
-			expectedObj:      nil,
-			expectedErr:      nil,
-			expectedPanic:    http.ErrAbortHandler.Error(),
-			expectedPanicObj: http.ErrAbortHandler,
-		},
-	}
-	for i, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer func() {
-				r := recover()
-				switch {
-				case r == nil && len(tc.expectedPanic) > 0:
-					t.Errorf("expected panic containing '%s', got none", tc.expectedPanic)
-				case r != nil && len(tc.expectedPanic) == 0:
-					t.Errorf("unexpected panic: %v", r)
-				case r != nil && len(tc.expectedPanic) > 0 && !strings.Contains(fmt.Sprintf("%v", r), tc.expectedPanic):
-					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
-				}
-
-				if tc.expectedPanicObj != nil && !reflect.DeepEqual(tc.expectedPanicObj, r) {
-					t.Errorf("expected panic obj %#v, got %#v", tc.expectedPanicObj, r)
-				}
-			}()
-			obj, err := finishRequest(tc.timeout, tc.fn)
-			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
-				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
-			}
-			if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
-				t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
-			}
-		})
-	}
-}
-
 func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, resourceVersion string, apiVersion string, activeDeadlineSeconds *int64, nodeName string) {
 	tcPod.Name = name
 	tcPod.Namespace = namespace
@@ -1101,6 +1071,304 @@ want: %#+v`, got, converted)
 					}
 
 				})
+			}
+		})
+	}
+}
+
+func TestDedupOwnerReferences(t *testing.T) {
+	falseA := false
+	falseB := false
+	testCases := []struct {
+		name            string
+		ownerReferences []metav1.OwnerReference
+		expected        []metav1.OwnerReference
+	}{
+		{
+			name: "simple multiple duplicates",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different name entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different API version entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "dedup memory-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "dedup semantic-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseB,
+					BlockOwnerDeletion: &falseB,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "don't dedup semantic-different entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
+			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
+				t.Errorf("diff: %v", cmp.Diff(deduped, tc.expected))
+			}
+		})
+	}
+}
+
+func TestParseYAMLWarnings(t *testing.T) {
+	yamlNoErrs := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  nested:
+  - name: nestedName
+    nestedField1: val1`
+	yamlOneErr := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  field2: val3
+  nested:
+  - name: nestedName
+    nestedField1: val1`
+	yamlManyErrs := `---
+apiVersion: foo
+kind: bar
+metadata:
+  name: no-errors
+spec:
+  field1: val1
+  field2: val2
+  field2: val3
+  nested:
+  - name: nestedName
+    nestedField1: val1
+    nestedField2: val2
+    nestedField2: val3`
+	testCases := []struct {
+		name     string
+		yaml     string
+		expected []string
+	}{
+		{
+			name: "no errors",
+			yaml: yamlNoErrs,
+		},
+		{
+			name:     "one error",
+			yaml:     yamlOneErr,
+			expected: []string{`line 9: key "field2" already set in map`},
+		},
+		{
+			name:     "many errors",
+			yaml:     yamlManyErrs,
+			expected: []string{`line 9: key "field2" already set in map`, `line 14: key "nestedField2" already set in map`},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+			if err := yaml.UnmarshalStrict([]byte(tc.yaml), &obj.Object); err != nil {
+				parsedErrs := parseYAMLWarnings(err.Error())
+				if !reflect.DeepEqual(tc.expected, parsedErrs) {
+					t.Fatalf("expected: %v\n, got: %v\n", tc.expected, parsedErrs)
+				}
 			}
 		})
 	}

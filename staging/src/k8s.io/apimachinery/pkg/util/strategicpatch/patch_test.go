@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,6 +36,9 @@ import (
 var (
 	fakeMergeItemSchema     = sptest.Fake{Path: filepath.Join("testdata", "swagger-merge-item.json")}
 	fakePrecisionItemSchema = sptest.Fake{Path: filepath.Join("testdata", "swagger-precision-item.json")}
+
+	fakeMergeItemV3Schema     = sptest.OpenAPIV3Getter{Path: filepath.Join("testdata", "swagger-merge-item-v3.json")}
+	fakePrecisionItemV3Schema = sptest.OpenAPIV3Getter{Path: filepath.Join("testdata", "swagger-precision-item-v3.json")}
 )
 
 type SortMergeListTestCases struct {
@@ -284,9 +287,14 @@ func TestSortMergeLists(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := SortMergeListTestCases{}
@@ -669,15 +677,111 @@ mergingList:
 			ExpectedError: "does not contain declared merge key",
 		},
 	},
+	{
+		Description: "$deleteFromPrimitiveList of nonexistent item in primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on empty primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on nonexistent primitive list should not add the primitive list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+foo:
+  - bar
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+foo:
+  - bar
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList should delete item from a list with merge patch strategy",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 2
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 3
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList should delete item from a list without merge patch strategy",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+nonMergingIntList:
+  - 1
+  - 2
+  - 3
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/nonMergingIntList:
+  - 2
+`),
+			Modified: []byte(`
+nonMergingIntList:
+  - 1
+  - 3
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := StrategicMergePatchTestCases{}
@@ -687,16 +791,20 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 		return
 	}
 
-	for _, schema := range schemas {
-		for _, c := range tc.TestCases {
-			original, expectedTwoWayPatch, _, expectedResult := twoWayTestCaseToJSONOrFail(t, c, schema)
-			testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, "", schema)
-		}
+	for _, c := range tc.TestCases {
+		t.Run(c.Description, func(t *testing.T) {
+			for _, schema := range schemas {
+				t.Run(schema.Name(), func(t *testing.T) {
+					original, expectedTwoWayPatch, _, expectedResult := twoWayTestCaseToJSONOrFail(t, c, schema)
+					testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, "", schema)
+				})
 
-		for _, c := range customStrategicMergePatchRawTestCases {
-			original, expectedTwoWayPatch, _, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
-			testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, c.ExpectedError, schema)
-		}
+				for _, c := range customStrategicMergePatchRawTestCases {
+					original, expectedTwoWayPatch, _, expectedResult := twoWayRawTestCaseToJSONOrFail(t, c)
+					testPatchApplication(t, original, expectedTwoWayPatch, expectedResult, c.Description, c.ExpectedError, schema)
+				}
+			}
+		})
 	}
 }
 
@@ -704,7 +812,6 @@ func TestCustomStrategicMergePatch(t *testing.T) {
 // yields the correct outcome. They are also test cases for CreateTwoWayMergePatch
 // and CreateThreeWayMergePatch, to assert that they both generate the correct patch
 // for the given set of input documents.
-//
 var createStrategicMergePatchTestCaseData = []byte(`
 testCases:
   - description: nil original
@@ -1158,6 +1265,50 @@ testCases:
 `)
 
 var strategicMergePatchRawTestCases = []StrategicMergePatchRawTestCase{
+	{
+		Description: "nested patch merge with empty list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+name: hi
+`),
+			Current: []byte(`
+name: hi
+mergingList:
+- name: hello2
+`),
+			Modified: []byte(`
+name: hi
+mergingList:
+- name: hello
+- $patch: delete
+  name: doesntexist
+`),
+			TwoWay: []byte(`
+mergingList:
+- name: hello
+- $patch: delete
+  name: doesntexist
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: hello
+- name: doesntexist
+mergingList:
+- name: hello
+`),
+			TwoWayResult: []byte(`
+name: hi
+mergingList:
+- name: hello
+`),
+			Result: []byte(`
+name: hi
+mergingList:
+- name: hello
+- name: hello2
+`),
+		},
+	},
 	{
 		Description: "delete items in lists of scalars",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
@@ -6031,9 +6182,14 @@ func TestStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	tc := StrategicMergePatchTestCases{}
@@ -6044,23 +6200,34 @@ func TestStrategicMergePatch(t *testing.T) {
 	}
 
 	for _, schema := range schemas {
-		testStrategicMergePatchWithCustomArguments(t, "bad original",
-			"<THIS IS NOT JSON>", "{}", schema, mergepatch.ErrBadJSONDoc)
-		testStrategicMergePatchWithCustomArguments(t, "bad patch",
-			"{}", "<THIS IS NOT JSON>", schema, mergepatch.ErrBadJSONDoc)
-		testStrategicMergePatchWithCustomArguments(t, "nil struct",
-			"{}", "{}", nil, mergepatch.ErrBadArgKind(struct{}{}, nil))
+		t.Run(schema.Name(), func(t *testing.T) {
 
-		for _, c := range tc.TestCases {
-			testTwoWayPatch(t, c, schema)
-			testThreeWayPatch(t, c, schema)
-		}
+			testStrategicMergePatchWithCustomArguments(t, "bad original",
+				"<THIS IS NOT JSON>", "{}", schema, mergepatch.ErrBadJSONDoc)
+			testStrategicMergePatchWithCustomArguments(t, "bad patch",
+				"{}", "<THIS IS NOT JSON>", schema, mergepatch.ErrBadJSONDoc)
+			testStrategicMergePatchWithCustomArguments(t, "nil struct",
+				"{}", "{}", nil, mergepatch.ErrBadArgKind(struct{}{}, nil))
+
+			for _, c := range tc.TestCases {
+				t.Run(c.Description+"/TwoWay", func(t *testing.T) {
+					testTwoWayPatch(t, c, schema)
+				})
+				t.Run(c.Description+"/ThreeWay", func(t *testing.T) {
+					testThreeWayPatch(t, c, schema)
+				})
+			}
+		})
 
 		// run multiple times to exercise different map traversal orders
 		for i := 0; i < 10; i++ {
 			for _, c := range strategicMergePatchRawTestCases {
-				testTwoWayPatchForRawTestCase(t, c, schema)
-				testThreeWayPatchForRawTestCase(t, c, schema)
+				t.Run(c.Description+"/TwoWay", func(t *testing.T) {
+					testTwoWayPatchForRawTestCase(t, c, schema)
+				})
+				t.Run(c.Description+"/ThreeWay", func(t *testing.T) {
+					testThreeWayPatchForRawTestCase(t, c, schema)
+				})
 			}
 		}
 	}
@@ -6315,7 +6482,7 @@ func jsonToYAMLOrError(j []byte) string {
 func toJSON(v interface{}) ([]byte, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("json marshal failed: %v\n%v\n", err, spew.Sdump(v))
+		return nil, fmt.Errorf("json marshal failed: %v\n%v\n", err, dump.Pretty(v))
 	}
 
 	return j, nil
@@ -6415,9 +6582,14 @@ func TestNumberConversion(t *testing.T) {
 	precisionItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakePrecisionItemSchema, "precisionItem"),
 	}
+	precisionItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakePrecisionItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakePrecisionItemV3Schema.SchemaOrDie().Components.Schemas["precisionItem"],
+	}
 	precisionItemSchemas := []LookupPatchMeta{
 		precisionItemStructSchema,
 		precisionItemOpenapiSchema,
+		precisionItemOpenapiV3Schema,
 	}
 
 	for _, schema := range precisionItemSchemas {
@@ -6625,9 +6797,14 @@ func TestReplaceWithRawExtension(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	for _, schema := range schemas {
@@ -6661,6 +6838,106 @@ func TestUnknownField(t *testing.T) {
 			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
 			ExpectedThreeWay:       `{}`,
 			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+		},
+		"no diff even if modified null": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":null},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":null}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":null}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+		},
+		"discard nulls in nested and adds not nulls": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value","keynull":null}},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+		},
+		"discard if modified all nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null}}`,
+			ExpectedTwoWayResult:   `{"complex":{}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null}}`,
+			ExpectedThreeWayResult: `{"complex":{}}`,
+		},
+		"add only not nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null,"nested2":"foo"}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedTwoWayResult:   `{"complex":{"nested2":"foo"}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedThreeWayResult: `{"complex":{"nested2":"foo"}}`,
+		},
+		"null values in original are preserved": {
+			Original: `{"thing":null}`,
+			Current:  `{"thing":null}`,
+			Modified: `{"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"nested":{"value":5},"thing":null}`,
+		},
+		"nested null values in original are preserved": {
+			Original: `{"complex":{"key":null},"thing":null}`,
+			Current:  `{"complex":{"key":null},"thing":null}`,
+			Modified: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+		},
+		"add empty slices": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[]}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":[]}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+		},
+		"filter nulls from nested slices": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+		},
+		"filter if slice is all empty": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{}}]}`,
+		},
+		"not filter nulls from non-associative slice": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":["key1",null,"key2"]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWay:       `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":["key1",null,"key2"]}`,
 		},
 		"added only": {
 			Original: `{"name":"foo"}`,
@@ -6697,67 +6974,74 @@ func TestUnknownField(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
 		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
+	mergeItemOpenapiV3Schema := PatchMetaFromOpenAPIV3{
+		SchemaList: fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas,
+		Schema:     fakeMergeItemV3Schema.SchemaOrDie().Components.Schemas["mergeItem"],
+	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
 		mergeItemOpenapiSchema,
+		mergeItemOpenapiV3Schema,
 	}
 
 	for _, k := range sets.StringKeySet(testcases).List() {
-		tc := testcases[k]
-		for _, schema := range schemas {
-			func() {
-				twoWay, err := CreateTwoWayMergePatchUsingLookupPatchMeta([]byte(tc.Original), []byte(tc.Modified), schema)
-				if err != nil {
-					if len(tc.ExpectedTwoWayErr) == 0 {
-						t.Errorf("using %s in testcase %s: error making two-way patch: %v", getSchemaType(schema), k, err)
+		t.Run(k, func(t *testing.T) {
+			tc := testcases[k]
+			for _, schema := range schemas {
+				t.Run(schema.Name()+"/TwoWay", func(t *testing.T) {
+					twoWay, err := CreateTwoWayMergePatchUsingLookupPatchMeta([]byte(tc.Original), []byte(tc.Modified), schema)
+					if err != nil {
+						if len(tc.ExpectedTwoWayErr) == 0 {
+							t.Errorf("using %s in testcase %s: error making two-way patch: %v", getSchemaType(schema), k, err)
+						}
+						if !strings.Contains(err.Error(), tc.ExpectedTwoWayErr) {
+							t.Errorf("using %s in testcase %s: expected error making two-way patch to contain '%s', got %s", getSchemaType(schema), k, tc.ExpectedTwoWayErr, err)
+						}
+						return
 					}
-					if !strings.Contains(err.Error(), tc.ExpectedTwoWayErr) {
-						t.Errorf("using %s in testcase %s: expected error making two-way patch to contain '%s', got %s", getSchemaType(schema), k, tc.ExpectedTwoWayErr, err)
+
+					if string(twoWay) != tc.ExpectedTwoWay {
+						t.Errorf("using %s in testcase %s: expected two-way patch:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedTwoWay), string(twoWay))
+						return
 					}
-					return
-				}
 
-				if string(twoWay) != tc.ExpectedTwoWay {
-					t.Errorf("using %s in testcase %s: expected two-way patch:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedTwoWay), string(twoWay))
-					return
-				}
-
-				twoWayResult, err := StrategicMergePatchUsingLookupPatchMeta([]byte(tc.Original), twoWay, schema)
-				if err != nil {
-					t.Errorf("using %s in testcase %s: error applying two-way patch: %v", getSchemaType(schema), k, err)
-					return
-				}
-				if string(twoWayResult) != tc.ExpectedTwoWayResult {
-					t.Errorf("using %s in testcase %s: expected two-way result:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedTwoWayResult), string(twoWayResult))
-					return
-				}
-			}()
-
-			func() {
-				threeWay, err := CreateThreeWayMergePatch([]byte(tc.Original), []byte(tc.Modified), []byte(tc.Current), schema, false)
-				if err != nil {
-					if len(tc.ExpectedThreeWayErr) == 0 {
-						t.Errorf("using %s in testcase %s: error making three-way patch: %v", getSchemaType(schema), k, err)
-					} else if !strings.Contains(err.Error(), tc.ExpectedThreeWayErr) {
-						t.Errorf("using %s in testcase %s: expected error making three-way patch to contain '%s', got %s", getSchemaType(schema), k, tc.ExpectedThreeWayErr, err)
+					twoWayResult, err := StrategicMergePatchUsingLookupPatchMeta([]byte(tc.Original), twoWay, schema)
+					if err != nil {
+						t.Errorf("using %s in testcase %s: error applying two-way patch: %v", getSchemaType(schema), k, err)
+						return
 					}
-					return
-				}
+					if string(twoWayResult) != tc.ExpectedTwoWayResult {
+						t.Errorf("using %s in testcase %s: expected two-way result:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedTwoWayResult), string(twoWayResult))
+						return
+					}
+				})
 
-				if string(threeWay) != tc.ExpectedThreeWay {
-					t.Errorf("using %s in testcase %s: expected three-way patch:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedThreeWay), string(threeWay))
-					return
-				}
+				t.Run(schema.Name()+"/ThreeWay", func(t *testing.T) {
+					threeWay, err := CreateThreeWayMergePatch([]byte(tc.Original), []byte(tc.Modified), []byte(tc.Current), schema, false)
+					if err != nil {
+						if len(tc.ExpectedThreeWayErr) == 0 {
+							t.Errorf("using %s in testcase %s: error making three-way patch: %v", getSchemaType(schema), k, err)
+						} else if !strings.Contains(err.Error(), tc.ExpectedThreeWayErr) {
+							t.Errorf("using %s in testcase %s: expected error making three-way patch to contain '%s', got %s", getSchemaType(schema), k, tc.ExpectedThreeWayErr, err)
+						}
+						return
+					}
 
-				threeWayResult, err := StrategicMergePatch([]byte(tc.Current), threeWay, schema)
-				if err != nil {
-					t.Errorf("using %s in testcase %s: error applying three-way patch: %v", getSchemaType(schema), k, err)
-					return
-				} else if string(threeWayResult) != tc.ExpectedThreeWayResult {
-					t.Errorf("using %s in testcase %s: expected three-way result:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedThreeWayResult), string(threeWayResult))
-					return
-				}
-			}()
-		}
+					if string(threeWay) != tc.ExpectedThreeWay {
+						t.Errorf("using %s in testcase %s: expected three-way patch:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedThreeWay), string(threeWay))
+						return
+					}
+
+					threeWayResult, err := StrategicMergePatch([]byte(tc.Current), threeWay, schema)
+					if err != nil {
+						t.Errorf("using %s in testcase %s: error applying three-way patch: %v", getSchemaType(schema), k, err)
+						return
+					} else if string(threeWayResult) != tc.ExpectedThreeWayResult {
+						t.Errorf("using %s in testcase %s: expected three-way result:\n\t%s\ngot\n\t%s", getSchemaType(schema), k, string(tc.ExpectedThreeWayResult), string(threeWayResult))
+						return
+					}
+				})
+			}
+		})
 	}
 }

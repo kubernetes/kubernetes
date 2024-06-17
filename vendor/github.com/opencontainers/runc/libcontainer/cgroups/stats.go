@@ -1,5 +1,3 @@
-// +build linux
-
 package cgroups
 
 type ThrottlingData struct {
@@ -39,6 +37,33 @@ type CpuStats struct {
 	ThrottlingData ThrottlingData `json:"throttling_data,omitempty"`
 }
 
+type CPUSetStats struct {
+	// List of the physical numbers of the CPUs on which processes
+	// in that cpuset are allowed to execute
+	CPUs []uint16 `json:"cpus,omitempty"`
+	// cpu_exclusive flag
+	CPUExclusive uint64 `json:"cpu_exclusive"`
+	// List of memory nodes on which processes in that cpuset
+	// are allowed to allocate memory
+	Mems []uint16 `json:"mems,omitempty"`
+	// mem_hardwall flag
+	MemHardwall uint64 `json:"mem_hardwall"`
+	// mem_exclusive flag
+	MemExclusive uint64 `json:"mem_exclusive"`
+	// memory_migrate flag
+	MemoryMigrate uint64 `json:"memory_migrate"`
+	// memory_spread page flag
+	MemorySpreadPage uint64 `json:"memory_spread_page"`
+	// memory_spread slab flag
+	MemorySpreadSlab uint64 `json:"memory_spread_slab"`
+	// memory_pressure
+	MemoryPressure uint64 `json:"memory_pressure"`
+	// sched_load balance flag
+	SchedLoadBalance uint64 `json:"sched_load_balance"`
+	// sched_relax_domain_level
+	SchedRelaxDomainLevel int64 `json:"sched_relax_domain_level"`
+}
+
 type MemoryData struct {
 	Usage    uint64 `json:"usage,omitempty"`
 	MaxUsage uint64 `json:"max_usage,omitempty"`
@@ -53,6 +78,8 @@ type MemoryStats struct {
 	Usage MemoryData `json:"usage,omitempty"`
 	// usage of memory + swap
 	SwapUsage MemoryData `json:"swap_usage,omitempty"`
+	// usage of swap only
+	SwapOnlyUsage MemoryData `json:"swap_only_usage,omitempty"`
 	// usage of kernel memory
 	KernelUsage MemoryData `json:"kernel_usage,omitempty"`
 	// usage of kernel TCP memory
@@ -99,7 +126,7 @@ type BlkioStatEntry struct {
 }
 
 type BlkioStats struct {
-	// number of bytes tranferred to and from the block device
+	// number of bytes transferred to and from the block device
 	IoServiceBytesRecursive []BlkioStatEntry `json:"io_service_bytes_recursive,omitempty"`
 	IoServicedRecursive     []BlkioStatEntry `json:"io_serviced_recursive,omitempty"`
 	IoQueuedRecursive       []BlkioStatEntry `json:"io_queue_recursive,omitempty"`
@@ -119,13 +146,26 @@ type HugetlbStats struct {
 	Failcnt uint64 `json:"failcnt"`
 }
 
+type RdmaEntry struct {
+	Device     string `json:"device,omitempty"`
+	HcaHandles uint32 `json:"hca_handles,omitempty"`
+	HcaObjects uint32 `json:"hca_objects,omitempty"`
+}
+
+type RdmaStats struct {
+	RdmaLimit   []RdmaEntry `json:"rdma_limit,omitempty"`
+	RdmaCurrent []RdmaEntry `json:"rdma_current,omitempty"`
+}
+
 type Stats struct {
 	CpuStats    CpuStats    `json:"cpu_stats,omitempty"`
+	CPUSetStats CPUSetStats `json:"cpuset_stats,omitempty"`
 	MemoryStats MemoryStats `json:"memory_stats,omitempty"`
 	PidsStats   PidsStats   `json:"pids_stats,omitempty"`
 	BlkioStats  BlkioStats  `json:"blkio_stats,omitempty"`
 	// the map is in the format "size of hugepage: stats of the hugepage"
 	HugetlbStats map[string]HugetlbStats `json:"hugetlb_stats,omitempty"`
+	RdmaStats    RdmaStats               `json:"rdma_stats,omitempty"`
 }
 
 func NewStats() *Stats {

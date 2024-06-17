@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // PodDisruptionBudgetsGetter has a method to return a PodDisruptionBudgetInterface.
@@ -47,6 +53,8 @@ type PodDisruptionBudgetInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error)
+	Apply(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error)
+	ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error)
 	PodDisruptionBudgetExpansion
 }
 
@@ -78,7 +86,26 @@ func (c *podDisruptionBudgets) Get(ctx context.Context, name string, options v1.
 }
 
 // List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
+func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.PodDisruptionBudgetList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for poddisruptionbudgets, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for poddisruptionbudgets", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for poddisruptionbudgets ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for poddisruptionbudgets", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
+func (c *podDisruptionBudgets) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -90,6 +117,23 @@ func (c *podDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (r
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of PodDisruptionBudgets
+func (c *podDisruptionBudgets) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.PodDisruptionBudgetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -188,6 +232,62 @@ func (c *podDisruptionBudgets) Patch(ctx context.Context, name string, pt types.
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied podDisruptionBudget.
+func (c *podDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error) {
+	if podDisruptionBudget == nil {
+		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(podDisruptionBudget)
+	if err != nil {
+		return nil, err
+	}
+	name := podDisruptionBudget.Name
+	if name == nil {
+		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
+	}
+	result = &v1beta1.PodDisruptionBudget{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *podDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error) {
+	if podDisruptionBudget == nil {
+		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(podDisruptionBudget)
+	if err != nil {
+		return nil, err
+	}
+
+	name := podDisruptionBudget.Name
+	if name == nil {
+		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
+	}
+
+	result = &v1beta1.PodDisruptionBudget{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

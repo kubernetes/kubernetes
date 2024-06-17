@@ -149,7 +149,6 @@ func TestAudit(t *testing.T) {
 	for _, test := range []struct {
 		desc   string
 		req    func(server string) (*http.Request, error)
-		linker runtime.SelfLinker
 		code   int
 		events int
 		checks []eventCheck
@@ -159,7 +158,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -172,11 +170,6 @@ func TestAudit(t *testing.T) {
 			"list",
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?labelSelector=a%3Dfoobar", nil)
-			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
-				namespace:   "other",
 			},
 			200,
 			2,
@@ -191,7 +184,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			201,
 			2,
 			[]eventCheck{
@@ -205,7 +197,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/named", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			405,
 			2,
 			[]eventCheck{
@@ -219,7 +210,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", nil)
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -233,7 +223,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", bytes.NewBuffer([]byte(`{"kind":"DeleteOptions"}`)))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -247,7 +236,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -261,7 +249,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
-			selfLinker,
 			400,
 			2,
 			[]eventCheck{
@@ -277,12 +264,6 @@ func TestAudit(t *testing.T) {
 				req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 				return req, nil
 			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/c",
-				name:        "c",
-				namespace:   "other",
-			},
 			200,
 			2,
 			[]eventCheck{
@@ -296,11 +277,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?watch=true", nil)
 			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
-				namespace:   "other",
-			},
 			200,
 			3,
 			[]eventCheck{
@@ -310,81 +286,97 @@ func TestAudit(t *testing.T) {
 			},
 		},
 	} {
-		sink := &fakeAuditSink{}
-		handler := handleInternal(map[string]rest.Storage{
-			"simple": &SimpleRESTStorage{
-				list: []genericapitesting.Simple{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "other"},
-						Other:      "foo",
+		t.Run(test.desc, func(t *testing.T) {
+			sink := &fakeAuditSink{}
+			handler := handleInternal(map[string]rest.Storage{
+				"simple": &SimpleRESTStorage{
+					list: []genericapitesting.Simple{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "other"},
+							Other:      "foo",
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "other"},
+							Other:      "foo",
+						},
 					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "other"},
+					item: genericapitesting.Simple{
+						ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "other", UID: "uid"},
 						Other:      "foo",
 					},
 				},
-				item: genericapitesting.Simple{
-					ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "other", UID: "uid"},
-					Other:      "foo",
-				},
-			},
-		}, admissionControl, selfLinker, sink)
+			}, admissionControl, sink)
 
-		server := httptest.NewServer(handler)
-		defer server.Close()
-		client := http.Client{Timeout: 2 * time.Second}
+			server := httptest.NewServer(handler)
+			defer server.Close()
+			client := http.Client{Timeout: 2 * time.Second}
 
-		req, err := test.req(server.URL)
-		if err != nil {
-			t.Errorf("[%s] error creating the request: %v", test.desc, err)
-		}
+			req, err := test.req(server.URL)
+			if err != nil {
+				t.Errorf("[%s] error creating the request: %v", test.desc, err)
+			}
 
-		req.Header.Set("User-Agent", userAgent)
+			req.Header.Set("User-Agent", userAgent)
 
-		response, err := client.Do(req)
-		if err != nil {
-			t.Errorf("[%s] error: %v", test.desc, err)
-		}
+			response, err := client.Do(req)
+			if err != nil {
+				t.Errorf("[%s] error: %v", test.desc, err)
+			}
 
-		if response.StatusCode != test.code {
-			t.Errorf("[%s] expected http code %d, got %#v", test.desc, test.code, response)
-		}
+			if response.StatusCode != test.code {
+				t.Errorf("[%s] expected http code %d, got %#v", test.desc, test.code, response)
+			}
 
-		// close body because the handler might block in Flush, unable to send the remaining event.
-		response.Body.Close()
+			// close body because the handler might block in Flush, unable to send the remaining event.
+			response.Body.Close()
 
-		// wait for events to arrive, at least the given number in the test
-		events := []*auditinternal.Event{}
-		err = wait.Poll(50*time.Millisecond, wait.ForeverTestTimeout, wait.ConditionFunc(func() (done bool, err error) {
-			events = sink.Events()
-			return len(events) >= test.events, nil
-		}))
-		if err != nil {
-			t.Errorf("[%s] timeout waiting for events", test.desc)
-		}
+			// wait for events to arrive, at least the given number in the test
+			events := []*auditinternal.Event{}
+			err = wait.Poll(50*time.Millisecond, testTimeout(t), wait.ConditionFunc(func() (done bool, err error) {
+				events = sink.Events()
+				return len(events) >= test.events, nil
+			}))
+			if err != nil {
+				t.Errorf("[%s] timeout waiting for events", test.desc)
+			}
 
-		if got := len(events); got != test.events {
-			t.Errorf("[%s] expected %d audit events, got %d", test.desc, test.events, got)
-		} else {
-			for i, check := range test.checks {
-				err := check(events)
-				if err != nil {
-					t.Errorf("[%s,%d] %v", test.desc, i, err)
+			if got := len(events); got != test.events {
+				t.Errorf("[%s] expected %d audit events, got %d", test.desc, test.events, got)
+			} else {
+				for i, check := range test.checks {
+					err := check(events)
+					if err != nil {
+						t.Errorf("[%s,%d] %v", test.desc, i, err)
+					}
+				}
+
+				if err := requestUserAgentMatches(userAgent)(events); err != nil {
+					t.Errorf("[%s] %v", test.desc, err)
 				}
 			}
 
-			if err := requestUserAgentMatches(userAgent)(events); err != nil {
-				t.Errorf("[%s] %v", test.desc, err)
+			if len(events) > 0 {
+				status := events[len(events)-1].ResponseStatus
+				if status == nil {
+					t.Errorf("[%s] expected non-nil ResponseStatus in last event", test.desc)
+				} else if int(status.Code) != test.code {
+					t.Errorf("[%s] expected ResponseStatus.Code=%d, got %d", test.desc, test.code, status.Code)
+				}
 			}
-		}
+		})
+	}
+}
 
-		if len(events) > 0 {
-			status := events[len(events)-1].ResponseStatus
-			if status == nil {
-				t.Errorf("[%s] expected non-nil ResponseStatus in last event", test.desc)
-			} else if int(status.Code) != test.code {
-				t.Errorf("[%s] expected ResponseStatus.Code=%d, got %d", test.desc, test.code, status.Code)
-			}
+// testTimeout returns the minimimum of the "ForeverTestTimeout" and the testing deadline (with
+// cleanup time).
+func testTimeout(t *testing.T) time.Duration {
+	defaultTimeout := wait.ForeverTestTimeout
+	const cleanupTime = 5 * time.Second
+	if deadline, ok := t.Deadline(); ok {
+		maxTimeout := time.Until(deadline) - cleanupTime
+		if maxTimeout < defaultTimeout {
+			return maxTimeout
 		}
 	}
+	return defaultTimeout
 }

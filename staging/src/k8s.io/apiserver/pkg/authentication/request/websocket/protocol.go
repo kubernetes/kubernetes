@@ -24,8 +24,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
 const bearerProtocolPrefix = "base64url.bearer.authorization.k8s.io."

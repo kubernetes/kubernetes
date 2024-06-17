@@ -21,29 +21,18 @@ limitations under the License.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
+	_ "time/tzdata" // for CronJob Time Zone support
 
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
+	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugin
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	command := app.NewControllerManagerCommand()
-
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	// utilflag.InitFlags()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }

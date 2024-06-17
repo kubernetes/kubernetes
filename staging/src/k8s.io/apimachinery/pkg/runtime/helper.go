@@ -236,10 +236,14 @@ func (e WithVersionEncoder) Encode(obj Object, stream io.Writer) error {
 			gvk = preferredGVK
 		}
 	}
-	kind.SetGroupVersionKind(gvk)
-	err = e.Encoder.Encode(obj, stream)
-	kind.SetGroupVersionKind(oldGVK)
-	return err
+
+	// The gvk only needs to be set if not already as desired.
+	if gvk != oldGVK {
+		kind.SetGroupVersionKind(gvk)
+		defer kind.SetGroupVersionKind(oldGVK)
+	}
+
+	return e.Encoder.Encode(obj, stream)
 }
 
 // WithoutVersionDecoder clears the group version kind of a deserialized object.
@@ -256,4 +260,27 @@ func (d WithoutVersionDecoder) Decode(data []byte, defaults *schema.GroupVersion
 		kind.SetGroupVersionKind(schema.GroupVersionKind{})
 	}
 	return obj, gvk, err
+}
+
+type encoderWithAllocator struct {
+	encoder      EncoderWithAllocator
+	memAllocator MemoryAllocator
+}
+
+// NewEncoderWithAllocator returns a new encoder
+func NewEncoderWithAllocator(e EncoderWithAllocator, a MemoryAllocator) Encoder {
+	return &encoderWithAllocator{
+		encoder:      e,
+		memAllocator: a,
+	}
+}
+
+// Encode writes the provided object to the nested writer
+func (e *encoderWithAllocator) Encode(obj Object, w io.Writer) error {
+	return e.encoder.EncodeWithAllocator(obj, w, e.memAllocator)
+}
+
+// Identifier returns identifier of this encoder.
+func (e *encoderWithAllocator) Identifier() Identifier {
+	return e.encoder.Identifier()
 }

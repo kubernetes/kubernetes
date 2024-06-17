@@ -1,0 +1,5 @@
+apiVersion: resource.k8s.io/v1alpha1
+kind: ResourceClass
+metadata:
+  name: another-test-class
+driverName: another-test-driver.cdi.k8s.io

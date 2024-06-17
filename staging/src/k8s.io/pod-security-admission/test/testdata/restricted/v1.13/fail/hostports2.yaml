@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostports2
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    ports:
+    - containerPort: 12345
+      hostPort: 12345
+    - containerPort: 12347
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    ports:
+    - containerPort: 12346
+      hostPort: 12346
+    - containerPort: 12348
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true

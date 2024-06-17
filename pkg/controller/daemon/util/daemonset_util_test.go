@@ -27,8 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
@@ -52,11 +51,11 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 }
 
 func TestIsPodUpdated(t *testing.T) {
-	templateGeneration := utilpointer.Int64Ptr(12345)
-	badGeneration := utilpointer.Int64Ptr(12345)
+	templateGeneration := pointer.Int64(12345)
+	badGeneration := pointer.Int64(12350)
 	hash := "55555"
-	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
-	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
+	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
+	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration)}
 	tests := []struct {
 		test               string
 		templateGeneration *int64
@@ -149,8 +148,8 @@ func TestCreatePodTemplate(t *testing.T) {
 		hash               string
 		expectUniqueLabel  bool
 	}{
-		{utilpointer.Int64Ptr(1), "", false},
-		{utilpointer.Int64Ptr(2), "3242341807", true},
+		{pointer.Int64(1), "", false},
+		{pointer.Int64(2), "3242341807", true},
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
@@ -185,7 +184,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -222,7 +221,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -272,7 +271,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -291,7 +290,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1", "host_2"},
 									},
@@ -309,7 +308,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -330,7 +329,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -358,7 +357,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_2"},
 									},
@@ -376,7 +375,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -395,7 +394,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpNotIn,
 										Values:   []string{"host_2"},
 									},
@@ -413,7 +412,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -453,7 +452,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      api.ObjectNameField,
+										Key:      metav1.ObjectNameField,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -479,7 +478,7 @@ func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...featuregat
 	for _, fg := range gates {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}()
 		}
@@ -519,7 +518,7 @@ func TestGetTargetNodeName(t *testing.T) {
 										{
 											MatchFields: []v1.NodeSelectorRequirement{
 												{
-													Key:      api.ObjectNameField,
+													Key:      metav1.ObjectNameField,
 													Operator: v1.NodeSelectorOpIn,
 													Values:   []string{"node-1"},
 												},
@@ -547,7 +546,7 @@ func TestGetTargetNodeName(t *testing.T) {
 										{
 											MatchFields: []v1.NodeSelectorRequirement{
 												{
-													Key:      api.ObjectNameField,
+													Key:      metav1.ObjectNameField,
 													Operator: v1.NodeSelectorOpIn,
 													Values:   []string{"node-1", "node-2"},
 												},

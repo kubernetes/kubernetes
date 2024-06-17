@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/errors"
-	pref "google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type extensionFieldInfo struct {
@@ -21,29 +21,21 @@ type extensionFieldInfo struct {
 	validation          validationInfo
 }
 
-var legacyExtensionFieldInfoCache sync.Map // map[protoreflect.ExtensionType]*extensionFieldInfo
-
-func getExtensionFieldInfo(xt pref.ExtensionType) *extensionFieldInfo {
+func getExtensionFieldInfo(xt protoreflect.ExtensionType) *extensionFieldInfo {
 	if xi, ok := xt.(*ExtensionInfo); ok {
 		xi.lazyInit()
 		return xi.info
 	}
-	return legacyLoadExtensionFieldInfo(xt)
+	// Ideally we'd cache the resulting *extensionFieldInfo so we don't have to
+	// recompute this metadata repeatedly. But without support for something like
+	// weak references, such a cache would pin temporary values (like dynamic
+	// extension types, constructed for the duration of a user request) to the
+	// heap forever, causing memory usage of the cache to grow unbounded.
+	// See discussion in https://github.com/golang/protobuf/issues/1521.
+	return makeExtensionFieldInfo(xt.TypeDescriptor())
 }
 
-// legacyLoadExtensionFieldInfo dynamically loads a *ExtensionInfo for xt.
-func legacyLoadExtensionFieldInfo(xt pref.ExtensionType) *extensionFieldInfo {
-	if xi, ok := legacyExtensionFieldInfoCache.Load(xt); ok {
-		return xi.(*extensionFieldInfo)
-	}
-	e := makeExtensionFieldInfo(xt.TypeDescriptor())
-	if e, ok := legacyMessageTypeCache.LoadOrStore(xt, e); ok {
-		return e.(*extensionFieldInfo)
-	}
-	return e
-}
-
-func makeExtensionFieldInfo(xd pref.ExtensionDescriptor) *extensionFieldInfo {
+func makeExtensionFieldInfo(xd protoreflect.ExtensionDescriptor) *extensionFieldInfo {
 	var wiretag uint64
 	if !xd.IsPacked() {
 		wiretag = protowire.EncodeTag(xd.Number(), wireTypes[xd.Kind()])
@@ -59,10 +51,10 @@ func makeExtensionFieldInfo(xd pref.ExtensionDescriptor) *extensionFieldInfo {
 	// This is true for composite types, where we pass in a message, list, or map to fill in,
 	// and for enums, where we pass in a prototype value to specify the concrete enum type.
 	switch xd.Kind() {
-	case pref.MessageKind, pref.GroupKind, pref.EnumKind:
+	case protoreflect.MessageKind, protoreflect.GroupKind, protoreflect.EnumKind:
 		e.unmarshalNeedsValue = true
 	default:
-		if xd.Cardinality() == pref.Repeated {
+		if xd.Cardinality() == protoreflect.Repeated {
 			e.unmarshalNeedsValue = true
 		}
 	}
@@ -73,21 +65,21 @@ type lazyExtensionValue struct {
 	atomicOnce uint32 // atomically set if value is valid
 	mu         sync.Mutex
 	xi         *extensionFieldInfo
-	value      pref.Value
+	value      protoreflect.Value
 	b          []byte
-	fn         func() pref.Value
+	fn         func() protoreflect.Value
 }
 
 type ExtensionField struct {
-	typ pref.ExtensionType
+	typ protoreflect.ExtensionType
 
 	// value is either the value of GetValue,
 	// or a *lazyExtensionValue that then returns the value of GetValue.
-	value pref.Value
+	value protoreflect.Value
 	lazy  *lazyExtensionValue
 }
 
-func (f *ExtensionField) appendLazyBytes(xt pref.ExtensionType, xi *extensionFieldInfo, num protowire.Number, wtyp protowire.Type, b []byte) {
+func (f *ExtensionField) appendLazyBytes(xt protoreflect.ExtensionType, xi *extensionFieldInfo, num protowire.Number, wtyp protowire.Type, b []byte) {
 	if f.lazy == nil {
 		f.lazy = &lazyExtensionValue{xi: xi}
 	}
@@ -97,7 +89,7 @@ func (f *ExtensionField) appendLazyBytes(xt pref.ExtensionType, xi *extensionFie
 	f.lazy.b = append(f.lazy.b, b...)
 }
 
-func (f *ExtensionField) canLazy(xt pref.ExtensionType) bool {
+func (f *ExtensionField) canLazy(xt protoreflect.ExtensionType) bool {
 	if f.typ == nil {
 		return true
 	}
@@ -154,7 +146,7 @@ func (f *ExtensionField) lazyInit() {
 
 // Set sets the type and value of the extension field.
 // This must not be called concurrently.
-func (f *ExtensionField) Set(t pref.ExtensionType, v pref.Value) {
+func (f *ExtensionField) Set(t protoreflect.ExtensionType, v protoreflect.Value) {
 	f.typ = t
 	f.value = v
 	f.lazy = nil
@@ -162,14 +154,14 @@ func (f *ExtensionField) Set(t pref.ExtensionType, v pref.Value) {
 
 // SetLazy sets the type and a value that is to be lazily evaluated upon first use.
 // This must not be called concurrently.
-func (f *ExtensionField) SetLazy(t pref.ExtensionType, fn func() pref.Value) {
+func (f *ExtensionField) SetLazy(t protoreflect.ExtensionType, fn func() protoreflect.Value) {
 	f.typ = t
 	f.lazy = &lazyExtensionValue{fn: fn}
 }
 
 // Value returns the value of the extension field.
 // This may be called concurrently.
-func (f *ExtensionField) Value() pref.Value {
+func (f *ExtensionField) Value() protoreflect.Value {
 	if f.lazy != nil {
 		if atomic.LoadUint32(&f.lazy.atomicOnce) == 0 {
 			f.lazyInit()
@@ -181,7 +173,7 @@ func (f *ExtensionField) Value() pref.Value {
 
 // Type returns the type of the extension field.
 // This may be called concurrently.
-func (f ExtensionField) Type() pref.ExtensionType {
+func (f ExtensionField) Type() protoreflect.ExtensionType {
 	return f.typ
 }
 
@@ -193,7 +185,7 @@ func (f ExtensionField) IsSet() bool {
 
 // IsLazy reports whether a field is lazily encoded.
 // It is exported for testing.
-func IsLazy(m pref.Message, fd pref.FieldDescriptor) bool {
+func IsLazy(m protoreflect.Message, fd protoreflect.FieldDescriptor) bool {
 	var mi *MessageInfo
 	var p pointer
 	switch m := m.(type) {
@@ -206,7 +198,7 @@ func IsLazy(m pref.Message, fd pref.FieldDescriptor) bool {
 	default:
 		return false
 	}
-	xd, ok := fd.(pref.ExtensionTypeDescriptor)
+	xd, ok := fd.(protoreflect.ExtensionTypeDescriptor)
 	if !ok {
 		return false
 	}

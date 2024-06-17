@@ -1,0 +1,50 @@
+name: Flaking Test
+description: Report flaky tests or jobs in Kubernetes CI
+labels: kind/flake
+body:
+  - type: textarea
+    id: jobs
+    attributes:
+      label: Which jobs are flaking?
+      description: |
+        Please only use this template for submitting reports about flaky tests or jobs (pass or fail with no underlying change in code) in Kubernetes CI.
+        Links to go.k8s.io/triage and/or links to specific failures in spyglass are appreciated.
+        Please see the deflaking doc (https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/flaky-tests.md) for more guidance.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Which tests are flaking?
+    validations:
+      required: true
+
+  - type: textarea
+    id: since
+    attributes:
+      label: Since when has it been flaking?
+    validations:
+      required: true
+
+  - type: input
+    id: testgrid
+    attributes:
+      label: Testgrid link
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: Reason for failure (if possible)
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Anything else we need to know?
+
+  - type: textarea
+    id: sigs
+    attributes:
+      label: Relevant SIG(s)
+      description: You can identify the SIG from the "prowjob_config_url" on the testgrid dashboard for a test.
+      value: /sig 

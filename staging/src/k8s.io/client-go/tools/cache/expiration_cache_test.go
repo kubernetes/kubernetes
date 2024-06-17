@@ -21,9 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestTTLExpirationBasic(t *testing.T) {
@@ -167,7 +168,7 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, clock.NewFakeClock(fakeTime)}
+	policy := TTLPolicy{ttl, testingclock.NewFakeClock(fakeTime)}
 	item := testStoreObject{id: "foo", val: "bar"}
 	itemkey, _ := testStoreKeyFunc(item)
 	fakeTimestampedEntry := &TimestampedEntry{Obj: item, Timestamp: exactlyOnTTL, key: itemkey}

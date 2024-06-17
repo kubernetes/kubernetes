@@ -18,15 +18,12 @@ package cronjob
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 )
@@ -34,7 +31,9 @@ import (
 // cjControlInterface is an interface that knows how to update CronJob status
 // created as an interface to allow testing.
 type cjControlInterface interface {
-	UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error)
+	UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error)
+	// GetCronJob retrieves a CronJob.
+	GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error)
 }
 
 // realCJControl is the default implementation of cjControlInterface.
@@ -42,20 +41,35 @@ type realCJControl struct {
 	KubeClient clientset.Interface
 }
 
+func (c *realCJControl) GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(namespace).Get(ctx, name, metav1.GetOptions{})
+}
+
 var _ cjControlInterface = &realCJControl{}
 
-func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.KubeClient.BatchV1beta1().CronJobs(cj.Namespace).UpdateStatus(context.TODO(), cj, metav1.UpdateOptions{})
+func (c *realCJControl) UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(cj.Namespace).UpdateStatus(ctx, cj, metav1.UpdateOptions{})
 }
 
 // fakeCJControl is the default implementation of cjControlInterface.
 type fakeCJControl struct {
-	Updates []batchv1beta1.CronJob
+	CronJob *batchv1.CronJob
+	Updates []batchv1.CronJob
+}
+
+func (c *fakeCJControl) GetCronJob(ctx context.Context, namespace, name string) (*batchv1.CronJob, error) {
+	if name == c.CronJob.Name && namespace == c.CronJob.Namespace {
+		return c.CronJob, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{
+		Group:    "v1beta1",
+		Resource: "cronjobs",
+	}, name)
 }
 
 var _ cjControlInterface = &fakeCJControl{}
 
-func (c *fakeCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
+func (c *fakeCJControl) UpdateStatus(ctx context.Context, cj *batchv1.CronJob) (*batchv1.CronJob, error) {
 	c.Updates = append(c.Updates, *cj)
 	return cj, nil
 }
@@ -69,10 +83,6 @@ type jobControlInterface interface {
 	GetJob(namespace, name string) (*batchv1.Job, error)
 	// CreateJob creates new Jobs according to the spec.
 	CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error)
-	// UpdateJob updates a Job.
-	UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error)
-	// PatchJob patches a Job.
-	PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error)
 	// DeleteJob deletes the Job identified by name.
 	// TODO: delete by UID?
 	DeleteJob(namespace string, name string) error
@@ -86,32 +96,8 @@ type realJobControl struct {
 
 var _ jobControlInterface = &realJobControl{}
 
-func copyLabels(template *batchv1beta1.JobTemplateSpec) labels.Set {
-	l := make(labels.Set)
-	for k, v := range template.Labels {
-		l[k] = v
-	}
-	return l
-}
-
-func copyAnnotations(template *batchv1beta1.JobTemplateSpec) labels.Set {
-	a := make(labels.Set)
-	for k, v := range template.Annotations {
-		a[k] = v
-	}
-	return a
-}
-
 func (r realJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
 	return r.KubeClient.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-}
-
-func (r realJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Update(context.TODO(), job, metav1.UpdateOptions{})
-}
-
-func (r realJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
-	return r.KubeClient.BatchV1().Jobs(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
 func (r realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
@@ -129,6 +115,7 @@ type fakeJobControl struct {
 	Jobs          []batchv1.Job
 	DeleteJobName []string
 	Err           error
+	CreateErr     error
 	UpdateJobName []string
 	PatchJobName  []string
 	Patches       [][]byte
@@ -139,10 +126,9 @@ var _ jobControlInterface = &fakeJobControl{}
 func (f *fakeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	f.Lock()
 	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
+	if f.CreateErr != nil {
+		return nil, f.CreateErr
 	}
-	job.SelfLink = fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
 	f.Jobs = append(f.Jobs, *job)
 	job.UID = "test-uid"
 	return job, nil
@@ -157,28 +143,6 @@ func (f *fakeJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
 	return f.Job, nil
 }
 
-func (f *fakeJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
-	f.Lock()
-	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
-	}
-	f.UpdateJobName = append(f.UpdateJobName, job.Name)
-	return job, nil
-}
-
-func (f *fakeJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
-	f.Lock()
-	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
-	}
-	f.PatchJobName = append(f.PatchJobName, name)
-	f.Patches = append(f.Patches, data)
-	// We don't have anything to return. Just return something non-nil.
-	return &batchv1.Job{}, nil
-}
-
 func (f *fakeJobControl) DeleteJob(namespace string, name string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -186,69 +150,5 @@ func (f *fakeJobControl) DeleteJob(namespace string, name string) error {
 		return f.Err
 	}
 	f.DeleteJobName = append(f.DeleteJobName, name)
-	return nil
-}
-
-func (f *fakeJobControl) Clear() {
-	f.Lock()
-	defer f.Unlock()
-	f.DeleteJobName = []string{}
-	f.Jobs = []batchv1.Job{}
-	f.Err = nil
-}
-
-// ------------------------------------------------------------------ //
-
-// podControlInterface is an interface that knows how to list or delete pods
-// created as an interface to allow testing.
-type podControlInterface interface {
-	// ListPods list pods
-	ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error)
-	// DeleteJob deletes the pod identified by name.
-	// TODO: delete by UID?
-	DeletePod(namespace string, name string) error
-}
-
-// realPodControl is the default implementation of podControlInterface.
-type realPodControl struct {
-	KubeClient clientset.Interface
-	Recorder   record.EventRecorder
-}
-
-var _ podControlInterface = &realPodControl{}
-
-func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-	return r.KubeClient.CoreV1().Pods(namespace).List(context.TODO(), opts)
-}
-
-func (r realPodControl) DeletePod(namespace string, name string) error {
-	return r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-}
-
-type fakePodControl struct {
-	sync.Mutex
-	Pods          []v1.Pod
-	DeletePodName []string
-	Err           error
-}
-
-var _ podControlInterface = &fakePodControl{}
-
-func (f *fakePodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
-	f.Lock()
-	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
-	}
-	return &v1.PodList{Items: f.Pods}, nil
-}
-
-func (f *fakePodControl) DeletePod(namespace string, name string) error {
-	f.Lock()
-	defer f.Unlock()
-	if f.Err != nil {
-		return f.Err
-	}
-	f.DeletePodName = append(f.DeletePodName, name)
 	return nil
 }

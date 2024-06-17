@@ -18,12 +18,13 @@ package create
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -43,7 +44,7 @@ func TestCreatePriorityClass(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+				Body:       io.NopCloser(&bytes.Buffer{}),
 			}, nil
 		}),
 	}
@@ -51,24 +52,22 @@ func TestCreatePriorityClass(t *testing.T) {
 
 	outputFormat := "name"
 
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	ioStreams, _, buf, _ := genericiooptions.NewTestIOStreams()
 	cmd := NewCmdCreatePriorityClass(tf, ioStreams)
 	cmd.Flags().Set("value", "1000")
 	cmd.Flags().Set("global-default", "true")
 	cmd.Flags().Set("description", "my priority")
-	cmd.Flags().Set("dry-run", "true")
+	cmd.Flags().Set("dry-run", "client")
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("preemption-policy", "Never")
 
 	printFlags := genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme)
 	printFlags.OutputFormat = &outputFormat
 
-	options := &PriorityClassOpts{
-		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: printFlags,
-			Name:       pcName,
-			IOStreams:  ioStreams,
-		},
+	options := &PriorityClassOptions{
+		PrintFlags: printFlags,
+		Name:       pcName,
+		IOStreams:  ioStreams,
 	}
 	err := options.Complete(tf, cmd, []string{pcName})
 	if err != nil {

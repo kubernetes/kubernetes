@@ -26,7 +26,7 @@ import (
 
 const (
 	defaultPerm = 0755
-	tmptag      = "tmp_" // additional prefix to prevent accidental collisions
+	tmpTag      = "tmp_" // additional prefix to prevent accidental collisions
 )
 
 // FileExists returns true if a regular file exists at `path`, false if `path` does not exist, otherwise an error
@@ -70,7 +70,7 @@ func EnsureFile(fs utilfs.Filesystem, path string) error {
 // Expects the parent directory to exist.
 func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath string, retErr error) {
 	dir := filepath.Dir(path)
-	prefix := tmptag + filepath.Base(path)
+	prefix := tmpTag + filepath.Base(path)
 
 	// create the tmp file
 	tmpFile, err := fs.TempFile(dir, prefix)
@@ -91,7 +91,7 @@ func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath strin
 		}
 	}()
 
-	// Name() will be an absolute path when using utilfs.DefaultFS, because ioutil.TempFile passes
+	// Name() will be an absolute path when using utilfs.DefaultFS, because os.CreateTemp passes
 	// an absolute path to os.Open, and we ensure similar behavior in utilfs.FakeFS for testing.
 	tmpPath = tmpFile.Name()
 
@@ -174,7 +174,7 @@ func WriteTempDir(fs utilfs.Filesystem, path string, files map[string]string) (t
 
 	// write the temp directory in parent dir and return path to the tmp directory
 	dir := filepath.Dir(path)
-	prefix := tmptag + filepath.Base(path)
+	prefix := tmpTag + filepath.Base(path)
 
 	// create the tmp dir
 	var err error

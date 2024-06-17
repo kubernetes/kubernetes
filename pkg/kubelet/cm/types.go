@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -26,15 +26,17 @@ type ResourceConfig struct {
 	// Memory limit (in bytes).
 	Memory *int64
 	// CPU shares (relative weight vs. other containers).
-	CpuShares *uint64
+	CPUShares *uint64
 	// CPU hardcap limit (in usecs). Allowed cpu time in a given period.
-	CpuQuota *int64
+	CPUQuota *int64
 	// CPU quota period.
-	CpuPeriod *uint64
+	CPUPeriod *uint64
 	// HugePageLimit map from page size (in bytes) to limit (in bytes)
 	HugePageLimit map[int64]int64
 	// Maximum number of pids
 	PidsLimit *int64
+	// Unified for cgroup v2
+	Unified map[string]string
 }
 
 // CgroupName is the abstract name of a cgroup prior to any driver specific conversion.
@@ -53,18 +55,6 @@ type CgroupConfig struct {
 	ResourceParameters *ResourceConfig
 }
 
-// MemoryStats holds the on-demand statistics from the memory cgroup
-type MemoryStats struct {
-	// Memory usage (in bytes).
-	Usage int64
-}
-
-// ResourceStats holds on-demand statistics from various cgroup subsystems
-type ResourceStats struct {
-	// Memory statistics.
-	MemoryStats *MemoryStats
-}
-
 // CgroupManager allows for cgroup management.
 // Supports Cgroup Creation ,Deletion and Updates.
 type CgroupManager interface {
@@ -76,6 +66,8 @@ type CgroupManager interface {
 	Destroy(*CgroupConfig) error
 	// Update cgroup configuration.
 	Update(*CgroupConfig) error
+	// Validate checks if the cgroup is valid
+	Validate(name CgroupName) error
 	// Exists checks if the cgroup already exists
 	Exists(name CgroupName) bool
 	// Name returns the literal cgroupfs name on the host after any driver specific conversions.
@@ -90,8 +82,12 @@ type CgroupManager interface {
 	Pids(name CgroupName) []int
 	// ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
 	ReduceCPULimits(cgroupName CgroupName) error
-	// GetResourceStats returns statistics of the specified cgroup as read from the cgroup fs.
-	GetResourceStats(name CgroupName) (*ResourceStats, error)
+	// MemoryUsage returns current memory usage of the specified cgroup, as read from the cgroupfs.
+	MemoryUsage(name CgroupName) (int64, error)
+	// Get the resource config values applied to the cgroup for specified resource type
+	GetCgroupConfig(name CgroupName, resource v1.ResourceName) (*ResourceConfig, error)
+	// Set resource config for the specified resource type on the cgroup
+	SetCgroupConfig(name CgroupName, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }
 
 // QOSContainersInfo stores the names of containers per qos
@@ -127,4 +123,13 @@ type PodContainerManager interface {
 
 	// IsPodCgroup returns true if the literal cgroupfs name corresponds to a pod
 	IsPodCgroup(cgroupfs string) (bool, types.UID)
+
+	// Get value of memory usage for the pod Cgroup
+	GetPodCgroupMemoryUsage(pod *v1.Pod) (uint64, error)
+
+	// Get the resource config values applied to the pod cgroup for specified resource type
+	GetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName) (*ResourceConfig, error)
+
+	// Set resource config values for the specified resource type on the pod cgroup
+	SetPodCgroupConfig(pod *v1.Pod, resource v1.ResourceName, resourceConfig *ResourceConfig) error
 }

@@ -24,30 +24,47 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	goruntime "runtime"
 	"strings"
 	"time"
 
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/apiserver/pkg/warning"
+)
+
+const (
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.
+	// Everyone chooses 30.
+	requestTimeoutUpperBound = 34 * time.Second
+	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
+	// duplicate owner reference entries.
+	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat indicates the duplication was observed
+	// after mutating admission.
+	// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+	// For PATCH request the API server only dedups after mutating admission.
+	DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat = ".metadata.ownerReferences contains duplicate entries after mutating admission happens; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
+	// shortPrefix is one possible beginning of yaml unmarshal strict errors.
+	shortPrefix = "yaml: unmarshal errors:\n"
+	// longPrefix is the other possible beginning of yaml unmarshal strict errors.
+	longPrefix = "error converting YAML to JSON: yaml: unmarshal errors:\n"
 )
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
@@ -72,10 +89,16 @@ type RequestScope struct {
 	EquivalentResourceMapper runtime.EquivalentResourceMapper
 
 	TableConvertor rest.TableConvertor
-	FieldManager   *fieldmanager.FieldManager
+	FieldManager   *managedfields.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
+	Resource schema.GroupVersionResource
+	Kind     schema.GroupVersionKind
+
+	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
+	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
+	// Note that this does not enable multi-version support for reads from a single endpoint.
+	AcceptsGroupVersionDelegate rest.GroupVersionAcceptor
+
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
@@ -88,6 +111,17 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+// AcceptsGroupVersion returns true if the specified GroupVersion is allowed
+// in create and update requests.
+func (scope *RequestScope) AcceptsGroupVersion(gv schema.GroupVersion) bool {
+	// If there's a custom acceptor, delegate to it. This is extremely rare.
+	if scope.AcceptsGroupVersionDelegate != nil {
+		return scope.AcceptsGroupVersionDelegate.AcceptsGroupVersion(gv)
+	}
+	// Fall back to only allowing the singular Kind. This is the typical behavior.
+	return gv == scope.Kind.GroupVersion()
 }
 
 func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
@@ -155,8 +189,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
@@ -202,65 +235,11 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj, false)
 }
 
 func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
-}
-
-// resultFunc is a function that returns a rest result and can be run in a goroutine
-type resultFunc func() (runtime.Object, error)
-
-// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
-	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
-	ch := make(chan runtime.Object, 1)
-	errCh := make(chan error, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer func() {
-			panicReason := recover()
-			if panicReason != nil {
-				// do not wrap the sentinel ErrAbortHandler panic value
-				if panicReason != http.ErrAbortHandler {
-					// Same as stdlib http server code. Manually allocate stack
-					// trace buffer size to prevent excessively large logs
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:goruntime.Stack(buf, false)]
-					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
-				}
-				// Propagate to parent goroutine
-				panicCh <- panicReason
-			}
-		}()
-
-		if result, err := fn(); err != nil {
-			errCh <- err
-		} else {
-			ch <- result
-		}
-	}()
-
-	select {
-	case result = <-ch:
-		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
-		}
-		return result, nil
-	case err = <-errCh:
-		return nil, err
-	case p := <-panicCh:
-		panic(p)
-	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
-	}
 }
 
 // transformDecodeError adds additional information into a bad-request api error when a decode fails.
@@ -275,18 +254,6 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 	}
 	summary := summarizeData(body, 30)
 	return errors.NewBadRequest(fmt.Sprintf("the object provided is unrecognized (must be of type %s): %v (%s)", objGVK.Kind, baseErr, summary))
-}
-
-// setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
-// plus the path and query generated by the provided linkFunc
-func setSelfLink(obj runtime.Object, requestInfo *request.RequestInfo, namer ScopeNamer) error {
-	// TODO: SelfLink generation should return a full URL?
-	uri, err := namer.GenerateLink(requestInfo, obj)
-	if err != nil {
-		return nil
-	}
-
-	return namer.SetSelfLink(obj, uri)
 }
 
 func hasUID(obj runtime.Object) (bool, error) {
@@ -324,50 +291,66 @@ func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) err
 	return nil
 }
 
-// setObjectSelfLink sets the self link of an object as needed.
-// TODO: remove the need for the namer LinkSetters by requiring objects implement either Object or List
-//   interfaces
-func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		return nil
-	}
-
-	// We only generate list links on objects that implement ListInterface - historically we duck typed this
-	// check via reflection, but as we move away from reflection we require that you not only carry Items but
-	// ListMeta into order to be identified as a list.
-	if !meta.IsListType(obj) {
-		requestInfo, ok := request.RequestInfoFrom(ctx)
-		if !ok {
-			return fmt.Errorf("missing requestInfo")
+// dedupOwnerReferences dedups owner references over the entire entry.
+// NOTE: We don't know enough about the existing cases of owner references
+// sharing the same UID but different fields. Nor do we know what might break.
+// In the future we may just dedup/reject owner references with the same UID.
+func dedupOwnerReferences(refs []metav1.OwnerReference) ([]metav1.OwnerReference, []string) {
+	var result []metav1.OwnerReference
+	var duplicates []string
+	seen := make(map[types.UID]struct{})
+	for _, ref := range refs {
+		_, ok := seen[ref.UID]
+		// Short-circuit if we haven't seen the UID before. Otherwise
+		// check the entire list we have so far.
+		if !ok || !hasOwnerReference(result, ref) {
+			seen[ref.UID] = struct{}{}
+			result = append(result, ref)
+		} else {
+			duplicates = append(duplicates, string(ref.UID))
 		}
-		return setSelfLink(obj, requestInfo, namer)
 	}
+	return result, duplicates
+}
 
-	uri, err := namer.GenerateListLink(req)
+// hasOwnerReference returns true if refs has an item equal to ref. The function
+// focuses on semantic equality instead of memory equality, to catch duplicates
+// with different pointer addresses. The function uses apiequality.Semantic
+// instead of implementing its own comparison, to tolerate API changes to
+// metav1.OwnerReference.
+// NOTE: This is expensive, but we accept it because we've made sure it only
+// happens to owner references containing duplicate UIDs, plus typically the
+// number of items in the list should be small.
+func hasOwnerReference(refs []metav1.OwnerReference, ref metav1.OwnerReference) bool {
+	for _, r := range refs {
+		if apiequality.Semantic.DeepEqual(r, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+// dedupOwnerReferencesAndAddWarning dedups owner references in the object metadata.
+// If duplicates are found, the function records a warning to the provided context.
+func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext context.Context, afterMutatingAdmission bool) {
+	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		// The object doesn't have metadata. Nothing we need to do here.
+		return
 	}
-	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).Infof("Unable to set self link on object: %v", err)
-	}
-	requestInfo, ok := request.RequestInfoFrom(ctx)
-	if !ok {
-		return fmt.Errorf("missing requestInfo")
-	}
-
-	count := 0
-	err = meta.EachListItem(obj, func(obj runtime.Object) error {
-		count++
-		return setSelfLink(obj, requestInfo, namer)
-	})
-
-	if count == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return err
+	refs := accessor.GetOwnerReferences()
+	deduped, duplicates := dedupOwnerReferences(refs)
+	if len(duplicates) > 0 {
+		// NOTE: For CREATE and UPDATE requests the API server dedups both before and after mutating admission.
+		// For PATCH request the API server only dedups after mutating admission.
+		format := DuplicateOwnerReferencesWarningFormat
+		if afterMutatingAdmission {
+			format = DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat
 		}
+		warning.AddWarning(requestContext, "", fmt.Sprintf(format,
+			strings.Join(duplicates, ", ")))
+		accessor.SetOwnerReferences(deduped)
 	}
-
-	return err
 }
 
 func summarizeData(data []byte, maxLength int) string {
@@ -406,20 +389,61 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	return data, nil
 }
 
-func parseTimeout(str string) time.Duration {
-	if str != "" {
-		timeout, err := time.ParseDuration(str)
-		if err == nil {
-			return timeout
-		}
-		klog.Errorf("Failed to parse %q: %v", str, err)
+func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, resourceGroup string, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
+	readBody, err := limitedReadBody(req, limit)
+	if err == nil {
+		// only record if we've read successfully
+		requestmetrics.RecordRequestBodySize(ctx, resourceGroup, verb, len(readBody))
 	}
-	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.  Everyone chooses 30.
-	return 34 * time.Second
+	return readBody, err
 }
 
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+// fieldValidation checks that the field validation feature is enabled
+// and returns a valid directive of either
+// - Ignore
+// - Warn (default)
+// - Strict
+func fieldValidation(directive string) string {
+	if directive == "" {
+		return metav1.FieldValidationWarn
+	}
+	return directive
+}
+
+// parseYAMLWarnings takes the strict decoding errors from the yaml decoder's output
+// and parses each individual warnings, or leaves the warning as is if
+// it does not look like a yaml strict decoding error.
+func parseYAMLWarnings(errString string) []string {
+	var trimmedString string
+	if trimmedShortString := strings.TrimPrefix(errString, shortPrefix); len(trimmedShortString) < len(errString) {
+		trimmedString = trimmedShortString
+	} else if trimmedLongString := strings.TrimPrefix(errString, longPrefix); len(trimmedLongString) < len(errString) {
+		trimmedString = trimmedLongString
+	} else {
+		// not a yaml error, return as-is
+		return []string{errString}
+	}
+
+	splitStrings := strings.Split(trimmedString, "\n")
+	for i, s := range splitStrings {
+		splitStrings[i] = strings.TrimSpace(s)
+	}
+	return splitStrings
+}
+
+// addStrictDecodingWarnings confirms that the error is a strict decoding error
+// and if so adds a warning for each strict decoding violation.
+func addStrictDecodingWarnings(requestContext context.Context, errs []error) {
+	for _, e := range errs {
+		yamlWarnings := parseYAMLWarnings(e.Error())
+		for _, w := range yamlWarnings {
+			warning.AddWarning(requestContext, "", w)
+		}
+	}
 }
 
 type etcdError interface {
@@ -445,11 +469,4 @@ func isTooLargeError(err error) bool {
 		}
 	}
 	return false
-}
-
-// requestWithTrace returns a new trace using the provided msg and fields, nested within any trace already in the
-//context of the provided req. Also returns a request with the new trace in the context.
-func requestWithTrace(req *http.Request, msg string, fields ...utiltrace.Field) (*http.Request, *utiltrace.Trace) {
-	ctx, trace := request.WithTrace(req.Context(), msg, fields...)
-	return req.Clone(ctx), trace
 }

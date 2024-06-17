@@ -17,6 +17,7 @@ limitations under the License.
 package namespace
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -33,7 +34,6 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
 
@@ -57,13 +57,14 @@ type NamespaceController struct {
 	// returns true when the namespace cache is ready
 	listerSynced cache.InformerSynced
 	// namespaces that have been queued up for processing by workers
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
 }
 
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
@@ -73,12 +74,13 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
-	}
-
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			nsControllerRateLimiter(),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "namespace",
+			},
+		),
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
 	// configure the namespace informer event handlers
@@ -104,12 +106,12 @@ func NewNamespaceController(
 // nsControllerRateLimiter is tuned for a faster than normal recycle time with default backoff speed and default overall
 // requeing speed.  We do this so that namespace cleanup is reliably faster and we know that the number of namespaces being
 // deleted is smaller than total number of other namespace scoped resources in a cluster.
-func nsControllerRateLimiter() workqueue.RateLimiter {
-	return workqueue.NewMaxOfRateLimiter(
+func nsControllerRateLimiter() workqueue.TypedRateLimiter[string] {
+	return workqueue.NewTypedMaxOfRateLimiter(
 		// this ensures that we retry namespace deletion at least every minute, never longer.
-		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 60*time.Second),
+		workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 60*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.TypedBucketRateLimiter[string]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 }
 
@@ -137,15 +139,15 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 // Each namespace can be in the queue at most once.
 // The system ensures that no two workers can process
 // the same namespace at the same time.
-func (nm *NamespaceController) worker() {
-	workFunc := func() bool {
+func (nm *NamespaceController) worker(ctx context.Context) {
+	workFunc := func(ctx context.Context) bool {
 		key, quit := nm.queue.Get()
 		if quit {
 			return true
 		}
 		defer nm.queue.Done(key)
 
-		err := nm.syncNamespaceFromKey(key.(string))
+		err := nm.syncNamespaceFromKey(ctx, key)
 		if err == nil {
 			// no error, forget this entry and return
 			nm.queue.Forget(key)
@@ -154,7 +156,7 @@ func (nm *NamespaceController) worker() {
 
 		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
 			t := estimate.Estimate/2 + 1
-			klog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
+			klog.FromContext(ctx).V(4).Info("Content remaining in namespace", "namespace", key, "waitSeconds", t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
@@ -163,9 +165,8 @@ func (nm *NamespaceController) worker() {
 		}
 		return false
 	}
-
 	for {
-		quit := workFunc()
+		quit := workFunc(ctx)
 
 		if quit {
 			return
@@ -174,39 +175,40 @@ func (nm *NamespaceController) worker() {
 }
 
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
-func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
+func (nm *NamespaceController) syncNamespaceFromKey(ctx context.Context, key string) (err error) {
 	startTime := time.Now()
+	logger := klog.FromContext(ctx)
 	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		logger.V(4).Info("Finished syncing namespace", "namespace", key, "duration", time.Since(startTime))
 	}()
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {
-		klog.Infof("Namespace has been deleted %v", key)
+		logger.Info("Namespace has been deleted", "namespace", key)
 		return nil
 	}
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
-	return nm.namespacedResourcesDeleter.Delete(namespace.Name)
+	return nm.namespacedResourcesDeleter.Delete(ctx, namespace.Name)
 }
 
 // Run starts observing the system with the specified number of workers.
-func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
+func (nm *NamespaceController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
+	logger := klog.FromContext(ctx)
+	logger.Info("Starting namespace controller")
+	defer logger.Info("Shutting down namespace controller")
 
-	klog.Infof("Starting namespace controller")
-	defer klog.Infof("Shutting down namespace controller")
-
-	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
 		return
 	}
 
-	klog.V(5).Info("Starting workers of namespace controller")
+	logger.V(5).Info("Starting workers of namespace controller")
 	for i := 0; i < workers; i++ {
-		go wait.Until(nm.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, nm.worker, time.Second)
 	}
-	<-stopCh
+	<-ctx.Done()
 }

@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // PodTemplatesGetter has a method to return a PodTemplateInterface.
@@ -46,6 +52,7 @@ type PodTemplateInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PodTemplate, err error)
+	Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodTemplate, err error)
 	PodTemplateExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *podTemplates) Get(ctx context.Context, name string, options metav1.GetO
 }
 
 // List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
+func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (*v1.PodTemplateList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for podtemplates, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for podtemplates", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for podtemplates ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for podtemplates", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of PodTemplates that match those selectors.
+func (c *podTemplates) list(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (resul
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of PodTemplates
+func (c *podTemplates) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.PodTemplateList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.PodTemplateList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied podTemplate.
+func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.PodTemplate, err error) {
+	if podTemplate == nil {
+		return nil, fmt.Errorf("podTemplate provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(podTemplate)
+	if err != nil {
+		return nil, err
+	}
+	name := podTemplate.Name
+	if name == nil {
+		return nil, fmt.Errorf("podTemplate.Name must be provided to Apply")
+	}
+	result = &v1.PodTemplate{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("podtemplates").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

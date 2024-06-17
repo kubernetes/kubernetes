@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -43,93 +43,113 @@ import (
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
 // Defaulting changes within this type can cause spurious rollouts of workloads on API server update.
 func TestWorkloadDefaults(t *testing.T) {
-	rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
-	template := rc.Spec.Template
+	t.Run("enabled_features", func(t *testing.T) { testWorkloadDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
+}
+func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
+	allFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range allFeatures {
+		if !featureSpec.LockToDefault {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
+		}
+	}
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
 	// Forbidden: defaulting an existing field `MyField *bool` when it was previously not defaulted
 	// Forbidden: changing an existing default value
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
-		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
-		".Spec.Containers[0].ImagePullPolicy":                       `"IfNotPresent"`,
-		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
-		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
-		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
-		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme":      `"HTTP"`,
-		".Spec.Containers[0].LivenessProbe.FailureThreshold":        `3`,
-		".Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Path":    `"/"`,
-		".Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Scheme":  `"HTTP"`,
-		".Spec.Containers[0].LivenessProbe.PeriodSeconds":           `10`,
-		".Spec.Containers[0].LivenessProbe.SuccessThreshold":        `1`,
-		".Spec.Containers[0].LivenessProbe.TimeoutSeconds":          `1`,
-		".Spec.Containers[0].Ports[0].Protocol":                     `"TCP"`,
-		".Spec.Containers[0].ReadinessProbe.FailureThreshold":       `3`,
-		".Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Path":   `"/"`,
-		".Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Scheme": `"HTTP"`,
-		".Spec.Containers[0].ReadinessProbe.PeriodSeconds":          `10`,
-		".Spec.Containers[0].ReadinessProbe.SuccessThreshold":       `1`,
-		".Spec.Containers[0].ReadinessProbe.TimeoutSeconds":         `1`,
-		".Spec.Containers[0].StartupProbe.FailureThreshold":         "3",
-		".Spec.Containers[0].StartupProbe.Handler.HTTPGet.Path":     `"/"`,
-		".Spec.Containers[0].StartupProbe.Handler.HTTPGet.Scheme":   `"HTTP"`,
-		".Spec.Containers[0].StartupProbe.PeriodSeconds":            "10",
-		".Spec.Containers[0].StartupProbe.SuccessThreshold":         "1",
-		".Spec.Containers[0].StartupProbe.TimeoutSeconds":           "1",
-		".Spec.Containers[0].TerminationMessagePath":                `"/dev/termination-log"`,
-		".Spec.Containers[0].TerminationMessagePolicy":              `"File"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
+		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
+		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
+		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Path":             `"/"`,
+		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme":           `"HTTP"`,
+		".Spec.Containers[0].LivenessProbe.FailureThreshold":             `3`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
+		".Spec.Containers[0].LivenessProbe.PeriodSeconds":                `10`,
+		".Spec.Containers[0].LivenessProbe.SuccessThreshold":             `1`,
+		".Spec.Containers[0].LivenessProbe.TimeoutSeconds":               `1`,
+		".Spec.Containers[0].Ports[0].Protocol":                          `"TCP"`,
+		".Spec.Containers[0].ReadinessProbe.FailureThreshold":            `3`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Path":   `"/"`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme": `"HTTP"`,
+		".Spec.Containers[0].ReadinessProbe.PeriodSeconds":               `10`,
+		".Spec.Containers[0].ReadinessProbe.SuccessThreshold":            `1`,
+		".Spec.Containers[0].ReadinessProbe.TimeoutSeconds":              `1`,
+		".Spec.Containers[0].StartupProbe.FailureThreshold":              "3",
+		".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":   `"HTTP"`,
+		".Spec.Containers[0].StartupProbe.PeriodSeconds":                 "10",
+		".Spec.Containers[0].StartupProbe.SuccessThreshold":              "1",
+		".Spec.Containers[0].StartupProbe.TimeoutSeconds":                "1",
+		".Spec.Containers[0].TerminationMessagePath":                     `"/dev/termination-log"`,
+		".Spec.Containers[0].TerminationMessagePolicy":                   `"File"`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.Service":     `""`,
 		".Spec.DNSPolicy": `"ClusterFirst"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme":      `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.FailureThreshold":        "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet.Path":    `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet.Scheme":  `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.PeriodSeconds":           "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.SuccessThreshold":        "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.TimeoutSeconds":          "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Ports[0].Protocol":                     `"TCP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.FailureThreshold":       "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet.Path":   `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet.Scheme": `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.PeriodSeconds":          "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.SuccessThreshold":       "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds":         "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.FailureThreshold":         "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.Handler.HTTPGet.Path":     `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.Handler.HTTPGet.Scheme":   `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":            "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":         "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":           "1",
-		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                `"v1"`,
-		".Spec.InitContainers[0].ImagePullPolicy":                                                     `"IfNotPresent"`,
-		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                    `"/"`,
-		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                  `"HTTP"`,
-		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Path":                                      `"/"`,
-		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme":                                    `"HTTP"`,
-		".Spec.InitContainers[0].LivenessProbe.FailureThreshold":                                      `3`,
-		".Spec.InitContainers[0].LivenessProbe.Handler.HTTPGet.Path":                                  `"/"`,
-		".Spec.InitContainers[0].LivenessProbe.Handler.HTTPGet.Scheme":                                `"HTTP"`,
-		".Spec.InitContainers[0].LivenessProbe.PeriodSeconds":                                         `10`,
-		".Spec.InitContainers[0].LivenessProbe.SuccessThreshold":                                      `1`,
-		".Spec.InitContainers[0].LivenessProbe.TimeoutSeconds":                                        `1`,
-		".Spec.InitContainers[0].Ports[0].Protocol":                                                   `"TCP"`,
-		".Spec.InitContainers[0].ReadinessProbe.FailureThreshold":                                     `3`,
-		".Spec.InitContainers[0].ReadinessProbe.Handler.HTTPGet.Path":                                 `"/"`,
-		".Spec.InitContainers[0].ReadinessProbe.Handler.HTTPGet.Scheme":                               `"HTTP"`,
-		".Spec.InitContainers[0].ReadinessProbe.PeriodSeconds":                                        `10`,
-		".Spec.InitContainers[0].ReadinessProbe.SuccessThreshold":                                     `1`,
-		".Spec.InitContainers[0].ReadinessProbe.TimeoutSeconds":                                       `1`,
-		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                       "3",
-		".Spec.InitContainers[0].StartupProbe.Handler.HTTPGet.Path":                                   `"/"`,
-		".Spec.InitContainers[0].StartupProbe.Handler.HTTPGet.Scheme":                                 `"HTTP"`,
-		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                          "10",
-		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                       "1",
-		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                         "1",
-		".Spec.InitContainers[0].TerminationMessagePath":                                              `"/dev/termination-log"`,
-		".Spec.InitContainers[0].TerminationMessagePolicy":                                            `"File"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path":   `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme": `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme":   `"HTTP"`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Path":                                  `"/"`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme":                                `"HTTP"`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Path":                                 `"/"`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme":                               `"HTTP"`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":             `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme":           `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.FailureThreshold":             "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.PeriodSeconds":                "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.SuccessThreshold":             "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.TimeoutSeconds":               "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Ports[0].Protocol":                          `"TCP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.FailureThreshold":            "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.PeriodSeconds":               "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.SuccessThreshold":            "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds":              "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.FailureThreshold":              "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":                 "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":              "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":                "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
+		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
+		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
+		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Path":                                           `"/"`,
+		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme":                                         `"HTTP"`,
+		".Spec.InitContainers[0].LivenessProbe.FailureThreshold":                                           `3`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.Service":                                  `""`,
+		".Spec.InitContainers[0].LivenessProbe.PeriodSeconds":                                              `10`,
+		".Spec.InitContainers[0].LivenessProbe.SuccessThreshold":                                           `1`,
+		".Spec.InitContainers[0].LivenessProbe.TimeoutSeconds":                                             `1`,
+		".Spec.InitContainers[0].Ports[0].Protocol":                                                        `"TCP"`,
+		".Spec.InitContainers[0].ReadinessProbe.FailureThreshold":                                          `3`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.Service":                                 `""`,
+		".Spec.InitContainers[0].ReadinessProbe.PeriodSeconds":                                             `10`,
+		".Spec.InitContainers[0].ReadinessProbe.SuccessThreshold":                                          `1`,
+		".Spec.InitContainers[0].ReadinessProbe.TimeoutSeconds":                                            `1`,
+		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                            "3",
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.Service":                                   `""`,
+		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                               "10",
+		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                            "1",
+		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                              "1",
+		".Spec.InitContainers[0].TerminationMessagePath":                                                   `"/dev/termination-log"`,
+		".Spec.InitContainers[0].TerminationMessagePolicy":                                                 `"File"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
 		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
@@ -155,16 +175,68 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
 	}
-	defaults := detectDefaults(t, rc, reflect.ValueOf(template))
-	if !reflect.DeepEqual(expectedDefaults, defaults) {
-		t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
-	}
+	t.Run("empty PodTemplateSpec", func(t *testing.T) {
+		rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
+		template := rc.Spec.Template
+		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
+		if !reflect.DeepEqual(expectedDefaults, defaults) {
+			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
+			t.Logf(cmp.Diff(expectedDefaults, defaults))
+		}
+	})
+	t.Run("hostnet PodTemplateSpec with ports", func(t *testing.T) {
+		rc := &v1.ReplicationController{
+			Spec: v1.ReplicationControllerSpec{
+				Template: &v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						HostNetwork: true,
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								ContainerPort: 12345,
+								Protocol:      v1.ProtocolTCP,
+							}},
+						}},
+					},
+				},
+			},
+		}
+		template := rc.Spec.Template
+		defaults := detectDefaults(t, rc, reflect.ValueOf(template))
+		expected := func() map[string]string {
+			// Set values that are known inputs
+			m := map[string]string{
+				".Spec.HostNetwork":                          "true",
+				".Spec.Containers[0].Ports[0].ContainerPort": "12345",
+			}
+			m[".Spec.Containers"] = `[{"name":"","ports":[{"containerPort":12345,"protocol":"TCP"}],"resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File","imagePullPolicy":"IfNotPresent"}]`
+			m[".Spec.Containers[0].Ports"] = `[{"containerPort":12345,"protocol":"TCP"}]`
+			for k, v := range expectedDefaults {
+				if _, found := m[k]; !found {
+					m[k] = v
+				}
+			}
+			return m
+		}()
+		if !reflect.DeepEqual(expected, defaults) {
+			t.Errorf("Defaults for PodTemplateSpec changed. This can cause spurious rollouts of workloads on API server upgrade.")
+			t.Logf(cmp.Diff(expected, defaults))
+		}
+	})
 }
 
 // TestPodDefaults detects changes to defaults within PodSpec.
 // Defaulting changes within this type (*especially* within containers) can cause kubelets to restart containers on API server update.
 func TestPodDefaults(t *testing.T) {
+	t.Run("enabled_features", func(t *testing.T) { testPodDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
+}
+func testPodDefaults(t *testing.T, featuresEnabled bool) {
+	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range features {
+		if !featureSpec.LockToDefault {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)
+		}
+	}
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value
@@ -172,88 +244,100 @@ func TestPodDefaults(t *testing.T) {
 	// Forbidden: changing an existing default value
 	// Allowed: adding a new field `MyContainer *MyType` and defaulting a child of that type (e.g. `MyContainer.MyChildField`) if and only if MyContainer is non-nil
 	expectedDefaults := map[string]string{
-		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
-		".Spec.Containers[0].ImagePullPolicy":                       `"IfNotPresent"`,
-		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
-		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
-		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
-		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme":      `"HTTP"`,
-		".Spec.Containers[0].LivenessProbe.FailureThreshold":        `3`,
-		".Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Path":    `"/"`,
-		".Spec.Containers[0].LivenessProbe.Handler.HTTPGet.Scheme":  `"HTTP"`,
-		".Spec.Containers[0].LivenessProbe.PeriodSeconds":           `10`,
-		".Spec.Containers[0].LivenessProbe.SuccessThreshold":        `1`,
-		".Spec.Containers[0].LivenessProbe.TimeoutSeconds":          `1`,
-		".Spec.Containers[0].Ports[0].Protocol":                     `"TCP"`,
-		".Spec.Containers[0].ReadinessProbe.FailureThreshold":       `3`,
-		".Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Path":   `"/"`,
-		".Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Scheme": `"HTTP"`,
-		".Spec.Containers[0].ReadinessProbe.PeriodSeconds":          `10`,
-		".Spec.Containers[0].ReadinessProbe.SuccessThreshold":       `1`,
-		".Spec.Containers[0].ReadinessProbe.TimeoutSeconds":         `1`,
-		".Spec.Containers[0].Resources.Requests":                    `{"":"0"}`, // this gets defaulted from the limits field
-		".Spec.Containers[0].StartupProbe.FailureThreshold":         "3",
-		".Spec.Containers[0].StartupProbe.Handler.HTTPGet.Path":     `"/"`,
-		".Spec.Containers[0].StartupProbe.Handler.HTTPGet.Scheme":   `"HTTP"`,
-		".Spec.Containers[0].StartupProbe.PeriodSeconds":            "10",
-		".Spec.Containers[0].StartupProbe.SuccessThreshold":         "1",
-		".Spec.Containers[0].StartupProbe.TimeoutSeconds":           "1",
-		".Spec.Containers[0].TerminationMessagePath":                `"/dev/termination-log"`,
-		".Spec.Containers[0].TerminationMessagePolicy":              `"File"`,
+		".Spec.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.Containers[0].ImagePullPolicy":                            `"IfNotPresent"`,
+		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
+		".Spec.Containers[0].Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
+		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Path":             `"/"`,
+		".Spec.Containers[0].Lifecycle.PreStop.HTTPGet.Scheme":           `"HTTP"`,
+		".Spec.Containers[0].LivenessProbe.FailureThreshold":             `3`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
+		".Spec.Containers[0].LivenessProbe.PeriodSeconds":                `10`,
+		".Spec.Containers[0].LivenessProbe.SuccessThreshold":             `1`,
+		".Spec.Containers[0].LivenessProbe.TimeoutSeconds":               `1`,
+		".Spec.Containers[0].Ports[0].Protocol":                          `"TCP"`,
+		".Spec.Containers[0].ReadinessProbe.FailureThreshold":            `3`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Path":   `"/"`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme": `"HTTP"`,
+		".Spec.Containers[0].ReadinessProbe.PeriodSeconds":               `10`,
+		".Spec.Containers[0].ReadinessProbe.SuccessThreshold":            `1`,
+		".Spec.Containers[0].ReadinessProbe.TimeoutSeconds":              `1`,
+		".Spec.Containers[0].Resources.Requests":                         `{"":"0"}`, // this gets defaulted from the limits field
+		".Spec.Containers[0].StartupProbe.FailureThreshold":              "3",
+		".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":   `"HTTP"`,
+		".Spec.Containers[0].StartupProbe.PeriodSeconds":                 "10",
+		".Spec.Containers[0].StartupProbe.SuccessThreshold":              "1",
+		".Spec.Containers[0].StartupProbe.TimeoutSeconds":                "1",
+		".Spec.Containers[0].TerminationMessagePath":                     `"/dev/termination-log"`,
+		".Spec.Containers[0].TerminationMessagePolicy":                   `"File"`,
+		".Spec.Containers[0].LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.Containers[0].ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.Containers[0].StartupProbe.ProbeHandler.GRPC.Service":     `""`,
 		".Spec.DNSPolicy":          `"ClusterFirst"`,
 		".Spec.EnableServiceLinks": `true`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme":      `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.FailureThreshold":        "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet.Path":    `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.Handler.HTTPGet.Scheme":  `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.PeriodSeconds":           "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.SuccessThreshold":        "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.TimeoutSeconds":          "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Ports[0].Protocol":                     `"TCP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.FailureThreshold":       "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet.Path":   `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.Handler.HTTPGet.Scheme": `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.PeriodSeconds":          "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.SuccessThreshold":       "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds":         "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.FailureThreshold":         "3",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.Handler.HTTPGet.Path":     `"/"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.Handler.HTTPGet.Scheme":   `"HTTP"`,
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":            "10",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":         "1",
-		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":           "1",
-		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                `"v1"`,
-		".Spec.InitContainers[0].ImagePullPolicy":                                                     `"IfNotPresent"`,
-		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                    `"/"`,
-		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                  `"HTTP"`,
-		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Path":                                      `"/"`,
-		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme":                                    `"HTTP"`,
-		".Spec.InitContainers[0].LivenessProbe.FailureThreshold":                                      `3`,
-		".Spec.InitContainers[0].LivenessProbe.Handler.HTTPGet.Path":                                  `"/"`,
-		".Spec.InitContainers[0].LivenessProbe.Handler.HTTPGet.Scheme":                                `"HTTP"`,
-		".Spec.InitContainers[0].LivenessProbe.PeriodSeconds":                                         `10`,
-		".Spec.InitContainers[0].LivenessProbe.SuccessThreshold":                                      `1`,
-		".Spec.InitContainers[0].LivenessProbe.TimeoutSeconds":                                        `1`,
-		".Spec.InitContainers[0].Ports[0].Protocol":                                                   `"TCP"`,
-		".Spec.InitContainers[0].ReadinessProbe.FailureThreshold":                                     `3`,
-		".Spec.InitContainers[0].ReadinessProbe.Handler.HTTPGet.Path":                                 `"/"`,
-		".Spec.InitContainers[0].ReadinessProbe.Handler.HTTPGet.Scheme":                               `"HTTP"`,
-		".Spec.InitContainers[0].ReadinessProbe.PeriodSeconds":                                        `10`,
-		".Spec.InitContainers[0].ReadinessProbe.SuccessThreshold":                                     `1`,
-		".Spec.InitContainers[0].ReadinessProbe.TimeoutSeconds":                                       `1`,
-		".Spec.InitContainers[0].Resources.Requests":                                                  `{"":"0"}`, // this gets defaulted from the limits field
-		".Spec.InitContainers[0].TerminationMessagePath":                                              `"/dev/termination-log"`,
-		".Spec.InitContainers[0].TerminationMessagePolicy":                                            `"File"`,
-		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                       "3",
-		".Spec.InitContainers[0].StartupProbe.Handler.HTTPGet.Path":                                   `"/"`,
-		".Spec.InitContainers[0].StartupProbe.Handler.HTTPGet.Scheme":                                 `"HTTP"`,
-		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                          "10",
-		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                       "1",
-		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                         "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":       `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                            `"IfNotPresent"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":           `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":         `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":             `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Scheme":           `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.FailureThreshold":             "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.PeriodSeconds":                "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.SuccessThreshold":             "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.TimeoutSeconds":               "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Ports[0].Protocol":                          `"TCP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.FailureThreshold":            "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.PeriodSeconds":               "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.SuccessThreshold":            "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.TimeoutSeconds":              "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.FailureThreshold":              "3",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":                 "10",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":              "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":                "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                     `"/dev/termination-log"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":                   `"File"`,
+		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                     `"v1"`,
+		".Spec.InitContainers[0].ImagePullPolicy":                                                          `"IfNotPresent"`,
+		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                         `"/"`,
+		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Scheme":                                       `"HTTP"`,
+		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Path":                                           `"/"`,
+		".Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet.Scheme":                                         `"HTTP"`,
+		".Spec.InitContainers[0].LivenessProbe.FailureThreshold":                                           `3`,
+		".Spec.InitContainers[0].LivenessProbe.PeriodSeconds":                                              `10`,
+		".Spec.InitContainers[0].LivenessProbe.SuccessThreshold":                                           `1`,
+		".Spec.InitContainers[0].LivenessProbe.TimeoutSeconds":                                             `1`,
+		".Spec.InitContainers[0].Ports[0].Protocol":                                                        `"TCP"`,
+		".Spec.InitContainers[0].ReadinessProbe.FailureThreshold":                                          `3`,
+		".Spec.InitContainers[0].ReadinessProbe.PeriodSeconds":                                             `10`,
+		".Spec.InitContainers[0].ReadinessProbe.SuccessThreshold":                                          `1`,
+		".Spec.InitContainers[0].ReadinessProbe.TimeoutSeconds":                                            `1`,
+		".Spec.InitContainers[0].Resources.Requests":                                                       `{"":"0"}`, // this gets defaulted from the limits field
+		".Spec.InitContainers[0].TerminationMessagePath":                                                   `"/dev/termination-log"`,
+		".Spec.InitContainers[0].TerminationMessagePolicy":                                                 `"File"`,
+		".Spec.InitContainers[0].StartupProbe.FailureThreshold":                                            "3",
+		".Spec.InitContainers[0].StartupProbe.PeriodSeconds":                                               "10",
+		".Spec.InitContainers[0].StartupProbe.SuccessThreshold":                                            "1",
+		".Spec.InitContainers[0].StartupProbe.TimeoutSeconds":                                              "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service":    `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Path":    `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet.Scheme":  `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service":   `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Path":   `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet.Scheme": `"HTTP"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service":     `""`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Path":     `"/"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet.Scheme":   `"HTTP"`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.GRPC.Service":                                  `""`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Path":                                  `"/"`,
+		".Spec.InitContainers[0].LivenessProbe.ProbeHandler.HTTPGet.Scheme":                                `"HTTP"`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.GRPC.Service":                                 `""`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Path":                                 `"/"`,
+		".Spec.InitContainers[0].ReadinessProbe.ProbeHandler.HTTPGet.Scheme":                               `"HTTP"`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.GRPC.Service":                                   `""`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Path":                                   `"/"`,
+		".Spec.InitContainers[0].StartupProbe.ProbeHandler.HTTPGet.Scheme":                                 `"HTTP"`,
 		".Spec.RestartPolicy":                                                                         `"Always"`,
 		".Spec.SchedulerName":                                                                         `"default-scheduler"`,
 		".Spec.SecurityContext":                                                                       `{}`,
@@ -282,7 +366,62 @@ func TestPodDefaults(t *testing.T) {
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
 		t.Errorf("Defaults for PodSpec changed. This can cause spurious restarts of containers on API server upgrade.")
-		t.Logf(diff.ObjectReflectDiff(expectedDefaults, defaults))
+		t.Logf(cmp.Diff(expectedDefaults, defaults))
+	}
+}
+
+func TestPodHostNetworkDefaults(t *testing.T) {
+	cases := []struct {
+		name                 string
+		hostNet              bool
+		expectPodDefault     bool
+		expectPodSpecDefault bool
+	}{{
+		name:                 "hostNetwork=false",
+		hostNet:              false,
+		expectPodDefault:     false,
+		expectPodSpecDefault: false,
+	}, {
+		name:                 "hostNetwork=true",
+		hostNet:              true,
+		expectPodDefault:     true,
+		expectPodSpecDefault: false,
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const portNum = 12345
+			spec := v1.PodSpec{
+				HostNetwork: tc.hostNet,
+				Containers: []v1.Container{{
+					Ports: []v1.ContainerPort{{
+						ContainerPort: portNum,
+						Protocol:      v1.ProtocolTCP,
+						// Note: HostPort is not set
+					}},
+				}},
+			}
+
+			// Test Pod defaulting.
+			p := v1.Pod{Spec: *spec.DeepCopy()}
+			corev1.SetDefaults_Pod(&p)
+			if got := p.Spec.Containers[0].Ports[0].HostPort; tc.expectPodDefault && got == 0 {
+				t.Errorf("expected Pod HostPort to be defaulted, got %v", got)
+			}
+			if got := p.Spec.Containers[0].Ports[0].HostPort; !tc.expectPodDefault && got != 0 {
+				t.Errorf("expected Pod HostPort to be 0, got %v", got)
+			}
+
+			// Test PodSpec defaulting.
+			s := spec.DeepCopy()
+			corev1.SetDefaults_PodSpec(s)
+			if got := s.Containers[0].Ports[0].HostPort; tc.expectPodSpecDefault && got == 0 {
+				t.Errorf("expected PodSpec HostPort to be defaulted, got %v", got)
+			}
+			if got := s.Containers[0].Ports[0].HostPort; !tc.expectPodSpecDefault && got != 0 {
+				t.Errorf("expected PodSpec HostPort to be 0, got %v", got)
+			}
+		})
 	}
 }
 
@@ -315,9 +454,12 @@ func detectDefaults(t *testing.T, obj runtime.Object, v reflect.Value) map[strin
 
 		case visit.value.Kind() == reflect.Slice:
 			if !visit.value.IsNil() {
-				// if we already have a value, we got defaulted
+				// if we already have a value, we either got defaulted or there
+				// was a fixed input - flag it and see if we can descend
+				// anyway.
 				marshaled, _ := json.Marshal(defaultedV.Interface())
 				defaults[visit.path] = string(marshaled)
+				toVisit = append(toVisit, testPath{path: visit.path + "[0]", value: visit.value.Index(0)})
 			} else if visit.value.Type().Elem().Kind() == reflect.Struct {
 				if strings.HasPrefix(visit.path, ".ObjectMeta.ManagedFields[") {
 					break
@@ -348,7 +490,7 @@ func detectDefaults(t *testing.T, obj runtime.Object, v reflect.Value) map[strin
 				t.Logf("unhandled non-primitive map type %s: %s", visit.path, visit.value.Type().Elem())
 			}
 
-		case visit.value.Kind() == reflect.Ptr:
+		case visit.value.Kind() == reflect.Pointer:
 			if visit.value.IsNil() {
 				if visit.value.Type().Elem().Kind() == reflect.Struct {
 					visit.value.Set(reflect.New(visit.value.Type().Elem()))
@@ -539,7 +681,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(0),
+					Replicas: utilpointer.Int32(0),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -554,7 +696,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(3),
+					Replicas: utilpointer.Int32(3),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -670,8 +812,8 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 
 	assertProb := func(got, expected *v1.Container) error {
 		// Assert LivenessProbe
-		if got.LivenessProbe.Handler.HTTPGet.Path != expected.LivenessProbe.Handler.HTTPGet.Path ||
-			got.LivenessProbe.Handler.HTTPGet.Scheme != expected.LivenessProbe.Handler.HTTPGet.Scheme ||
+		if got.LivenessProbe.ProbeHandler.HTTPGet.Path != expected.LivenessProbe.ProbeHandler.HTTPGet.Path ||
+			got.LivenessProbe.ProbeHandler.HTTPGet.Scheme != expected.LivenessProbe.ProbeHandler.HTTPGet.Scheme ||
 			got.LivenessProbe.FailureThreshold != expected.LivenessProbe.FailureThreshold ||
 			got.LivenessProbe.SuccessThreshold != expected.LivenessProbe.SuccessThreshold ||
 			got.LivenessProbe.PeriodSeconds != expected.LivenessProbe.PeriodSeconds ||
@@ -680,8 +822,8 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 		}
 
 		// Assert ReadinessProbe
-		if got.ReadinessProbe.Handler.HTTPGet.Path != expected.ReadinessProbe.Handler.HTTPGet.Path ||
-			got.ReadinessProbe.Handler.HTTPGet.Scheme != expected.ReadinessProbe.Handler.HTTPGet.Scheme ||
+		if got.ReadinessProbe.ProbeHandler.HTTPGet.Path != expected.ReadinessProbe.ProbeHandler.HTTPGet.Path ||
+			got.ReadinessProbe.ProbeHandler.HTTPGet.Scheme != expected.ReadinessProbe.ProbeHandler.HTTPGet.Scheme ||
 			got.ReadinessProbe.FailureThreshold != expected.ReadinessProbe.FailureThreshold ||
 			got.ReadinessProbe.SuccessThreshold != expected.ReadinessProbe.SuccessThreshold ||
 			got.ReadinessProbe.PeriodSeconds != expected.ReadinessProbe.PeriodSeconds ||
@@ -863,14 +1005,14 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 									Name:  "fun",
 									Image: "alpine",
 									LivenessProbe: &v1.Probe{
-										Handler: v1.Handler{
+										ProbeHandler: v1.ProbeHandler{
 											HTTPGet: &v1.HTTPGetAction{
 												Host: "localhost",
 											},
 										},
 									},
 									ReadinessProbe: &v1.Probe{
-										Handler: v1.Handler{
+										ProbeHandler: v1.ProbeHandler{
 											HTTPGet: &v1.HTTPGetAction{
 												Host: "localhost",
 											},
@@ -885,7 +1027,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			expected: []v1.Container{
 				{
 					LivenessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -897,7 +1039,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 						FailureThreshold: 3,
 					},
 					ReadinessProbe: &v1.Probe{
-						Handler: v1.Handler{
+						ProbeHandler: v1.ProbeHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -928,12 +1070,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 										},
 									},
 									Lifecycle: &v1.Lifecycle{
-										PostStart: &v1.Handler{
+										PostStart: &v1.LifecycleHandler{
 											HTTPGet: &v1.HTTPGetAction{
 												Host: "localhost",
 											},
 										},
-										PreStop: &v1.Handler{
+										PreStop: &v1.LifecycleHandler{
 											HTTPGet: &v1.HTTPGetAction{
 												Host: "localhost",
 											},
@@ -948,13 +1090,13 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			expected: []v1.Container{
 				{
 					Lifecycle: &v1.Lifecycle{
-						PostStart: &v1.Handler{
+						PostStart: &v1.LifecycleHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
 							},
 						},
-						PreStop: &v1.Handler{
+						PreStop: &v1.LifecycleHandler{
 							HTTPGet: &v1.HTTPGetAction{
 								Path:   "/",
 								Scheme: v1.URISchemeHTTP,
@@ -1017,140 +1159,6 @@ func TestSetDefaultService(t *testing.T) {
 	}
 }
 
-func TestSetDefaultServiceIPFamily(t *testing.T) {
-	svc := v1.Service{
-		Spec: v1.ServiceSpec{
-			SessionAffinity: v1.ServiceAffinityNone,
-			Type:            v1.ServiceTypeClusterIP,
-		},
-	}
-	testCases := []struct {
-		name            string
-		inSvcTweak      func(s v1.Service) v1.Service
-		outSvcTweak     func(s v1.Service) v1.Service
-		enableDualStack bool
-	}{
-		{
-			name:            "dualstack off. ipfamily not set",
-			inSvcTweak:      func(s v1.Service) v1.Service { return s },
-			outSvcTweak:     func(s v1.Service) v1.Service { return s },
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack on. ipfamily not set, service is *not* ClusterIP-able",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.Type = v1.ServiceTypeExternalName
-				return s
-			},
-			outSvcTweak:     func(s v1.Service) v1.Service { return s },
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack off. ipfamily set",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack off. ipfamily not set. clusterip set",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				return s
-			},
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack on. ipfamily not set (clusterIP is v4)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily not set (clusterIP is v6)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily set (clusterIP is v4)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily set (clusterIP is v6)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				return s
-			},
-			enableDualStack: true,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			tweakedIn := tc.inSvcTweak(svc)
-			expectedSvc := tc.outSvcTweak(svc)
-			defaulted := roundTrip(t, runtime.Object(&tweakedIn))
-
-			defaultedSvc := defaulted.(*v1.Service)
-			if expectedSvc.Spec.IPFamily != nil {
-				if defaultedSvc.Spec.IPFamily == nil {
-					t.Fatalf("defaulted service ipfamily is nil while expected is not")
-				}
-				if *(expectedSvc.Spec.IPFamily) != *(defaultedSvc.Spec.IPFamily) {
-					t.Fatalf("defaulted service ipfamily %v does not match expected %v", defaultedSvc.Spec.IPFamily, expectedSvc.Spec.IPFamily)
-				}
-			}
-
-			if expectedSvc.Spec.IPFamily == nil && defaultedSvc.Spec.IPFamily != nil {
-				t.Fatalf("defaulted service ipfamily is not nil, while expected service ipfamily is")
-			}
-		})
-	}
-}
-
 func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
 	testCases := map[string]v1.Service{
 		"SessionAffinityConfig is empty": {
@@ -1187,6 +1195,74 @@ func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
 		if *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds != v1.DefaultClientIPServiceAffinitySeconds {
 			t.Errorf("Case: %s, default TimeoutSeconds should be %d when session affinity type: %s, got: %d", name, v1.DefaultClientIPServiceAffinitySeconds, v1.ServiceAffinityClientIP, *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 		}
+	}
+}
+
+func TestSetDefaultServiceLoadbalancerIPMode(t *testing.T) {
+	modeVIP := v1.LoadBalancerIPModeVIP
+	modeProxy := v1.LoadBalancerIPModeProxy
+	testCases := []struct {
+		name           string
+		ipModeEnabled  bool
+		svc            *v1.Service
+		expectedIPMode []*v1.LoadBalancerIPMode
+	}{
+		{
+			name:          "Set IP but not set IPMode with LoadbalancerIPMode disabled",
+			ipModeEnabled: false,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP: "1.2.3.4",
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{nil},
+		}, {
+			name:          "Set IP but bot set IPMode with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP: "1.2.3.4",
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{&modeVIP},
+		}, {
+			name:          "Both IP and IPMode are set with LoadbalancerIPMode enabled",
+			ipModeEnabled: true,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{{
+							IP:     "1.2.3.4",
+							IPMode: &modeProxy,
+						}},
+					},
+				}},
+			expectedIPMode: []*v1.LoadBalancerIPMode{&modeProxy},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
+			obj := roundTrip(t, runtime.Object(tc.svc))
+			svc := obj.(*v1.Service)
+			for i, s := range svc.Status.LoadBalancer.Ingress {
+				got := s.IPMode
+				expected := tc.expectedIPMode[i]
+				if !reflect.DeepEqual(got, expected) {
+					t.Errorf("Expected IPMode %v, got %v", tc.expectedIPMode[i], s.IPMode)
+				}
+			}
+		})
 	}
 }
 
@@ -1455,14 +1531,14 @@ func TestSetDefaultServiceTargetPort(t *testing.T) {
 	in := &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234}}}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*v1.Service)
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(1234) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(1234) {
 		t.Errorf("Expected TargetPort to be defaulted, got %v", out.Spec.Ports[0].TargetPort)
 	}
 
-	in = &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234, TargetPort: intstr.FromInt(5678)}}}}
+	in = &v1.Service{Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1234, TargetPort: intstr.FromInt32(5678)}}}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(5678) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(5678) {
 		t.Errorf("Expected TargetPort to be unchanged, got %v", out.Spec.Ports[0].TargetPort)
 	}
 }
@@ -1472,7 +1548,7 @@ func TestSetDefaultServicePort(t *testing.T) {
 	in := &v1.Service{Spec: v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{Protocol: "UDP", Port: 9376, TargetPort: intstr.FromString("p")},
-			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt(309)},
+			{Protocol: "UDP", Port: 8675, TargetPort: intstr.FromInt32(309)},
 		},
 	}}
 	out := roundTrip(t, runtime.Object(in)).(*v1.Service)
@@ -1485,7 +1561,7 @@ func TestSetDefaultServicePort(t *testing.T) {
 	if out.Spec.Ports[1].Protocol != v1.ProtocolUDP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolUDP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(309) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt32(309) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 
@@ -1493,20 +1569,20 @@ func TestSetDefaultServicePort(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{
 		Ports: []v1.ServicePort{
 			{Protocol: "", Port: 9376, TargetPort: intstr.FromString("")},
-			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt(0)},
+			{Protocol: "", Port: 8675, TargetPort: intstr.FromInt32(0)},
 		},
 	}}
 	out = roundTrip(t, runtime.Object(in)).(*v1.Service)
 	if out.Spec.Ports[0].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(int(in.Spec.Ports[0].Port)) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt32(in.Spec.Ports[0].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt32(in.Spec.Ports[1].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }
@@ -1522,15 +1598,36 @@ func TestSetDefaultServiceExternalTraffic(t *testing.T) {
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
 	}
 
 	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeLoadBalancer}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*v1.Service)
-	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeCluster {
-		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyTypeCluster, out.Spec.ExternalTrafficPolicy)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeClusterIP, ExternalIPs: []string{"1.2.3.4"}}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
+		t.Errorf("Expected ExternalTrafficPolicy to be %v, got %v", v1.ServiceExternalTrafficPolicyCluster, out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeClusterIP}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
+	}
+
+	in = &v1.Service{Spec: v1.ServiceSpec{Type: v1.ServiceTypeExternalName}}
+	obj = roundTrip(t, runtime.Object(in))
+	out = obj.(*v1.Service)
+	if out.Spec.ExternalTrafficPolicy != "" {
+		t.Errorf("Expected ExternalTrafficPolicy to be empty, got %v", out.Spec.ExternalTrafficPolicy)
 	}
 }
 
@@ -1541,6 +1638,21 @@ func TestSetDefaultNamespace(t *testing.T) {
 
 	if s2.Status.Phase != v1.NamespaceActive {
 		t.Errorf("Expected phase %v, got %v", v1.NamespaceActive, s2.Status.Phase)
+	}
+}
+
+func TestSetDefaultNamespaceLabels(t *testing.T) {
+	theNs := "default-ns-labels-are-great"
+	s := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: theNs,
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*v1.Namespace)
+
+	if s2.ObjectMeta.Labels[v1.LabelMetadataName] != theNs {
+		t.Errorf("Expected default namespace label value of %v, but got %v", theNs, s2.ObjectMeta.Labels[v1.LabelMetadataName])
 	}
 }
 
@@ -1806,7 +1918,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 	rc := &v1.ReplicationController{
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: utilpointer.Int32Ptr(3),
+			Replicas: utilpointer.Int32(3),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1927,5 +2039,270 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
 		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
+	}
+}
+
+func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
+	testCases := []struct {
+		name                          string
+		expectedInternalTrafficPolicy *v1.ServiceInternalTrafficPolicy
+		svc                           v1.Service
+	}{
+		{
+			name:                          "must set default internalTrafficPolicy",
+			expectedInternalTrafficPolicy: &cluster,
+			svc:                           v1.Service{},
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's cluster",
+			expectedInternalTrafficPolicy: &cluster,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &cluster,
+				},
+			},
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when type is ExternalName",
+			expectedInternalTrafficPolicy: nil,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeExternalName,
+				},
+			},
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's local",
+			expectedInternalTrafficPolicy: &local,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &local,
+				},
+			},
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			obj := roundTrip(t, runtime.Object(&test.svc))
+			svc := obj.(*v1.Service)
+
+			if !reflect.DeepEqual(svc.Spec.InternalTrafficPolicy, test.expectedInternalTrafficPolicy) {
+				t.Errorf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, svc.Spec.InternalTrafficPolicy)
+			}
+		})
+	}
+}
+
+func TestSetDefaultResizePolicy(t *testing.T) {
+	// verify we default to NotRequired restart policy for resize when resources are specified
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	for desc, tc := range map[string]struct {
+		testContainer        v1.Container
+		expectedResizePolicy []v1.ContainerResizePolicy
+	}{
+		"CPU and memory limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU requests are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"Memory limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"No resources are specified": {
+			testContainer:        v1.Container{Name: "besteffort"},
+			expectedResizePolicy: nil,
+		},
+		"CPU and memory limits are specified with restartContainer resize policy for memory": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU requests and memory limits are specified with restartContainer resize policy for CPU": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceCPU,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"CPU and memory requests are specified with restartContainer resize policy for both": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceCPU,
+						RestartPolicy: v1.RestartContainer,
+					},
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+			},
+		},
+		"Ephemeral storage limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: nil,
+		},
+		"Ephemeral storage requests and CPU limits are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("100m"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceCPU,
+					RestartPolicy: v1.NotRequired,
+				},
+			},
+		},
+		"Ephemeral storage requests and limits, memory requests with restartContainer policy are specified": {
+			testContainer: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceEphemeralStorage: resource.MustParse("500Mi"),
+						v1.ResourceMemory:           resource.MustParse("200Mi"),
+					},
+				},
+				ResizePolicy: []v1.ContainerResizePolicy{
+					{
+						ResourceName:  v1.ResourceMemory,
+						RestartPolicy: v1.RestartContainer,
+					},
+				},
+			},
+			expectedResizePolicy: []v1.ContainerResizePolicy{
+				{
+					ResourceName:  v1.ResourceMemory,
+					RestartPolicy: v1.RestartContainer,
+				},
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			testPod := v1.Pod{}
+			testPod.Spec.Containers = append(testPod.Spec.Containers, tc.testContainer)
+			output := roundTrip(t, runtime.Object(&testPod))
+			pod2 := output.(*v1.Pod)
+			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
+				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
+			}
+		})
 	}
 }

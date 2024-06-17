@@ -1,12 +1,10 @@
-// +build linux
-
 package keys
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"golang.org/x/sys/unix"
 )
@@ -14,18 +12,18 @@ import (
 type KeySerial uint32
 
 func JoinSessionKeyring(name string) (KeySerial, error) {
-	sessKeyId, err := unix.KeyctlJoinSessionKeyring(name)
+	sessKeyID, err := unix.KeyctlJoinSessionKeyring(name)
 	if err != nil {
-		return 0, errors.Wrap(err, "create session key")
+		return 0, fmt.Errorf("unable to create session key: %w", err)
 	}
-	return KeySerial(sessKeyId), nil
+	return KeySerial(sessKeyID), nil
 }
 
 // ModKeyringPerm modifies permissions on a keyring by reading the current permissions,
 // anding the bits with the given mask (clearing permissions) and setting
 // additional permission bits
-func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
-	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringId))
+func ModKeyringPerm(ringID KeySerial, mask, setbits uint32) error {
+	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringID))
 	if err != nil {
 		return err
 	}
@@ -43,5 +41,5 @@ func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
 
 	perm := (uint32(perm64) & mask) | setbits
 
-	return unix.KeyctlSetperm(int(ringId), perm)
+	return unix.KeyctlSetperm(int(ringID), perm)
 }

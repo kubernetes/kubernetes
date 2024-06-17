@@ -1,6 +1,8 @@
 # console
 
-[![Build Status](https://travis-ci.org/containerd/console.svg?branch=master)](https://travis-ci.org/containerd/console)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/console)](https://pkg.go.dev/github.com/containerd/console)
+[![Build Status](https://github.com/containerd/console/workflows/CI/badge.svg)](https://github.com/containerd/console/actions?query=workflow%3ACI)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/console)](https://goreportcard.com/report/github.com/containerd/console)
 
 Golang package for dealing with consoles.  Light on deps and a simple API.
 

@@ -22,10 +22,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/gofuzz"
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {
@@ -89,6 +89,26 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 		// fmt.Sprint() over String() as nil.String() will panic
 		if fmt.Sprint(out) != fmt.Sprint(tc.out) {
 			t.Errorf("[%v]expected:\n\t%s\nbut got:\n\t%s", i, fmt.Sprint(tc.out), fmt.Sprint(out))
+		}
+	}
+}
+
+func BenchmarkLabelSelectorAsSelector(b *testing.B) {
+	selector := &LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "foo",
+			"bar": "bar",
+		},
+		MatchExpressions: []LabelSelectorRequirement{{
+			Key:      "baz",
+			Operator: LabelSelectorOpExists,
+		}},
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := LabelSelectorAsSelector(selector)
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
@@ -185,13 +205,47 @@ func TestResetObjectMetaForStatus(t *testing.T) {
 	existingMeta.SetUID(types.UID(""))
 	existingMeta.SetName("")
 	existingMeta.SetNamespace("")
-	existingMeta.SetClusterName("")
 	existingMeta.SetCreationTimestamp(Time{})
 	existingMeta.SetDeletionTimestamp(nil)
 	existingMeta.SetDeletionGracePeriodSeconds(nil)
 	existingMeta.SetManagedFields(nil)
 
 	if !reflect.DeepEqual(meta, existingMeta) {
-		t.Error(diff.ObjectDiff(meta, existingMeta))
+		t.Error(cmp.Diff(meta, existingMeta))
+	}
+}
+
+func TestSetMetaDataLabel(t *testing.T) {
+	tests := []struct {
+		obj   *ObjectMeta
+		label string
+		value string
+		want  map[string]string
+	}{
+		{
+			obj:   &ObjectMeta{},
+			label: "foo",
+			value: "bar",
+			want:  map[string]string{"foo": "bar"},
+		},
+		{
+			obj:   &ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			label: "foo",
+			value: "baz",
+			want:  map[string]string{"foo": "baz"},
+		},
+		{
+			obj:   &ObjectMeta{Labels: map[string]string{"foo": "bar"}},
+			label: "version",
+			value: "1.0.0",
+			want:  map[string]string{"foo": "bar", "version": "1.0.0"},
+		},
+	}
+
+	for _, tc := range tests {
+		SetMetaDataLabel(tc.obj, tc.label, tc.value)
+		if !reflect.DeepEqual(tc.obj.Labels, tc.want) {
+			t.Errorf("got %v, want %v", tc.obj.Labels, tc.want)
+		}
 	}
 }

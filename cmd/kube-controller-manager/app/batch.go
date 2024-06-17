@@ -17,41 +17,57 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
+	"context"
 	"fmt"
 
-	"net/http"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
-func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
-		return nil, false, nil
+func newJobControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.JobController,
+		aliases:  []string{"job"},
+		initFunc: startJobController,
 	}
-	go job.NewController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Batch().V1().Jobs(),
-		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)
+}
+
+func startJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	jobController, err := job.NewController(
+		ctx,
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("creating Job controller: %v", err)
+	}
+	go jobController.Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
 }
 
-func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
-		return nil, false, nil
+func newCronJobControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.CronJobController,
+		aliases:  []string{"cronjob"},
+		initFunc: startCronJobController,
 	}
-	cjc, err := cronjob.NewController(
-		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
+}
+
+func startCronJobController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	cj2c, err := cronjob.NewControllerV2(ctx, controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.InformerFactory.Batch().V1().CronJobs(),
+		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
+		return nil, true, fmt.Errorf("creating CronJob controller V2: %v", err)
 	}
-	go cjc.Run(ctx.Stop)
+
+	go cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
 	return nil, true, nil
 }

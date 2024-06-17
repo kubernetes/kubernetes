@@ -1,11 +1,13 @@
 approvers:
-- sttts
-- roycaihw
-- liggitt
+  - sttts
+  - roycaihw
+  - liggitt
+  # APIs frequently hit this directory for zz_generate.openapi.go
+  - api-approvers
 reviewers:
-- sttts
-- roycaihw
-- liggitt
+  - sttts
+  - roycaihw
+  - liggitt
 labels:
-- sig/api-machinery
-- area/code-generation
+  - sig/api-machinery
+  - area/code-generation

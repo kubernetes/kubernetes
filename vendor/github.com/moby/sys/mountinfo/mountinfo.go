@@ -1,6 +1,8 @@
 package mountinfo
 
-import "io"
+import (
+	"os"
+)
 
 // GetMounts retrieves a list of mounts for the current running process,
 // with an optional filter applied (use nil for no filter).
@@ -8,23 +10,18 @@ func GetMounts(f FilterFunc) ([]*Info, error) {
 	return parseMountTable(f)
 }
 
-// GetMountsFromReader retrieves a list of mounts from the
-// reader provided, with an optional filter applied (use nil
-// for no filter). This can be useful in tests or benchmarks
-// that provide a fake mountinfo data.
-func GetMountsFromReader(reader io.Reader, f FilterFunc) ([]*Info, error) {
-	return parseInfoFile(reader, f)
-}
-
-// Mounted determines if a specified mountpoint has been mounted.
-// On Linux it looks at /proc/self/mountinfo.
-func Mounted(mountpoint string) (bool, error) {
-	entries, err := GetMounts(SingleEntryFilter(mountpoint))
-	if err != nil {
-		return false, err
+// Mounted determines if a specified path is a mount point. In case of any
+// error, false (and an error) is returned.
+//
+// If a non-existent path is specified, an appropriate error is returned.
+// In case the caller is not interested in this particular error, it should
+// be handled separately using e.g. errors.Is(err, fs.ErrNotExist).
+func Mounted(path string) (bool, error) {
+	// root is always mounted
+	if path == string(os.PathSeparator) {
+		return true, nil
 	}
-
-	return len(entries) > 0, nil
+	return mounted(path)
 }
 
 // Info reveals information about a particular mounted filesystem. This
@@ -33,35 +30,38 @@ type Info struct {
 	// ID is a unique identifier of the mount (may be reused after umount).
 	ID int
 
-	// Parent indicates the ID of the mount parent (or of self for the top of the
-	// mount tree).
+	// Parent is the ID of the parent mount (or of self for the root
+	// of this mount namespace's mount tree).
 	Parent int
 
-	// Major indicates one half of the device ID which identifies the device class.
-	Major int
+	// Major and Minor are the major and the minor components of the Dev
+	// field of unix.Stat_t structure returned by unix.*Stat calls for
+	// files on this filesystem.
+	Major, Minor int
 
-	// Minor indicates one half of the device ID which identifies a specific
-	// instance of device.
-	Minor int
-
-	// Root of the mount within the filesystem.
+	// Root is the pathname of the directory in the filesystem which forms
+	// the root of this mount.
 	Root string
 
-	// Mountpoint indicates the mount point relative to the process's root.
+	// Mountpoint is the pathname of the mount point relative to the
+	// process's root directory.
 	Mountpoint string
 
-	// Opts represents mount-specific options.
-	Opts string
+	// Options is a comma-separated list of mount options.
+	Options string
 
-	// Optional represents optional fields.
+	// Optional are zero or more fields of the form "tag[:value]",
+	// separated by a space.  Currently, the possible optional fields are
+	// "shared", "master", "propagate_from", and "unbindable". For more
+	// information, see mount_namespaces(7) Linux man page.
 	Optional string
 
-	// Fstype indicates the type of filesystem, such as EXT3.
-	Fstype string
+	// FSType is the filesystem type in the form "type[.subtype]".
+	FSType string
 
-	// Source indicates filesystem specific information or "none".
+	// Source is filesystem-specific information, or "none".
 	Source string
 
-	// VfsOpts represents per super block options.
-	VfsOpts string
+	// VFSOptions is a comma-separated list of superblock options.
+	VFSOptions string
 }

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,13 +29,23 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
-// defaultLogsContainerAnnotationName is an annotation name that can be used to preselect the interesting container
-// from a pod when running kubectl logs.
-const defaultLogsContainerAnnotationName = "kubectl.kubernetes.io/default-logs-container"
+func allPodLogsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+	clientConfig, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientset, err := corev1client.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, true)
+}
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
@@ -48,11 +57,11 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, false)
 }
 
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool, allPods bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
@@ -62,7 +71,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	case *corev1.PodList:
 		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
 		for i := range t.Items {
-			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers, allPods)
 			if err != nil {
 				return nil, err
 			}
@@ -73,44 +82,41 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return ret, nil
 
 	case *corev1.Pod:
-		// in case the "kubectl.kubernetes.io/default-logs-container" annotation is present, we preset the opts.Containers to default to selected
-		// container. This gives users ability to preselect the most interesting container in pod.
-		if annotations := t.GetAnnotations(); annotations != nil && len(opts.Container) == 0 && len(annotations[defaultLogsContainerAnnotationName]) > 0 {
-			containerName := annotations[defaultLogsContainerAnnotationName]
-			if exists, _ := findContainerByName(t, containerName); exists != nil {
-				opts.Container = containerName
-			} else {
-				fmt.Fprintf(os.Stderr, "Default container name %q not found in a pod\n", containerName)
-			}
-		}
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
-			var containerName string
-			if opts == nil || len(opts.Container) == 0 {
-				// We don't know container name. In this case we expect only one container to be present in the pod (ignoring InitContainers).
-				// If there is more than one container we should return an error showing all container names.
-				if len(t.Spec.Containers) != 1 {
-					containerNames := getContainerNames(t.Spec.Containers)
-					initContainerNames := getContainerNames(t.Spec.InitContainers)
-					ephemeralContainerNames := getContainerNames(ephemeralContainersToContainers(t.Spec.EphemeralContainers))
-					err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", t.Name, containerNames)
-					if len(initContainerNames) > 0 {
-						err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-					}
-					if len(ephemeralContainerNames) > 0 {
-						err += fmt.Sprintf(" or one of the ephemeral containers: [%s]", ephemeralContainerNames)
-					}
-
-					return nil, errors.New(err)
+			currOpts := new(corev1.PodLogOptions)
+			if opts != nil {
+				opts.DeepCopyInto(currOpts)
+			}
+			// in case the "kubectl.kubernetes.io/default-container" annotation is present, we preset the opts.Containers to default to selected
+			// container. This gives users ability to preselect the most interesting container in pod.
+			if annotations := t.GetAnnotations(); annotations != nil && currOpts.Container == "" {
+				var defaultContainer string
+				if len(annotations[podcmd.DefaultContainerAnnotationName]) > 0 {
+					defaultContainer = annotations[podcmd.DefaultContainerAnnotationName]
 				}
-				containerName = t.Spec.Containers[0].Name
-			} else {
-				containerName = opts.Container
+				if len(defaultContainer) > 0 {
+					if exists, _ := podcmd.FindContainerByName(t, defaultContainer); exists == nil {
+						fmt.Fprintf(os.Stderr, "Default container name %q not found in pod %s\n", defaultContainer, t.Name)
+					} else {
+						currOpts.Container = defaultContainer
+					}
+				}
 			}
 
-			container, fieldPath := findContainerByName(t, containerName)
+			if currOpts.Container == "" {
+				// Default to the first container name(aligning behavior with `kubectl exec').
+				currOpts.Container = t.Spec.Containers[0].Name
+				if len(t.Spec.Containers) > 1 || len(t.Spec.InitContainers) > 0 || len(t.Spec.EphemeralContainers) > 0 {
+					if !allPods {
+						fmt.Fprintf(os.Stderr, "Defaulted container %q out of: %s\n", currOpts.Container, podcmd.AllContainerNames(t))
+					}
+				}
+			}
+
+			container, fieldPath := podcmd.FindContainerByName(t, currOpts.Container)
 			if container == nil {
-				return nil, fmt.Errorf("container %s is not valid for pod %s", opts.Container, t.Name)
+				return nil, fmt.Errorf("container %s is not valid for pod %s", currOpts.Container, t.Name)
 			}
 			ref, err := reference.GetPartialReference(scheme.Scheme, t, fieldPath)
 			if err != nil {
@@ -118,7 +124,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			}
 
 			ret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)
-			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, opts)
+			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)
 			return ret, nil
 		}
 
@@ -126,7 +132,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -137,7 +143,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +154,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.EphemeralContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, false)
 			if err != nil {
 				return nil, err
 			}
@@ -170,48 +176,18 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	if err != nil {
 		return nil, err
 	}
+	var targetObj runtime.Object = pod
+
 	if numPods > 1 {
-		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
-	}
-
-	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
-}
-
-// findContainerByName searches for a container by name amongst all containers in a pod.
-// Returns a pointer to a container and a field path.
-func findContainerByName(pod *corev1.Pod, name string) (container *corev1.Container, fieldPath string) {
-	for _, c := range pod.Spec.InitContainers {
-		if c.Name == name {
-			return &c, fmt.Sprintf("spec.initContainers{%s}", c.Name)
+		if allPods {
+			targetObj, err = GetPodList(clientset, namespace, selector.String(), timeout, sortBy)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 		}
 	}
-	for _, c := range pod.Spec.Containers {
-		if c.Name == name {
-			return &c, fmt.Sprintf("spec.containers{%s}", c.Name)
-		}
-	}
-	for _, c := range pod.Spec.EphemeralContainers {
-		if c.Name == name {
-			containerCommon := corev1.Container(c.EphemeralContainerCommon)
-			return &containerCommon, fmt.Sprintf("spec.ephemeralContainers{%s}", containerCommon.Name)
-		}
-	}
-	return nil, ""
-}
 
-// getContainerNames returns a formatted string containing the container names
-func getContainerNames(containers []corev1.Container) string {
-	names := []string{}
-	for _, c := range containers {
-		names = append(names, c.Name)
-	}
-	return strings.Join(names, " ")
-}
-
-func ephemeralContainersToContainers(containers []corev1.EphemeralContainer) []corev1.Container {
-	var ec []corev1.Container
-	for i := range containers {
-		ec = append(ec, corev1.Container(containers[i].EphemeralContainerCommon))
-	}
-	return ec
+	return logsForObjectWithClient(clientset, targetObj, options, timeout, allContainers, allPods)
 }

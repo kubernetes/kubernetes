@@ -31,14 +31,11 @@ readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 find_files() {
   find . -not \( \
       \( \
-        -wholename './output' \
-        -o -wholename './_output' \
-        -o -wholename './_gopath' \
+        -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
-        -o -wholename './staging/src/k8s.io/client-go/*vendor/*' \
         -o -wholename './staging/src/k8s.io/client-go/pkg/*' \
       \) -prune \
     \) -name '.readonly'
@@ -47,7 +44,7 @@ find_files() {
 conflicts=()
 while IFS=$'\n' read -r dir; do
     dir=${dir#./}
-    if kube::util::has_changes "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/BUILD$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
+    if kube::util::has_changes "${branch}" "^${dir}/[^/]*\$" '/\.readonly$|/zz_generated|/\.generated\.|\.proto$|\.pb\.go$' >/dev/null; then
         conflicts+=("${dir}")
     fi
 done < <(find_files | sed 's|/.readonly||')

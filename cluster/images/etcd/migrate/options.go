@@ -28,7 +28,7 @@ import (
 )
 
 var (
-	supportedEtcdVersions = []string{"3.0.17", "3.1.12", "3.2.24", "3.3.17", "3.4.9"}
+	supportedEtcdVersions = []string{"3.4.18", "3.5.14"}
 )
 
 const (
@@ -42,6 +42,8 @@ const (
 	peerListenUrlsFmt     = "http://localhost:%d"
 	peerAdvertiseUrlsEnv  = "INITIAL_ADVERTISE_PEER_URLS"
 	peerAdvertiseUrlsFmt  = "http://localhost:%d"
+	clientListenURLsEnv   = "LISTEN_CLIENT_URLS"
+	clientListenURLFmt    = "http://127.0.0.1:%d"
 	targetVersionEnv      = "TARGET_VERSION"
 	targetStorageEnv      = "TARGET_STORAGE"
 	etcdDataPrefixEnv     = "ETCD_DATA_PREFIX"
@@ -66,6 +68,7 @@ type migrateOpts struct {
 	targetVersion     string
 	targetStorage     string
 	etcdServerArgs    string
+	clientListenUrls  string
 }
 
 func registerFlags(flags *flag.FlagSet, opt *migrateOpts) {
@@ -74,13 +77,15 @@ func registerFlags(flags *flag.FlagSet, opt *migrateOpts) {
 	flags.Uint64Var(&opts.port, "port", 0,
 		"etcd client port to use during migration operations. "+
 			"This should be a different port than typically used by etcd to avoid clients accidentally connecting during upgrade/downgrade operations. "+
-			"If unset default to 18629 or 18631 depenging on <data-dir>.")
+			"If unset default to 18629 or 18631 depending on <data-dir>.")
 	flags.Uint64Var(&opts.peerPort, "peer-port", 0,
 		"etcd peer port to use during migration operations. If unset defaults to 2380 or 2381 depending on <data-dir>.")
 	flags.StringVar(&opts.peerListenUrls, "listen-peer-urls", "",
 		"etcd --listen-peer-urls flag. If unset, fallbacks to LISTEN_PEER_URLS env and if unset defaults to http://localhost:<peer-port>.")
 	flags.StringVar(&opts.peerAdvertiseUrls, "initial-advertise-peer-urls", "",
 		"etcd --initial-advertise-peer-urls flag. If unset fallbacks to INITIAL_ADVERTISE_PEER_URLS env and if unset defaults to http://localhost:<peer-port>.")
+	flags.StringVar(&opts.clientListenUrls, "listen-client-urls", "",
+		"etcd --listen-client-urls flag. If unset, fallbacks to LISTEN_CLIENT_URLS env, and if unset defaults to http://127.0.0.1:<port>.")
 	flags.StringVar(&opts.binDir, "bin-dir", "/usr/local/bin",
 		"directory of etcd and etcdctl binaries, must contain etcd-<version> and etcdctl-<version> for each version listed in <bundled-versions>.")
 	flags.StringVar(&opts.dataDir, "data-dir", "",
@@ -119,7 +124,7 @@ func fallbackToEnvWithDefault(flag, env, def string) string {
 	if value, err := lookupEnv(env); err == nil {
 		return value
 	}
-	klog.Warningf("%s variable unset - defaulting to %s", env, def)
+	klog.Warningf("%s variable for %s flag unset - defaulting to %s", env, flag, def)
 	return def
 }
 
@@ -185,6 +190,11 @@ func (opts *migrateOpts) validateAndDefault() error {
 	if opts.peerAdvertiseUrls == "" {
 		def := fmt.Sprintf(peerAdvertiseUrlsFmt, opts.peerPort)
 		opts.peerAdvertiseUrls = fallbackToEnvWithDefault("initial-advertise-peer-urls", peerAdvertiseUrlsEnv, def)
+	}
+
+	if opts.clientListenUrls == "" {
+		def := fmt.Sprintf(clientListenURLFmt, opts.port)
+		opts.clientListenUrls = fallbackToEnvWithDefault("listen-client-urls", clientListenURLsEnv, def)
 	}
 
 	if opts.targetVersion == "" {

@@ -14,34 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// apiserver is the main api server and master for the cluster.
-// it is responsible for serving the cluster management API.
+// APIServer is the main API server and master for the cluster.
+// It is responsible for serving the cluster management API.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
+	_ "time/tzdata" // for timeZone support in CronJob
 
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
+	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugins
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	command := app.NewAPIServerCommand()
-
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	// utilflag.InitFlags()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }

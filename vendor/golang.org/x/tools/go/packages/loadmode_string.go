@@ -15,7 +15,7 @@ var allModes = []LoadMode{
 	NeedCompiledGoFiles,
 	NeedImports,
 	NeedDeps,
-	NeedExportsFile,
+	NeedExportFile,
 	NeedTypes,
 	NeedSyntax,
 	NeedTypesInfo,
@@ -28,7 +28,7 @@ var modeStrings = []string{
 	"NeedCompiledGoFiles",
 	"NeedImports",
 	"NeedDeps",
-	"NeedExportsFile",
+	"NeedExportFile",
 	"NeedTypes",
 	"NeedSyntax",
 	"NeedTypesInfo",
@@ -38,7 +38,7 @@ var modeStrings = []string{
 func (mod LoadMode) String() string {
 	m := mod
 	if m == 0 {
-		return fmt.Sprintf("LoadMode(0)")
+		return "LoadMode(0)"
 	}
 	var out []string
 	for i, x := range allModes {

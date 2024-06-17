@@ -24,3 +24,4 @@ file_content_in_loop
 break_on_expected_content
 Premium_LRS
 VCP_STRESS_ITERATIONS
+update_type

@@ -21,7 +21,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+
+	v1 "k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/utils/pointer"
+)
+
+var (
+	containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
 )
 
 func TestGenerateContainersReadyCondition(t *testing.T) {
@@ -105,6 +114,74 @@ func TestGenerateContainersReadyCondition(t *testing.T) {
 			},
 			podPhase:    v1.PodSucceeded,
 			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, PodCompleted, ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [restartable-init-1]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getReadyStatus("restartable-init-2"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionTrue, "", ""),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unknown status: [restartable-init-2]"),
+		},
+		{
+			spec: &v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "restartable-init-1", RestartPolicy: &containerRestartPolicyAlways},
+					{Name: "restartable-init-2", RestartPolicy: &containerRestartPolicyAlways},
+				},
+				Containers: []v1.Container{
+					{Name: "regular-1"},
+				},
+			},
+			containerStatuses: []v1.ContainerStatus{
+				getReadyStatus("restartable-init-1"),
+				getNotReadyStatus("restartable-init-2"),
+				getReadyStatus("regular-1"),
+			},
+			podPhase:    v1.PodRunning,
+			expectReady: getPodCondition(v1.ContainersReady, v1.ConditionFalse, ContainersNotReady, "containers with unready status: [restartable-init-2]"),
 		},
 	}
 
@@ -319,11 +396,31 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 		InitContainers: []v1.Container{
 			{Name: "1234"},
 		},
+		Containers: []v1.Container{
+			{Name: "regular"},
+		},
 	}
 	twoInitContainer := &v1.PodSpec{
 		InitContainers: []v1.Container{
 			{Name: "1234"},
 			{Name: "5678"},
+		},
+		Containers: []v1.Container{
+			{Name: "regular"},
+		},
+	}
+	oneRestartableInitContainer := &v1.PodSpec{
+		InitContainers: []v1.Container{
+			{
+				Name: "1234",
+				RestartPolicy: func() *v1.ContainerRestartPolicy {
+					p := v1.ContainerRestartPolicyAlways
+					return &p
+				}(),
+			},
+		},
+		Containers: []v1.Container{
+			{Name: "regular"},
 		},
 	}
 	tests := []struct {
@@ -405,6 +502,43 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 				Reason: PodCompleted,
 			},
 		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getNotStartedStatus("1234"),
+			},
+			podPhase: v1.PodPending,
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+				Reason: ContainersNotInitialized,
+			},
+		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getStartedStatus("1234"),
+			},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			spec: oneRestartableInitContainer,
+			containerStatuses: []v1.ContainerStatus{
+				getNotStartedStatus("1234"),
+				{
+					Name: "regular",
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			podPhase: v1.PodRunning,
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -414,6 +548,77 @@ func TestGeneratePodInitializedCondition(t *testing.T) {
 		assert.Equal(t, test.expected.Status, condition.Status)
 		assert.Equal(t, test.expected.Reason, condition.Reason)
 
+	}
+}
+
+func TestGeneratePodReadyToStartContainersCondition(t *testing.T) {
+	for desc, test := range map[string]struct {
+		pod      *v1.Pod
+		status   *kubecontainer.PodStatus
+		expected v1.PodCondition
+	}{
+		"Empty pod status": {
+			pod:    &v1.Pod{},
+			status: &kubecontainer.PodStatus{},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status not ready": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_NOTREADY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status ready but no IP configured": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionFalse,
+			},
+		},
+		"Pod sandbox status ready and IP configured": {
+			pod: &v1.Pod{},
+			status: &kubecontainer.PodStatus{
+				SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+					{
+						Network: &runtimeapi.PodSandboxNetworkStatus{
+							Ip: "10.0.0.10",
+						},
+						Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+						State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+					},
+				},
+			},
+			expected: v1.PodCondition{
+				Status: v1.ConditionTrue,
+			},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			test.expected.Type = v1.PodReadyToStartContainers
+			condition := GeneratePodReadyToStartContainersCondition(test.pod, test.status)
+			require.Equal(t, test.expected.Type, condition.Type)
+			require.Equal(t, test.expected.Status, condition.Status)
+		})
 	}
 }
 
@@ -437,5 +642,19 @@ func getNotReadyStatus(cName string) v1.ContainerStatus {
 	return v1.ContainerStatus{
 		Name:  cName,
 		Ready: false,
+	}
+}
+
+func getStartedStatus(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name:    cName,
+		Started: pointer.Bool(true),
+	}
+}
+
+func getNotStartedStatus(cName string) v1.ContainerStatus {
+	return v1.ContainerStatus{
+		Name:    cName,
+		Started: pointer.Bool(false),
 	}
 }

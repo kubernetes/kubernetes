@@ -4,13 +4,12 @@
 options:
   no_parent_owners: true
 approvers:
-- api-approvers
+  - api-approvers
 reviewers:
-- api-reviewers
-- deads2k
-- luxas
-- mtaufen
-- sttts
-- stewart-yu
+  - api-reviewers
+  - deads2k
+  - luxas
+  - mtaufen
+  - sttts
 labels:
-- kind/api-change
+  - kind/api-change

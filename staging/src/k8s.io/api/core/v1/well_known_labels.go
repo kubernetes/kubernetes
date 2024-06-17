@@ -19,10 +19,25 @@ package v1
 const (
 	LabelHostname = "kubernetes.io/hostname"
 
-	LabelZoneFailureDomain       = "failure-domain.beta.kubernetes.io/zone"
-	LabelZoneRegion              = "failure-domain.beta.kubernetes.io/region"
-	LabelZoneFailureDomainStable = "topology.kubernetes.io/zone"
-	LabelZoneRegionStable        = "topology.kubernetes.io/region"
+	// Label value is the network location of kube-apiserver stored as <ip:port>
+	// Stored in APIServer Identity lease objects to view what address is used for peer proxy
+	AnnotationPeerAdvertiseAddress = "kubernetes.io/peer-advertise-address"
+
+	LabelTopologyZone   = "topology.kubernetes.io/zone"
+	LabelTopologyRegion = "topology.kubernetes.io/region"
+
+	// These label have been deprecated since 1.17, but will be supported for
+	// the foreseeable future, to accommodate things like long-lived PVs that
+	// use them.  New users should prefer the "topology.kubernetes.io/*"
+	// equivalents.
+	LabelFailureDomainBetaZone   = "failure-domain.beta.kubernetes.io/zone"   // deprecated
+	LabelFailureDomainBetaRegion = "failure-domain.beta.kubernetes.io/region" // deprecated
+
+	// Retained for compat when vendored.  Do not use these consts in new code.
+	LabelZoneFailureDomain       = LabelFailureDomainBetaZone   // deprecated
+	LabelZoneRegion              = LabelFailureDomainBetaRegion // deprecated
+	LabelZoneFailureDomainStable = LabelTopologyZone            // deprecated
+	LabelZoneRegionStable        = LabelTopologyRegion          // deprecated
 
 	LabelInstanceType       = "beta.kubernetes.io/instance-type"
 	LabelInstanceTypeStable = "node.kubernetes.io/instance-type"
@@ -47,4 +62,13 @@ const (
 	// controllers and kube-proxy to check if the Endpoint objects should be replicated when
 	// using Headless Services
 	IsHeadlessService = "service.kubernetes.io/headless"
+
+	// LabelNodeExcludeBalancers specifies that the node should not be considered as a target
+	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
+	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
+	// any backends on excluded nodes are not reachable by those external load-balancers.
+	// Implementations of this exclusion may vary based on provider.
+	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
+	// LabelMetadataName is the label name which, in-tree, is used to automatically label namespaces, so they can be selected easily by tools which require definitive labels
+	LabelMetadataName = "kubernetes.io/metadata.name"
 )

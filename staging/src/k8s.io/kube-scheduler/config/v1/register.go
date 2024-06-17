@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,9 +37,14 @@ var (
 // addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Policy{},
+		&KubeSchedulerConfiguration{},
+		&DefaultPreemptionArgs{},
+		&InterPodAffinityArgs{},
+		&NodeResourcesBalancedAllocationArgs{},
+		&NodeResourcesFitArgs{},
+		&PodTopologySpreadArgs{},
+		&VolumeBindingArgs{},
+		&NodeAffinityArgs{},
 	)
-	// also register into the v1 group for API backward compatibility
-	scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &Policy{})
 	return nil
 }

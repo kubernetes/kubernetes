@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -24,28 +25,29 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxSurge            intstr.IntOrString
-		oldReplicas         int
-		newReplicas         int
+		oldReplicas         int32
+		newReplicas         int32
 		scaleExpected       bool
-		expectedNewReplicas int
+		expectedNewReplicas int32
 	}{
 		{
 			// Should not scale up.
 			deploymentReplicas: 10,
-			maxSurge:           intstr.FromInt(0),
+			maxSurge:           intstr.FromInt32(0),
 			oldReplicas:        10,
 			newReplicas:        0,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -53,7 +55,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		},
 		{
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         5,
 			newReplicas:         0,
 			scaleExpected:       true,
@@ -61,7 +63,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		},
 		{
 			deploymentReplicas: 10,
-			maxSurge:           intstr.FromInt(2),
+			maxSurge:           intstr.FromInt32(2),
 			oldReplicas:        10,
 			newReplicas:        2,
 			scaleExpected:      false,
@@ -69,7 +71,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		{
 			// Should scale down.
 			deploymentReplicas:  10,
-			maxSurge:            intstr.FromInt(2),
+			maxSurge:            intstr.FromInt32(2),
 			oldReplicas:         2,
 			newReplicas:         11,
 			scaleExpected:       true,
@@ -83,14 +85,17 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		newRS := rs("foo-v2", test.newReplicas, nil, noTimestamp)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		allRSs := []*apps.ReplicaSet{newRS, oldRS}
-		maxUnavailable := intstr.FromInt(0)
+		maxUnavailable := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		scaled, err := controller.reconcileNewReplicaSet(ctx, allRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -110,7 +115,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			continue
 		}
 		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
-		if e, a := test.expectedNewReplicas, int(*(updated.Spec.Replicas)); e != a {
+		if e, a := test.expectedNewReplicas, *(updated.Spec.Replicas); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}
@@ -118,18 +123,18 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 
 func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxUnavailable      intstr.IntOrString
-		oldReplicas         int
-		newReplicas         int
+		oldReplicas         int32
+		newReplicas         int32
 		readyPodsFromOldRS  int
 		readyPodsFromNewRS  int
 		scaleExpected       bool
-		expectedOldReplicas int
+		expectedOldReplicas int32
 	}{
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(0),
+			maxUnavailable:      intstr.FromInt32(0),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  10,
@@ -139,7 +144,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  10,
@@ -149,7 +154,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // expect unhealthy replicas from old replica sets been cleaned up
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  8,
@@ -159,7 +164,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // expect 1 unhealthy replica from old replica sets been cleaned up, and 1 ready pod been scaled down
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			oldReplicas:         10,
 			newReplicas:         0,
 			readyPodsFromOldRS:  9,
@@ -169,7 +174,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		},
 		{ // the unavailable pods from the newRS would not make us scale down old RSs in a further step
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			oldReplicas:        8,
 			newReplicas:        2,
 			readyPodsFromOldRS: 8,
@@ -189,15 +194,15 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		oldRS.Status.AvailableReplicas = int32(test.readyPodsFromOldRS)
 		oldRSs := []*apps.ReplicaSet{oldRS}
 		allRSs := []*apps.ReplicaSet{oldRS, newRS}
-		maxSurge := intstr.FromInt(0)
+		maxSurge := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-
-		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		scaled, err := controller.reconcileOldReplicaSets(ctx, allRSs, oldRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -215,7 +220,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 
 func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 	tests := []struct {
-		oldReplicas          int
+		oldReplicas          int32
 		readyPods            int
 		unHealthyPods        int
 		maxCleanupCount      int
@@ -256,8 +261,8 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		oldRSs := []*apps.ReplicaSet{oldRS}
-		maxSurge := intstr.FromInt(2)
-		maxUnavailable := intstr.FromInt(2)
+		maxSurge := intstr.FromInt32(2)
+		maxUnavailable := intstr.FromInt32(2)
 		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
 		fakeClientset := fake.Clientset{}
 
@@ -265,7 +270,8 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, int32(test.maxCleanupCount))
+		_, ctx := ktesting.NewTestContext(t)
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(ctx, oldRSs, deployment, int32(test.maxCleanupCount))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -279,16 +285,16 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 
 func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing.T) {
 	tests := []struct {
-		deploymentReplicas  int
+		deploymentReplicas  int32
 		maxUnavailable      intstr.IntOrString
 		readyPods           int
-		oldReplicas         int
+		oldReplicas         int32
 		scaleExpected       bool
-		expectedOldReplicas int
+		expectedOldReplicas int32
 	}{
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(0),
+			maxUnavailable:      intstr.FromInt32(0),
 			readyPods:           10,
 			oldReplicas:         10,
 			scaleExpected:       true,
@@ -296,7 +302,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		},
 		{
 			deploymentReplicas:  10,
-			maxUnavailable:      intstr.FromInt(2),
+			maxUnavailable:      intstr.FromInt32(2),
 			readyPods:           10,
 			oldReplicas:         10,
 			scaleExpected:       true,
@@ -304,21 +310,21 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          8,
 			oldReplicas:        10,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          10,
 			oldReplicas:        0,
 			scaleExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
-			maxUnavailable:     intstr.FromInt(2),
+			maxUnavailable:     intstr.FromInt32(2),
 			readyPods:          1,
 			oldReplicas:        10,
 			scaleExpected:      false,
@@ -332,14 +338,15 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
 		allRSs := []*apps.ReplicaSet{oldRS}
 		oldRSs := []*apps.ReplicaSet{oldRS}
-		maxSurge := intstr.FromInt(0)
+		maxSurge := intstr.FromInt32(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
+		_, ctx := ktesting.NewTestContext(t)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(ctx, allRSs, oldRSs, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -372,7 +379,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			continue
 		}
 		updated := updateAction.GetObject().(*apps.ReplicaSet)
-		if e, a := test.expectedOldReplicas, int(*(updated.Spec.Replicas)); e != a {
+		if e, a := test.expectedOldReplicas, *(updated.Spec.Replicas); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
 	}

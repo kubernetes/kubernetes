@@ -18,47 +18,103 @@ package upgrade
 
 import (
 	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/pflag"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
+const testConfigToken = `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data:
+    server: localhost:8000
+  name: prod
+contexts:
+- context:
+    cluster: prod
+    namespace: default
+    user: default-service-account
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data:
+`
+
 func TestEnforceRequirements(t *testing.T) {
+	tmpDir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpDir)
+	fullPath := filepath.Join(tmpDir, "test-config-file")
+	f, err := os.Create(fullPath)
+	if err != nil {
+		t.Errorf("Unable to create test file %q: %v", fullPath, err)
+	}
+	defer f.Close()
+	if _, err = f.WriteString(testConfigToken); err != nil {
+		t.Errorf("Unable to write test file %q: %v", fullPath, err)
+	}
 	tcases := []struct {
-		name          string
-		newK8sVersion string
-		dryRun        bool
-		flags         applyPlanFlags
-		expectedErr   bool
+		name               string
+		newK8sVersion      string
+		dryRun             bool
+		flags              applyPlanFlags
+		expectedErr        string
+		expectedErrNonRoot string
 	}{
 		{
-			name:        "Fail pre-flight check",
-			expectedErr: true,
+			name: "Fail pre-flight check",
+			flags: applyPlanFlags{
+				kubeConfigPath: fullPath,
+			},
+			expectedErr:        "ERROR CoreDNSUnsupportedPlugins",
+			expectedErrNonRoot: "user is not running as", // user is not running as (root || administrator)
 		},
 		{
-			name: "Bogus preflight check disabled when also 'all' is specified",
+			name: "Bogus preflight check specify all with individual check",
 			flags: applyPlanFlags{
 				ignorePreflightErrors: []string{"bogusvalue", "all"},
+				kubeConfigPath:        fullPath,
 			},
-			expectedErr: true,
+			expectedErr: "don't specify individual checks if 'all' is used",
 		},
 		{
 			name: "Fail to create client",
 			flags: applyPlanFlags{
 				ignorePreflightErrors: []string{"all"},
 			},
-			expectedErr: true,
+			expectedErr: "couldn't create a Kubernetes client from file",
 		},
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false)
-
-			if err == nil && tt.expectedErr {
+			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
 			}
-			if err != nil && !tt.expectedErr {
-				t.Errorf("Unexpected error: %+v", err)
+
+			expErr := tt.expectedErr
+			// pre-flight check expects the user to be root, so the root and non-root should hit different errors
+			isPrivileged := preflight.IsPrivilegedUserCheck{}
+			// this will return an array of errors if we're not running as a privileged user.
+			_, errors := isPrivileged.Check()
+			if len(errors) != 0 && len(tt.expectedErrNonRoot) != 0 {
+				expErr = tt.expectedErrNonRoot
+			}
+			if err != nil && !strings.Contains(err.Error(), expErr) {
+				t.Fatalf("enforceRequirements returned unexpected error, expected: %s, got %v", expErr, err)
 			}
 		})
 	}
@@ -85,24 +141,21 @@ func TestPrintConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
 			},
-			expectedBytes: []byte(`[upgrade/config] Configuration used:
+			expectedBytes: []byte(fmt.Sprintf(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta2
+	apiVersion: %s
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
+	dns: {}
 	etcd:
 	  local:
 	    dataDir: /some/path
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking: {}
+	proxy: {}
 	scheduler: {}
-`),
+`, kubeadmapiv1.SchemeGroupVersion.String())),
 		},
 		{
 			name: "cluster config with ServiceSubnet and external Etcd",
@@ -116,16 +169,12 @@ func TestPrintConfiguration(t *testing.T) {
 						Endpoints: []string{"https://one-etcd-instance:2379"},
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta2
+	apiVersion: ` + kubeadmapiv1.SchemeGroupVersion.String() + `
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
+	dns: {}
 	etcd:
 	  external:
 	    caFile: ""
@@ -137,6 +186,7 @@ func TestPrintConfiguration(t *testing.T) {
 	kubernetesVersion: v1.7.1
 	networking:
 	  serviceSubnet: 10.96.0.1/12
+	proxy: {}
 	scheduler: {}
 `),
 		},
@@ -144,7 +194,7 @@ func TestPrintConfiguration(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			rt.buf = bytes.NewBufferString("")
-			printConfiguration(rt.cfg, rt.buf)
+			printConfiguration(rt.cfg, rt.buf, &output.TextPrinter{})
 			actualBytes := rt.buf.Bytes()
 			if !bytes.Equal(actualBytes, rt.expectedBytes) {
 				t.Errorf(

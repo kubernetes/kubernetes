@@ -22,7 +22,7 @@ func CopyFile(source string, dest string) error {
 
 	uid := int(st.Uid)
 	gid := int(st.Gid)
-	modeType := si.Mode()&os.ModeType
+	modeType := si.Mode() & os.ModeType
 
 	// Handle symlinks
 	if modeType == os.ModeSymlink {
@@ -52,19 +52,7 @@ func CopyFile(source string, dest string) error {
 
 	// Handle regular files
 	if si.Mode().IsRegular() {
-		sf, err := os.Open(source)
-		if err != nil {
-			return err
-		}
-		defer sf.Close()
-
-		df, err := os.Create(dest)
-		if err != nil {
-			return err
-		}
-		defer df.Close()
-
-		_, err = io.Copy(df, sf)
+		err = copyInternal(source, dest)
 		if err != nil {
 			return err
 		}
@@ -83,6 +71,28 @@ func CopyFile(source string, dest string) error {
 	}
 
 	return nil
+}
+
+func copyInternal(source, dest string) (retErr error) {
+	sf, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+
+	df, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := df.Close()
+		if retErr == nil {
+			retErr = err
+		}
+	}()
+
+	_, err = io.Copy(df, sf)
+	return err
 }
 
 // CopyDirectory copies the files under the source directory
@@ -115,6 +125,7 @@ func CopyDirectory(source string, dest string) error {
 		if err != nil {
 			return nil
 		}
+		destPath := filepath.Join(dest, relPath)
 
 		if info.IsDir() {
 			// Skip the source directory.
@@ -128,18 +139,20 @@ func CopyDirectory(source string, dest string) error {
 				uid := int(st.Uid)
 				gid := int(st.Gid)
 
-				if err := os.Mkdir(filepath.Join(dest, relPath), info.Mode()); err != nil {
+				if err := os.Mkdir(destPath, info.Mode()); err != nil {
 					return err
 				}
-
-				if err := os.Lchown(filepath.Join(dest, relPath), uid, gid); err != nil {
+				if err := os.Lchown(destPath, uid, gid); err != nil {
+					return err
+				}
+				if err := os.Chmod(destPath, info.Mode()); err != nil {
 					return err
 				}
 			}
 			return nil
 		}
 
-		return CopyFile(path, filepath.Join(dest, relPath))
+		return CopyFile(path, destPath)
 	})
 }
 

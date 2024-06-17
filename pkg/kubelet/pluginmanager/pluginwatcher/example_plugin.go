@@ -50,7 +50,7 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	klog.Infof("GetExampleInfo v1beta1field: %s", rqt.V1Beta1Field)
+	klog.InfoS("GetExampleInfo v1beta1field", "field", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
@@ -63,7 +63,7 @@ type pluginServiceV1Beta2 struct {
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
-	klog.Infof("GetExampleInfo v1beta2_field: %s", rqt.V1Beta2Field)
+	klog.InfoS("GetExampleInfo v1beta2_field", "field", rqt.V1Beta2Field)
 	return &v1beta2.ExampleResponse{}, nil
 }
 
@@ -105,7 +105,7 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	klog.Errorf("Registration is: %v\n", status)
+	klog.InfoS("Notify registration status", "status", status)
 
 	if e.registrationStatus != nil {
 		e.registrationStatus <- *status
@@ -116,13 +116,13 @@ func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *re
 
 // Serve starts a pluginwatcher server and one or more of the plugin services
 func (e *examplePlugin) Serve(services ...string) error {
-	klog.Infof("starting example server at: %s\n", e.endpoint)
+	klog.InfoS("Starting example server", "endpoint", e.endpoint)
 	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
 		return err
 	}
 
-	klog.Infof("example server started at: %s\n", e.endpoint)
+	klog.InfoS("Example server started", "endpoint", e.endpoint)
 	e.grpcServer = grpc.NewServer()
 
 	// Registers kubelet plugin watcher api.
@@ -147,7 +147,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 		defer e.wg.Done()
 		// Blocking call to accept incoming connections.
 		if err := e.grpcServer.Serve(lis); err != nil {
-			klog.Errorf("example server stopped serving: %v", err)
+			klog.ErrorS(err, "Example server stopped serving")
 		}
 	}()
 
@@ -155,7 +155,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 }
 
 func (e *examplePlugin) Stop() error {
-	klog.Infof("Stopping example server at: %s\n", e.endpoint)
+	klog.InfoS("Stopping example server", "endpoint", e.endpoint)
 
 	e.grpcServer.Stop()
 	c := make(chan struct{})

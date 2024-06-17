@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -24,17 +25,21 @@ import (
 	"math"
 	"net"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	certificates "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/certificate"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	netutils "k8s.io/utils/net"
 )
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
@@ -104,23 +109,10 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	}
 
 	m, err := certificate.NewManager(&certificate.Config{
-		ClientsetFn: clientsetFn,
-		GetTemplate: getTemplate,
-		SignerName:  certificates.KubeletServingSignerName,
-		Usages: []certificates.KeyUsage{
-			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-			//
-			// Digital signature allows the certificate to be used to verify
-			// digital signatures used during TLS negotiation.
-			certificates.UsageDigitalSignature,
-			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symmetric keys negotiated during TLS setup
-			// and used for data transfer.
-			certificates.UsageKeyEncipherment,
-			// ServerAuth allows the cert to be used by a TLS server to
-			// authenticate itself to a TLS client.
-			certificates.UsageServerAuth,
-		},
+		ClientsetFn:             clientsetFn,
+		GetTemplate:             getTemplate,
+		SignerName:              certificates.KubeletServingSignerName,
+		GetUsages:               certificate.DefaultKubeletServingGetUsages,
 		CertificateStore:        certificateStore,
 		CertificateRotation:     certificateRotationAge,
 		CertificateRenewFailure: certificateRenewFailure,
@@ -129,7 +121,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
 	}
 	legacyregistry.RawMustRegister(compbasemetrics.NewGaugeFunc(
-		compbasemetrics.GaugeOpts{
+		&compbasemetrics.GaugeOpts{
 			Subsystem: metrics.KubeletSubsystem,
 			Name:      "certificate_manager_server_ttl_seconds",
 			Help: "Gauge of the shortest TTL (time-to-live) of " +
@@ -141,7 +133,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		},
 		func() float64 {
 			if c := m.Current(); c != nil && c.Leaf != nil {
-				return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+				return math.Trunc(time.Until(c.Leaf.NotAfter).Seconds())
 			}
 			return math.Inf(1)
 		},
@@ -159,13 +151,13 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 
 		switch address.Type {
 		case v1.NodeHostName:
-			if ip := net.ParseIP(address.Address); ip != nil {
+			if ip := netutils.ParseIPSloppy(address.Address); ip != nil {
 				seenIPs[address.Address] = true
 			} else {
 				seenDNSNames[address.Address] = true
 			}
 		case v1.NodeExternalIP, v1.NodeInternalIP:
-			if ip := net.ParseIP(address.Address); ip != nil {
+			if ip := netutils.ParseIPSloppy(address.Address); ip != nil {
 				seenIPs[address.Address] = true
 			}
 		case v1.NodeExternalDNS, v1.NodeInternalDNS:
@@ -177,7 +169,7 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 		dnsNames = append(dnsNames, dnsName)
 	}
 	for ip := range seenIPs {
-		ips = append(ips, net.ParseIP(ip))
+		ips = append(ips, netutils.ParseIPSloppy(ip))
 	}
 
 	// return in stable order
@@ -229,22 +221,7 @@ func NewKubeletClientCertificateManager(
 			},
 		},
 		SignerName: certificates.KubeAPIServerClientKubeletSignerName,
-		Usages: []certificates.KeyUsage{
-			// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-			//
-			// DigitalSignature allows the certificate to be used to verify
-			// digital signatures including signatures used during TLS
-			// negotiation.
-			certificates.UsageDigitalSignature,
-			// KeyEncipherment allows the cert/key pair to be used to encrypt
-			// keys, including the symmetric keys negotiated during TLS setup
-			// and used for data transfer..
-			certificates.UsageKeyEncipherment,
-			// ClientAuth allows the cert to be used by a TLS client to
-			// authenticate itself to the TLS server.
-			certificates.UsageClientAuth,
-		},
-
+		GetUsages:  certificate.DefaultKubeletClientGetUsages,
 		// For backwards compatibility, the kubelet supports the ability to
 		// provide a higher privileged certificate as initial data that will
 		// then be rotated immediately. This code path is used by kubeadm on
@@ -260,4 +237,67 @@ func NewKubeletClientCertificateManager(
 	}
 
 	return m, nil
+}
+
+// NewKubeletServerCertificateDynamicFileManager creates a certificate manager based on reading and watching certificate and key files.
+// The returned struct implements certificate.Manager interface, enabling using it like other CertificateManager in this package.
+// But the struct doesn't communicate with API server to perform certificate request at all.
+func NewKubeletServerCertificateDynamicFileManager(certFile, keyFile string) (certificate.Manager, error) {
+	c, err := dynamiccertificates.NewDynamicServingContentFromFiles("kubelet-server-cert-files", certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to set up dynamic certificate manager for kubelet server cert files: %w", err)
+	}
+	m := &kubeletServerCertificateDynamicFileManager{
+		dynamicCertificateContent: c,
+		certFile:                  certFile,
+		keyFile:                   keyFile,
+	}
+	m.Enqueue()
+	c.AddListener(m)
+	return m, nil
+}
+
+// kubeletServerCertificateDynamicFileManager uses a dynamic CertKeyContentProvider based on cert and key files.
+type kubeletServerCertificateDynamicFileManager struct {
+	cancelFn                  context.CancelFunc
+	certFile                  string
+	keyFile                   string
+	dynamicCertificateContent *dynamiccertificates.DynamicCertKeyPairContent
+	currentTLSCertificate     atomic.Pointer[tls.Certificate]
+}
+
+// Enqueue implements the functions to be notified when the serving cert content changes.
+func (m *kubeletServerCertificateDynamicFileManager) Enqueue() {
+	certContent, keyContent := m.dynamicCertificateContent.CurrentCertKeyContent()
+	cert, err := tls.X509KeyPair(certContent, keyContent)
+	if err != nil {
+		klog.ErrorS(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
+		return
+	}
+	m.currentTLSCertificate.Store(&cert)
+	klog.V(4).InfoS("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
+}
+
+// Current returns the last valid certificate key pair loaded from files.
+func (m *kubeletServerCertificateDynamicFileManager) Current() *tls.Certificate {
+	return m.currentTLSCertificate.Load()
+}
+
+// Start starts watching the certificate and key files
+func (m *kubeletServerCertificateDynamicFileManager) Start() {
+	var ctx context.Context
+	ctx, m.cancelFn = context.WithCancel(context.Background())
+	go m.dynamicCertificateContent.Run(ctx, 1)
+}
+
+// Stop stops watching the certificate and key files
+func (m *kubeletServerCertificateDynamicFileManager) Stop() {
+	if m.cancelFn != nil {
+		m.cancelFn()
+	}
+}
+
+// ServerHealthy always returns true since the file manager doesn't communicate with any server
+func (m *kubeletServerCertificateDynamicFileManager) ServerHealthy() bool {
+	return true
 }

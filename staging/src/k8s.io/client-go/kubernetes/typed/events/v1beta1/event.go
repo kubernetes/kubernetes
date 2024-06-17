@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	eventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // EventsGetter has a method to return a EventInterface.
@@ -46,6 +52,7 @@ type EventInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EventList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error)
+	Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Event, err error)
 	EventExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *events) Get(ctx context.Context, name string, options v1.GetOptions) (r
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EventList, err error) {
+func (c *events) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EventList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for events, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for events", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for events ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for events", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Events that match those selectors.
+func (c *events) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EventList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Events
+func (c *events) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EventList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.EventList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, dat
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied event.
+func (c *events) Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Event, err error) {
+	if event == nil {
+		return nil, fmt.Errorf("event provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+	name := event.Name
+	if name == nil {
+		return nil, fmt.Errorf("event.Name must be provided to Apply")
+	}
+	result = &v1beta1.Event{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("events").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

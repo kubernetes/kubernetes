@@ -1,146 +1,87 @@
-// +build linux
-
 package fs
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/configs"
-	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-var (
-	subsystemsLegacy = subsystemSet{
-		&CpusetGroup{},
-		&DevicesGroup{},
-		&MemoryGroup{},
-		&CpuGroup{},
-		&CpuacctGroup{},
-		&PidsGroup{},
-		&BlkioGroup{},
-		&HugetlbGroup{},
-		&NetClsGroup{},
-		&NetPrioGroup{},
-		&PerfEventGroup{},
-		&FreezerGroup{},
-		&NameGroup{GroupName: "name=systemd", Join: true},
-	}
-	HugePageSizes, _ = cgroups.GetHugePageSize()
-)
+var subsystems = []subsystem{
+	&CpusetGroup{},
+	&DevicesGroup{},
+	&MemoryGroup{},
+	&CpuGroup{},
+	&CpuacctGroup{},
+	&PidsGroup{},
+	&BlkioGroup{},
+	&HugetlbGroup{},
+	&NetClsGroup{},
+	&NetPrioGroup{},
+	&PerfEventGroup{},
+	&FreezerGroup{},
+	&RdmaGroup{},
+	&NameGroup{GroupName: "name=systemd", Join: true},
+	&NameGroup{GroupName: "misc", Join: true},
+}
 
 var errSubsystemDoesNotExist = errors.New("cgroup: subsystem does not exist")
 
-type subsystemSet []subsystem
-
-func (s subsystemSet) Get(name string) (subsystem, error) {
-	for _, ss := range s {
-		if ss.Name() == name {
-			return ss, nil
-		}
+func init() {
+	// If using cgroups-hybrid mode then add a "" controller indicating
+	// it should join the cgroups v2.
+	if cgroups.IsCgroup2HybridMode() {
+		subsystems = append(subsystems, &NameGroup{GroupName: "", Join: true})
 	}
-	return nil, errSubsystemDoesNotExist
 }
 
 type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
-	// Returns the stats, as 'stats', corresponding to the cgroup under 'path'.
+	// GetStats fills in the stats for the subsystem.
 	GetStats(path string, stats *cgroups.Stats) error
-	// Removes the cgroup represented by 'cgroupData'.
-	Remove(*cgroupData) error
-	// Creates and joins the cgroup represented by 'cgroupData'.
-	Apply(*cgroupData) error
-	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *configs.Cgroup) error
+	// Apply creates and joins a cgroup, adding pid into it. Some
+	// subsystems use resources to pre-configure the cgroup parents
+	// before creating or joining it.
+	Apply(path string, r *configs.Resources, pid int) error
+	// Set sets the cgroup resources.
+	Set(path string, r *configs.Resources) error
 }
 
 type manager struct {
-	mu       sync.Mutex
-	cgroups  *configs.Cgroup
-	rootless bool // ignore permission-related errors
-	paths    map[string]string
+	mu      sync.Mutex
+	cgroups *configs.Cgroup
+	paths   map[string]string
 }
 
-func NewManager(cg *configs.Cgroup, paths map[string]string, rootless bool) cgroups.Manager {
+func NewManager(cg *configs.Cgroup, paths map[string]string) (cgroups.Manager, error) {
+	// Some v1 controllers (cpu, cpuset, and devices) expect
+	// cgroups.Resources to not be nil in Apply.
+	if cg.Resources == nil {
+		return nil, errors.New("cgroup v1 manager needs configs.Resources to be set during manager creation")
+	}
+	if cg.Resources.Unified != nil {
+		return nil, cgroups.ErrV1NoUnified
+	}
+
+	if paths == nil {
+		var err error
+		paths, err = initPaths(cg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &manager{
-		cgroups:  cg,
-		paths:    paths,
-		rootless: rootless,
-	}
-}
-
-// The absolute path to the root of the cgroup hierarchies.
-var cgroupRootLock sync.Mutex
-var cgroupRoot string
-
-// Gets the cgroupRoot.
-func getCgroupRoot() (string, error) {
-	cgroupRootLock.Lock()
-	defer cgroupRootLock.Unlock()
-
-	if cgroupRoot != "" {
-		return cgroupRoot, nil
-	}
-
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	var root string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		text := scanner.Text()
-		fields := strings.Split(text, " ")
-		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		index := strings.Index(text, " - ")
-		postSeparatorFields := strings.Fields(text[index+3:])
-		numPostFields := len(postSeparatorFields)
-
-		// This is an error as we can't detect if the mount is for "cgroup"
-		if numPostFields == 0 {
-			return "", fmt.Errorf("mountinfo: found no fields post '-' in %q", text)
-		}
-
-		if postSeparatorFields[0] == "cgroup" {
-			// Check that the mount is properly formatted.
-			if numPostFields < 3 {
-				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
-			}
-
-			root = filepath.Dir(fields[4])
-			break
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	if root == "" {
-		return "", errors.New("no cgroup mount found in mountinfo")
-	}
-
-	if _, err := os.Stat(root); err != nil {
-		return "", err
-	}
-
-	cgroupRoot = root
-	return cgroupRoot, nil
-}
-
-type cgroupData struct {
-	root      string
-	innerPath string
-	config    *configs.Cgroup
-	pid       int
+		cgroups: cg,
+		paths:   paths,
+	}, nil
 }
 
 // isIgnorableError returns whether err is a permission error (in the loose
@@ -152,8 +93,6 @@ func isIgnorableError(rootless bool, err error) bool {
 	if !rootless {
 		return false
 	}
-	// TODO: rm errors.Cause once we switch to %w everywhere
-	err = errors.Cause(err)
 	// Is it an ordinary EPERM?
 	if errors.Is(err, os.ErrPermission) {
 		return true
@@ -166,58 +105,31 @@ func isIgnorableError(rootless bool, err error) bool {
 	return false
 }
 
-func (m *manager) getSubsystems() subsystemSet {
-	return subsystemsLegacy
-}
-
 func (m *manager) Apply(pid int) (err error) {
-	if m.cgroups == nil {
-		return nil
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var c = m.cgroups
+	c := m.cgroups
 
-	d, err := getCgroupData(m.cgroups, pid)
-	if err != nil {
-		return err
-	}
-
-	m.paths = make(map[string]string)
-	if c.Paths != nil {
-		for name, path := range c.Paths {
-			_, err := d.path(name)
-			if err != nil {
-				if cgroups.IsNotFound(err) {
-					continue
-				}
-				return err
-			}
-			m.paths[name] = path
+	for _, sys := range subsystems {
+		name := sys.Name()
+		p, ok := m.paths[name]
+		if !ok {
+			continue
 		}
-		return cgroups.EnterPid(m.paths, pid)
-	}
 
-	for _, sys := range m.getSubsystems() {
-		p, err := d.path(sys.Name())
-		if err != nil {
-			// The non-presence of the devices subsystem is
-			// considered fatal for security reasons.
-			if cgroups.IsNotFound(err) && (c.SkipDevices || sys.Name() != "devices") {
-				continue
-			}
-			return err
-		}
-		m.paths[sys.Name()] = p
-
-		if err := sys.Apply(d); err != nil {
+		if err := sys.Apply(p, c.Resources, pid); err != nil {
 			// In the case of rootless (including euid=0 in userns), where an
 			// explicit cgroup path hasn't been set, we don't bail on error in
-			// case of permission problems. Cases where limits have been set
-			// (and we couldn't create our own cgroup) are handled by Set.
-			if isIgnorableError(m.rootless, err) && m.cgroups.Path == "" {
-				delete(m.paths, sys.Name())
+			// case of permission problems here, but do delete the path from
+			// the m.paths map, since it is either non-existent and could not
+			// be created, or the pid could not be added to it.
+			//
+			// Cases where limits for the subsystem have been set are handled
+			// later by Set, which fails with a friendly error (see
+			// if path == "" in Set).
+			if isIgnorableError(c.Rootless, err) && c.Path == "" {
+				delete(m.paths, name)
 				continue
 			}
 			return err
@@ -228,16 +140,9 @@ func (m *manager) Apply(pid int) (err error) {
 }
 
 func (m *manager) Destroy() error {
-	if m.cgroups == nil || m.cgroups.Paths != nil {
-		return nil
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := cgroups.RemovePaths(m.paths); err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+	return cgroups.RemovePaths(m.paths)
 }
 
 func (m *manager) Path(subsys string) string {
@@ -250,9 +155,9 @@ func (m *manager) GetStats() (*cgroups.Stats, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	stats := cgroups.NewStats()
-	for name, path := range m.paths {
-		sys, err := m.getSubsystems().Get(name)
-		if err == errSubsystemDoesNotExist || !cgroups.PathExists(path) {
+	for _, sys := range subsystems {
+		path := m.paths[sys.Name()]
+		if path == "" {
 			continue
 		}
 		if err := sys.GetStats(path, stats); err != nil {
@@ -262,26 +167,25 @@ func (m *manager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
-func (m *manager) Set(container *configs.Config) error {
-	if container.Cgroups == nil {
+func (m *manager) Set(r *configs.Resources) error {
+	if r == nil {
 		return nil
 	}
 
-	// If Paths are set, then we are just joining cgroups paths
-	// and there is no need to set any values.
-	if m.cgroups != nil && m.cgroups.Paths != nil {
-		return nil
+	if r.Unified != nil {
+		return cgroups.ErrV1NoUnified
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, sys := range m.getSubsystems() {
+	for _, sys := range subsystems {
 		path := m.paths[sys.Name()]
-		if err := sys.Set(path, container.Cgroups); err != nil {
-			if m.rootless && sys.Name() == "devices" {
+		if err := sys.Set(path, r); err != nil {
+			// When rootless is true, errors from the device subsystem
+			// are ignored, as it is really not expected to work.
+			if m.cgroups.Rootless && sys.Name() == "devices" {
 				continue
 			}
-			// When m.Rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
 			// However, errors from other subsystems are not ignored.
 			// see @test "runc create (rootless + limits + no cgrouppath + no permission) fails with informative error"
 			if path == "" {
@@ -300,14 +204,14 @@ func (m *manager) Set(container *configs.Config) error {
 // provided
 func (m *manager) Freeze(state configs.FreezerState) error {
 	path := m.Path("freezer")
-	if m.cgroups == nil || path == "" {
+	if path == "" {
 		return errors.New("cannot toggle freezer: cgroups not configured for container")
 	}
 
 	prevState := m.cgroups.Resources.Freezer
 	m.cgroups.Resources.Freezer = state
 	freezer := &FreezerGroup{}
-	if err := freezer.Set(path, m.cgroups); err != nil {
+	if err := freezer.Set(path, m.cgroups.Resources); err != nil {
 		m.cgroups.Resources.Freezer = prevState
 		return err
 	}
@@ -320,82 +224,6 @@ func (m *manager) GetPids() ([]int, error) {
 
 func (m *manager) GetAllPids() ([]int, error) {
 	return cgroups.GetAllPids(m.Path("devices"))
-}
-
-func getCgroupData(c *configs.Cgroup, pid int) (*cgroupData, error) {
-	root, err := getCgroupRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	if (c.Name != "" || c.Parent != "") && c.Path != "" {
-		return nil, errors.New("cgroup: either Path or Name and Parent should be used")
-	}
-
-	// XXX: Do not remove this code. Path safety is important! -- cyphar
-	cgPath := libcontainerUtils.CleanPath(c.Path)
-	cgParent := libcontainerUtils.CleanPath(c.Parent)
-	cgName := libcontainerUtils.CleanPath(c.Name)
-
-	innerPath := cgPath
-	if innerPath == "" {
-		innerPath = filepath.Join(cgParent, cgName)
-	}
-
-	return &cgroupData{
-		root:      root,
-		innerPath: innerPath,
-		config:    c,
-		pid:       pid,
-	}, nil
-}
-
-func (raw *cgroupData) path(subsystem string) (string, error) {
-	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
-	if filepath.IsAbs(raw.innerPath) {
-		mnt, err := cgroups.FindCgroupMountpoint(raw.root, subsystem)
-		// If we didn't mount the subsystem, there is no point we make the path.
-		if err != nil {
-			return "", err
-		}
-
-		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
-		return filepath.Join(raw.root, filepath.Base(mnt), raw.innerPath), nil
-	}
-
-	// Use GetOwnCgroupPath instead of GetInitCgroupPath, because the creating
-	// process could in container and shared pid namespace with host, and
-	// /proc/1/cgroup could point to whole other world of cgroups.
-	parentPath, err := cgroups.GetOwnCgroupPath(subsystem)
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(parentPath, raw.innerPath), nil
-}
-
-func (raw *cgroupData) join(subsystem string) (string, error) {
-	path, err := raw.path(subsystem)
-	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return "", err
-	}
-	if err := cgroups.WriteCgroupProc(path, raw.pid); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func removePath(p string, err error) error {
-	if err != nil {
-		return err
-	}
-	if p != "" {
-		return os.RemoveAll(p)
-	}
-	return nil
 }
 
 func (m *manager) GetPaths() map[string]string {
@@ -420,4 +248,18 @@ func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 
 func (m *manager) Exists() bool {
 	return cgroups.PathExists(m.Path("devices"))
+}
+
+func OOMKillCount(path string) (uint64, error) {
+	return fscommon.GetValueByKey(path, "memory.oom_control", "oom_kill")
+}
+
+func (m *manager) OOMKillCount() (uint64, error) {
+	c, err := OOMKillCount(m.Path("memory"))
+	// Ignore ENOENT when rootless as it couldn't create cgroup.
+	if err != nil && m.cgroups.Rootless && os.IsNotExist(err) {
+		err = nil
+	}
+
+	return c, err
 }

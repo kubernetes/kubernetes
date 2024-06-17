@@ -22,6 +22,29 @@ import (
 	"strconv"
 )
 
+type pathOptions struct {
+	path *Path
+}
+
+// PathOption modifies a pathOptions
+type PathOption func(o *pathOptions)
+
+// WithPath generates a PathOption
+func WithPath(p *Path) PathOption {
+	return func(o *pathOptions) {
+		o.path = p
+	}
+}
+
+// ToPath produces *Path from a set of PathOption
+func ToPath(opts ...PathOption) *Path {
+	c := &pathOptions{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c.path
+}
+
 // Path represents the path from some root to a particular field.
 type Path struct {
 	name   string // the name of this field or "" if this is an index
@@ -67,6 +90,9 @@ func (p *Path) Key(key string) *Path {
 
 // String produces a string representation of the Path.
 func (p *Path) String() string {
+	if p == nil {
+		return "<nil>"
+	}
 	// make a slice to iterate
 	elems := []*Path{}
 	for ; p != nil; p = p.parent {

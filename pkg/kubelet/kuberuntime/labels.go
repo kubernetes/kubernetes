@@ -20,12 +20,11 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/kubelet/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -68,7 +67,7 @@ type annotatedContainerInfo struct {
 	PodTerminationGracePeriod *int64
 	TerminationMessagePath    string
 	TerminationMessagePolicy  v1.TerminationMessagePolicy
-	PreStopHandler            *v1.Handler
+	PreStopHandler            *v1.LifecycleHandler
 	ContainerPorts            []v1.ContainerPort
 }
 
@@ -129,7 +128,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		// Using json encoding so that the PreStop handler object is readable after writing as a label
 		rawPreStop, err := json.Marshal(container.Lifecycle.PreStop)
 		if err != nil {
-			klog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
+			klog.ErrorS(err, "Unable to marshal lifecycle PreStop handler for container", "containerName", container.Name, "pod", klog.KObj(pod))
 		} else {
 			annotations[containerPreStopHandlerLabel] = string(rawPreStop)
 		}
@@ -138,7 +137,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	if len(container.Ports) > 0 {
 		rawContainerPorts, err := json.Marshal(container.Ports)
 		if err != nil {
-			klog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
+			klog.ErrorS(err, "Unable to marshal container ports for container", "containerName", container.Name, "pod", klog.KObj(pod))
 		} else {
 			annotations[containerPortsLabel] = string(rawContainerPorts)
 		}
@@ -192,28 +191,28 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 	}
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashLabel, "annotations", annotations)
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerRestartCountLabel, "annotations", annotations)
 	}
 	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", podDeletionGracePeriodLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", podDeletionGracePeriodLabel, "annotations", annotations)
 	}
 	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", podTerminationGracePeriodLabel, "annotations", annotations)
 	}
 
-	preStopHandler := &v1.Handler{}
+	preStopHandler := &v1.LifecycleHandler{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerPreStopHandlerLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
 
 	containerPorts := []v1.ContainerPort{}
 	if found, err := getJSONObjectFromLabel(annotations, containerPortsLabel, &containerPorts); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerPortsLabel, annotations, err)
+		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerPortsLabel, "annotations", annotations)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
 	}
@@ -226,7 +225,7 @@ func getStringValueFromLabel(labels map[string]string, label string) string {
 		return value
 	}
 	// Do not report error, because there should be many old containers without label now.
-	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).InfoS("Container doesn't have requested label, it may be an old or invalid container", "label", label)
 	// Return empty string "" for these containers, the caller will get value by other ways.
 	return ""
 }
@@ -241,7 +240,7 @@ func getIntValueFromLabel(labels map[string]string, label string) (int, error) {
 		return intValue, nil
 	}
 	// Do not report error, because there should be many old containers without label now.
-	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).InfoS("Container doesn't have requested label, it may be an old or invalid container", "label", label)
 	// Just set the value to 0
 	return 0, nil
 }
@@ -256,7 +255,7 @@ func getUint64ValueFromLabel(labels map[string]string, label string) (uint64, er
 		return intValue, nil
 	}
 	// Do not report error, because there should be many old containers without label now.
-	klog.V(3).Infof("Container doesn't have label %s, it may be an old or invalid container", label)
+	klog.V(3).InfoS("Container doesn't have requested label, it may be an old or invalid container", "label", label)
 	// Just set the value to 0
 	return 0, nil
 }

@@ -62,13 +62,17 @@ func (ingressClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 	if !apiequality.Semantic.DeepEqual(oldIngressClass.Spec, newIngressClass.Spec) {
 		newIngressClass.Generation = oldIngressClass.Generation + 1
 	}
-
 }
 
 // Validate validates a new IngressClass.
 func (ingressClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ingressClass := obj.(*networking.IngressClass)
 	return validation.ValidateIngressClass(ingressClass)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (ingressClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -87,6 +91,11 @@ func (ingressClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 	oldIngressClass := old.(*networking.IngressClass)
 
 	return validation.ValidateIngressClassUpdate(newIngressClass, oldIngressClass)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for IngressClass

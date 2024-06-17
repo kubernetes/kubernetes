@@ -20,19 +20,28 @@ import (
 	"path"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/rest"
-	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/apiserver/pkg/storageversion"
 )
+
+// ConvertabilityChecker indicates what versions a GroupKind is available in.
+type ConvertabilityChecker interface {
+	// VersionsForGroupKind indicates what versions are available to convert a group kind. This determines
+	// what our decoding abilities are.
+	VersionsForGroupKind(gk schema.GroupKind) []schema.GroupVersion
+}
 
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
 // It handles URLs of the form:
@@ -46,6 +55,11 @@ type APIGroupVersion struct {
 
 	// GroupVersion is the external group version
 	GroupVersion schema.GroupVersion
+
+	// AllServedVersionsByResource is indexed by resource and maps to a list of versions that resource exists in.
+	// This was created so that StorageVersion for APIs can include a list of all version that are served for each
+	// GroupResource tuple.
+	AllServedVersionsByResource map[string][]string
 
 	// OptionsExternalVersion controls the Kubernetes APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and metav1.ListOptions. Other implementors may
@@ -65,12 +79,14 @@ type APIGroupVersion struct {
 	Serializer     runtime.NegotiatedSerializer
 	ParameterCodec runtime.ParameterCodec
 
-	Typer           runtime.ObjectTyper
-	Creater         runtime.ObjectCreater
-	Convertor       runtime.ObjectConvertor
-	Defaulter       runtime.ObjectDefaulter
-	Linker          runtime.SelfLinker
-	UnsafeConvertor runtime.ObjectConvertor
+	Typer                 runtime.ObjectTyper
+	Creater               runtime.ObjectCreater
+	Convertor             runtime.ObjectConvertor
+	ConvertabilityChecker ConvertabilityChecker
+	Defaulter             runtime.ObjectDefaulter
+	Namer                 runtime.Namer
+	UnsafeConvertor       runtime.ObjectConvertor
+	TypeConverter         managedfields.TypeConverter
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
@@ -83,9 +99,6 @@ type APIGroupVersion struct {
 
 	MinRequestTimeout time.Duration
 
-	// OpenAPIModels exposes the OpenAPI models to each individual handler.
-	OpenAPIModels openapiproto.Models
-
 	// The limit on the request body size that would be accepted and decoded in a write request.
 	// 0 means no limit.
 	MaxRequestBodyBytes int64
@@ -94,7 +107,7 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]apidiscoveryv2.APIResourceDiscovery, []*storageversion.ResourceInfo, error) {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
@@ -102,11 +115,28 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 		minRequestTimeout: g.MinRequestTimeout,
 	}
 
-	apiResources, ws, registrationErrors := installer.Install()
+	apiResources, resourceInfos, ws, registrationErrors := installer.Install()
 	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return utilerrors.NewAggregate(registrationErrors)
+	aggregatedDiscoveryResources, err := ConvertGroupVersionIntoToDiscovery(apiResources)
+	if err != nil {
+		registrationErrors = append(registrationErrors, err)
+	}
+	return aggregatedDiscoveryResources, removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
+}
+
+func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {
+	var filtered []*storageversion.ResourceInfo
+	for _, info := range infos {
+		// if EncodingVersion is empty, then the apiserver does not
+		// need to register this resource via the storage version API,
+		// thus we can remove it.
+		if info != nil && len(info.EncodingVersion) > 0 {
+			filtered = append(filtered, info)
+		}
+	}
+	return filtered
 }
 
 // staticLister implements the APIResourceLister interface

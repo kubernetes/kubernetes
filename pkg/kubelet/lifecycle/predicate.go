@@ -18,17 +18,18 @@ package lifecycle
 
 import (
 	"fmt"
+	"runtime"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -62,7 +63,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.Errorf("Cannot get Node info: %v", err)
+		klog.ErrorS(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "InvalidNodeInfo",
@@ -70,13 +71,46 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	admitPod := attrs.Pod
+
+	// perform the checks that preemption will not help first to avoid meaningless pod eviction
+	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSSelectorNodeLabelDoesNotMatch",
+			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
+		}
+	}
+	if rejectPodAdmissionBasedOnOSField(admitPod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "PodOSNotSupported",
+			Message: "Failed to admit pod as the OS field doesn't match node OS",
+		}
+	}
+
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+
+	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, c := range admitPod.Spec.InitContainers {
+			if types.IsRestartableInitContainer(&c) {
+				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)
+				klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  "InitContainerRestartPolicyForbidden",
+					Message: message,
+				}
+			}
+		}
+	}
+
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
-		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "UnexpectedAdmissionError",
@@ -94,23 +128,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
 
-	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
-	fit := len(reasons) == 0 && err == nil
-	if err != nil {
-		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-		klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
-		return PodAdmitResult{
-			Admit:   fit,
-			Reason:  "UnexpectedAdmissionError",
-			Message: message,
-		}
-	}
+	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
+	fit := len(reasons) == 0
 	if !fit {
 		reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnexpectedAdmissionError",
@@ -123,7 +148,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var message string
 		if len(reasons) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  "UnknownReason",
@@ -136,15 +161,15 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		case *PredicateFailureError:
 			reason = re.PredicateName
 			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
+			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		case *InsufficientResourceError:
 			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 			message = re.Error()
-			klog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(admitPod), message)
+			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		default:
 			reason = "UnexpectedPredicateFailureType"
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
+			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
 			Admit:   fit,
@@ -155,6 +180,38 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
+// We expect the kubelet status reconcile which happens every 10sec to update the node labels if there is a mismatch.
+func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
+	labels := node.Labels
+	osName, osLabelExists := labels[v1.LabelOSStable]
+	if !osLabelExists || osName != runtime.GOOS {
+		if len(labels) == 0 {
+			labels = make(map[string]string)
+		}
+		labels[v1.LabelOSStable] = runtime.GOOS
+	}
+	podLabelSelector, podOSLabelExists := pod.Labels[v1.LabelOSStable]
+	if !podOSLabelExists {
+		// If the labelselector didn't exist, let's keep the current behavior as is
+		return false
+	} else if podOSLabelExists && podLabelSelector != labels[v1.LabelOSStable] {
+		return true
+	}
+	return false
+}
+
+// rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
+// TODO: Relax this restriction when we start supporting LCOW in kubernetes where podOS may not match
+// node's OS.
+func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
+	if pod.Spec.OS == nil {
+		return false
+	}
+	// If the pod OS doesn't match runtime.GOOS return false
+	return string(pod.Spec.OS.Name) != runtime.GOOS
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
@@ -220,31 +277,33 @@ func (e *PredicateFailureError) GetReason() string {
 	return e.PredicateDesc
 }
 
-// GeneralPredicates checks a group of predicates that the kubelet cares about.
-func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
-	if nodeInfo.Node() == nil {
-		return nil, fmt.Errorf("node not found")
-	}
-
+// generalFilter checks a group of filterings that the kubelet cares about.
+func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []PredicateFailureReason {
+	admissionResults := scheduler.AdmissionCheck(pod, nodeInfo, true)
 	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &InsufficientResourceError{
-			ResourceName: r.ResourceName,
-			Requested:    r.Requested,
-			Used:         r.Used,
-			Capacity:     r.Capacity,
+	for _, r := range admissionResults {
+		if r.InsufficientResource != nil {
+			reasons = append(reasons, &InsufficientResourceError{
+				ResourceName: r.InsufficientResource.ResourceName,
+				Requested:    r.InsufficientResource.Requested,
+				Used:         r.InsufficientResource.Used,
+				Capacity:     r.InsufficientResource.Capacity,
+			})
+		} else {
+			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
+		}
+	}
+
+	// Check taint/toleration except for static pods
+	if !types.IsStaticPod(pod) {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			// Kubelet is only interested in the NoExecute taint.
+			return t.Effect == v1.TaintEffectNoExecute
 		})
+		if isUntolerated {
+			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
+		}
 	}
 
-	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo.Node()) {
-		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReason})
-	}
-	if !nodename.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &PredicateFailureError{nodename.Name, nodename.ErrReason})
-	}
-	if !nodeports.Fits(pod, nodeInfo) {
-		reasons = append(reasons, &PredicateFailureError{nodeports.Name, nodeports.ErrReason})
-	}
-
-	return reasons, nil
+	return reasons
 }

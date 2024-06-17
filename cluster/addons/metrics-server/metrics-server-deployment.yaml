@@ -23,48 +23,65 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.3.6
+  name: metrics-server-v0.7.1
   namespace: kube-system
   labels:
     k8s-app: metrics-server
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.3.6
+    version: v0.7.1
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.3.6
+      version: v0.7.1
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.3.6
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        version: v0.7.1
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
       nodeSelector:
         kubernetes.io/os: linux
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server-amd64:v0.3.6
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.1
         command:
         - /metrics-server
-        - --metric-resolution=30s
-        # These are needed for GKE, which doesn't support secure communication yet.
-        # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
-        - --kubelet-port=10255
-        - --deprecated-kubelet-completely-insecure=true
+        - --metric-resolution=15s
+        - --kubelet-use-node-status-port
+        - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,Hostname,InternalDNS,ExternalDNS,ExternalIP
+        - --cert-dir=/tmp
+        - --secure-port=10250
         ports:
-        - containerPort: 443
+        - containerPort: 10250
           name: https
           protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          failureThreshold: 3
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.11
+        image: registry.k8s.io/autoscaling/addon-resizer:1.8.14
         resources:
           limits:
             cpu: 100m
@@ -92,9 +109,9 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.3.6
+          - --deployment=metrics-server-v0.7.1
           - --container=metrics-server
-          - --poll-period=300000
+          - --poll-period=30000
           - --estimator=exponential
           # Specifies the smallest cluster (defined in number of nodes)
           # resources will be scaled to.
@@ -102,9 +119,11 @@ spec:
           # Use kube-apiserver metrics to avoid periodically listing nodes.
           - --use-metrics=true
       volumes:
-        - name: metrics-server-config-volume
-          configMap:
-            name: metrics-server-config
+      - name: metrics-server-config-volume
+        configMap:
+          name: metrics-server-config
+      - emptyDir: {}
+        name: tmp-dir
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"

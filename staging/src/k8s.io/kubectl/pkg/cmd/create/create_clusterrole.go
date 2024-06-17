@@ -25,7 +25,7 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -36,25 +36,25 @@ import (
 
 var (
 	clusterRoleLong = templates.LongDesc(i18n.T(`
-		Create a ClusterRole.`))
+		Create a cluster role.`))
 
 	clusterRoleExample = templates.Examples(i18n.T(`
-		# Create a ClusterRole named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
+		# Create a cluster role named "pod-reader" that allows user to perform "get", "watch" and "list" on pods
 		kubectl create clusterrole pod-reader --verb=get,list,watch --resource=pods
 
-		# Create a ClusterRole named "pod-reader" with ResourceName specified
+		# Create a cluster role named "pod-reader" with ResourceName specified
 		kubectl create clusterrole pod-reader --verb=get --resource=pods --resource-name=readablepod --resource-name=anotherpod
 
-		# Create a ClusterRole named "foo" with API Group specified
-		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.extensions
+		# Create a cluster role named "foo" with API Group specified
+		kubectl create clusterrole foo --verb=get,list,watch --resource=rs.apps
 
-		# Create a ClusterRole named "foo" with SubResource specified
+		# Create a cluster role named "foo" with SubResource specified
 		kubectl create clusterrole foo --verb=get,list,watch --resource=pods,pods/status
 
-		# Create a ClusterRole name "foo" with NonResourceURL specified
+		# Create a cluster role name "foo" with NonResourceURL specified
 		kubectl create clusterrole "foo" --verb=get --non-resource-url=/logs/*
 
-		# Create a ClusterRole name "monitoring" with AggregationRule specified
+		# Create a cluster role name "monitoring" with AggregationRule specified
 		kubectl create clusterrole monitoring --aggregation-rule="rbac.example.com/aggregate-to-monitoring=true"`))
 
 	// Valid nonResource verb list for validation.
@@ -70,7 +70,7 @@ type CreateClusterRoleOptions struct {
 }
 
 // NewCmdCreateClusterRole initializes and returns new ClusterRoles command
-func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	c := &CreateClusterRoleOptions{
 		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
 		AggregationRule:   map[string]string{},
@@ -78,7 +78,7 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	cmd := &cobra.Command{
 		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 clusterRoleLong,
+		Short:                 i18n.T("Create a cluster role"),
 		Long:                  clusterRoleLong,
 		Example:               clusterRoleExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -143,7 +143,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 	if len(c.Resources) > 0 {
 		for _, v := range c.Verbs {
 			if !arrayContains(validResourceVerbs, v) {
-				return fmt.Errorf("invalid verb: '%s'", v)
+				fmt.Fprintf(c.ErrOut, "Warning: '%s' is not a standard resource verb\n", v)
 			}
 		}
 		if err := c.validateResource(); err != nil {
@@ -213,10 +213,8 @@ func (c *CreateClusterRoleOptions) RunCreateRole() error {
 		if c.FieldManager != "" {
 			createOptions.FieldManager = c.FieldManager
 		}
+		createOptions.FieldValidation = c.ValidationDirective
 		if c.DryRunStrategy == cmdutil.DryRunServer {
-			if err := c.DryRunVerifier.HasSupport(clusterRole.GroupVersionKind()); err != nil {
-				return err
-			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		clusterRole, err = c.Client.ClusterRoles().Create(context.TODO(), clusterRole, createOptions)

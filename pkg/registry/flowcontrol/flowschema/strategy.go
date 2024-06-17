@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // flowSchemaStrategy implements verification logic for FlowSchema.
@@ -40,6 +41,27 @@ var Strategy = flowSchemaStrategy{legacyscheme.Scheme, names.SimpleNameGenerator
 // NamespaceScoped returns false because all PriorityClasses are global.
 func (flowSchemaStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (flowSchemaStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta3": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a flow-schema before creation.
@@ -66,6 +88,11 @@ func (flowSchemaStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	return validation.ValidateFlowSchema(obj.(*flowcontrol.FlowSchema))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (flowSchemaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (flowSchemaStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -84,12 +111,42 @@ func (flowSchemaStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	return validation.ValidateFlowSchemaUpdate(old.(*flowcontrol.FlowSchema), obj.(*flowcontrol.FlowSchema))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (flowSchemaStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type flowSchemaStatusStrategy struct {
 	flowSchemaStrategy
 }
 
 // StatusStrategy is the default logic that applies when updating flow-schema objects' status.
 var StatusStrategy = flowSchemaStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (flowSchemaStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta3": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newFlowSchema := obj.(*flowcontrol.FlowSchema)
@@ -105,4 +162,9 @@ func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 func (flowSchemaStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateFlowSchemaStatusUpdate(old.(*flowcontrol.FlowSchema), obj.(*flowcontrol.FlowSchema))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (flowSchemaStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

@@ -2,16 +2,14 @@ package intelrdt
 
 import (
 	"bufio"
-	"github.com/sirupsen/logrus"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 )
 
-var (
-	enabledMonFeatures monFeatures
-)
+var enabledMonFeatures monFeatures
 
 type monFeatures struct {
 	mbmTotalBytes bool
@@ -21,10 +19,10 @@ type monFeatures struct {
 
 func getMonFeatures(intelRdtRoot string) (monFeatures, error) {
 	file, err := os.Open(filepath.Join(intelRdtRoot, "info", "L3_MON", "mon_features"))
-	defer file.Close()
 	if err != nil {
 		return monFeatures{}, err
 	}
+	defer file.Close()
 	return parseMonFeatures(file)
 }
 
@@ -50,7 +48,7 @@ func parseMonFeatures(reader io.Reader) (monFeatures, error) {
 }
 
 func getMonitoringStats(containerPath string, stats *Stats) error {
-	numaFiles, err := ioutil.ReadDir(filepath.Join(containerPath, "mon_data"))
+	numaFiles, err := os.ReadDir(filepath.Join(containerPath, "mon_data"))
 	if err != nil {
 		return err
 	}

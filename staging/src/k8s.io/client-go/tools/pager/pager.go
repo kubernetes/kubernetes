@@ -73,11 +73,28 @@ func New(fn ListPageFunc) *ListPager {
 // List returns a single list object, but attempts to retrieve smaller chunks from the
 // server to reduce the impact on the server. If the chunk attempt fails, it will load
 // the full list instead. The Limit field on options, if unset, will default to the page size.
+//
+// If items in the returned list are retained for different durations, and you want to avoid
+// retaining the whole slice returned by p.PageFn as long as any item is referenced,
+// use ListWithAlloc instead.
 func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runtime.Object, bool, error) {
+	return p.list(ctx, options, false)
+}
+
+// ListWithAlloc works like List, but avoids retaining references to the items slice returned by p.PageFn.
+// It does this by making a shallow copy of non-pointer items in the slice returned by p.PageFn.
+//
+// If the items in the returned list are not retained, or are retained for the same duration, use List instead for memory efficiency.
+func (p *ListPager) ListWithAlloc(ctx context.Context, options metav1.ListOptions) (runtime.Object, bool, error) {
+	return p.list(ctx, options, true)
+}
+
+func (p *ListPager) list(ctx context.Context, options metav1.ListOptions, allocNew bool) (runtime.Object, bool, error) {
 	if options.Limit == 0 {
 		options.Limit = p.PageSize
 	}
 	requestedResourceVersion := options.ResourceVersion
+	requestedResourceVersionMatch := options.ResourceVersionMatch
 	var list *metainternalversion.List
 	paginatedResult := false
 
@@ -102,6 +119,7 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 			options.Limit = 0
 			options.Continue = ""
 			options.ResourceVersion = requestedResourceVersion
+			options.ResourceVersionMatch = requestedResourceVersionMatch
 			result, err := p.PageFn(ctx, options)
 			return result, paginatedResult, err
 		}
@@ -121,7 +139,11 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 			list.ResourceVersion = m.GetResourceVersion()
 			list.SelfLink = m.GetSelfLink()
 		}
-		if err := meta.EachListItem(obj, func(obj runtime.Object) error {
+		eachListItemFunc := meta.EachListItem
+		if allocNew {
+			eachListItemFunc = meta.EachListItemWithAlloc
+		}
+		if err := eachListItemFunc(obj, func(obj runtime.Object) error {
 			list.Items = append(list.Items, obj)
 			return nil
 		}); err != nil {
@@ -135,10 +157,11 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 
 		// set the next loop up
 		options.Continue = m.GetContinue()
-		// Clear the ResourceVersion on the subsequent List calls to avoid the
+		// Clear the ResourceVersion(Match) on the subsequent List calls to avoid the
 		// `specifying resource version is not allowed when using continue` error.
 		// See https://github.com/kubernetes/kubernetes/issues/85221#issuecomment-553748143.
 		options.ResourceVersion = ""
+		options.ResourceVersionMatch = ""
 		// At this point, result is already paginated.
 		paginatedResult = true
 	}
@@ -153,9 +176,23 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 //
 // Items are retrieved in chunks from the server to reduce the impact on the server with up to
 // ListPager.PageBufferSize chunks buffered concurrently in the background.
+//
+// If items passed to fn are retained for different durations, and you want to avoid
+// retaining the whole slice returned by p.PageFn as long as any item is referenced,
+// use EachListItemWithAlloc instead.
 func (p *ListPager) EachListItem(ctx context.Context, options metav1.ListOptions, fn func(obj runtime.Object) error) error {
 	return p.eachListChunkBuffered(ctx, options, func(obj runtime.Object) error {
 		return meta.EachListItem(obj, fn)
+	})
+}
+
+// EachListItemWithAlloc works like EachListItem, but avoids retaining references to the items slice returned by p.PageFn.
+// It does this by making a shallow copy of non-pointer items in the slice returned by p.PageFn.
+//
+// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
+func (p *ListPager) EachListItemWithAlloc(ctx context.Context, options metav1.ListOptions, fn func(obj runtime.Object) error) error {
+	return p.eachListChunkBuffered(ctx, options, func(obj runtime.Object) error {
+		return meta.EachListItemWithAlloc(obj, fn)
 	})
 }
 
@@ -200,6 +237,11 @@ func (p *ListPager) eachListChunkBuffered(ctx context.Context, options metav1.Li
 	}()
 
 	for o := range chunkC {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		err := fn(o)
 		if err != nil {
 			return err // any fn error should be returned immediately

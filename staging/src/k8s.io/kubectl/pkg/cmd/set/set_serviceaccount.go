@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -38,20 +40,20 @@ import (
 )
 
 var (
-	serviceaccountResources = `
-	replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`
+	serviceaccountResources = i18n.T(`replicationcontroller (rc), deployment (deploy), daemonset (ds), job, replicaset (rs), statefulset`)
 
 	serviceaccountLong = templates.LongDesc(i18n.T(`
-	Update ServiceAccount of pod template resources.
+	Update the service account of pod template resources.
 
 	Possible resources (case insensitive) can be:
-	` + serviceaccountResources))
+
+	`) + serviceaccountResources)
 
 	serviceaccountExample = templates.Examples(i18n.T(`
-	# Set Deployment nginx-deployment's ServiceAccount to serviceaccount1
+	# Set deployment nginx-deployment's service account to serviceaccount1
 	kubectl set serviceaccount deployment nginx-deployment serviceaccount1
 
-	# Print the result (in yaml format) of updated nginx deployment with serviceaccount from local file, without hitting apiserver
+	# Print the result (in YAML format) of updated nginx deployment with the service account from local file, without hitting the API server
 	kubectl set sa -f nginx-deployment.yaml serviceaccount1 --local --dry-run=client -o yaml
 	`))
 )
@@ -63,7 +65,6 @@ type SetServiceAccountOptions struct {
 
 	fileNameOptions        resource.FilenameOptions
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.DryRunVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -76,11 +77,11 @@ type SetServiceAccountOptions struct {
 	PrintObj printers.ResourcePrinterFunc
 	Recorder genericclioptions.Recorder
 
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
 // NewSetServiceAccountOptions returns an initialized SetServiceAccountOptions instance
-func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
+func NewSetServiceAccountOptions(streams genericiooptions.IOStreams) *SetServiceAccountOptions {
 	return &SetServiceAccountOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -92,14 +93,14 @@ func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServic
 }
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
-func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdServiceAccount(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
 		Use:                   "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"sa"},
-		Short:                 i18n.T("Update ServiceAccount of a resource"),
+		Short:                 i18n.T("Update the service account of a resource"),
 		Long:                  serviceaccountLong,
 		Example:               serviceaccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -113,7 +114,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.fileNameOptions, usage)
-	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set serviceaccount will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
@@ -138,15 +139,6 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
 		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
 	}
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return err
-	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
@@ -158,7 +150,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	o.PrintObj = printer.PrintObj
 
 	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
+	if err != nil && !(o.local && clientcmd.IsEmptyConfig(err)) {
 		return err
 	}
 	if len(args) == 0 {
@@ -178,10 +170,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 			Latest()
 	}
 	o.infos, err = builder.Do().Infos()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Run creates and applies the patch either locally or calling apiserver.
@@ -216,12 +205,6 @@ func (o *SetServiceAccountOptions) Run() error {
 				patchErrs = append(patchErrs, err)
 			}
 			continue
-		}
-		if o.dryRunStrategy == cmdutil.DryRunServer {
-			if err := o.dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
-				patchErrs = append(patchErrs, err)
-				continue
-			}
 		}
 		actual, err := resource.
 			NewHelper(info.Client, info.Mapping).

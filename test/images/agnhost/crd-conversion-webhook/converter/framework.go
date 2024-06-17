@@ -18,7 +18,7 @@ package converter
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -117,7 +117,7 @@ func doConversionV1(convertRequest *v1.ConversionRequest, convert convertFunc) *
 func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	var body []byte
 	if r.Body != nil {
-		if data, err := ioutil.ReadAll(r.Body); err == nil {
+		if data, err := io.ReadAll(r.Body); err == nil {
 			body = data
 		}
 	}
@@ -216,8 +216,8 @@ func addToScheme(scheme *runtime.Scheme) {
 }
 
 var serializers = map[mediaType]runtime.Serializer{
-	{"application", "json"}: json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false),
-	{"application", "yaml"}: json.NewYAMLSerializer(json.DefaultMetaFactory, scheme, scheme),
+	{"application", "json"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Pretty: false}),
+	{"application", "yaml"}: json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{Yaml: true}),
 }
 
 func getInputSerializer(contentType string) runtime.Serializer {

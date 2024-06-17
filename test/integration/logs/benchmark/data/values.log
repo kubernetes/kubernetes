@@ -1,0 +1,1 @@
+{"v":0, "msg": "Example", "someValue": 1, "someString": "hello world", "pod": {"namespace": "system", "name": "kube-scheduler"}, "pv": {"name": "volume"}}

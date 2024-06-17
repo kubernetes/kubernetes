@@ -8,8 +8,6 @@
 
 A high-performance 100% compatible drop-in replacement of "encoding/json"
 
-You can also use thrift like JSON using [thrift-iterator](https://github.com/thrift-iterator/go)
-
 # Benchmark
 
 ![benchmark](http://jsoniter.com/benchmarks/go-benchmark.png)

@@ -20,9 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
@@ -47,12 +45,10 @@ func VisitContainersWithPath(podSpec *api.PodSpec, specPath *field.Path, visitor
 			return false
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		fldPath = specPath.Child("ephemeralContainers")
-		for i := range podSpec.EphemeralContainers {
-			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), fldPath.Index(i)) {
-				return false
-			}
+	fldPath = specPath.Child("ephemeralContainers")
+	for i := range podSpec.EphemeralContainers {
+		if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), fldPath.Index(i)) {
+			return false
 		}
 	}
 	return true
@@ -88,6 +84,7 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 		"spec.schedulerName",
 		"status.phase",
 		"status.hostIP",
+		"status.hostIPs",
 		"status.podIP",
 		"status.podIPs":
 		return label, value, nil

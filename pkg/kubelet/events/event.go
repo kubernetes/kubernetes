@@ -65,6 +65,7 @@ const (
 	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
 	NodeRebooted                         = "Rebooted"
+	NodeShutdown                         = "Shutdown"
 	ContainerGCFailed                    = "ContainerGCFailed"
 	ImageGCFailed                        = "ImageGCFailed"
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
@@ -73,6 +74,8 @@ const (
 	FailedCreatePodSandBox               = "FailedCreatePodSandBox"
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
 	FailedMountOnFilesystemMismatch      = "FailedMountOnFilesystemMismatch"
+	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
+	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 )
 
 // Image manager event reason list

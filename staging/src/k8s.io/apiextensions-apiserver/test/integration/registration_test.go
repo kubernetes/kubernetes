@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,8 +47,8 @@ func TestMultipleResourceInstances(t *testing.T) {
 	defer tearDown()
 
 	ns := "not-the-default"
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,8 +172,8 @@ func TestMultipleRegistration(t *testing.T) {
 
 	ns := "not-the-default"
 	sameInstanceName := "foo"
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,8 +191,8 @@ func TestMultipleRegistration(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
-	curletDefinition := fixtures.NewCurletCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	curletDefinition, err = fixtures.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition := fixtures.NewCurletV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,11 +225,11 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tearDown()
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
 	ns := "not-the-default"
 	sameInstanceName := "foo"
 	func() {
-		noxuDefinition, err := fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,10 +237,10 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 		if _, err := instantiateCustomResource(t, fixtures.NewNoxuInstance(ns, sameInstanceName), noxuNamespacedResourceClient, noxuDefinition); err != nil {
 			t.Fatal(err)
 		}
-		if err := fixtures.DeleteCustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
+		if err := fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
+		if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
 		if _, err = noxuNamespacedResourceClient.List(context.TODO(), metav1.ListOptions{}); err == nil || !errors.IsNotFound(err) {
@@ -252,10 +252,10 @@ func TestDeRegistrationAndReRegistration(t *testing.T) {
 	}()
 
 	func() {
-		if _, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
+		if _, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), noxuDefinition.Name, metav1.GetOptions{}); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("expected a NotFound error, got:%v", err)
 		}
-		noxuDefinition, err := fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+		noxuDefinition, err := fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -327,8 +327,8 @@ func TestEtcdStorage(t *testing.T) {
 	etcdPrefix := s.RecommendedOptions.Etcd.StorageConfig.Prefix
 
 	ns1 := "another-default-is-possible"
-	curletDefinition := fixtures.NewCurletCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
-	curletDefinition, err = fixtures.CreateNewCustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
+	curletDefinition := fixtures.NewCurletV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,8 +338,8 @@ func TestEtcdStorage(t *testing.T) {
 	}
 
 	ns2 := "the-cruel-default"
-	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "noxus.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "",
 				},
 			},
 		},
@@ -372,7 +371,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "foo",
 					Namespace: "the-cruel-default",
-					SelfLink:  "", // TODO double check: empty?
 				},
 			},
 		},
@@ -385,7 +383,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "curlets.mygroup.example.com",
 					Namespace: "",
-					SelfLink:  "",
 				},
 			},
 		},
@@ -398,7 +395,6 @@ func TestEtcdStorage(t *testing.T) {
 				Metadata: Metadata{
 					Name:      "bar",
 					Namespace: "",
-					SelfLink:  "", // TODO double check: empty?
 				},
 			},
 		},
@@ -452,5 +448,4 @@ type metaObject struct {
 type Metadata struct {
 	Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
-	SelfLink  string `json:"selfLink,omitempty" protobuf:"bytes,3,opt,name=selfLink"`
 }

@@ -17,8 +17,11 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"strings"
 	"time"
+
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/component-base/metrics"
@@ -27,7 +30,7 @@ import (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -37,6 +40,10 @@ const (
 	successLabel = "success"
 	failureLabel = "failure"
 	errorLabel   = "error"
+
+	allowedLabel   = "allowed"
+	deniedLabel    = "denied"
+	noOpinionLabel = "no-opinion"
 )
 
 var (
@@ -67,15 +74,54 @@ var (
 		},
 		[]string{"result"},
 	)
+
+	authorizationAttemptsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "authorization_attempts_total",
+			Help:           "Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
+
+	authorizationLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:           "authorization_duration_seconds",
+			Help:           "Authorization duration in seconds broken out by result.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(authenticatedUserCounter)
 	legacyregistry.MustRegister(authenticatedAttemptsCounter)
 	legacyregistry.MustRegister(authenticationLatency)
+	legacyregistry.MustRegister(authorizationAttemptsCounter)
+	legacyregistry.MustRegister(authorizationLatency)
 }
 
-func recordAuthMetrics(resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time) {
+func recordAuthorizationMetrics(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time) {
+	var resultLabel string
+
+	switch {
+	case authorized == authorizer.DecisionAllow:
+		resultLabel = allowedLabel
+	case err != nil:
+		resultLabel = errorLabel
+	case authorized == authorizer.DecisionDeny:
+		resultLabel = deniedLabel
+	case authorized == authorizer.DecisionNoOpinion:
+		resultLabel = noOpinionLabel
+	}
+
+	authorizationAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
+	authorizationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
+}
+
+func recordAuthenticationMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
 	var resultLabel string
 
 	switch {
@@ -85,11 +131,11 @@ func recordAuthMetrics(resp *authenticator.Response, ok bool, err error, apiAudi
 		resultLabel = failureLabel
 	default:
 		resultLabel = successLabel
-		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedUserCounter.WithContext(ctx).WithLabelValues(compressUsername(resp.User.GetName())).Inc()
 	}
 
-	authenticatedAttemptsCounter.WithLabelValues(resultLabel).Inc()
-	authenticationLatency.WithLabelValues(resultLabel).Observe(time.Since(authStart).Seconds())
+	authenticatedAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
+	authenticationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
 }
 
 // compressUsername maps all possible usernames onto a small set of categories

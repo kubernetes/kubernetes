@@ -26,24 +26,6 @@ import (
 )
 
 const (
-	// SchedulerDefaultLockObjectNamespace defines default scheduler lock object namespace ("kube-system")
-	SchedulerDefaultLockObjectNamespace string = metav1.NamespaceSystem
-
-	// SchedulerDefaultLockObjectName defines default scheduler lock object name ("kube-scheduler")
-	SchedulerDefaultLockObjectName = "kube-scheduler"
-
-	// SchedulerPolicyConfigMapKey defines the key of the element in the
-	// scheduler's policy ConfigMap that contains scheduler's policy config.
-	SchedulerPolicyConfigMapKey = "policy.cfg"
-
-	// SchedulerDefaultProviderName defines the default provider names
-	SchedulerDefaultProviderName = "DefaultProvider"
-
-	// DefaultInsecureSchedulerPort is the default port for the scheduler status server.
-	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeSchedulerPort instead.
-	DefaultInsecureSchedulerPort = 10251
-
 	// DefaultKubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
 	DefaultKubeSchedulerPort = 10259
@@ -53,12 +35,18 @@ const (
 
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
+	// TypeMeta contains the API version and kind. In kube-scheduler, after
+	// conversion from the versioned KubeSchedulerConfiguration type to this
+	// internal type, we set the APIVersion field to the scheme group/version of
+	// the type we converted from. This is done in cmd/kube-scheduler in two
+	// places: (1) when loading config from a file, (2) generating the default
+	// config. Based on the versioned type set in this field, we make decisions;
+	// for example (1) during validation to check for usage of removed plugins,
+	// (2) writing config to a file, (3) initialising the scheduler.
 	metav1.TypeMeta
 
-	// AlgorithmSource specifies the scheduler algorithm source.
-	// TODO(#87526): Remove AlgorithmSource from this package
-	// DEPRECATED: AlgorithmSource is removed in the v1beta1 ComponentConfig
-	AlgorithmSource SchedulerAlgorithmSource
+	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
+	Parallelism int32
 
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection componentbaseconfig.LeaderElectionConfiguration
@@ -66,12 +54,6 @@ type KubeSchedulerConfiguration struct {
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
 	ClientConnection componentbaseconfig.ClientConnectionConfiguration
-	// HealthzBindAddress is the IP address and port for the health check server to serve on,
-	// defaulting to 0.0.0.0:10251
-	HealthzBindAddress string
-	// MetricsBindAddress is the IP address and port for the metrics server to
-	// serve on, defaulting to 0.0.0.0:10251.
-	MetricsBindAddress string
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfig.DebuggingConfiguration
@@ -84,8 +66,8 @@ type KubeSchedulerConfiguration struct {
 	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
-	// nodes will be scored.
-	PercentageOfNodesToScore int32
+	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
+	PercentageOfNodesToScore *int32
 
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
@@ -106,6 +88,12 @@ type KubeSchedulerConfiguration struct {
 	// Extenders are the list of scheduler extenders, each holding the values of how to communicate
 	// with the extender. These extenders are shared by all scheduler profiles.
 	Extenders []Extender
+
+	// DelayCacheUntilActive specifies when to start caching. If this is true and leader election is enabled,
+	// the scheduler will wait to fill informer caches until it is the leader. Doing so will have slower
+	// failover with the benefit of lower memory overhead while waiting to become leader.
+	// Defaults to false.
+	DelayCacheUntilActive bool
 }
 
 // KubeSchedulerProfile is a scheduling profile.
@@ -114,6 +102,17 @@ type KubeSchedulerProfile struct {
 	// If SchedulerName matches with the pod's "spec.schedulerName", then the pod
 	// is scheduled with this profile.
 	SchedulerName string
+
+	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
+	// for running a pod, the scheduler stops its search for more feasible nodes in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasibleNodesToFind" feasible nodes no matter what the value of this flag is.
+	// Example: if the cluster size is 500 nodes and the value of this flag is 30,
+	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
+	// nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty,
+	// global PercentageOfNodesToScore will be used.
+	PercentageOfNodesToScore *int32
 
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the
@@ -131,80 +130,52 @@ type KubeSchedulerProfile struct {
 	PluginConfig []PluginConfig
 }
 
-// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
-// field must be specified, and source fields are mutually exclusive.
-type SchedulerAlgorithmSource struct {
-	// Policy is a policy based algorithm source.
-	Policy *SchedulerPolicySource
-	// Provider is the name of a scheduling algorithm provider to use.
-	Provider *string
-}
-
-// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
-// source field must be specified, and source fields are mutually exclusive.
-type SchedulerPolicySource struct {
-	// File is a file policy source.
-	File *SchedulerPolicyFileSource
-	// ConfigMap is a config map policy source.
-	ConfigMap *SchedulerPolicyConfigMapSource
-}
-
-// SchedulerPolicyFileSource is a policy serialized to disk and accessed via
-// path.
-type SchedulerPolicyFileSource struct {
-	// Path is the location of a serialized policy.
-	Path string
-}
-
-// SchedulerPolicyConfigMapSource is a policy serialized into a config map value
-// under the SchedulerPolicyConfigMapKey key.
-type SchedulerPolicyConfigMapSource struct {
-	// Namespace is the namespace of the policy config map.
-	Namespace string
-	// Name is the name of the policy config map.
-	Name string
-}
-
 // Plugins include multiple extension points. When specified, the list of plugins for
 // a particular extension point are the only ones enabled. If an extension point is
 // omitted from the config, then the default set of plugins is used for that extension point.
 // Enabled plugins are called in the order specified here, after default plugins. If they need to
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
+	// PreEnqueue is a list of plugins that should be invoked before adding pods to the scheduling queue.
+	PreEnqueue PluginSet
+
 	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
-	QueueSort *PluginSet
+	QueueSort PluginSet
 
 	// PreFilter is a list of plugins that should be invoked at "PreFilter" extension point of the scheduling framework.
-	PreFilter *PluginSet
+	PreFilter PluginSet
 
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
-	Filter *PluginSet
+	Filter PluginSet
 
-	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
-	PostFilter *PluginSet
+	// PostFilter is a list of plugins that are invoked after filtering phase, but only when no feasible nodes were found for the pod.
+	PostFilter PluginSet
 
 	// PreScore is a list of plugins that are invoked before scoring.
-	PreScore *PluginSet
+	PreScore PluginSet
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
-	Score *PluginSet
+	Score PluginSet
 
 	// Reserve is a list of plugins invoked when reserving/unreserving resources
 	// after a node is assigned to run the pod.
-	Reserve *PluginSet
+	Reserve PluginSet
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
-	Permit *PluginSet
+	Permit PluginSet
 
 	// PreBind is a list of plugins that should be invoked before a pod is bound.
-	PreBind *PluginSet
+	PreBind PluginSet
 
 	// Bind is a list of plugins that should be invoked at "Bind" extension point of the scheduling framework.
 	// The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.
-	Bind *PluginSet
+	Bind PluginSet
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
-	PostBind *PluginSet
+	PostBind PluginSet
+
+	// MultiPoint is a simplified config field for enabling plugins for all valid extension points
+	MultiPoint PluginSet
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -255,83 +226,32 @@ const (
 	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
 )
 
-func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
-	if dst == nil {
-		dst = &PluginSet{}
+// Names returns the list of enabled plugin names.
+func (p *Plugins) Names() []string {
+	if p == nil {
+		return nil
 	}
-	if src != nil {
-		dst.Enabled = append(dst.Enabled, src.Enabled...)
-		dst.Disabled = append(dst.Disabled, src.Disabled...)
+	extensions := []PluginSet{
+		p.PreEnqueue,
+		p.PreFilter,
+		p.Filter,
+		p.PostFilter,
+		p.Reserve,
+		p.PreScore,
+		p.Score,
+		p.PreBind,
+		p.Bind,
+		p.PostBind,
+		p.Permit,
+		p.QueueSort,
 	}
-	return dst
-}
-
-// Append appends src Plugins to current Plugins. If a PluginSet is nil, it will
-// be created.
-func (p *Plugins) Append(src *Plugins) {
-	if p == nil || src == nil {
-		return
-	}
-	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
-	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
-	p.Filter = appendPluginSet(p.Filter, src.Filter)
-	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
-	p.PreScore = appendPluginSet(p.PreScore, src.PreScore)
-	p.Score = appendPluginSet(p.Score, src.Score)
-	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
-	p.Permit = appendPluginSet(p.Permit, src.Permit)
-	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
-	p.Bind = appendPluginSet(p.Bind, src.Bind)
-	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
-}
-
-// Apply merges the plugin configuration from custom plugins, handling disabled sets.
-func (p *Plugins) Apply(customPlugins *Plugins) {
-	if customPlugins == nil {
-		return
-	}
-
-	p.QueueSort = mergePluginSets(p.QueueSort, customPlugins.QueueSort)
-	p.PreFilter = mergePluginSets(p.PreFilter, customPlugins.PreFilter)
-	p.Filter = mergePluginSets(p.Filter, customPlugins.Filter)
-	p.PostFilter = mergePluginSets(p.PostFilter, customPlugins.PostFilter)
-	p.PreScore = mergePluginSets(p.PreScore, customPlugins.PreScore)
-	p.Score = mergePluginSets(p.Score, customPlugins.Score)
-	p.Reserve = mergePluginSets(p.Reserve, customPlugins.Reserve)
-	p.Permit = mergePluginSets(p.Permit, customPlugins.Permit)
-	p.PreBind = mergePluginSets(p.PreBind, customPlugins.PreBind)
-	p.Bind = mergePluginSets(p.Bind, customPlugins.Bind)
-	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
-}
-
-func mergePluginSets(defaultPluginSet, customPluginSet *PluginSet) *PluginSet {
-	if customPluginSet == nil {
-		customPluginSet = &PluginSet{}
-	}
-
-	if defaultPluginSet == nil {
-		defaultPluginSet = &PluginSet{}
-	}
-
-	disabledPlugins := sets.NewString()
-	for _, disabledPlugin := range customPluginSet.Disabled {
-		disabledPlugins.Insert(disabledPlugin.Name)
-	}
-
-	enabledPlugins := []Plugin{}
-	if !disabledPlugins.Has("*") {
-		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
-			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
-				continue
-			}
-
-			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
+	n := sets.New[string]()
+	for _, e := range extensions {
+		for _, pg := range e.Enabled {
+			n.Insert(pg.Name)
 		}
 	}
-
-	enabledPlugins = append(enabledPlugins, customPluginSet.Enabled...)
-
-	return &PluginSet{Enabled: enabledPlugins}
+	return sets.List(n)
 }
 
 // Extender holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
@@ -409,7 +329,7 @@ type ExtenderTLSConfig struct {
 	CertData []byte
 	// KeyData holds PEM-encoded bytes (typically read from a client certificate key file).
 	// KeyData takes precedence over KeyFile
-	KeyData []byte
+	KeyData []byte `datapolicy:"security-key"`
 	// CAData holds PEM-encoded bytes (typically read from a root certificates bundle).
 	// CAData takes precedence over CAFile
 	CAData []byte

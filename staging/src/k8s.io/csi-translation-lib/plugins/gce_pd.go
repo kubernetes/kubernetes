@@ -25,7 +25,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
 const (
@@ -78,7 +77,7 @@ func generateToplogySelectors(key string, values []string) []v1.TopologySelector
 	}
 }
 
-// TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
+// TranslateInTreeStorageClassToCSI translates InTree GCE storage class parameters to CSI storage class
 func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	var generatedTopologies []v1.TopologySelectorTerm
 
@@ -163,7 +162,7 @@ func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.Per
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with GCEPersistentDisk set from in-tree
 // and converts the GCEPersistentDisk source to a CSIPersistentVolumeSource
-func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.GCEPersistentDisk == nil {
 		return nil, fmt.Errorf("volume is nil or GCE PD not defined on volume")
 	}
@@ -216,18 +215,23 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		return nil, fmt.Errorf("pv is nil or GCE Persistent Disk source not defined on pv")
 	}
 
-	zonesLabel := pv.Labels[v1.LabelZoneFailureDomain]
-	zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
+	// depend on which version it migrates from, the label could be failuredomain beta or topology GA version
+	zonesLabel := pv.Labels[v1.LabelFailureDomainBetaZone]
+	if zonesLabel == "" {
+		zonesLabel = pv.Labels[v1.LabelTopologyZone]
+	}
+
+	zones := strings.Split(zonesLabel, labelMultiZoneDelimiter)
 	if len(zones) == 1 && len(zones[0]) != 0 {
 		// Zonal
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, zones[0], pv.Spec.GCEPersistentDisk.PDName)
 	} else if len(zones) > 1 {
 		// Regional
-		region, err := getRegionFromZones(zones)
+		region, err := gceGetRegionFromZones(zones)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get region from zones: %v", err)
 		}
-		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
+		volID = fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, region, pv.Spec.GCEPersistentDisk.PDName)
 	} else {
 		// Unspecified
 		volID = fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, pv.Spec.GCEPersistentDisk.PDName)
@@ -250,7 +254,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 		},
 	}
 
-	if err := translateTopology(pv, GCEPDTopologyKey); err != nil {
+	if err := translateTopologyFromInTreeToCSI(pv, GCEPDTopologyKey); err != nil {
 		return nil, fmt.Errorf("failed to translate topology: %v", err)
 	}
 
@@ -287,7 +291,10 @@ func (g *gcePersistentDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.Persisten
 		gceSource.Partition = int32(partInt)
 	}
 
-	// TODO: Take the zone/regional information and stick it into the label.
+	// translate CSI topology to In-tree topology for rollback compatibility
+	if err := translateTopologyFromCSIToInTree(pv, GCEPDTopologyKey, gceGetRegionFromZones); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
+	}
 
 	pv.Spec.CSI = nil
 	pv.Spec.GCEPersistentDisk = gceSource
@@ -349,7 +356,7 @@ func (g *gcePersistentDiskCSITranslator) RepairVolumeHandle(volumeHandle, nodeID
 	case "regions":
 		region := ""
 		if tok[volIDZoneValue] == UnspecifiedValue {
-			region, err = getRegionFromZones([]string{nodeTok[volIDZoneValue]})
+			region, err = gceGetRegionFromZones([]string{nodeTok[volIDZoneValue]})
 			if err != nil {
 				return "", fmt.Errorf("failed to get region from zone %s: %v", nodeTok[volIDZoneValue], err)
 			}
@@ -372,7 +379,7 @@ func pdNameFromVolumeID(id string) (string, error) {
 
 // TODO: Replace this with the imported one from GCE PD CSI Driver when
 // the driver removes all k8s/k8s dependencies
-func getRegionFromZones(zones []string) (string, error) {
+func gceGetRegionFromZones(zones []string) (string, error) {
 	regions := sets.String{}
 	if len(zones) < 1 {
 		return "", fmt.Errorf("no zones specified")

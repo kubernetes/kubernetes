@@ -23,7 +23,6 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog/v2"
 )
 
 // PodDisruptionBudgetListerExpansion allows custom methods to be added to
@@ -40,10 +39,6 @@ type PodDisruptionBudgetNamespaceListerExpansion interface{}
 func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
 	var selector labels.Selector
 
-	if len(pod.Labels) == 0 {
-		return nil, fmt.Errorf("no PodDisruptionBudgets found for pod %v because it has no labels", pod.Name)
-	}
-
 	list, err := s.PodDisruptionBudgets(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -54,8 +49,7 @@ func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*
 		pdb := list[i]
 		selector, err = metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
-			klog.Warningf("invalid selector: %v", err)
-			// TODO(mml): add an event to the PDB
+			// This object has an invalid selector, it does not match the pod
 			continue
 		}
 

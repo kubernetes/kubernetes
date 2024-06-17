@@ -18,13 +18,16 @@ package runtime
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestHandleCrash(t *testing.T) {
@@ -41,8 +44,8 @@ func TestCustomHandleCrash(t *testing.T) {
 	old := PanicHandlers
 	defer func() { PanicHandlers = old }()
 	var result interface{}
-	PanicHandlers = []func(interface{}){
-		func(r interface{}) {
+	PanicHandlers = []func(context.Context, interface{}){
+		func(_ context.Context, r interface{}) {
 			result = r
 		},
 	}
@@ -64,8 +67,8 @@ func TestCustomHandleError(t *testing.T) {
 	old := ErrorHandlers
 	defer func() { ErrorHandlers = old }()
 	var result error
-	ErrorHandlers = []func(error){
-		func(err error) {
+	ErrorHandlers = []ErrorHandler{
+		func(_ context.Context, err error, msg string, keysAndValues ...interface{}) {
 			result = err
 		},
 	}
@@ -99,7 +102,8 @@ func TestHandleCrashLog(t *testing.T) {
 	if len(lines) < 4 {
 		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call")
 	}
-	if match, _ := regexp.MatchString("Observed a panic: test panic", lines[0]); !match {
+	t.Logf("Got log output:\n%s", strings.Join(lines, "\n"))
+	if match, _ := regexp.MatchString(`"Observed a panic" panic="test panic"`, lines[0]); !match {
 		t.Errorf("mismatch panic message: %s", lines[0])
 	}
 	// The following regexp's verify that Kubernetes panic log matches Golang stdlib
@@ -155,4 +159,28 @@ func captureStderr(f func()) (string, error) {
 	w.Close()
 
 	return <-resultCh, nil
+}
+
+func Test_rudimentaryErrorBackoff_OnError_ParallelSleep(t *testing.T) {
+	r := &rudimentaryErrorBackoff{
+		minPeriod: time.Second,
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := 0; i < 30; i++ {
+		wg.Add(1)
+		go func() {
+			<-start
+			r.OnError()
+			wg.Done()
+		}()
+	}
+	st := time.Now()
+	close(start)
+	wg.Wait()
+
+	if since := time.Since(st); since > 5*time.Second {
+		t.Errorf("OnError slept for too long: %s", since)
+	}
 }

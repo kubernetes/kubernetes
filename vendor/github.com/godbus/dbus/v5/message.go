@@ -118,11 +118,7 @@ type header struct {
 	Variant
 }
 
-// DecodeMessage tries to decode a single message in the D-Bus wire format
-// from the given reader. The byte order is figured out from the first byte.
-// The possibly returned error can be an error of the underlying reader, an
-// InvalidMessageError or a FormatError.
-func DecodeMessage(rd io.Reader) (msg *Message, err error) {
+func DecodeMessageWithFDs(rd io.Reader, fds []int) (msg *Message, err error) {
 	var order binary.ByteOrder
 	var hlength, length uint32
 	var typ, flags, proto byte
@@ -142,7 +138,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 		return nil, InvalidMessageError("invalid byte order")
 	}
 
-	dec := newDecoder(rd, order)
+	dec := newDecoder(rd, order, fds)
 	dec.pos = 1
 
 	msg = new(Message)
@@ -166,7 +162,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	if hlength+length+16 > 1<<27 {
 		return nil, InvalidMessageError("message is too long")
 	}
-	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order)
+	dec = newDecoder(io.MultiReader(bytes.NewBuffer(b), rd), order, fds)
 	dec.pos = 12
 	vs, err = dec.Decode(Signature{"a(yv)"})
 	if err != nil {
@@ -196,7 +192,7 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	sig, _ := msg.Headers[FieldSignature].value.(Signature)
 	if sig.str != "" {
 		buf := bytes.NewBuffer(body)
-		dec = newDecoder(buf, order)
+		dec = newDecoder(buf, order, fds)
 		vs, err := dec.Decode(sig)
 		if err != nil {
 			return nil, err
@@ -207,12 +203,32 @@ func DecodeMessage(rd io.Reader) (msg *Message, err error) {
 	return
 }
 
-// EncodeTo encodes and sends a message to the given writer. The byte order must
-// be either binary.LittleEndian or binary.BigEndian. If the message is not
-// valid or an error occurs when writing, an error is returned.
-func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
-	if err := msg.IsValid(); err != nil {
-		return err
+// DecodeMessage tries to decode a single message in the D-Bus wire format
+// from the given reader. The byte order is figured out from the first byte.
+// The possibly returned error can be an error of the underlying reader, an
+// InvalidMessageError or a FormatError.
+func DecodeMessage(rd io.Reader) (msg *Message, err error) {
+	return DecodeMessageWithFDs(rd, make([]int, 0))
+}
+
+type nullwriter struct{}
+
+func (nullwriter) Write(p []byte) (cnt int, err error) {
+	return len(p), nil
+}
+
+func (msg *Message) CountFds() (int, error) {
+	if len(msg.Body) == 0 {
+		return 0, nil
+	}
+	enc := newEncoder(nullwriter{}, nativeEndian, make([]int, 0))
+	err := enc.Encode(msg.Body...)
+	return len(enc.fds), err
+}
+
+func (msg *Message) EncodeToWithFDs(out io.Writer, order binary.ByteOrder) (fds []int, err error) {
+	if err := msg.validateHeader(); err != nil {
+		return nil, err
 	}
 	var vs [7]interface{}
 	switch order {
@@ -221,12 +237,16 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	case binary.BigEndian:
 		vs[0] = byte('B')
 	default:
-		return errors.New("dbus: invalid byte order")
+		return nil, errors.New("dbus: invalid byte order")
 	}
 	body := new(bytes.Buffer)
-	enc := newEncoder(body, order)
+	fds = make([]int, 0)
+	enc := newEncoder(body, order, fds)
 	if len(msg.Body) != 0 {
-		enc.Encode(msg.Body...)
+		err = enc.Encode(msg.Body...)
+		if err != nil {
+			return
+		}
 	}
 	vs[1] = msg.Type
 	vs[2] = msg.Flags
@@ -239,22 +259,38 @@ func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) error {
 	}
 	vs[6] = headers
 	var buf bytes.Buffer
-	enc = newEncoder(&buf, order)
-	enc.Encode(vs[:]...)
+	enc = newEncoder(&buf, order, enc.fds)
+	err = enc.Encode(vs[:]...)
+	if err != nil {
+		return
+	}
 	enc.align(8)
 	body.WriteTo(&buf)
 	if buf.Len() > 1<<27 {
-		return InvalidMessageError("message is too long")
+		return make([]int, 0), InvalidMessageError("message is too long")
 	}
 	if _, err := buf.WriteTo(out); err != nil {
-		return err
+		return make([]int, 0), err
 	}
-	return nil
+	return enc.fds, nil
+}
+
+// EncodeTo encodes and sends a message to the given writer. The byte order must
+// be either binary.LittleEndian or binary.BigEndian. If the message is not
+// valid or an error occurs when writing, an error is returned.
+func (msg *Message) EncodeTo(out io.Writer, order binary.ByteOrder) (err error) {
+	_, err = msg.EncodeToWithFDs(out, order)
+	return err
 }
 
 // IsValid checks whether msg is a valid message and returns an
-// InvalidMessageError if it is not.
+// InvalidMessageError or FormatError if it is not.
 func (msg *Message) IsValid() error {
+	var b bytes.Buffer
+	return msg.EncodeTo(&b, nativeEndian)
+}
+
+func (msg *Message) validateHeader() error {
 	if msg.Flags & ^(FlagNoAutoStart|FlagNoReplyExpected|FlagAllowInteractiveAuthorization) != 0 {
 		return InvalidMessageError("invalid flags")
 	}
@@ -299,6 +335,7 @@ func (msg *Message) IsValid() error {
 			return InvalidMessageError("missing signature")
 		}
 	}
+
 	return nil
 }
 

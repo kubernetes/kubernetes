@@ -35,15 +35,15 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 export KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*))?$"
 export KUBE_RELEASE_VERSION_DASHED_REGEX="v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)-(0|[1-9][0-9]*))?"
 
-# KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" This
+# KUBE_CI_VERSION_REGEX matches things like "v1.2.3-alpha.4.56+abcdefg" and "v1.2.3-56+abcdefg"
 #
 # NOTE This must match the version_regex in build/common.sh
-# kube::release::parse_and_validate_ci_version()
 #
 # TODO: KUBE_CI_VERSION_REGEX is used in hack/get-build.sh and KUBE_CI_VERSION_DASHED_REGEX is used in cluster/gce/util.sh,
 # make sure to remove these vars when not used anymore
-export KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
-export KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-([a-zA-Z0-9]+)-(0|[1-9][0-9]*)(-(0|[1-9][0-9]*)\\+[-0-9a-z]*)?"
+#                              v1                .26               .0              -(rc            .0                .)?1              (  +014f      )?
+export KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+\\.(0|[1-9][0-9]*)\\.)?(0|[1-9][0-9]*)(\\+[-0-9a-z]*)?$"
+export KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-([a-zA-Z0-9]+-(0|[1-9][0-9]*)-)?(0|[1-9][0-9]*)(\\+[-0-9a-z]*)?"
 
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
@@ -221,7 +221,7 @@ function get-kubeconfig-user-basicauth() {
 #   KUBE_PASSWORD
 function gen-kube-basicauth() {
     KUBE_USER='admin'
-    KUBE_PASSWORD=$(python -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
+    KUBE_PASSWORD=$(python3 -c 'import string,random; print("".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16)))')
 }
 
 # Get the bearer token for the current-context in kubeconfig if one exists.
@@ -288,12 +288,7 @@ function load-or-gen-kube-basicauth() {
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    IFS='/' read -r -a path <<< "${1}"
-    if [[ "${path[0]}" == "release" ]]; then
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
-    else
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
-    fi
+    KUBE_VERSION=$(curl -sL "https://dl.k8s.io/${1}.txt")
   else
     KUBE_VERSION=${1}
   fi
@@ -313,8 +308,9 @@ function find-tar() {
   locations=(
     "${KUBE_ROOT}/node/${tarball}"
     "${KUBE_ROOT}/server/${tarball}"
+    "${KUBE_ROOT}/kubernetes/node/${tarball}"
+    "${KUBE_ROOT}/kubernetes/server/${tarball}"    
     "${KUBE_ROOT}/_output/release-tars/${tarball}"
-    "${KUBE_ROOT}/bazel-bin/build/release-tars/${tarball}"
   )
   location=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
@@ -334,7 +330,12 @@ function find-tar() {
 #   SERVER_BINARY_TAR
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
-  SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
+  # Use first item in KUBE_BUILD_PLATFORMS as server platform
+  KUBE_BUILD_PLATFORMS=${KUBE_BUILD_PLATFORMS:-"linux/amd64"}
+  SERVER_PLATFORM=$(cut -d' ' -f1 <<< "${KUBE_BUILD_PLATFORMS}")
+  OS=$(cut -d'/' -f1 <<< "${SERVER_PLATFORM}")
+  ARCH=$(cut -d'/' -f2 <<< "${SERVER_PLATFORM}")
+  SERVER_BINARY_TAR=$(find-tar kubernetes-server-"${OS}"-"${ARCH}".tar.gz)
   if [[ -z "${SERVER_BINARY_TAR}" ]]; then
 	  exit 1
   fi
@@ -342,7 +343,7 @@ function find-release-tars() {
 
   local find_result
   if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
-    if NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-amd64.tar.gz); then
+    if NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-"${ARCH}".tar.gz); then
       find_result=0
     else
       find_result=1

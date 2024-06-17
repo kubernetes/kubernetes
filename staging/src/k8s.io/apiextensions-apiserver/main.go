@@ -17,24 +17,16 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
 )
 
 func main() {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	stopCh := genericapiserver.SetupSignalHandler()
-	cmd := server.NewServerCommand(os.Stdout, os.Stderr, stopCh)
-	cmd.Flags().AddGoFlagSet(flag.CommandLine)
-	if err := cmd.Execute(); err != nil {
-		klog.Fatal(err)
-	}
+	ctx := genericapiserver.SetupSignalContext()
+	cmd := server.NewServerCommand(ctx, os.Stdout, os.Stderr)
+	code := cli.Run(cmd)
+	os.Exit(code)
 }

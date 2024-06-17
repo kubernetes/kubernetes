@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"net/http"
+
 	v1beta1 "k8s.io/api/authentication/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -26,6 +28,7 @@ import (
 
 type AuthenticationV1beta1Interface interface {
 	RESTClient() rest.Interface
+	SelfSubjectReviewsGetter
 	TokenReviewsGetter
 }
 
@@ -34,17 +37,37 @@ type AuthenticationV1beta1Client struct {
 	restClient rest.Interface
 }
 
+func (c *AuthenticationV1beta1Client) SelfSubjectReviews() SelfSubjectReviewInterface {
+	return newSelfSubjectReviews(c)
+}
+
 func (c *AuthenticationV1beta1Client) TokenReviews() TokenReviewInterface {
 	return newTokenReviews(c)
 }
 
 // NewForConfig creates a new AuthenticationV1beta1Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*AuthenticationV1beta1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	httpClient, err := rest.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+
+// NewForConfigAndClient creates a new AuthenticationV1beta1Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AuthenticationV1beta1Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}

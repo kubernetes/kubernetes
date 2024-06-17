@@ -23,11 +23,17 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
+# Nuke old files so we don't accidentally carry stuff forward.
+rm -f staging/src/k8s.io/api/testdata/HEAD/*.{yaml,json,pb}
+rm -f staging/src/k8s.io/apiextensions-apiserver/pkg/apis/testdata/HEAD/*.{yaml,json,pb}
+
 # UPDATE_COMPATIBILITY_FIXTURE_DATA=true regenerates fixture data if needed.
 # -run //HEAD only runs the test cases comparing against testdata for HEAD.
 # We suppress the output because we are expecting to have changes.
 # We suppress the test failure that occurs when there are changes.
-UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test ./vendor/k8s.io/api -run //HEAD >/dev/null 2>&1 || true
+UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test k8s.io/api -run //HEAD >/dev/null 2>&1 || true
+UPDATE_COMPATIBILITY_FIXTURE_DATA=true go test k8s.io/apiextensions-apiserver/pkg/apis -run //HEAD >/dev/null 2>&1 || true
 
 # Now that we have regenerated data at HEAD, run the test without suppressing output or failures
-go test ./vendor/k8s.io/api -run //HEAD -count=1
+go test k8s.io/api -run //HEAD -count=1
+go test k8s.io/apiextensions-apiserver/pkg/apis -run //HEAD -count=1

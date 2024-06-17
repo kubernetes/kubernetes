@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"math"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,22 +55,18 @@ func SetDefaults_DaemonSet(obj *extensionsv1beta1.DaemonSet) {
 		}
 		if updateStrategy.RollingUpdate.MaxUnavailable == nil {
 			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			maxUnavailable := intstr.FromInt32(1)
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+		if updateStrategy.RollingUpdate.MaxSurge == nil {
+			// Set default MaxSurge as 0 by default.
+			maxSurge := intstr.FromInt32(0)
+			updateStrategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
-	}
-}
-
-func SetDefaults_PodSecurityPolicySpec(obj *extensionsv1beta1.PodSecurityPolicySpec) {
-	// This field was added after PodSecurityPolicy was released.
-	// Policies that do not include this field must remain as permissive as they were prior to the introduction of this field.
-	if obj.AllowPrivilegeEscalation == nil {
-		t := true
-		obj.AllowPrivilegeEscalation = &t
 	}
 }
 
@@ -103,12 +99,12 @@ func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 		}
 		if strategy.RollingUpdate.MaxUnavailable == nil {
 			// Set default MaxUnavailable as 1 by default.
-			maxUnavailable := intstr.FromInt(1)
+			maxUnavailable := intstr.FromInt32(1)
 			strategy.RollingUpdate.MaxUnavailable = &maxUnavailable
 		}
 		if strategy.RollingUpdate.MaxSurge == nil {
 			// Set default MaxSurge as 1 by default.
-			maxSurge := intstr.FromInt(1)
+			maxSurge := intstr.FromInt32(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}

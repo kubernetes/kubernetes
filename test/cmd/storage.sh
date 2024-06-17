@@ -37,6 +37,8 @@ run_persistent_volumes_tests() {
   kubectl delete pv pv0002 "${kube_flags[@]:?}"
   kubectl create -f test/fixtures/doc-yaml/user-guide/persistent-volumes/volumes/gce.yaml "${kube_flags[@]:?}"
   kube::test::get_object_assert pv "{{range.items}}{{${id_field:?}}}:{{end}}" 'pv0003:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert persistentvolumes events
   kubectl delete pv pv0003 "${kube_flags[@]:?}"
   # Post-condition: no PVs
   kube::test::get_object_assert pv "{{range.items}}{{${id_field:?}}}:{{end}}" ''
@@ -44,7 +46,7 @@ run_persistent_volumes_tests() {
   kubectl create -f test/fixtures/doc-yaml/user-guide/persistent-volumes/volumes/local-01.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" 'pv0001:'
   output_message=$(kubectl delete pv -n test --all 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'Warning: deleting cluster-scoped resources'
   kube::test::if_has_string "${output_message}" 'persistentvolume "pv0001" deleted'
   kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -65,6 +67,8 @@ run_persistent_volume_claims_tests() {
   # Command
   kubectl create -f test/fixtures/doc-yaml/user-guide/persistent-volumes/claims/claim-01.yaml "${kube_flags[@]:?}"
   kube::test::get_object_assert pvc "{{range.items}}{{${id_field:?}}}:{{end}}" 'myclaim-1:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert persistentvolumeclaims pods,events
   kubectl delete pvc myclaim-1 "${kube_flags[@]:?}"
 
   kubectl create -f test/fixtures/doc-yaml/user-guide/persistent-volumes/claims/claim-02.yaml "${kube_flags[@]:?}"
@@ -107,6 +111,8 @@ run_storage_class_tests() {
 __EOF__
   kube::test::get_object_assert storageclass "{{range.items}}{{${id_field:?}}}:{{end}}" 'storage-class-name:'
   kube::test::get_object_assert sc "{{range.items}}{{${id_field:?}}}:{{end}}" 'storage-class-name:'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert storageclasses events
   kubectl delete storageclass storage-class-name "${kube_flags[@]:?}"
   # Post-condition: no storage classes
   kube::test::get_object_assert storageclass "{{range.items}}{{${id_field:?}}}:{{end}}" ''

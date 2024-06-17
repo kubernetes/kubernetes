@@ -28,10 +28,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func NewServiceRegistry() *ServiceRegistry {
-	return &ServiceRegistry{}
-}
-
 type ServiceRegistry struct {
 	mu      sync.Mutex
 	List    api.ServiceList
@@ -116,11 +112,4 @@ func (r *ServiceRegistry) WatchServices(ctx context.Context, options *metaintern
 	defer r.mu.Unlock()
 
 	return nil, r.Err
-}
-
-func (r *ServiceRegistry) ExportService(ctx context.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	return r.Service, r.Err
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2/ktesting"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -75,10 +77,10 @@ func TestPatchNode(t *testing.T) {
 
 	for i, testCase := range testCases {
 		fakeClient := &fake.Clientset{}
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient: fakeClient,
 		}
-		err := ttlController.patchNodeWithAnnotation(testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
+		err := ttlController.patchNodeWithAnnotation(context.TODO(), testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
@@ -132,12 +134,12 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeStore.Add(testCase.node)
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient:        fakeClient,
 			nodeStore:         listers.NewNodeLister(nodeStore),
 			desiredTTLSeconds: testCase.desiredTTL,
 		}
-		if err := ttlController.updateNodeIfNeeded(testCase.node.Name); err != nil {
+		if err := ttlController.updateNodeIfNeeded(context.TODO(), testCase.node.Name); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
@@ -210,17 +212,32 @@ func TestDesiredTTL(t *testing.T) {
 			boundaryStep: 1,
 			expectedTTL:  0,
 		},
+		{
+			deleteNode:   true,
+			nodeCount:    1800,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  60,
+		},
+		{
+			deleteNode:   true,
+			nodeCount:    10000,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  300,
+		},
 	}
 
 	for i, testCase := range testCases {
-		ttlController := &TTLController{
-			queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		ttlController := &Controller{
+			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,
 			boundaryStep:      testCase.boundaryStep,
 		}
 		if testCase.addNode {
-			ttlController.addNode(&v1.Node{})
+			logger, _ := ktesting.NewTestContext(t)
+			ttlController.addNode(logger, &v1.Node{})
 		}
 		if testCase.deleteNode {
 			ttlController.deleteNode(&v1.Node{})

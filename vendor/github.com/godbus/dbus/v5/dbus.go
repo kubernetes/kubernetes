@@ -28,6 +28,7 @@ var (
 	interfaceType   = reflect.TypeOf((*interface{})(nil)).Elem()
 	unixFDType      = reflect.TypeOf(UnixFD(0))
 	unixFDIndexType = reflect.TypeOf(UnixFDIndex(0))
+	errType         = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 // An InvalidTypeError signals that a value which cannot be represented in the
@@ -63,6 +64,9 @@ func storeInterfaces(src, dest interface{}) error {
 
 func store(dest, src reflect.Value) error {
 	if dest.Kind() == reflect.Ptr {
+		if dest.IsNil() {
+			dest.Set(reflect.New(dest.Type().Elem()))
+		}
 		return store(dest.Elem(), src)
 	}
 	switch src.Kind() {
@@ -118,8 +122,11 @@ func isConvertibleTo(dest, src reflect.Type) bool {
 	case dest.Kind() == reflect.Slice:
 		return src.Kind() == reflect.Slice &&
 			isConvertibleTo(dest.Elem(), src.Elem())
+	case dest.Kind() == reflect.Ptr:
+		dest = dest.Elem()
+		return isConvertibleTo(dest, src)
 	case dest.Kind() == reflect.Struct:
-		return src == interfacesType
+		return src == interfacesType || dest.Kind() == src.Kind()
 	default:
 		return src.ConvertibleTo(dest)
 	}
@@ -270,13 +277,8 @@ func storeSliceIntoInterface(dest, src reflect.Value) error {
 func storeSliceIntoSlice(dest, src reflect.Value) error {
 	if dest.IsNil() || dest.Len() < src.Len() {
 		dest.Set(reflect.MakeSlice(dest.Type(), src.Len(), src.Cap()))
-	}
-	if dest.Len() != src.Len() {
-		return fmt.Errorf(
-			"dbus.Store: type mismatch: "+
-				"slices are different lengths "+
-				"need: %d have: %d",
-			src.Len(), dest.Len())
+	} else if dest.Len() > src.Len() {
+		dest.Set(dest.Slice(0, src.Len()))
 	}
 	for i := 0; i < src.Len(); i++ {
 		err := store(dest.Index(i), getVariantValue(src.Index(i)))

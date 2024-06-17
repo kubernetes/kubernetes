@@ -1,0 +1,21 @@
+# this is a test-only public key that is used in integration
+# tests as the kube controller manager's signing certificate
+# and the api server's client ca file.
+# generated with 'openssl req -new -x509 -nodes -days 365000 -key ca.key -out ca.crt', set the CN to 127.0.0.1
+-----BEGIN CERTIFICATE-----
+MIICpjCCAY4CCQCP7S9OEzUZmDANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAkx
+MjcuMC4wLjEwIBcNMjIwMTA0MjMzNDMyWhgPMzAyMTA1MDcyMzM0MzJaMBQxEjAQ
+BgNVBAMMCTEyNy4wLjAuMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+AMI22ieHLxXpWc58JyCdYG9QmahHfdtDN6R9EwI674gmm81iUq0+bQBoyh4oASos
+Xuc3i6Fc7S+rvEeReaYCYQOXk/KotajY3sSCNAGI9oHsdJmrtuLTcPX9vIgcqBU5
+BiFaSQEkFtlSGKECI5l/mH+5uMsBkmx7YKj6LyvM/YAPv1WsWrM2IZVPj2eWMljh
+uhaDOiQOhrSjmWZuOcRKPTui2IVqTjszuZ7A1r+sKHFSNgTFqEcVSCH8Jcja/35H
+LvTpOLdfntVSvklCO20sDGXnNkxcLYz2i2Jm7ixksTeGFPbzfT9q7q3Vyi5FfVvQ
+31cGieUwifk3toheQ63WdZMCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAXF6NCEdP
+LMqgmtrfP5bl4F2QLRkVhmqoS88gsQHEUSb1ljz0Jwov4V4/m56Of+jHpQeFbsO7
+dXfR4kN3J7cW3UZ8HddIiQvFHW8NPEQvmvVpWfEnNl8aXS9NilowMVDOGwvhQFFS
+xsz+1OWXxrF+RpgYB+b0orjy7K1jYER+baXKeLU8JGPKXQGSR+0YomeC/xc2LznD
+KfS8t/7D9jbKhFGvTC5x15MSy8rGcdCsFVxtkCmbuq1KwP5CYAyowZ/zCKPtBoKK
+5F9TmayjX3AUvh4KVdeh8zrMhFdWmOihKlrj/bJyY0l/hbnROG+ipMPdcepCmfFA
+r+6CBEIWxsxJTQ==
+-----END CERTIFICATE-----

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +45,7 @@ func TestBrokenWebhook(t *testing.T) {
 	}()
 
 	etcdConfig := framework.SharedEtcd()
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdConfig)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcdConfig)
 	tearDownFn = server.TearDownFn
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -60,7 +60,7 @@ func TestBrokenWebhook(t *testing.T) {
 	}
 
 	t.Logf("Creating Broken Webhook that will block all operations on all objects")
-	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(context.TODO(), brokenWebhookConfig(brokenWebhookName), metav1.CreateOptions{})
+	_, err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), brokenWebhookConfig(brokenWebhookName), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to register broken webhook: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestBrokenWebhook(t *testing.T) {
 	t.Logf("Restarting apiserver")
 	tearDownFn = nil
 	server.TearDownFn()
-	server = kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdConfig)
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcdConfig)
 	tearDownFn = server.TearDownFn
 
 	client, err = kubernetes.NewForConfig(server.ClientConfig)
@@ -96,7 +96,7 @@ func TestBrokenWebhook(t *testing.T) {
 	}
 
 	t.Logf("Deleting the broken webhook to fix the cluster")
-	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(context.TODO(), brokenWebhookName, metav1.DeleteOptions{})
+	err = client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.TODO(), brokenWebhookName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete broken webhook: %v", err)
 	}
@@ -149,19 +149,19 @@ func exampleDeployment(name string) *appsv1.Deployment {
 	}
 }
 
-func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWebhookConfiguration {
+func brokenWebhookConfig(name string) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	var path string
-	failurePolicy := admissionregistrationv1beta1.Fail
-	return &admissionregistrationv1beta1.ValidatingWebhookConfiguration{
+	failurePolicy := admissionregistrationv1.Fail
+	return &admissionregistrationv1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Webhooks: []admissionregistrationv1beta1.ValidatingWebhook{
+		Webhooks: []admissionregistrationv1.ValidatingWebhook{
 			{
 				Name: "broken-webhook.k8s.io",
-				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule: admissionregistrationv1beta1.Rule{
+				Rules: []admissionregistrationv1.RuleWithOperations{{
+					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
+					Rule: admissionregistrationv1.Rule{
 						APIGroups:   []string{"*"},
 						APIVersions: []string{"*"},
 						Resources:   []string{"*/*"},
@@ -169,15 +169,17 @@ func brokenWebhookConfig(name string) *admissionregistrationv1beta1.ValidatingWe
 				}},
 				// This client config references a non existent service
 				// so it should always fail.
-				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
-					Service: &admissionregistrationv1beta1.ServiceReference{
+				ClientConfig: admissionregistrationv1.WebhookClientConfig{
+					Service: &admissionregistrationv1.ServiceReference{
 						Namespace: "default",
 						Name:      "invalid-webhook-service",
 						Path:      &path,
 					},
 					CABundle: nil,
 				},
-				FailurePolicy: &failurePolicy,
+				FailurePolicy:           &failurePolicy,
+				SideEffects:             &noSideEffects,
+				AdmissionReviewVersions: []string{"v1"},
 			},
 		},
 	}

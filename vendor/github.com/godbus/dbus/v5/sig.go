@@ -34,7 +34,7 @@ type Signature struct {
 func SignatureOf(vs ...interface{}) Signature {
 	var s string
 	for _, v := range vs {
-		s += getSignature(reflect.TypeOf(v))
+		s += getSignature(reflect.TypeOf(v), &depthCounter{})
 	}
 	return Signature{s}
 }
@@ -42,11 +42,19 @@ func SignatureOf(vs ...interface{}) Signature {
 // SignatureOfType returns the signature of the given type. It panics if the
 // type is not representable in D-Bus.
 func SignatureOfType(t reflect.Type) Signature {
-	return Signature{getSignature(t)}
+	return Signature{getSignature(t, &depthCounter{})}
 }
 
 // getSignature returns the signature of the given type and panics on unknown types.
-func getSignature(t reflect.Type) string {
+func getSignature(t reflect.Type, depth *depthCounter) (sig string) {
+	if !depth.Valid() {
+		panic("container nesting too deep")
+	}
+	defer func() {
+		if len(sig) > 255 {
+			panic("signature exceeds the length limitation")
+		}
+	}()
 	// handle simple types first
 	switch t.Kind() {
 	case reflect.Uint8:
@@ -74,7 +82,7 @@ func getSignature(t reflect.Type) string {
 	case reflect.Float64:
 		return "d"
 	case reflect.Ptr:
-		return getSignature(t.Elem())
+		return getSignature(t.Elem(), depth)
 	case reflect.String:
 		if t == objectPathType {
 			return "o"
@@ -90,17 +98,20 @@ func getSignature(t reflect.Type) string {
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
 			if field.PkgPath == "" && field.Tag.Get("dbus") != "-" {
-				s += getSignature(t.Field(i).Type)
+				s += getSignature(t.Field(i).Type, depth.EnterStruct())
 			}
+		}
+		if len(s) == 0 {
+			panic(InvalidTypeError{t})
 		}
 		return "(" + s + ")"
 	case reflect.Array, reflect.Slice:
-		return "a" + getSignature(t.Elem())
+		return "a" + getSignature(t.Elem(), depth.EnterArray())
 	case reflect.Map:
 		if !isKeyType(t.Key()) {
 			panic(InvalidTypeError{t})
 		}
-		return "a{" + getSignature(t.Key()) + getSignature(t.Elem()) + "}"
+		return "a{" + getSignature(t.Key(), depth.EnterArray().EnterDictEntry()) + getSignature(t.Elem(), depth.EnterArray().EnterDictEntry()) + "}"
 	case reflect.Interface:
 		return "v"
 	}
@@ -118,7 +129,7 @@ func ParseSignature(s string) (sig Signature, err error) {
 	}
 	sig.str = s
 	for err == nil && len(s) != 0 {
-		err, s = validSingle(s, 0)
+		err, s = validSingle(s, &depthCounter{})
 	}
 	if err != nil {
 		sig = Signature{""}
@@ -137,14 +148,14 @@ func ParseSignatureMust(s string) Signature {
 	return sig
 }
 
-// Empty retruns whether the signature is the empty signature.
+// Empty returns whether the signature is the empty signature.
 func (s Signature) Empty() bool {
 	return s.str == ""
 }
 
 // Single returns whether the signature represents a single, complete type.
 func (s Signature) Single() bool {
-	err, r := validSingle(s.str, 0)
+	err, r := validSingle(s.str, &depthCounter{})
 	return err != nil && r == ""
 }
 
@@ -164,15 +175,38 @@ func (e SignatureError) Error() string {
 	return fmt.Sprintf("dbus: invalid signature: %q (%s)", e.Sig, e.Reason)
 }
 
+type depthCounter struct {
+	arrayDepth, structDepth, dictEntryDepth int
+}
+
+func (cnt *depthCounter) Valid() bool {
+	return cnt.arrayDepth <= 32 && cnt.structDepth <= 32 && cnt.dictEntryDepth <= 32
+}
+
+func (cnt depthCounter) EnterArray() *depthCounter {
+	cnt.arrayDepth++
+	return &cnt
+}
+
+func (cnt depthCounter) EnterStruct() *depthCounter {
+	cnt.structDepth++
+	return &cnt
+}
+
+func (cnt depthCounter) EnterDictEntry() *depthCounter {
+	cnt.dictEntryDepth++
+	return &cnt
+}
+
 // Try to read a single type from this string. If it was successful, err is nil
 // and rem is the remaining unparsed part. Otherwise, err is a non-nil
 // SignatureError and rem is "". depth is the current recursion depth which may
 // not be greater than 64 and should be given as 0 on the first call.
-func validSingle(s string, depth int) (err error, rem string) {
+func validSingle(s string, depth *depthCounter) (err error, rem string) {
 	if s == "" {
 		return SignatureError{Sig: s, Reason: "empty signature"}, ""
 	}
-	if depth > 64 {
+	if !depth.Valid() {
 		return SignatureError{Sig: s, Reason: "container nesting too deep"}, ""
 	}
 	switch s[0] {
@@ -187,10 +221,10 @@ func validSingle(s string, depth int) (err error, rem string) {
 			i++
 			rem = s[i+1:]
 			s = s[2:i]
-			if err, _ = validSingle(s[:1], depth+1); err != nil {
+			if err, _ = validSingle(s[:1], depth.EnterArray().EnterDictEntry()); err != nil {
 				return err, ""
 			}
-			err, nr := validSingle(s[1:], depth+1)
+			err, nr := validSingle(s[1:], depth.EnterArray().EnterDictEntry())
 			if err != nil {
 				return err, ""
 			}
@@ -199,7 +233,7 @@ func validSingle(s string, depth int) (err error, rem string) {
 			}
 			return nil, rem
 		}
-		return validSingle(s[1:], depth+1)
+		return validSingle(s[1:], depth.EnterArray())
 	case '(':
 		i := findMatching(s, '(', ')')
 		if i == -1 {
@@ -208,7 +242,7 @@ func validSingle(s string, depth int) (err error, rem string) {
 		rem = s[i+1:]
 		s = s[1:i]
 		for err == nil && s != "" {
-			err, s = validSingle(s, depth+1)
+			err, s = validSingle(s, depth.EnterStruct())
 		}
 		if err != nil {
 			rem = ""
@@ -236,7 +270,7 @@ func findMatching(s string, left, right rune) int {
 // typeFor returns the type of the given signature. It ignores any left over
 // characters and panics if s doesn't start with a valid type signature.
 func typeFor(s string) (t reflect.Type) {
-	err, _ := validSingle(s, 0)
+	err, _ := validSingle(s, &depthCounter{})
 	if err != nil {
 		panic(err)
 	}

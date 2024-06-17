@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: test-server
-        image: k8s.gcr.io/mysql-e2e-test:0.1
+        image: registry.k8s.io/mysql-e2e-test:0.1
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -25,7 +25,7 @@ spec:
           initialDelaySeconds: 2
           periodSeconds: 2
 ---
-apiVersion: policy/v1beta1
+apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: tester-pdb

@@ -17,36 +17,53 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 
-	"net/http"
-
+	"k8s.io/controller-manager/controller"
+	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
-func startBootstrapSignerController(ctx ControllerContext) (http.Handler, bool, error) {
+func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                names.BootstrapSignerController,
+		aliases:             []string{"bootstrapsigner"},
+		initFunc:            startBootstrapSignerController,
+		isDisabledByDefault: true,
+	}
+}
+func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	bsc, err := bootstrap.NewSigner(
-		ctx.ClientBuilder.ClientOrDie("bootstrap-signer"),
-		ctx.InformerFactory.Core().V1().Secrets(),
-		ctx.InformerFactory.Core().V1().ConfigMaps(),
+		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
+		controllerContext.InformerFactory.Core().V1().Secrets(),
+		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
 		bootstrap.DefaultSignerOptions(),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)
 	}
-	go bsc.Run(ctx.Stop)
+	go bsc.Run(ctx)
 	return nil, true, nil
 }
 
-func startTokenCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
+func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:                names.TokenCleanerController,
+		aliases:             []string{"tokencleaner"},
+		initFunc:            startTokenCleanerController,
+		isDisabledByDefault: true,
+	}
+}
+func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
-		ctx.ClientBuilder.ClientOrDie("token-cleaner"),
-		ctx.InformerFactory.Core().V1().Secrets(),
+		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
+		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)
 	}
-	go tcc.Run(ctx.Stop)
+	go tcc.Run(ctx)
 	return nil, true, nil
 }

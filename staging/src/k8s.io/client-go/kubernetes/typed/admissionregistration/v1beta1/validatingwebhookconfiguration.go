@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // ValidatingWebhookConfigurationsGetter has a method to return a ValidatingWebhookConfigurationInterface.
@@ -46,6 +52,7 @@ type ValidatingWebhookConfigurationInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error)
+	Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error)
 	ValidatingWebhookConfigurationExpansion
 }
 
@@ -74,7 +81,26 @@ func (c *validatingWebhookConfigurations) Get(ctx context.Context, name string, 
 }
 
 // List takes label and field selectors, and returns the list of ValidatingWebhookConfigurations that match those selectors.
-func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ValidatingWebhookConfigurationList, err error) {
+func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.ValidatingWebhookConfigurationList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for validatingwebhookconfigurations, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for validatingwebhookconfigurations", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for validatingwebhookconfigurations ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for validatingwebhookconfigurations", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of ValidatingWebhookConfigurations that match those selectors.
+func (c *validatingWebhookConfigurations) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ValidatingWebhookConfigurationList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -85,6 +111,22 @@ func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.List
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of ValidatingWebhookConfigurations
+func (c *validatingWebhookConfigurations) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ValidatingWebhookConfigurationList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.ValidatingWebhookConfigurationList{}
+	err = c.client.Get().
+		Resource("validatingwebhookconfigurations").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -161,6 +203,31 @@ func (c *validatingWebhookConfigurations) Patch(ctx context.Context, name string
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied validatingWebhookConfiguration.
+func (c *validatingWebhookConfigurations) Apply(ctx context.Context, validatingWebhookConfiguration *admissionregistrationv1beta1.ValidatingWebhookConfigurationApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
+	if validatingWebhookConfiguration == nil {
+		return nil, fmt.Errorf("validatingWebhookConfiguration provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(validatingWebhookConfiguration)
+	if err != nil {
+		return nil, err
+	}
+	name := validatingWebhookConfiguration.Name
+	if name == nil {
+		return nil, fmt.Errorf("validatingWebhookConfiguration.Name must be provided to Apply")
+	}
+	result = &v1beta1.ValidatingWebhookConfiguration{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("validatingwebhookconfigurations").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

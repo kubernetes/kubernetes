@@ -17,26 +17,25 @@ limitations under the License.
 package bootstrappolicy_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -100,7 +99,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't already have extra powers
 	for _, rule := range viewEscalatingNamespaceResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
+		if covers, _ := validation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has extra powers: %#v", rule)
 		}
 	}
@@ -108,7 +107,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't have ungettable resources
 	for _, rule := range ungettableResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
+		if covers, _ := validation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has ungettable resource: %#v", rule)
 		}
 	}
@@ -225,7 +224,7 @@ func TestBootstrapControllerRoleBindings(t *testing.T) {
 
 func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 	filename := filepath.Join("testdata", fixtureFilename)
-	expectedYAML, err := ioutil.ReadFile(filename)
+	expectedYAML, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,14 +246,14 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 
 		const updateEnvVar = "UPDATE_BOOTSTRAP_POLICY_FIXTURE_DATA"
 		if os.Getenv(updateEnvVar) == "true" {
-			if err := ioutil.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
+			if err := os.WriteFile(filename, []byte(yamlData), os.FileMode(0755)); err == nil {
 				t.Logf("Updated data in %s", filename)
 				t.Logf("Verify the diff, commit changes, and rerun the tests")
 			} else {
 				t.Logf("Could not update data in %s: %v", filename, err)
 			}
 		} else {
-			t.Logf("Diff between bootstrap data and fixture data in %s:\n-------------\n%s", filename, diff.StringDiff(string(yamlData), string(expectedYAML)))
+			t.Logf("Diff between bootstrap data and fixture data in %s:\n-------------\n%s", filename, cmp.Diff(string(yamlData), string(expectedYAML)))
 			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
 		}
 	}

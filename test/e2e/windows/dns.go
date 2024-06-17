@@ -18,95 +18,123 @@ package windows
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("DNS", func() {
+var _ = sigDescribe(feature.Windows, "DNS", skipUnlessWindows(func() {
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
 	f := framework.NewDefaultFramework("dns")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	ginkgo.It("should support configurable pod DNS servers", func(ctx context.Context) {
 
-	ginkgo.It("should support configurable pod DNS servers", func() {
+		ginkgo.By("Getting the IP address of the internal Kubernetes service")
+
+		svc, err := f.ClientSet.CoreV1().Services("kube-system").Get(ctx, "kube-dns", metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
 		ginkgo.By("Preparing a test DNS service with injected DNS names...")
-		testInjectedIP := "1.1.1.1"
-		testSearchPath := "resolv.conf.local"
+		// the default service IP will vary from cluster to cluster, but will always be present and is a good DNS test target
+		testInjectedIP := svc.Spec.ClusterIP
+		testSearchPath := "default.svc.cluster.local"
 
-		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
-		testUtilsPod := generateDNSUtilsPod()
-		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
-		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
-			Nameservers: []string{testInjectedIP},
+		ginkgo.By("Creating a windows pod with dnsPolicy=None and customized dnsConfig...")
+		testPod := e2epod.NewAgnhostPod(f.Namespace.Name, "e2e-dns-utils", nil, nil, nil)
+		testPod.Spec.DNSPolicy = v1.DNSNone
+		testPod.Spec.DNSConfig = &v1.PodDNSConfig{
+			Nameservers: []string{testInjectedIP, "1.1.1.1"},
 			Searches:    []string{testSearchPath},
 		}
-		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
+		testPod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+		testPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, testPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		framework.Logf("Created pod %v", testUtilsPod)
+
+		ginkgo.By("confirming that the pod has a windows label")
+		gomega.Expect(testPod.Spec.NodeSelector).To(gomega.HaveKeyWithValue("kubernetes.io/os", "windows"), "pod.spec.nodeSelector")
+
+		framework.Logf("Created pod %v", testPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testUtilsPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
+			framework.Logf("Deleting pod %s...", testPod.Name)
+			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, testPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
+				framework.Failf("Failed to delete pod %s: %v", testPod.Name, err)
 			}
 		}()
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testUtilsPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testUtilsPod.Name)
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, testPod.Name, f.Namespace.Name), "failed to wait for pod %s to be running", testPod.Name)
 
-		ginkgo.By("Verifying customized DNS option is configured on pod...")
+		// This isn't the best 'test' but it is a great diagnostic, see later test for the 'real' test.
+		ginkgo.By("Calling ipconfig to get debugging info for this pod's DNS and confirm that a dns server 1.1.1.1 can be injected, along with ")
 		cmd := []string{"ipconfig", "/all"}
-		stdout, _, err := f.ExecWithOptions(framework.ExecOptions{
+		stdout, _, err := e2epod.ExecWithOptions(f, e2epod.ExecOptions{
 			Command:       cmd,
 			Namespace:     f.Namespace.Name,
-			PodName:       testUtilsPod.Name,
-			ContainerName: "util",
+			PodName:       testPod.Name,
+			ContainerName: "agnhost-container",
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
 		framework.ExpectNoError(err)
-
 		framework.Logf("ipconfig /all:\n%s", stdout)
-		dnsRegex, err := regexp.Compile(`DNS Servers[\s*.]*:(\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})+`)
-		framework.ExpectNoError(err)
 
-		if dnsRegex.MatchString(stdout) {
-			match := dnsRegex.FindString(stdout)
-
-			if !strings.Contains(match, testInjectedIP) {
-				framework.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
-			}
-		} else {
-			framework.Failf("cannot find DNS server info in ipconfig /all output: \n%s", stdout)
+		if !strings.Contains(stdout, "1.1.1.1") {
+			framework.Failf("One of the custom DNS options 1.1.1.1, not found in ipconfig /all")
 		}
+
+		// We've now verified that the DNS stuff is injected...  now lets make sure that curl'ing 'wrong' endpoints fails, i.e.
+		// a negative control, to run before we run our final test...
+
+		ginkgo.By("Verifying that curl queries FAIL for wrong URLs")
+
+		// the below tests use curl because nslookup doesn't seem to use ndots properly
+		// ideally we'd use the powershell native ResolveDns but, that is not a part of agnhost images (as of k8s 1.20)
+		// TODO @jayunit100 add ResolveHost to agn images
+
+		cmd = []string{"curl.exe", "-k", "https://kubernetezzzzzzzz:443"}
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace.Name,
+			PodName:       testPod.Name,
+			ContainerName: "agnhost-container",
+			CaptureStdout: true,
+			CaptureStderr: true,
+		})
+		if err == nil {
+			framework.Logf("Warning: Somehow the curl command succeeded... The output was \n %v", stdout)
+			framework.Failf("Expected a bogus URL query to fail - something is wrong with this test harness, cannot proceed.")
+		}
+
+		ginkgo.By("Verifying that injected dns records for 'kubernetes' resolve to the valid ip address")
+		cmd = []string{"curl.exe", "-k", "https://kubernetes:443"}
+		stdout, _, err = e2epod.ExecWithOptions(f, e2epod.ExecOptions{
+			Command:       cmd,
+			Namespace:     f.Namespace.Name,
+			PodName:       testPod.Name,
+			ContainerName: "agnhost-container",
+			CaptureStdout: true,
+			CaptureStderr: true,
+		})
+		framework.Logf("Result of curling the kubernetes service... (Failure ok, only testing for the sake of DNS resolution) %v ... error = %v", stdout, err)
+
+		// curl returns an error if the host isn't resolved, otherwise, it will return a passing result.
+		if err != nil {
+			framework.ExpectNoError(err)
+		}
+
 		// TODO: Add more test cases for other DNSPolicies.
 	})
-})
-
-func generateDNSUtilsPod() *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-dns-utils-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    "util",
-					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-					Command: []string{"sleep", "10000"},
-				},
-			},
-		},
-	}
-}
+}))

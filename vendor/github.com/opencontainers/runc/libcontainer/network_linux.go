@@ -1,13 +1,11 @@
-// +build linux
-
 package libcontainer
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/types"
@@ -75,16 +73,15 @@ func getNetworkInterfaceStats(interfaceName string) (*types.NetworkInterface, er
 
 // Reads the specified statistics available under /sys/class/net/<EthInterface>/statistics
 func readSysfsNetworkStats(ethInterface, statsFile string) (uint64, error) {
-	data, err := ioutil.ReadFile(filepath.Join("/sys/class/net", ethInterface, "statistics", statsFile))
+	data, err := os.ReadFile(filepath.Join("/sys/class/net", ethInterface, "statistics", statsFile))
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+	return strconv.ParseUint(string(bytes.TrimSpace(data)), 10, 64)
 }
 
 // loopback is a network strategy that provides a basic loopback device
-type loopback struct {
-}
+type loopback struct{}
 
 func (l *loopback) create(n *network, nspid int) error {
 	return nil

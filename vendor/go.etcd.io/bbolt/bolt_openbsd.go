@@ -1,22 +1,11 @@
 package bbolt
 
 import (
-	"syscall"
-	"unsafe"
-)
-
-const (
-	msAsync      = 1 << iota // perform asynchronous writes
-	msSync                   // perform synchronous writes
-	msInvalidate             // invalidate cached data
+	"golang.org/x/sys/unix"
 )
 
 func msync(db *DB) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, uintptr(unsafe.Pointer(db.data)), uintptr(db.datasz), msInvalidate)
-	if errno != 0 {
-		return errno
-	}
-	return nil
+	return unix.Msync(db.data[:db.datasz], unix.MS_INVALIDATE)
 }
 
 func fdatasync(db *DB) error {

@@ -27,11 +27,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/utils/clock"
 )
 
 func checkObject(t *testing.T, store manager.Store, ns, name string, shouldExist bool) {

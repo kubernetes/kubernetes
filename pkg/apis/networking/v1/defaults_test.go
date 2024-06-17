@@ -28,6 +28,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	. "k8s.io/kubernetes/pkg/apis/networking/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultNetworkPolicy(t *testing.T) {
@@ -231,6 +232,91 @@ func TestSetDefaultNetworkPolicy(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
 		}
+	}
+}
+
+func TestSetDefaultsForIngressClassParametersReference(t *testing.T) {
+	tests := []struct {
+		name     string
+		original *networkingv1.IngressClass
+		expected *networkingv1.IngressClass
+	}{
+		{
+			name: "populated parameters sets the default Scope",
+			original: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+					Parameters: &networkingv1.IngressClassParametersReference{
+						Kind: "k",
+						Name: "n",
+					},
+				},
+			},
+			expected: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+					Parameters: &networkingv1.IngressClassParametersReference{
+						Kind:  "k",
+						Name:  "n",
+						Scope: utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster),
+					},
+				},
+			},
+		},
+		{
+			name: "existing scope is not overridden",
+			original: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+					Parameters: &networkingv1.IngressClassParametersReference{
+						Kind:      "k",
+						Name:      "n",
+						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: utilpointer.String("foo-ns"),
+					},
+				},
+			},
+			expected: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+					Parameters: &networkingv1.IngressClassParametersReference{
+						Kind:      "k",
+						Name:      "n",
+						Scope:     utilpointer.String(networkingv1.IngressClassParametersReferenceScopeNamespace),
+						Namespace: utilpointer.String("foo-ns"),
+					},
+				},
+			},
+		},
+		{
+			name: "empty Parameters does not set the default Scope",
+			original: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+				},
+			},
+			expected: &networkingv1.IngressClass{
+				Spec: networkingv1.IngressClassSpec{
+					Controller: "controller",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			original := test.original
+			expected := test.expected
+			obj2 := roundTrip(t, runtime.Object(original))
+			got, ok := obj2.(*networkingv1.IngressClass)
+			if !ok {
+				t.Errorf("unexpected object: %v", got)
+				t.FailNow()
+			}
+			if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+				t.Errorf("got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", got.Spec, expected.Spec)
+			}
+		})
 	}
 }
 

@@ -19,7 +19,7 @@ package metrics
 import (
 	"fmt"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -45,14 +45,14 @@ type StableCollector interface {
 	HiddenMetrics() []string
 }
 
-// BaseStableCollector which implements almost all of the methods defined by StableCollector
+// BaseStableCollector which implements almost all methods defined by StableCollector
 // is a convenient assistant for custom collectors.
-// It is recommend that inherit BaseStableCollector when implementing custom collectors.
+// It is recommended to inherit BaseStableCollector when implementing custom collectors.
 type BaseStableCollector struct {
-	descriptors map[string]*Desc // stores all descriptors by pair<fqName, Desc>, these are collected from DescribeWithStability().
-	registrable map[string]*Desc // stores registrable descriptors by pair<fqName, Desc>, is a subset of descriptors.
-	hidden      map[string]*Desc // stores hidden descriptors by pair<fqName, Desc>, is a subset of descriptors.
-	self        StableCollector
+	descriptors  map[string]*Desc // stores all descriptors by pair<fqName, Desc>, these are collected from DescribeWithStability().
+	registerable map[string]*Desc // stores registerable descriptors by pair<fqName, Desc>, is a subset of descriptors.
+	hidden       map[string]*Desc // stores hidden descriptors by pair<fqName, Desc>, is a subset of descriptors.
+	self         StableCollector
 }
 
 // DescribeWithStability sends all descriptors to the provided channel.
@@ -62,9 +62,9 @@ func (bsc *BaseStableCollector) DescribeWithStability(ch chan<- *Desc) {
 }
 
 // Describe sends all descriptors to the provided channel.
-// It intend to be called by prometheus registry.
+// It intended to be called by prometheus registry.
 func (bsc *BaseStableCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range bsc.registrable {
+	for _, d := range bsc.registerable {
 		ch <- d.toPrometheusDesc()
 	}
 }
@@ -128,11 +128,11 @@ func (bsc *BaseStableCollector) init(self StableCollector) {
 }
 
 func (bsc *BaseStableCollector) trackRegistrableDescriptor(d *Desc) {
-	if bsc.registrable == nil {
-		bsc.registrable = make(map[string]*Desc)
+	if bsc.registerable == nil {
+		bsc.registerable = make(map[string]*Desc)
 	}
 
-	bsc.registrable[d.fqName] = d
+	bsc.registerable[d.fqName] = d
 }
 
 func (bsc *BaseStableCollector) trackHiddenDescriptor(d *Desc) {
@@ -158,7 +158,7 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 		}
 	}
 
-	if len(bsc.registrable) > 0 {
+	if len(bsc.registerable) > 0 {
 		return true
 	}
 
@@ -173,7 +173,7 @@ func (bsc *BaseStableCollector) ClearState() {
 	}
 
 	bsc.descriptors = nil
-	bsc.registrable = nil
+	bsc.registerable = nil
 	bsc.hidden = nil
 	bsc.self = nil
 }

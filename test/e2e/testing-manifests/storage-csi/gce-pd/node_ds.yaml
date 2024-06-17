@@ -11,18 +11,14 @@ spec:
       labels:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
-      # Host network must be used for interaction with Workload Identity in GKE
-      # since it replaces GCE Metadata Server with GKE Metadata Server. Remove
-      # this requirement when issue is resolved and before any exposure of
-      # metrics ports.
-      hostNetwork: true
       containers:
         - name: csi-driver-registrar
-          image: gcr.io/gke-release/csi-node-driver-registrar:v1.2.0-gke.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.1
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
             - "--kubelet-registration-path=/var/lib/kubelet/plugins/pd.csi.storage.gke.io/csi.sock"
+            - "--http-endpoint=:22013"
           lifecycle:
             preStop:
               exec:
@@ -32,6 +28,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          ports:
+            - containerPort: 22013
+              name: http-endpoint
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /healthz
+              port: http-endpoint
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 20
           volumeMounts:
             - name: plugin-dir
               mountPath: /csi
@@ -40,10 +48,11 @@ spec:
         - name: gce-pd-driver
           securityContext:
             privileged: true
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.2-gke.0
+          image: registry.k8s.io/cloud-provider-gcp/gcp-compute-persistent-disk-csi-driver:v1.2.2
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"
+            - "--run-controller-service=false"
           volumeMounts:
             - name: kubelet-dir
               mountPath: /var/lib/kubelet

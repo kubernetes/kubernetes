@@ -45,14 +45,14 @@ func Convert_networking_IngressBackend_To_v1beta1_IngressBackend(in *networking.
 		if len(in.Service.Port.Name) > 0 {
 			out.ServicePort = intstr.FromString(in.Service.Port.Name)
 		} else {
-			out.ServicePort = intstr.FromInt(int(in.Service.Port.Number))
+			out.ServicePort = intstr.FromInt32(in.Service.Port.Number)
 		}
 	}
 	return nil
 }
 func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSpec, out *networking.IngressSpec, s conversion.Scope) error {
 	if err := autoConvert_v1beta1_IngressSpec_To_networking_IngressSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 	if in.Backend != nil {
 		out.DefaultBackend = &networking.IngressBackend{}
@@ -65,7 +65,7 @@ func Convert_v1beta1_IngressSpec_To_networking_IngressSpec(in *v1beta1.IngressSp
 
 func Convert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.IngressSpec, out *v1beta1.IngressSpec, s conversion.Scope) error {
 	if err := autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 	if in.DefaultBackend != nil {
 		out.Backend = &v1beta1.IngressBackend{}

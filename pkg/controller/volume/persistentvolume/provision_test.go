@@ -18,6 +18,11 @@ package persistentvolume
 
 import (
 	"errors"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -26,9 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-helpers/storage/volume"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 var class1Parameters = map[string]string{
@@ -127,6 +132,20 @@ var storageClasses = []*storage.StorageClass{
 		MountOptions:      []string{"foo"},
 		VolumeBindingMode: &modeImmediate,
 	},
+	{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "StorageClass",
+		},
+
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "csi",
+		},
+
+		Provisioner:       "mydriver.csi.k8s.io",
+		Parameters:        class1Parameters,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &modeImmediate,
+	},
 }
 
 // call to storageClass 1, returning an error
@@ -152,104 +171,114 @@ var provision2Success = provisionCall{
 // 2. Call the syncVolume *once*.
 // 3. Compare resulting volumes with expected volumes.
 func TestProvisionSync(t *testing.T) {
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// Provision a volume (with a default class)
-			"11-1 - successful provision with storage class 1",
-			novolumes,
-			newVolumeArray("pvc-uid11-1", "1Gi", "uid11-1", "claim11-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold),
+			name:            "11-1 - successful provision with storage class 1",
+			initialVolumes:  novolumes,
+			expectedVolumes: volumesWithFinalizers(newVolumeArray("pvc-uid11-1", "1Gi", "uid11-1", "claim11-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
 			// Binding will be completed in the next syncClaim
-			newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			initialClaims:  newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims: newClaimArray("claim11-1", "uid11-1", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents: []string{"Normal ProvisioningSucceeded"},
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - plugin not found
-			"11-2 - plugin not found",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
-			testSyncClaim,
+			name:            "11-2 - plugin not found",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-2", "uid11-2", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors:          noerrors,
+			test:            testSyncClaim,
 		},
 		{
 			// Provision failure - newProvisioner returns error
-			"11-3 - newProvisioner failure",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
-			wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-3 - newProvisioner failure",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-3", "uid11-3", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// Provision failure - Provision returns error
-			"11-4 - provision failure",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"}, noerrors,
-			wrapTestWithProvisionCalls([]provisionCall{provision1Error}, testSyncClaim),
+			name:            "11-4 - provision failure",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-4", "uid11-4", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{provision1Error}, testSyncClaim),
 		},
 		{
 			// No provisioning if there is a matching volume available
-			"11-6 - provisioning when there is a volume available",
-			newVolumeArray("volume11-6", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
-			newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classGold, pvutil.AnnBoundByController),
-			newClaimArray("claim11-6", "uid11-6", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", v1.ClaimBound, &classGold, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			noevents, noerrors,
+			name:            "11-6 - provisioning when there is a volume available",
+			initialVolumes:  newVolumeArray("volume11-6", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classGold),
+			expectedVolumes: newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classGold, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim11-6", "uid11-6", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedEvents:  noevents,
+			errors:          noerrors,
 			// No provisioning plugin confingure - makes the test fail when
 			// the controller erroneously tries to provision something
-			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			test: wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision success? - claim is bound before provisioner creates
 			// a volume.
-			"11-7 - claim is bound before provisioning",
-			novolumes,
-			newVolumeArray("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold),
+			name:            "11-7 - claim is bound before provisioning",
+			initialVolumes:  novolumes,
+			expectedVolumes: newVolumeArray("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
+			initialClaims:   newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold),
 			// The claim would be bound in next syncClaim
-			newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			expectedClaims: newClaimArray("claim11-7", "uid11-7", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents: noevents,
+			errors:         noerrors,
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before provisionClaimOperation starts.
 				// This similates a parallel controller provisioning the volume.
-				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned)
+				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned)
 				reactor.AddVolume(volume)
 			}),
 		},
 		{
 			// Provision success - cannot save provisioned PV once,
 			// second retry succeeds
-			"11-8 - cannot save provisioned volume",
-			novolumes,
-			newVolumeArray("pvc-uid11-8", "1Gi", "uid11-8", "claim11-8", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, &classGold),
+			name:            "11-8 - cannot save provisioned volume",
+			initialVolumes:  novolumes,
+			expectedVolumes: volumesWithFinalizers(newVolumeArray("pvc-uid11-8", "1Gi", "uid11-8", "claim11-8", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
+			initialClaims:   newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, &classGold),
 			// Binding will be completed in the next syncClaim
-			newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Normal ProvisioningSucceeded"},
-			[]pvtesting.ReactorError{
+			expectedClaims: newClaimArray("claim11-8", "uid11-8", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents: []string{"Normal ProvisioningSucceeded"},
+			errors: []pvtesting.ReactorError{
 				// Inject error to the first
 				// kubeclient.PersistentVolumes.Create() call. All other calls
 				// will succeed.
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error")},
 			},
-			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			test: wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision success? - cannot save provisioned PV five times,
 			// volume is deleted and delete succeeds
-			"11-9 - cannot save provisioned volume, delete succeeds",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"},
-			[]pvtesting.ReactorError{
+			name:            "11-9 - cannot save provisioned volume, delete succeeds",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-9", "uid11-9", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors: []pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
@@ -258,7 +287,7 @@ func TestProvisionSync(t *testing.T) {
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
-			wrapTestWithPluginCalls(
+			test: wrapTestWithPluginCalls(
 				nil,                                // recycle calls
 				[]error{nil},                       // delete calls
 				[]provisionCall{provision1Success}, // provision calls
@@ -268,13 +297,13 @@ func TestProvisionSync(t *testing.T) {
 		{
 			// Provision failure - cannot save provisioned PV five times,
 			// volume delete failed - no plugin found
-			"11-10 - cannot save provisioned volume, no delete plugin found",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
-			[]pvtesting.ReactorError{
+			name:            "11-10 - cannot save provisioned volume, no delete plugin found",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-10", "uid11-10", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
+			errors: []pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
@@ -284,18 +313,18 @@ func TestProvisionSync(t *testing.T) {
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
 			// No deleteCalls are configured, which results into no deleter plugin available for the volume
-			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			test: wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - cannot save provisioned PV five times,
 			// volume delete failed - deleter returns error five times
-			"11-11 - cannot save provisioned volume, deleter fails",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
-			[]pvtesting.ReactorError{
+			name:            "11-11 - cannot save provisioned volume, deleter fails",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-11", "uid11-11", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed", "Warning ProvisioningCleanupFailed"},
+			errors: []pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
@@ -304,7 +333,7 @@ func TestProvisionSync(t *testing.T) {
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
-			wrapTestWithPluginCalls(
+			test: wrapTestWithPluginCalls(
 				nil, // recycle calls
 				[]error{ // delete calls
 					errors.New("Mock deletion error1"),
@@ -319,13 +348,13 @@ func TestProvisionSync(t *testing.T) {
 		{
 			// Provision failure - cannot save provisioned PV five times,
 			// volume delete succeeds 2nd time
-			"11-12 - cannot save provisioned volume, delete succeeds 2nd time",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
-			[]string{"Warning ProvisioningFailed"},
-			[]pvtesting.ReactorError{
+			name:            "11-12 - cannot save provisioned volume, delete succeeds 2nd time",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim11-12", "uid11-12", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors: []pvtesting.ReactorError{
 				// Inject error to five kubeclient.PersistentVolumes.Create()
 				// calls
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error1")},
@@ -334,7 +363,7 @@ func TestProvisionSync(t *testing.T) {
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error4")},
 				{Verb: "create", Resource: "persistentvolumes", Error: errors.New("Mock creation error5")},
 			},
-			wrapTestWithPluginCalls(
+			test: wrapTestWithPluginCalls(
 				nil, // recycle calls
 				[]error{ // delete calls
 					errors.New("Mock deletion error1"),
@@ -346,61 +375,72 @@ func TestProvisionSync(t *testing.T) {
 		},
 		{
 			// Provision a volume (with non-default class)
-			"11-13 - successful provision with storage class 2",
-			novolumes,
-			newVolumeArray("pvc-uid11-13", "1Gi", "uid11-13", "claim11-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classSilver, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver),
+			name:            "11-13 - successful provision with storage class 2",
+			initialVolumes:  novolumes,
+			expectedVolumes: volumesWithFinalizers(newVolumeArray("pvc-uid11-13", "1Gi", "uid11-13", "claim11-13", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classSilver, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
+			initialClaims:   newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver),
 			// Binding will be completed in the next syncClaim
-			newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver, pvutil.AnnStorageProvisioner),
-			[]string{"Normal ProvisioningSucceeded"}, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
+			expectedClaims: newClaimArray("claim11-13", "uid11-13", "1Gi", "", v1.ClaimPending, &classSilver, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents: []string{"Normal ProvisioningSucceeded"},
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
 		},
 		{
 			// Provision error - non existing class
-			"11-14 - fail due to non-existing class",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-14", "uid11-14", "1Gi", "", v1.ClaimPending, &classNonExisting),
-			newClaimArray("claim11-14", "uid11-14", "1Gi", "", v1.ClaimPending, &classNonExisting),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-14 - fail due to non-existing class",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-14", "uid11-14", "1Gi", "", v1.ClaimPending, &classNonExisting),
+			expectedClaims:  newClaimArray("claim11-14", "uid11-14", "1Gi", "", v1.ClaimPending, &classNonExisting),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// No provisioning with class=""
-			"11-15 - no provisioning with class=''",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, &classEmpty),
-			newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, &classEmpty),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-15 - no provisioning with class=''",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, &classEmpty),
+			expectedClaims:  newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, &classEmpty),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// No provisioning with class=nil
-			"11-16 - no provisioning with class=nil",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, nil),
-			newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, nil),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-16 - no provisioning with class=nil",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, nil),
+			expectedClaims:  newClaimArray("claim11-15", "uid11-15", "1Gi", "", v1.ClaimPending, nil),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// No provisioning + normal event with external provisioner
-			"11-17 - external provisioner",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-17", "uid11-17", "1Gi", "", v1.ClaimPending, &classExternal),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
-				newClaimArray("claim11-17", "uid11-17", "1Gi", "", v1.ClaimPending, &classExternal)),
-			[]string{"Normal ExternalProvisioning"},
-			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-17 - external provisioner",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-17", "uid11-17", "1Gi", "", v1.ClaimPending, &classExternal),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim11-17", "uid11-17", "1Gi", "", v1.ClaimPending, &classExternal))),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// No provisioning + warning event with unknown internal provisioner
-			"11-18 - unknown internal provisioner",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-18", "uid11-18", "1Gi", "", v1.ClaimPending, &classUnknownInternal),
-			newClaimArray("claim11-18", "uid11-18", "1Gi", "", v1.ClaimPending, &classUnknownInternal),
-			[]string{"Warning ProvisioningFailed"},
-			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-18 - unknown internal provisioner",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-18", "uid11-18", "1Gi", "", v1.ClaimPending, &classUnknownInternal),
+			expectedClaims:  newClaimArray("claim11-18", "uid11-18", "1Gi", "", v1.ClaimPending, &classUnknownInternal),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// Provision success - first save of a PV to API server fails (API
@@ -417,7 +457,7 @@ func TestProvisionSync(t *testing.T) {
 			// end of the test is empty.
 			novolumes,
 			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold, pvutil.AnnStorageProvisioner),
+			newClaimArray("claim11-19", "uid11-19", "1Gi", "", v1.ClaimPending, &classGold, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
 			noevents,
 			[]pvtesting.ReactorError{
 				// Inject errors to simulate crashed API server during
@@ -434,58 +474,62 @@ func TestProvisionSync(t *testing.T) {
 		},
 		{
 			// No provisioning + warning event with unsupported storageClass.mountOptions
-			"11-20 - unsupported storageClass.mountOptions",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions),
-			newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions, pvutil.AnnStorageProvisioner),
+			name:            "11-20 - unsupported storageClass.mountOptions",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions),
+			expectedClaims:  newClaimArray("claim11-20", "uid11-20", "1Gi", "", v1.ClaimPending, &classUnsupportedMountOptions, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
 			// Expect event to be prefixed with "Mount options" because saving PV will fail anyway
-			[]string{"Warning ProvisioningFailed Mount options"},
-			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			expectedEvents: []string{"Warning ProvisioningFailed Mount options"},
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// No provisioning due to CSI migration + normal event with external provisioner
-			"11-21 - external provisioner for CSI migration",
-			novolumes,
-			novolumes,
-			newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
-			[]*v1.PersistentVolumeClaim{
+			name:            "11-21 - external provisioner for CSI migration",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims: []*v1.PersistentVolumeClaim{
 				annotateClaim(
 					newClaim("claim11-21", "uid11-21", "1Gi", "", v1.ClaimPending, &classGold),
 					map[string]string{
-						pvutil.AnnStorageProvisioner: "vendor.com/MockCSIDriver",
-						pvutil.AnnMigratedTo:         "vendor.com/MockCSIDriver",
+						volume.AnnStorageProvisioner:     "vendor.com/MockCSIDriver",
+						volume.AnnBetaStorageProvisioner: "vendor.com/MockCSIDriver",
+						volume.AnnMigratedTo:             "vendor.com/MockCSIDriver",
 					}),
 			},
-			[]string{"Normal ExternalProvisioning"},
-			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test:           wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},
 		{
 			// volume provisioned and available
 			// in this case, NO normal event with external provisioner should be issued
-			"11-22 - external provisioner with volume available",
-			newVolumeArray("volume11-22", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal),
-			newVolumeArray("volume11-22", "1Gi", "uid11-22", "claim11-22", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
-			newClaimArray("claim11-22", "uid11-22", "1Gi", "", v1.ClaimPending, &classExternal),
-			newClaimArray("claim11-22", "uid11-22", "1Gi", "volume11-22", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
-			noevents,
-			noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+			name:            "11-22 - external provisioner with volume available",
+			initialVolumes:  newVolumeArray("volume11-22", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal),
+			expectedVolumes: newVolumeArray("volume11-22", "1Gi", "uid11-22", "claim11-22", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim11-22", "uid11-22", "1Gi", "", v1.ClaimPending, &classExternal),
+			expectedClaims:  newClaimArray("claim11-22", "uid11-22", "1Gi", "volume11-22", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// volume provision for PVC scheduled
 			"11-23 - skip finding PV and provision for PVC annotated with AnnSelectedNode",
 			newVolumeArray("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
 			[]*v1.PersistentVolume{
-				newVolume("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper),
-				newVolume("pvc-uid11-23", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, pvutil.AnnDynamicallyProvisioned, pvutil.AnnBoundByController),
+				newVolumeWithFinalizers("volume11-23", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classCopper, nil /*No Finalizer is added here since the test doesn't trigger syncVolume, instead just syncClaim*/),
+				newVolumeWithFinalizers("pvc-uid11-23", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionInTreeProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			},
-			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+			claimWithAnnotation(volume.AnnSelectedNode, "node1",
 				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper)),
-			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
-				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper, pvutil.AnnStorageProvisioner)),
+			claimWithAnnotation(volume.AnnSelectedNode, "node1",
+				newClaimArray("claim11-23", "uid11-23", "1Gi", "", v1.ClaimPending, &classCopper, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner)),
 			[]string{"Normal ProvisioningSucceeded"},
 			noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 				func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 					nodesIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 					node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
@@ -495,57 +539,90 @@ func TestProvisionSync(t *testing.T) {
 		},
 		{
 			// volume provision for PVC that scheduled
-			"11-24 - skip finding PV and wait external provisioner for PVC annotated with AnnSelectedNode",
-			newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
-			newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
-			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+			name:            "11-24 - skip finding PV and wait external provisioner for PVC annotated with AnnSelectedNode",
+			initialVolumes:  newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
+			expectedVolumes: newVolumeArray("volume11-24", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classExternalWait),
+			initialClaims: claimWithAnnotation(volume.AnnSelectedNode, "node1",
 				newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait)),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume-wait",
-				claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
-					newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait))),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume-wait",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume-wait",
+					claimWithAnnotation(volume.AnnSelectedNode, "node1",
+						newClaimArray("claim11-24", "uid11-24", "1Gi", "", v1.ClaimPending, &classExternalWait)))),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test:           testSyncClaim,
+		},
+		{
+			// Provision a volume with a data source will fail
+			// for in-tree plugins
+			name:            "11-25 - failed in-tree provision with data source",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
+			expectedClaims:  claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-25", "uid11-25", "1Gi", "", v1.ClaimPending, &classGold)),
+			expectedEvents:  []string{"Warning ProvisioningFailed"},
+			errors:          noerrors,
+			test:            testSyncClaim,
+		},
+		{
+			// Provision a volume with a data source will proceed
+			// for CSI plugins
+			"11-26 - csi with data source",
+			novolumes,
+			novolumes,
+			claimWithAnnotation(volume.AnnStorageProvisioner, "mydriver.csi.k8s.io",
+				claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-26", "uid11-26", "1Gi", "", v1.ClaimPending, &classCSI))),
+			claimWithAnnotation(volume.AnnStorageProvisioner, "mydriver.csi.k8s.io",
+				claimWithDataSource("test-snap", "VolumeSnapshot", "snapshot.storage.k8s.io", newClaimArray("claim11-26", "uid11-26", "1Gi", "", v1.ClaimPending, &classCSI))),
 			[]string{"Normal ExternalProvisioning"},
-			noerrors, testSyncClaim,
+			noerrors,
+			wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}
-	runSyncTests(t, tests, storageClasses, []*v1.Pod{})
+	runSyncTests(t, ctx, tests, storageClasses, []*v1.Pod{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
 // volume/claims. The test follows this pattern:
-// 0. Load the controller with initial data.
-// 1. Call controllerTest.testCall() once as in TestSync()
-// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
-//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
-//    events). Go to 2. if these calls change anything.
-// 3. When all changes are processed and no new changes were made, call
-//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
-// 4. If some changes were done by step 3., go to 2. (simulation of
-//    "volume/claim updated" events, eventually performing step 3. again)
-// 5. When 3. does not do any changes, finish the tests and compare final set
-//    of volumes/claims with expected claims/volumes and report differences.
+//  0. Load the controller with initial data.
+//  1. Call controllerTest.testCall() once as in TestSync()
+//  2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//     call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//     events). Go to 2. if these calls change anything.
+//  3. When all changes are processed and no new changes were made, call
+//     syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+//  4. If some changes were done by step 3., go to 2. (simulation of
+//     "volume/claim updated" events, eventually performing step 3. again)
+//  5. When 3. does not do any changes, finish the tests and compare final set
+//     of volumes/claims with expected claims/volumes and report differences.
+//
 // Some limit of calls in enforced to prevent endless loops.
 func TestProvisionMultiSync(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// Provision a volume with binding
-			"12-1 - successful provision",
-			novolumes,
-			newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
-			newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, pvutil.AnnBoundByController, pvutil.AnnBindCompleted, pvutil.AnnStorageProvisioner),
-			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			name:            "12-1 - successful provision",
+			initialVolumes:  novolumes,
+			expectedVolumes: newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
+			initialClaims:   newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
+			expectedClaims:  newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test:            wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// provision a volume (external provisioner) and binding + normal event with external provisioner
-			"12-2 - external provisioner with volume provisioned success",
-			novolumes,
-			newVolumeArray("pvc-uid12-2", "1Gi", "uid12-2", "claim12-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
-			newClaimArray("claim12-2", "uid12-2", "1Gi", "", v1.ClaimPending, &classExternal),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
-				newClaimArray("claim12-2", "uid12-2", "1Gi", "pvc-uid12-2", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
-			[]string{"Normal ExternalProvisioning"},
-			noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			name:            "12-2 - external provisioner with volume provisioned success",
+			initialVolumes:  novolumes,
+			expectedVolumes: newVolumeArray("pvc-uid12-2", "1Gi", "uid12-2", "claim12-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim12-2", "uid12-2", "1Gi", "", v1.ClaimPending, &classExternal),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim12-2", "uid12-2", "1Gi", "pvc-uid12-2", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -562,27 +639,29 @@ func TestProvisionMultiSync(t *testing.T) {
 		},
 		{
 			// provision a volume (external provisioner) but binding will not happen + normal event with external provisioner
-			"12-3 - external provisioner with volume to be provisioned",
-			novolumes,
-			novolumes,
-			newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
-				newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal)),
-			[]string{"Normal ExternalProvisioning"},
-			noerrors,
-			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
+			name:            "12-3 - external provisioner with volume to be provisioned",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim12-3", "uid12-3", "1Gi", "", v1.ClaimPending, &classExternal))),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test:           wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// provision a volume (external provisioner) and binding + normal event with external provisioner
-			"12-4 - external provisioner with volume provisioned/bound success",
-			novolumes,
-			newVolumeArray("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController),
-			newClaimArray("claim12-4", "uid12-4", "1Gi", "", v1.ClaimPending, &classExternal),
-			claimWithAnnotation(pvutil.AnnStorageProvisioner, "vendor.com/my-volume",
-				newClaimArray("claim12-4", "uid12-4", "1Gi", "pvc-uid12-4", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
-			[]string{"Normal ExternalProvisioning"},
-			noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
+			name:            "12-4 - external provisioner with volume provisioned/bound success",
+			initialVolumes:  novolumes,
+			expectedVolumes: newVolumeArray("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim12-4", "uid12-4", "1Gi", "", v1.ClaimPending, &classExternal),
+			expectedClaims: claimWithAnnotation(volume.AnnBetaStorageProvisioner, "vendor.com/my-volume",
+				claimWithAnnotation(volume.AnnStorageProvisioner, "vendor.com/my-volume",
+					newClaimArray("claim12-4", "uid12-4", "1Gi", "pvc-uid12-4", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted))),
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
+			test: wrapTestWithInjectedOperation(ctx, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Create a volume before syncClaim tries to bind a PV to PVC
 				// This simulates external provisioner creating a volume while the controller
 				// is waiting for a volume to bind to the existed claim
@@ -591,7 +670,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// is working on provisioning the PV, also add the operation start timestamp into local cache
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
 				if ctrl.operationTimestamps.Has("default/claim12-4") {
-					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController)
+					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, volume.AnnBoundByController)
 					ctrl.volumes.store.Add(volume) // add the volume to controller
 					reactor.AddVolume(volume)
 				}
@@ -599,16 +678,17 @@ func TestProvisionMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, tests, storageClasses, storageClasses[0].Name)
+	runMultisyncTests(t, ctx, tests, storageClasses, storageClasses[0].Name)
 }
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	ctrl, err := newTestController(nil, nil, false)
+	_, ctx := ktesting.NewTestContext(t)
+	ctrl, err := newTestController(ctx, nil, nil, false)
 	if err != nil {
 		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
 	}
-	retVal := ctrl.provisionClaim(nil)
+	retVal := ctrl.provisionClaim(ctx, nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)
 	}

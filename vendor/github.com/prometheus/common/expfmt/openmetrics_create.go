@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/prometheus/common/model"
 
 	dto "github.com/prometheus/client_model/go"
@@ -36,6 +35,18 @@ import (
 // sanity checks. If the input contains duplicate metrics or invalid metric or
 // label names, the conversion will result in invalid text format output.
 //
+// If metric names conform to the legacy validation pattern, they will be placed
+// outside the brackets in the traditional way, like `foo{}`. If the metric name
+// fails the legacy validation check, it will be placed quoted inside the
+// brackets: `{"foo"}`. As stated above, the input is assumed to be santized and
+// no error will be thrown in this case.
+//
+// Similar to metric names, if label names conform to the legacy validation
+// pattern, they will be unquoted as normal, like `foo{bar="baz"}`. If the label
+// name fails the legacy validation check, it will be quoted:
+// `foo{"bar"="baz"}`. As stated above, the input is assumed to be santized and
+// no error will be thrown in this case.
+//
 // This function fulfills the type 'expfmt.encoder'.
 //
 // Note that OpenMetrics requires a final `# EOF` line. Since this function acts
@@ -47,20 +58,20 @@ import (
 // missing features and peculiarities to avoid complications when switching from
 // Prometheus to OpenMetrics or vice versa:
 //
-// - Counters are expected to have the `_total` suffix in their metric name. In
-//   the output, the suffix will be truncated from the `# TYPE` and `# HELP`
-//   line. A counter with a missing `_total` suffix is not an error. However,
-//   its type will be set to `unknown` in that case to avoid invalid OpenMetrics
-//   output.
+//   - Counters are expected to have the `_total` suffix in their metric name. In
+//     the output, the suffix will be truncated from the `# TYPE` and `# HELP`
+//     line. A counter with a missing `_total` suffix is not an error. However,
+//     its type will be set to `unknown` in that case to avoid invalid OpenMetrics
+//     output.
 //
-// - No support for the following (optional) features: `# UNIT` line, `_created`
-//   line, info type, stateset type, gaugehistogram type.
+//   - No support for the following (optional) features: `# UNIT` line, `_created`
+//     line, info type, stateset type, gaugehistogram type.
 //
-// - The size of exemplar labels is not checked (i.e. it's possible to create
-//   exemplars that are larger than allowed by the OpenMetrics specification).
+//   - The size of exemplar labels is not checked (i.e. it's possible to create
+//     exemplars that are larger than allowed by the OpenMetrics specification).
 //
-// - The value of Counters is not checked. (OpenMetrics doesn't allow counters
-//   with a `NaN` value.)
+//   - The value of Counters is not checked. (OpenMetrics doesn't allow counters
+//     with a `NaN` value.)
 func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int, err error) {
 	name := in.GetName()
 	if name == "" {
@@ -99,7 +110,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 		if err != nil {
 			return
 		}
-		n, err = w.WriteString(shortName)
+		n, err = writeName(w, shortName)
 		written += n
 		if err != nil {
 			return
@@ -125,7 +136,7 @@ func MetricFamilyToOpenMetrics(out io.Writer, in *dto.MetricFamily) (written int
 	if err != nil {
 		return
 	}
-	n, err = w.WriteString(shortName)
+	n, err = writeName(w, shortName)
 	written += n
 	if err != nil {
 		return
@@ -304,21 +315,9 @@ func writeOpenMetricsSample(
 	floatValue float64, intValue uint64, useIntValue bool,
 	exemplar *dto.Exemplar,
 ) (int, error) {
-	var written int
-	n, err := w.WriteString(name)
-	written += n
-	if err != nil {
-		return written, err
-	}
-	if suffix != "" {
-		n, err = w.WriteString(suffix)
-		written += n
-		if err != nil {
-			return written, err
-		}
-	}
-	n, err = writeOpenMetricsLabelPairs(
-		w, metric.Label, additionalLabelName, additionalLabelValue,
+	written := 0
+	n, err := writeOpenMetricsNameAndLabelPairs(
+		w, name+suffix, metric.Label, additionalLabelName, additionalLabelValue,
 	)
 	written += n
 	if err != nil {
@@ -366,27 +365,58 @@ func writeOpenMetricsSample(
 	return written, nil
 }
 
-// writeOpenMetricsLabelPairs works like writeOpenMetrics but formats the float
-// in OpenMetrics style.
-func writeOpenMetricsLabelPairs(
+// writeOpenMetricsNameAndLabelPairs works like writeOpenMetricsSample but
+// formats the float in OpenMetrics style.
+func writeOpenMetricsNameAndLabelPairs(
 	w enhancedWriter,
+	name string,
 	in []*dto.LabelPair,
 	additionalLabelName string, additionalLabelValue float64,
 ) (int, error) {
-	if len(in) == 0 && additionalLabelName == "" {
-		return 0, nil
-	}
 	var (
-		written   int
-		separator byte = '{'
+		written            int
+		separator          byte = '{'
+		metricInsideBraces      = false
 	)
+
+	if name != "" {
+		// If the name does not pass the legacy validity check, we must put the
+		// metric name inside the braces, quoted.
+		if !model.IsValidLegacyMetricName(model.LabelValue(name)) {
+			metricInsideBraces = true
+			err := w.WriteByte(separator)
+			written++
+			if err != nil {
+				return written, err
+			}
+			separator = ','
+		}
+
+		n, err := writeName(w, name)
+		written += n
+		if err != nil {
+			return written, err
+		}
+	}
+
+	if len(in) == 0 && additionalLabelName == "" {
+		if metricInsideBraces {
+			err := w.WriteByte('}')
+			written++
+			if err != nil {
+				return written, err
+			}
+		}
+		return written, nil
+	}
+
 	for _, lp := range in {
 		err := w.WriteByte(separator)
 		written++
 		if err != nil {
 			return written, err
 		}
-		n, err := w.WriteString(lp.GetName())
+		n, err := writeName(w, lp.GetName())
 		written += n
 		if err != nil {
 			return written, err
@@ -452,7 +482,7 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 	if err != nil {
 		return written, err
 	}
-	n, err = writeOpenMetricsLabelPairs(w, e.Label, "", 0)
+	n, err = writeOpenMetricsNameAndLabelPairs(w, "", e.Label, "", 0)
 	written += n
 	if err != nil {
 		return written, err
@@ -473,10 +503,11 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 		if err != nil {
 			return written, err
 		}
-		ts, err := ptypes.Timestamp((*e).Timestamp)
+		err = (*e).Timestamp.CheckValid()
 		if err != nil {
 			return written, err
 		}
+		ts := (*e).Timestamp.AsTime()
 		// TODO(beorn7): Format this directly from components of ts to
 		// avoid overflow/underflow and precision issues of the float
 		// conversion.

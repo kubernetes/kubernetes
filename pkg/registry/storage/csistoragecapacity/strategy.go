@@ -19,10 +19,12 @@ package csistoragecapacity
 import (
 	"context"
 
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	storageutil "k8s.io/kubernetes/pkg/api/storage"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
 )
@@ -47,11 +49,16 @@ func (csiStorageCapacityStrategy) PrepareForCreate(ctx context.Context, obj runt
 
 func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiStorageCapacity := obj.(*storage.CSIStorageCapacity)
-
-	errs := validation.ValidateCSIStorageCapacity(csiStorageCapacity)
-	errs = append(errs, validation.ValidateCSIStorageCapacity(csiStorageCapacity)...)
-
+	opts := validation.CSIStorageCapacityValidateOptions{
+		AllowInvalidLabelValueInSelector: false,
+	}
+	errs := validation.ValidateCSIStorageCapacity(csiStorageCapacity, opts)
 	return errs
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiStorageCapacityStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return storageutil.GetWarningsForCSIStorageCapacity(obj.(*storage.CSIStorageCapacity))
 }
 
 // Canonicalize normalizes the object after validation.
@@ -69,10 +76,23 @@ func (csiStorageCapacityStrategy) PrepareForUpdate(ctx context.Context, obj, old
 func (csiStorageCapacityStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSIStorageCapacityObj := obj.(*storage.CSIStorageCapacity)
 	oldCSIStorageCapacityObj := old.(*storage.CSIStorageCapacity)
-	errorList := validation.ValidateCSIStorageCapacity(newCSIStorageCapacityObj)
+	opts := validation.CSIStorageCapacityValidateOptions{
+		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldCSIStorageCapacityObj),
+	}
+	errorList := validation.ValidateCSIStorageCapacity(newCSIStorageCapacityObj, opts)
 	return append(errorList, validation.ValidateCSIStorageCapacityUpdate(newCSIStorageCapacityObj, oldCSIStorageCapacityObj)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiStorageCapacityStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return storageutil.GetWarningsForCSIStorageCapacity(obj.(*storage.CSIStorageCapacity))
 }
 
 func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {
 	return false
+}
+
+func hasInvalidLabelValueInLabelSelector(capacity *storage.CSIStorageCapacity) bool {
+	labelSelectorValidationOptions := metav1validation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}
+	return len(metav1validation.ValidateLabelSelector(capacity.NodeTopology, labelSelectorValidationOptions, nil)) > 0
 }

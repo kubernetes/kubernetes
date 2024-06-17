@@ -10,7 +10,6 @@ approvers:
   - spiffxp
   - johnbelamaric
 emeritus_approvers:
-  - mml
 labels:
   - area/conformance
   - sig/architecture

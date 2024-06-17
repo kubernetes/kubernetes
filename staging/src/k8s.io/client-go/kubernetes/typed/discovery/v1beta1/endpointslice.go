@@ -20,14 +20,20 @@ package v1beta1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/discovery/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	discoveryv1beta1 "k8s.io/client-go/applyconfigurations/discovery/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // EndpointSlicesGetter has a method to return a EndpointSliceInterface.
@@ -46,6 +52,7 @@ type EndpointSliceInterface interface {
 	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EndpointSliceList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.EndpointSlice, err error)
+	Apply(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSliceApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.EndpointSlice, err error)
 	EndpointSliceExpansion
 }
 
@@ -77,7 +84,26 @@ func (c *endpointSlices) Get(ctx context.Context, name string, options v1.GetOpt
 }
 
 // List takes label and field selectors, and returns the list of EndpointSlices that match those selectors.
-func (c *endpointSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
+func (c *endpointSlices) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EndpointSliceList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for endpointslices, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for endpointslices", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for endpointslices ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for endpointslices", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of EndpointSlices that match those selectors.
+func (c *endpointSlices) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -89,6 +115,23 @@ func (c *endpointSlices) List(ctx context.Context, opts v1.ListOptions) (result 
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of EndpointSlices
+func (c *endpointSlices) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1beta1.EndpointSliceList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("endpointslices").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -171,6 +214,32 @@ func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchT
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied endpointSlice.
+func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1beta1.EndpointSliceApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.EndpointSlice, err error) {
+	if endpointSlice == nil {
+		return nil, fmt.Errorf("endpointSlice provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(endpointSlice)
+	if err != nil {
+		return nil, err
+	}
+	name := endpointSlice.Name
+	if name == nil {
+		return nil, fmt.Errorf("endpointSlice.Name must be provided to Apply")
+	}
+	result = &v1beta1.EndpointSlice{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("endpointslices").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

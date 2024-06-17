@@ -19,22 +19,27 @@ package preflight
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 
+	utiltesting "k8s.io/client-go/util/testing"
+
+	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
-	"net/http"
-	"os"
-
 	"k8s.io/apimachinery/pkg/util/sets"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 var (
@@ -184,117 +189,228 @@ func (pfct preflightCheckTest) Check() (warning, errorList []error) {
 	return
 }
 
-func TestRunInitNodeChecks(t *testing.T) {
+func TestFileExistingCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-exist-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
-		name                    string
-		cfg                     *kubeadmapi.InitConfiguration
-		expected                bool
-		isSecondaryControlPlane bool
-		downloadCerts           bool
+		name          string
+		check         FileExistingCheck
+		expectedError bool
 	}{
-		{name: "Test valid advertised address",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
+		{
+			name: "File does not exist, so it's not available",
+			check: FileExistingCheck{
+				Path: "/does/not/exist",
 			},
-			expected: false,
+			expectedError: true,
 		},
 		{
-			name: "Test CA file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
-				},
+			name: "File exists and is available",
+			check: FileExistingCheck{
+				Path: f.Name(),
 			},
-			expected: false,
-		},
-		{
-			name: "Skip test CA file exists if specified/download certs",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
-				},
-			},
-			expected:                true,
-			isSecondaryControlPlane: true,
-			downloadCerts:           true,
-		},
-		{
-			name: "Test Cert file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
-				},
-			},
-			expected: false,
-		},
-		{
-			name: "Test Key file exists if specified",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
-				},
-			},
-			expected: false,
-		},
-		{
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
-			},
-			expected: false,
+			expectedError: false,
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make RunInitNodeChecks accept a ClusterConfiguration object instead of InitConfiguration
-		actual := RunInitNodeChecks(exec.New(), rt.cfg, sets.NewString(), rt.isSecondaryControlPlane, rt.downloadCerts)
-		if (actual == nil) != rt.expected {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
 			t.Errorf(
-				"failed RunInitNodeChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
-				rt.expected,
-				(actual == nil),
-				actual,
+				"Failed FileExistingCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
 			)
 		}
 	}
 }
 
-func TestRunJoinNodeChecks(t *testing.T) {
+func TestFileAvailableCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-avail-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer utiltesting.CloseAndRemove(t, f)
 	var tests = []struct {
-		cfg      *kubeadmapi.JoinConfiguration
-		expected bool
+		name          string
+		check         FileAvailableCheck
+		expectedError bool
 	}{
 		{
-			cfg:      &kubeadmapi.JoinConfiguration{},
-			expected: false,
+			name: "The file does not exist",
+			check: FileAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: false,
 		},
 		{
-			cfg: &kubeadmapi.JoinConfiguration{
-				Discovery: kubeadmapi.Discovery{
-					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoint: "192.168.1.15",
-					},
-				},
+			name: "The file exists",
+			check: FileAvailableCheck{
+				Path: f.Name(),
 			},
-			expected: false,
-		},
-		{
-			cfg: &kubeadmapi.JoinConfiguration{
-				Discovery: kubeadmapi.Discovery{
-					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
-						APIServerEndpoint: "2001:1234::1:15",
-					},
-				},
-			},
-			expected: false,
+			expectedError: true,
 		},
 	}
-
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(exec.New(), rt.cfg, sets.NewString())
-		if (actual == nil) != rt.expected {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
 			t.Errorf(
-				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual != nil),
+				"Failed FileAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestFileContentCheck(t *testing.T) {
+	f, err := os.CreateTemp("", "file-content-check")
+	if err != nil {
+		t.Fatalf("Failed to create file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	var tests = []struct {
+		name          string
+		check         FileContentCheck
+		expectedError bool
+	}{
+		{
+			name: "File exists and has matching content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("Test FileContentCheck"),
+			},
+			expectedError: false,
+		},
+		{
+			name: "File exists, content is nil",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: nil,
+			},
+			expectedError: false,
+		},
+		{
+			name: "File exists but has unexpected content",
+			check: FileContentCheck{
+				Path:    f.Name(),
+				Content: []byte("foo"),
+			},
+			expectedError: true,
+		},
+		{
+			name: "File does not exist, content is not nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: []byte("foo"),
+			},
+			expectedError: true,
+		},
+		{
+			name: "File dose not exist, content is nil",
+			check: FileContentCheck{
+				Path:    "/does/not/exist",
+				Content: nil,
+			},
+			expectedError: true,
+		},
+	}
+	if _, err = f.WriteString("Test FileContentCheck"); err != nil {
+		t.Fatalf("Failed to write to file: %v", err)
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (len(output) > 0) != rt.expectedError {
+			t.Errorf(
+				"Failed FileContentCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(len(output) > 0),
+			)
+		}
+	}
+}
+
+func TestDirAvailableCheck(t *testing.T) {
+	fileDir, err := os.MkdirTemp("", "dir-avail-check")
+	if err != nil {
+		t.Fatalf("failed creating directory: %v", err)
+	}
+	defer os.RemoveAll(fileDir)
+	var tests = []struct {
+		name          string
+		check         DirAvailableCheck
+		expectedError bool
+	}{
+		{
+			name: "Directory exists and is empty",
+			check: DirAvailableCheck{
+				Path: fileDir,
+			},
+			expectedError: false,
+		},
+		{
+			name: "Directory exists and has something",
+			check: DirAvailableCheck{
+				Path: os.TempDir(), // a directory was created previously in this test
+			},
+			expectedError: true,
+		},
+		{
+			name: "Directory does not exist",
+			check: DirAvailableCheck{
+				Path: "/does/not/exist",
+			},
+			expectedError: false,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
+			t.Errorf(
+				"Failed DirAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
+			)
+		}
+	}
+}
+
+func TestPortOpenCheck(t *testing.T) {
+	ln, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("could not listen on local network: %v", err)
+	}
+	defer ln.Close()
+	var tests = []struct {
+		name          string
+		check         PortOpenCheck
+		expectedError bool
+	}{
+		{
+			name:          "Port is available",
+			check:         PortOpenCheck{port: 0},
+			expectedError: false,
+		},
+		{
+			name:          "Port is not available",
+			check:         PortOpenCheck{port: ln.Addr().(*net.TCPAddr).Port},
+			expectedError: true,
+		},
+	}
+	for _, rt := range tests {
+		_, output := rt.check.Check()
+		if (output != nil) != rt.expectedError {
+			t.Errorf(
+				"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
+				rt.name,
+				rt.expectedError,
+				(output != nil),
 			)
 		}
 	}
@@ -322,7 +438,7 @@ func TestRunChecks(t *testing.T) {
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
-		actual := RunChecks(rt.p, buf, sets.NewString())
+		actual := RunChecks(rt.p, buf, sets.New[string]())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunChecks:\n\texpected: %t\n\t  actual: %t",
@@ -340,12 +456,12 @@ func TestRunChecks(t *testing.T) {
 	}
 }
 func TestConfigRootCAs(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-cafile")
+	f, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-cafile")
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
-	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, f)
+	if _, err := f.Write([]byte(externalEtcdRootCAFileContent)); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -366,15 +482,15 @@ func TestConfigRootCAs(t *testing.T) {
 	}
 }
 func TestConfigCertAndKey(t *testing.T) {
-	certFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-certfile")
+	certFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-certfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp CertFile file\n\tactual:%v",
 			err,
 		)
 	}
-	defer os.Remove(certFile.Name())
-	if err := ioutil.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, certFile)
+	if _, err := certFile.Write([]byte(externalEtcdCertFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -382,15 +498,15 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 
-	keyFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
+	keyFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp KeyFile file\n\tactual:%v",
 			err,
 		)
 	}
-	defer os.Remove(keyFile.Name())
-	if err := ioutil.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	defer utiltesting.CloseAndRemove(t, keyFile)
+	if _, err := keyFile.Write([]byte(externalEtcdKeyFileContent)); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),
@@ -526,9 +642,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -608,9 +722,7 @@ func TestHTTPProxyCheck(t *testing.T) {
 		},
 	}
 
-	// Save current content of *_proxy and *_PROXY variables.
-	savedEnv := resetProxyEnv(t)
-	defer restoreEnv(savedEnv)
+	resetProxyEnv(t)
 
 	for _, rt := range tests {
 		warning, _ := rt.check.Check()
@@ -627,22 +739,19 @@ func TestHTTPProxyCheck(t *testing.T) {
 	}
 }
 
-// resetProxyEnv is helper function that unsets all *_proxy variables
-// and return previously set values as map. This can be used to restore
-// original state of the environment.
-func resetProxyEnv(t *testing.T) map[string]string {
-	savedEnv := make(map[string]string)
+// resetProxyEnv is helper function that unsets all *_proxy variables.
+func resetProxyEnv(t *testing.T) {
 	for _, e := range os.Environ() {
-		pair := strings.Split(e, "=")
-		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
-			savedEnv[pair[0]] = pair[1]
-			os.Unsetenv(pair[0])
+		key, value, _ := strings.Cut(e, "=")
+		if strings.HasSuffix(strings.ToLower(key), "_proxy") {
+			t.Cleanup(func() { os.Setenv(key, value) })
+			os.Unsetenv(key)
 		}
 	}
-	t.Log("Saved environment: ", savedEnv)
 
-	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
-	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+	t.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	t.Setenv("HTTPS_PROXY", "https://proxy.example.com:3128")
+	t.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
 	// Check if we can reliably execute tests:
 	// ProxyFromEnvironment caches the *_proxy environment variables and
 	// if ProxyFromEnvironment already executed before our test with empty
@@ -659,31 +768,25 @@ func resetProxyEnv(t *testing.T) map[string]string {
 		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
 	}
 	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
-	return savedEnv
-}
-
-// restoreEnv is helper function to restores values
-// of environment variables from saved state in the map
-func restoreEnv(e map[string]string) {
-	for k, v := range e {
-		os.Setenv(k, v)
-	}
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
+	minimumKubeletVersion := version.MustParseSemantic("v1.3.0")
+	minimumControlPlaneVersion := version.MustParseSemantic("v1.3.0")
+	currentKubernetesVersion := version.MustParseSemantic("v1.4.0")
 	cases := []struct {
 		kubeletVersion string
 		k8sVersion     string
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v" + constants.CurrentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                                     // check minimally supported version when there is no information about control plane
-		{"v1.11.3", "v1.11.8", true, false},                                                                                                                    // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v" + constants.MinimumKubeletVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.WithPatch(5).String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.String(), constants.CurrentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
-		{"v" + constants.CurrentKubernetesVersion.WithPreRelease("alpha.1").String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v" + constants.CurrentKubernetesVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
+		{"v" + currentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                           // check minimally supported version when there is no information about control plane
+		{"v1.1.0", "v1.11.8", true, false},                                                                                                 // too old kubelet, should fail.
+		{"v" + minimumKubeletVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
+		{"v" + minimumKubeletVersion.WithPatch(5).String(), minimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
+		{"v" + minimumKubeletVersion.String(), currentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
+		{"v" + currentKubernetesVersion.WithPreRelease("alpha.1").String(), minimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v" + currentKubernetesVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
@@ -699,7 +802,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 				},
 			}
 
-			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
+			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec, minKubeletVersion: minimumKubeletVersion}
 			warnings, errors := check.Check()
 
 			switch {
@@ -718,16 +821,16 @@ func TestKubeletVersionCheck(t *testing.T) {
 
 func TestSetHasItemOrAll(t *testing.T) {
 	var tests = []struct {
-		ignoreSet      sets.String
+		ignoreSet      sets.Set[string]
 		testString     string
 		expectedResult bool
 	}{
-		{sets.NewString(), "foo", false},
-		{sets.NewString("all"), "foo", true},
-		{sets.NewString("all", "bar"), "foo", true},
-		{sets.NewString("bar"), "foo", false},
-		{sets.NewString("baz", "foo", "bar"), "foo", true},
-		{sets.NewString("baz", "bar", "foo"), "Foo", true},
+		{sets.New[string](), "foo", false},
+		{sets.New("all"), "foo", true},
+		{sets.New("all", "bar"), "foo", true},
+		{sets.New("bar"), "foo", false},
+		{sets.New("baz", "foo", "bar"), "foo", true},
+		{sets.New("baz", "bar", "foo"), "Foo", true},
 	}
 
 	for _, rt := range tests {
@@ -742,88 +845,6 @@ func TestSetHasItemOrAll(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestImagePullCheck(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeAction{
-			// Test case 1: img1 and img2 exist, img3 doesn't exist
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-
-			// Test case 2: images don't exist
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-		CombinedOutputScript: []fakeexec.FakeAction{
-			// Test case1: pull only img3
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// Test case 2: fail to pull image2 and image3
-			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
-	}
-
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, constants.DefaultDockerCRISocket)
-	if err != nil {
-		t.Errorf("unexpected NewContainerRuntime error: %v", err)
-	}
-
-	check := ImagePullCheck{
-		runtime:   containerRuntime,
-		imageList: []string{"img1", "img2", "img3"},
-	}
-	warnings, errors := check.Check()
-	if len(warnings) != 0 {
-		t.Fatalf("did not expect any warnings but got %q", warnings)
-	}
-	if len(errors) != 0 {
-		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
-	}
-
-	warnings, errors = check.Check()
-	if len(warnings) != 0 {
-		t.Fatalf("did not expect any warnings but got %q", warnings)
-	}
-	if len(errors) != 2 {
-		t.Fatalf("expected 2 errors but got %d: %q", len(errors), errors)
 	}
 }
 
@@ -845,6 +866,168 @@ func TestNumCPUCheck(t *testing.T) {
 			}
 			if len(errors) != rt.numErrors {
 				t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestMemCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS for memory check test ")
+	}
+
+	var tests = []struct {
+		minimum        uint64
+		expectedErrors int
+	}{
+		{0, 0},
+		{9999999999999999, 1},
+	}
+
+	for _, rt := range tests {
+		t.Run(fmt.Sprintf("MemoryCheck{%d}", rt.minimum), func(t *testing.T) {
+			warnings, errors := MemCheck{Mem: rt.minimum}.Check()
+			if len(warnings) > 0 {
+				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
+			} else if len(errors) != rt.expectedErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", rt.expectedErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestInitIPCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+	// should be a privileged user for the `init` command, otherwise just skip it.
+	isPrivileged := IsPrivilegedUserCheck{}
+	if _, err := isPrivileged.Check(); err != nil {
+		t.Skip("not a privileged user")
+	}
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
+	if err != nil {
+		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
+	}
+	internalcfg.LocalAPIEndpoint.AdvertiseAddress = "" // AdvertiseAddress is optional, it could be auto-detected.
+	ipv4File := "FileContent--proc-sys-net-ipv4-ip_forward"
+	ipv6File := "FileContent--proc-sys-net-ipv6-conf-default-forwarding"
+	var tests = []struct {
+		testName    string
+		PodSubnet   string
+		serviceCidr string
+		expStr      []string
+	}{
+		{
+			testName:    "dual stack",
+			PodSubnet:   "fda9:d324:354d:0::/56",
+			serviceCidr: "10.96.0.0/16,fda9:d324:354d:1::/112",
+			expStr:      []string{"FileContent--proc-sys-net-ipv4-ip_forward", "FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+		{
+			testName:    "single stack ipv4",
+			PodSubnet:   "10.244.0.0/16",
+			serviceCidr: "10.96.0.0/16",
+			expStr:      []string{"FileContent--proc-sys-net-ipv4-ip_forward"},
+		},
+		{
+			testName:    "single stack ipv6",
+			PodSubnet:   "fda9:d324:354d:0::/56",
+			serviceCidr: "fda9:d324:354d:1::/112",
+			expStr:      []string{"FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.testName, func(t *testing.T) {
+			checkList := []string{}
+			internalcfg.Networking.ServiceSubnet = rt.serviceCidr
+			internalcfg.Networking.PodSubnet = rt.PodSubnet
+			checks, err := InitNodeChecks(exec.New(), internalcfg, nil, false, false)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, check := range checks {
+				if check.Name() == ipv4File {
+					checkList = append(checkList, ipv4File)
+				}
+				if check.Name() == ipv6File {
+					checkList = append(checkList, ipv6File)
+				}
+			}
+			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
+				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestJoinIPCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS")
+	}
+	// should be a privileged user for the `join` command, otherwise just skip it.
+	isPrivileged := IsPrivilegedUserCheck{}
+	if _, err := isPrivileged.Check(); err != nil {
+		t.Skip("not a privileged user")
+	}
+
+	opts := configutil.LoadOrDefaultConfigurationOptions{
+		SkipCRIDetect: true,
+	}
+
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		Discovery: kubeadmapiv1.Discovery{
+			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
+				Token:                    configutil.PlaceholderToken.Token.String(),
+				APIServerEndpoint:        "kube-apiserver:6443",
+				UnsafeSkipCAVerification: true,
+			},
+		},
+	}, opts)
+	if err != nil {
+		t.Fatalf("unexpected failure when defaulting JoinConfiguration: %v", err)
+	}
+	ipv4File := "FileContent--proc-sys-net-ipv4-ip_forward"
+	ipv6File := "FileContent--proc-sys-net-ipv6-conf-default-forwarding"
+	var tests = []struct {
+		testName string
+		endpoint string
+		expStr   []string
+	}{
+		{
+			testName: "single stack ipv4",
+			endpoint: "10.244.0.0:1234",
+			expStr:   []string{"FileContent--proc-sys-net-ipv4-ip_forward"},
+		},
+		{
+			testName: "single stack ipv6",
+			endpoint: "[fda9:d324:354d:0::]:1234",
+			expStr:   []string{"FileContent--proc-sys-net-ipv6-conf-default-forwarding"},
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.testName, func(t *testing.T) {
+			checkList := []string{}
+			internalcfg.Discovery.BootstrapToken.APIServerEndpoint = rt.endpoint
+			checks, err := JoinNodeChecks(exec.New(), internalcfg, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, check := range checks {
+				if check.Name() == ipv4File {
+					checkList = append(checkList, ipv4File)
+				}
+				if check.Name() == ipv6File {
+					checkList = append(checkList, ipv6File)
+				}
+			}
+			if diff := cmp.Diff(checkList, rt.expStr); diff != "" {
+				t.Fatalf("unexpected file content check (-want,+got):\n%s", diff)
 			}
 		})
 	}

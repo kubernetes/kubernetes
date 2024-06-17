@@ -82,6 +82,23 @@ func TestNestedDecode(t *testing.T) {
 	}
 }
 
+func TestNestedDecodeStrictDecodingError(t *testing.T) {
+	strictErr := runtime.NewStrictDecodingError([]error{fmt.Errorf("duplicate field")})
+	n := &testNestedDecodable{nestedErr: strictErr}
+	decoder := &mockSerializer{obj: n}
+	codec := NewCodec(nil, decoder, nil, nil, nil, nil, nil, nil, "TestNestedDecode")
+	o, _, err := codec.Decode([]byte(`{}`), nil, n)
+	if strictErr, ok := runtime.AsStrictDecodingError(err); !ok || err != strictErr {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if o != n {
+		t.Errorf("did not successfully decode with strict decoding error: %v", o)
+	}
+	if !n.nestedCalled {
+		t.Errorf("did not invoke nested decoder")
+	}
+}
+
 func TestNestedEncode(t *testing.T) {
 	n := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode")}
 	n2 := &testNestedDecodable{nestedErr: fmt.Errorf("unable to decode 2")}
@@ -108,8 +125,9 @@ func TestNestedEncodeError(t *testing.T) {
 	gvk1 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v1"}
 	gvk2 := schema.GroupVersionKind{Kind: "test", Group: "other", Version: "v2"}
 	n.SetGroupVersionKind(gvk1)
+	encoder := &mockSerializer{obj: n}
 	codec := NewCodec(
-		nil, nil,
+		encoder, nil,
 		&mockConvertor{},
 		nil,
 		&mockTyper{gvks: []schema.GroupVersionKind{gvk1, gvk2}},
@@ -317,15 +335,6 @@ func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 
 func (s *mockSerializer) Identifier() runtime.Identifier {
 	return runtime.Identifier("mock")
-}
-
-type mockCreater struct {
-	err error
-	obj runtime.Object
-}
-
-func (c *mockCreater) New(kind schema.GroupVersionKind) (runtime.Object, error) {
-	return c.obj, c.err
 }
 
 type mockTyper struct {

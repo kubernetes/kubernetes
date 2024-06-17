@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -34,60 +33,6 @@ const (
 	daemonsetName = "test-daemonset"
 	namespace     = "test-namespace"
 )
-
-func TestDaemonsetDefaultGarbageCollectionPolicy(t *testing.T) {
-	// Make sure we correctly implement the interface.
-	// Otherwise a typo could silently change the default.
-	var gcds rest.GarbageCollectionDeleteStrategy = Strategy
-	tests := []struct {
-		requestInfo      genericapirequest.RequestInfo
-		expectedGCPolicy rest.GarbageCollectionPolicy
-		isNilRequestInfo bool
-	}{
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
-				Resource:   "daemonsets",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1beta2",
-				Resource:   "daemonsets",
-			},
-			rest.OrphanDependents,
-			false,
-		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "apps",
-				APIVersion: "v1",
-				Resource:   "daemonsets",
-			},
-			rest.DeleteDependents,
-			false,
-		},
-		{
-			expectedGCPolicy: rest.DeleteDependents,
-			isNilRequestInfo: true,
-		},
-	}
-
-	for _, test := range tests {
-		context := genericapirequest.NewContext()
-		if !test.isNilRequestInfo {
-			context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
-		}
-		if got, want := gcds.DefaultGarbageCollectionPolicy(context), test.expectedGCPolicy; got != want {
-			t.Errorf("%s/%s: DefaultGarbageCollectionPolicy() = %#v, want %#v", test.requestInfo.APIGroup,
-				test.requestInfo.APIVersion, got, want)
-		}
-	}
-}
 
 func TestSelectorImmutability(t *testing.T) {
 	tests := []struct {
@@ -144,7 +89,7 @@ func TestSelectorImmutability(t *testing.T) {
 			},
 			map[string]string{"a": "b"},
 			map[string]string{"c": "d"},
-			field.ErrorList{},
+			nil,
 		},
 	}
 
@@ -157,6 +102,19 @@ func TestSelectorImmutability(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedErrorList, errorList) {
 			t.Errorf("Unexpected error list, expected: %v, actual: %v", test.expectedErrorList, errorList)
 		}
+	}
+}
+
+func TestValidateToleratingBadLabels(t *testing.T) {
+	oldObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	oldObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
+	newObj := newDaemonSetWithSelectorLabels(map[string]string{"a": "b"}, 1)
+	newObj.Spec.Selector.MatchExpressions = []metav1.LabelSelectorRequirement{{Key: "key", Operator: metav1.LabelSelectorOpNotIn, Values: []string{"bad value"}}}
+
+	context := genericapirequest.NewContext()
+	errorList := daemonSetStrategy{}.ValidateUpdate(context, newObj, oldObj)
+	if len(errorList) > 0 {
+		t.Errorf("Unexpected error list with no-op update of bad object: %v", errorList)
 	}
 }
 

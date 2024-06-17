@@ -7,9 +7,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/opencontainers/runc/libcontainer/devices"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type Rlimit struct {
@@ -20,9 +21,9 @@ type Rlimit struct {
 
 // IDMap represents UID/GID Mappings for User Namespaces.
 type IDMap struct {
-	ContainerID int `json:"container_id"`
-	HostID      int `json:"host_id"`
-	Size        int `json:"size"`
+	ContainerID int64 `json:"container_id"`
+	HostID      int64 `json:"host_id"`
+	Size        int64 `json:"size"`
 }
 
 // Seccomp represents syscall restrictions
@@ -30,9 +31,12 @@ type IDMap struct {
 // for syscalls. Additional architectures can be added by specifying them in
 // Architectures.
 type Seccomp struct {
-	DefaultAction Action     `json:"default_action"`
-	Architectures []string   `json:"architectures"`
-	Syscalls      []*Syscall `json:"syscalls"`
+	DefaultAction    Action     `json:"default_action"`
+	Architectures    []string   `json:"architectures"`
+	Syscalls         []*Syscall `json:"syscalls"`
+	DefaultErrnoRet  *uint      `json:"default_errno_ret"`
+	ListenerPath     string     `json:"listener_path,omitempty"`
+	ListenerMetadata string     `json:"listener_metadata,omitempty"`
 }
 
 // Action is taken upon rule match in Seccomp
@@ -45,6 +49,9 @@ const (
 	Allow
 	Trace
 	Log
+	Notify
+	KillThread
+	KillProcess
 )
 
 // Operator is a comparison operator to be used when matching syscall arguments in Seccomp
@@ -92,6 +99,9 @@ type Config struct {
 	// Path to a directory containing the container's root filesystem.
 	Rootfs string `json:"rootfs"`
 
+	// Umask is the umask to use inside of the container.
+	Umask *uint32 `json:"umask"`
+
 	// Readonlyfs will remount the container's rootfs as readonly where only externally mounted
 	// bind mounts are writtable.
 	Readonlyfs bool `json:"readonlyfs"`
@@ -104,7 +114,7 @@ type Config struct {
 	Mounts []*Mount `json:"mounts"`
 
 	// The device nodes that should be automatically created within the container upon container start.  Note, make sure that the node is marked as allowed in the cgroup as well!
-	Devices []*Device `json:"devices"`
+	Devices []*devices.Device `json:"devices"`
 
 	MountLabel string `json:"mount_label"`
 
@@ -203,9 +213,11 @@ type Config struct {
 	RootlessCgroups bool `json:"rootless_cgroups,omitempty"`
 }
 
-type HookName string
-type HookList []Hook
-type Hooks map[HookName]HookList
+type (
+	HookName string
+	HookList []Hook
+	Hooks    map[HookName]HookList
+)
 
 const (
 	// Prestart commands are executed after the container namespaces are created,
@@ -218,35 +230,39 @@ const (
 	// the runtime environment has been created but before the pivot_root has been executed.
 	// CreateRuntime is called immediately after the deprecated Prestart hook.
 	// CreateRuntime commands are called in the Runtime Namespace.
-	CreateRuntime = "createRuntime"
+	CreateRuntime HookName = "createRuntime"
 
 	// CreateContainer commands MUST be called as part of the create operation after
 	// the runtime environment has been created but before the pivot_root has been executed.
 	// CreateContainer commands are called in the Container namespace.
-	CreateContainer = "createContainer"
+	CreateContainer HookName = "createContainer"
 
 	// StartContainer commands MUST be called as part of the start operation and before
 	// the container process is started.
 	// StartContainer commands are called in the Container namespace.
-	StartContainer = "startContainer"
+	StartContainer HookName = "startContainer"
 
 	// Poststart commands are executed after the container init process starts.
 	// Poststart commands are called in the Runtime Namespace.
-	Poststart = "poststart"
+	Poststart HookName = "poststart"
 
 	// Poststop commands are executed after the container init process exits.
 	// Poststop commands are called in the Runtime Namespace.
-	Poststop = "poststop"
+	Poststop HookName = "poststop"
 )
 
-// TODO move this to runtime-spec
-// See: https://github.com/opencontainers/runtime-spec/pull/1046
-const (
-	Creating = "creating"
-	Created  = "created"
-	Running  = "running"
-	Stopped  = "stopped"
-)
+// KnownHookNames returns the known hook names.
+// Used by `runc features`.
+func KnownHookNames() []string {
+	return []string{
+		string(Prestart), // deprecated
+		string(CreateRuntime),
+		string(CreateContainer),
+		string(StartContainer),
+		string(Poststart),
+		string(Poststop),
+	}
+}
 
 type Capabilities struct {
 	// Bounding is the set of capabilities checked by the kernel.
@@ -264,7 +280,7 @@ type Capabilities struct {
 func (hooks HookList) RunHooks(state *specs.State) error {
 	for i, h := range hooks {
 		if err := h.Run(state); err != nil {
-			return errors.Wrapf(err, "Running hook #%d:", i)
+			return fmt.Errorf("error running hook #%d: %w", i, err)
 		}
 	}
 
@@ -377,7 +393,7 @@ func (c Command) Run(s *specs.State) error {
 	go func() {
 		err := cmd.Wait()
 		if err != nil {
-			err = fmt.Errorf("error running hook: %v, stdout: %s, stderr: %s", err, stdout.String(), stderr.String())
+			err = fmt.Errorf("error running hook: %w, stdout: %s, stderr: %s", err, stdout.String(), stderr.String())
 		}
 		errC <- err
 	}()
@@ -391,8 +407,8 @@ func (c Command) Run(s *specs.State) error {
 	case err := <-errC:
 		return err
 	case <-timerCh:
-		cmd.Process.Kill()
-		cmd.Wait()
+		_ = cmd.Process.Kill()
+		<-errC
 		return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
 	}
 }

@@ -30,7 +30,7 @@ readonly logexporter_namespace="${3:-logexporter}"
 # check for a function named log_dump_custom_get_instances. If it's
 # defined, we assume the function can me called with one argument, the
 # role, which is either "master" or "node".
-echo "Checking for custom logdump instances, if any"
+echo 'Checking for custom logdump instances, if any'
 if [[ $(type -t log_dump_custom_get_instances) == "function" ]]; then
   readonly use_custom_instance_list=yes
 else
@@ -41,8 +41,8 @@ readonly master_ssh_supported_providers="gce aws"
 readonly node_ssh_supported_providers="gce gke aws"
 readonly gcloud_supported_providers="gce gke"
 
-readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
-readonly node_logfiles="kube-proxy.log fluentd.log node-problem-detector.log kubelet.cov"
+readonly master_logfiles="kube-apiserver.log kube-apiserver-audit.log kube-scheduler.log kube-controller-manager.log cloud-controller-manager.log etcd.log etcd-events.log glbc.log cluster-autoscaler.log kube-addon-manager.log konnectivity-server.log fluentd.log kubelet.cov"
+readonly node_logfiles="kube-proxy.log containers/konnectivity-agent-*.log fluentd.log node-problem-detector.log kubelet.cov kube-network-policies.log"
 readonly node_systemd_services="node-problem-detector"
 readonly hollow_node_logfiles="kubelet-hollow-node-*.log kubeproxy-hollow-node-*.log npd-hollow-node-*.log"
 readonly aws_logfiles="cloud-init-output.log"
@@ -50,12 +50,12 @@ readonly gce_logfiles="startupscript.log"
 readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
-readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-containerd}"
 readonly extra_log_files="${LOG_DUMP_EXTRA_FILES:-}"
 readonly extra_systemd_services="${LOG_DUMP_SAVE_SERVICES:-}"
 readonly dump_systemd_journal="${LOG_DUMP_SYSTEMD_JOURNAL:-false}"
 # Log files found in WINDOWS_LOGS_DIR on Windows nodes:
-readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log"
+readonly windows_node_logfiles="kubelet.log kube-proxy.log docker.log docker_images.log csi-proxy.log"
 # Log files found in other directories on Windows nodes:
 readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 
@@ -63,14 +63,31 @@ readonly windows_node_otherfiles="C:\\Windows\\MEMORY.dmp"
 # file descriptors for large clusters.
 readonly max_dump_processes=25
 
+# Indicator variable whether we experienced a significant failure during
+# logexporter creation or execution.
+logexporter_failed=0
+
+# Percentage of nodes that must be logexported successfully (otherwise the
+# process will exit with a non-zero exit code).
+readonly log_dump_expected_success_percentage="${LOG_DUMP_EXPECTED_SUCCESS_PERCENTAGE:-0}"
+
+function print-deprecation-note() {
+  local -r dashline=$(printf -- '-%.0s' {1..100})
+  echo "${dashline}"
+  echo "k/k version of the log-dump.sh script is deprecated!"
+  echo "Please migrate your test job to use test-infra's repo version of log-dump.sh!"
+  echo "Migration steps can be found in the readme file."
+  echo "${dashline}"
+}
+
 # TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
   KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
   if [[ -z "${use_custom_instance_list}" ]]; then
-    : ${KUBE_CONFIG_FILE:="config-test.sh"}
-    echo "Sourcing kube-util.sh"
+    : "${KUBE_CONFIG_FILE:=config-test.sh}"
+    echo 'Sourcing kube-util.sh'
     source "${KUBE_ROOT}/cluster/kube-util.sh"
-    echo "Detecting project"
+    echo 'Detecting project'
     detect-project 2>&1
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
@@ -80,16 +97,17 @@ function setup() {
     source "${KUBE_ROOT}/cluster/gce/util.sh"
     ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
-    echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
+    echo 'LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances'
     exit 1
   elif [[ -z "${LOG_DUMP_SSH_USER:-}" ]]; then
-    echo "LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances"
+    echo 'LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances'
     exit 1
   fi
+  source "${KUBE_ROOT}/hack/lib/util.sh"
 }
 
 function log-dump-ssh() {
-  if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+  if [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
     ssh-to-node "$@"
     return
   fi
@@ -101,12 +119,14 @@ function log-dump-ssh() {
 }
 
 # Copy all files /var/log/{$3}.log on node $1 into local dir $2.
-# $3 should be a space-separated string of files.
+# $3 should be a string array of file names.
 # This function shouldn't ever trigger errexit, but doesn't block stderr.
 function copy-logs-from-node() {
     local -r node="${1}"
     local -r dir="${2}"
-    local files=( ${3} )
+    shift
+    shift
+    local files=("$@")
     # Append "*"
     # The * at the end is needed to also copy rotated logs (which happens
     # in large clusters and long runs).
@@ -116,12 +136,17 @@ function copy-logs-from-node() {
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
     local -r scp_files="{$(printf "%s," "${files[@]}")}"
 
-    if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    if [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
       # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
       gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-      gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+      source_file_args=()
+      for single_file in "${files[@]}"; do
+        source_file_args+=( "${node}:${single_file}" )
+      done
+      gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${source_file_args[@]}" "${dir}" > /dev/null || true
     elif  [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      local ip=$(get_ssh_hostname "${node}")
+      local ip
+      ip=$(get_ssh_hostname "${node}")
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
     elif  [[ -n "${use_custom_instance_list}" ]]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
@@ -138,26 +163,34 @@ function copy-logs-from-node() {
 function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
-    local files="${3}"
+    local files=()
+    IFS=' ' read -r -a files <<< "$3"
     local opt_systemd_services="${4:-""}"
     local on_master="${5:-"false"}"
 
-    files="${files} ${extra_log_files}"
+    local extra=()
+    IFS=' ' read -r -a extra <<< "$extra_log_files"
+    files+=("${extra[@]}")
     if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
-        files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
+	local dump=()
+        IFS=' ' read -r -a dump <<< "${LOG_DUMP_SAVE_LOGS:-}"
+        files+=("${dump[@]}")
       fi
     else
+      local providerlogs=()
       case "${KUBERNETES_PROVIDER}" in
         gce|gke)
-          files="${files} ${gce_logfiles}"
+          IFS=' ' read -r -a providerlogs <<< "${gce_logfiles}"
           ;;
         aws)
-          files="${files} ${aws_logfiles}"
+          IFS=' ' read -r -a providerlogs <<< "${aws_logfiles}"
           ;;
       esac
+      files+=("${providerlogs[@]}")
     fi
-    local -r services=( ${systemd_services} ${opt_systemd_services} ${extra_systemd_services} )
+    local services
+    read -r -a services <<< "${systemd_services} ${opt_systemd_services} ${extra_systemd_services}"
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
         if [[ "${on_master}" == "true" ]]; then
@@ -170,15 +203,23 @@ function save-logs() {
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
 
         for svc in "${services[@]}"; do
-            log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
+            log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u ${svc}.service" > "${dir}/${svc}.log" || true
         done
 
         if [[ "$dump_systemd_journal" == "true" ]]; then
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise" > "${dir}/systemd.log" || true
         fi
     else
-        files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
+        local tmpfiles=()
+        for f in "${kern_logfile}" "${initd_logfiles}" "${supervisord_logfiles}"; do
+	    IFS=' ' read -r -a tmpfiles <<< "$f"
+	    files+=("${tmpfiles[@]}")
+        done
     fi
+
+    # log where we pull the images from
+    log-dump-ssh "${node_name}" "sudo ctr -n k8s.io images ls" > "${dir}/images-containerd.log" || true
+    log-dump-ssh "${node_name}" "sudo docker images --all" > "${dir}/images-docker.log" || true
 
     # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
     if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
@@ -191,15 +232,15 @@ function save-logs() {
           run-in-docker-container "${node_name}" "kube-proxy" "cat /tmp/k8s-kube-proxy.cov" > "${dir}/kube-proxy.cov" || true
         fi
       else
-        echo "Coverage profiles seem to exist, but cannot be retrieved from inside containers."
+        echo 'Coverage profiles seem to exist, but cannot be retrieved from inside containers.'
       fi
     fi
 
-    echo "Changing logfiles to be world-readable for download"
+    echo 'Changing logfiles to be world-readable for download'
     log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
 
-    echo "Copying '${files}' from ${node_name}"
-    copy-logs-from-node "${node_name}" "${dir}" "${files}"
+    echo "Copying '${files[*]}' from ${node_name}"
+    copy-logs-from-node "${node_name}" "${dir}" "${files[@]}"
 }
 
 # Saves a copy of the Windows Docker event log to ${WINDOWS_LOGS_DIR}\docker.log
@@ -245,8 +286,9 @@ function save-windows-logs-via-diagnostics-tool() {
     local node="${1}"
     local dest_dir="${2}"
 
-    gcloud compute instances add-metadata ${node} --metadata enable-diagnostics=true --project=${PROJECT} --zone=${ZONE}
-    local logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs ${node} --zone=${ZONE} --project=${PROJECT} | tail -n 1)
+    gcloud compute instances add-metadata "${node}" --metadata enable-diagnostics=true --project="${PROJECT}" --zone="${ZONE}"
+    local logs_archive_in_gcs
+    logs_archive_in_gcs=$(gcloud alpha compute diagnose export-logs "${node}" "--zone=${ZONE}" "--project=${PROJECT}" | tail -n 1)
     local temp_local_path="${node}.zip"
     for retry in {1..20}; do
       if gsutil mv "${logs_archive_in_gcs}" "${temp_local_path}"  > /dev/null 2>&1; then
@@ -258,8 +300,8 @@ function save-windows-logs-via-diagnostics-tool() {
     done
 
     if [[ -f "${temp_local_path}" ]]; then
-      unzip ${temp_local_path} -d "${dest_dir}" > /dev/null
-      rm -f ${temp_local_path}
+      unzip "${temp_local_path}" -d "${dest_dir}" > /dev/null
+      rm -f "${temp_local_path}"
     fi
 }
 
@@ -272,14 +314,14 @@ function save-windows-logs-via-ssh() {
     export-windows-docker-images-list "${node}"
 
     local remote_files=()
-    for file in ${windows_node_logfiles[@]}; do
+    for file in "${windows_node_logfiles[@]}"; do
       remote_files+=( "${WINDOWS_LOGS_DIR}\\${file}" )
     done
     remote_files+=( "${windows_node_otherfiles[@]}" )
 
     # TODO(pjh, yujuhong): handle rotated logs and copying multiple files at the
     # same time.
-    for remote_file in ${remote_files[@]}; do
+    for remote_file in "${remote_files[@]}"; do
       # Retry up to 3 times to allow ssh keys to be properly propagated and
       # stored.
       for retry in {1..3}; do
@@ -301,7 +343,7 @@ function save-logs-windows() {
     local -r node="${1}"
     local -r dest_dir="${2}"
 
-    if [[ ! "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    if [[ ! "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
       echo "Not saving logs for ${node}, Windows log dumping requires gcloud support"
       return
     fi
@@ -323,28 +365,28 @@ function run-in-docker-container() {
   local node_name="$1"
   local container="$2"
   shift 2
-  log-dump-ssh "${node_name}" "docker exec \"\$(docker ps -f label=io.kubernetes.container.name=${container} --format \"{{.ID}}\")\" $@"
+  log-dump-ssh "${node_name}" "docker exec \"\$(docker ps -f label=io.kubernetes.container.name=${container} --format \"{{.ID}}\")\" $*"
 }
 
 function dump_masters() {
-  local master_names
+  local master_names=()
   if [[ -n "${use_custom_instance_list}" ]]; then
-    master_names=( $(log_dump_custom_get_instances master) )
-  elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    while IFS='' read -r line; do master_names+=("$line"); done < <(log_dump_custom_get_instances master)
+  elif [[ ! "${master_ssh_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
   elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
     master_names=( "${KUBEMARK_MASTER_NAME}" )
   else
     if ! (detect-master); then
-      echo "Master not detected. Is the cluster up?"
+      echo 'Master not detected. Is the cluster up?'
       return
     fi
     master_names=( "${MASTER_NAME}" )
   fi
 
   if [[ "${#master_names[@]}" == 0 ]]; then
-    echo "No masters found?"
+    echo 'No masters found?'
     return
   fi
 
@@ -377,16 +419,16 @@ function dump_nodes() {
   local node_names=()
   local windows_node_names=()
   if [[ -n "${1:-}" ]]; then
-    echo "Dumping logs for nodes provided as args to dump_nodes() function"
+    echo 'Dumping logs for nodes provided as args to dump_nodes() function'
     node_names=( "$@" )
   elif [[ -n "${use_custom_instance_list}" ]]; then
-    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
-    node_names=( $(log_dump_custom_get_instances node) )
-  elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    echo 'Dumping logs for nodes provided by log_dump_custom_get_instances() function'
+    while IFS='' read -r line; do node_names+=("$line"); done < <(log_dump_custom_get_instances node)
+  elif [[ ! "${node_ssh_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
     echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
     return
   else
-    echo "Detecting nodes in the cluster"
+    echo 'Detecting nodes in the cluster'
     detect-node-names &> /dev/null
     if [[ -n "${NODE_NAMES:-}" ]]; then
       node_names=( "${NODE_NAMES[@]}" )
@@ -397,7 +439,7 @@ function dump_nodes() {
   fi
 
   if [[ "${#node_names[@]}" == 0 && "${#windows_node_names[@]}" == 0 ]]; then
-    echo "No nodes found!"
+    echo 'No nodes found!'
     return
   fi
 
@@ -409,7 +451,7 @@ function dump_nodes() {
   linux_nodes_selected_for_logs=()
   if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
     # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
-    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
+    for index in $(shuf -i 0-$(( ${#node_names[*]} - 1 )) -n "${LOGDUMP_ONLY_N_RANDOM_NODES}")
     do
       linux_nodes_selected_for_logs+=("${node_names[$index]}")
     done
@@ -472,10 +514,10 @@ function find_non_logexported_nodes() {
   local file="${gcs_artifacts_dir}/logexported-nodes-registry"
   echo "Listing marker files ($file) for successful nodes..."
   succeeded_nodes=$(gsutil ls "${file}") || return 1
-  echo "Successfully listed marker files for successful nodes"
+  echo 'Successfully listed marker files for successful nodes'
   NON_LOGEXPORTED_NODES=()
   for node in "${NODE_NAMES[@]}"; do
-    if [[ ! "${succeeded_nodes}" =~ "${node}" ]]; then
+    if [[ ! "${succeeded_nodes}" =~ ${node} ]]; then
       NON_LOGEXPORTED_NODES+=("${node}")
     fi
   done
@@ -485,40 +527,51 @@ function find_non_logexported_nodes() {
 # does not run on Windows nodes.
 function dump_nodes_with_logexporter() {
   if [[ -n "${use_custom_instance_list}" ]]; then
-    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
-    NODE_NAMES=( $(log_dump_custom_get_instances node) )
+    echo 'Dumping logs for nodes provided by log_dump_custom_get_instances() function'
+    NODE_NAMES=()
+    while IFS='' read -r line; do NODE_NAMES+=("$line"); done < <(log_dump_custom_get_instances node)
   else
-    echo "Detecting nodes in the cluster"
+    echo 'Detecting nodes in the cluster'
     detect-node-names &> /dev/null
   fi
 
   if [[ -z "${NODE_NAMES:-}" ]]; then
-    echo "No nodes found!"
+    echo 'No nodes found!'
     return
   fi
 
   # Obtain parameters required by logexporter.
-  local -r service_account_credentials="$(cat ${GOOGLE_APPLICATION_CREDENTIALS} | base64 | tr -d '\n')"
+  local -r service_account_credentials="$(base64 "${GOOGLE_APPLICATION_CREDENTIALS}" | tr -d '\n')"
   local -r cloud_provider="${KUBERNETES_PROVIDER}"
   local -r enable_hollow_node_logs="${ENABLE_HOLLOW_NODE_LOGS:-false}"
   local -r logexport_sleep_seconds="$(( 90 + NUM_NODES / 3 ))"
+  if [[ -z "${ZONE_NODE_SELECTOR_DISABLED:-}" ]]; then
+    local -r node_selector="${ZONE_NODE_SELECTOR_LABEL:-topology.kubernetes.io/zone}: ${ZONE}"
+  fi
 
   # Fill in the parameters in the logexporter daemonset template.
-  sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.ExtraLogFiles}}@${extra_log_files}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
-  sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"
+  local -r tmp="${KUBE_TEMP}/logexporter"
+  local -r manifest_yaml="${tmp}/logexporter-daemonset.yaml"
+  mkdir -p "${tmp}"
+  cp "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
+
+  sed -i'' -e "s@{{.NodeSelector}}@${node_selector:-}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.ServiceAccountCredentials}}@${service_account_credentials}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.CloudProvider}}@${cloud_provider}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.GCSPath}}@${gcs_artifacts_dir}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.EnableHollowNodeLogs}}@${enable_hollow_node_logs}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.DumpSystemdJournal}}@${dump_systemd_journal}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.ExtraLogFiles}}@${extra_log_files}@g" "${manifest_yaml}"
+  sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
   KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
-  if ! "${KUBECTL}" create -f "${KUBE_ROOT}/cluster/log-dump/logexporter-daemonset.yaml"; then
-    echo "Failed to create logexporter daemonset.. falling back to logdump through SSH"
+  if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
+    echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
     "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
     dump_nodes "${NODE_NAMES[@]}"
+    logexporter_failed=1
     return
   fi
 
@@ -528,7 +581,7 @@ function dump_nodes_with_logexporter() {
   while true; do
     now="$(date +%s)"
     if [[ $((now - start)) -gt ${logexport_sleep_seconds} ]]; then
-      echo "Waiting for all nodes to be logexported timed out."
+      echo 'Waiting for all nodes to be logexported timed out.'
       break
     fi
     if find_non_logexported_nodes; then
@@ -559,16 +612,16 @@ function dump_nodes_with_logexporter() {
   done; wait)
 
   # List registry of marker files (of nodes whose logexporter succeeded) from GCS.
-  local nodes_succeeded
   for retry in {1..10}; do
     if find_non_logexported_nodes; then
       break
     else
       echo "Attempt ${retry} failed to list marker files for successful nodes"
       if [[ "${retry}" == 10 ]]; then
-        echo "Final attempt to list marker files failed.. falling back to logdump through SSH"
+        echo 'Final attempt to list marker files failed.. falling back to logdump through SSH'
         "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
         dump_nodes "${NODE_NAMES[@]}"
+        logexporter_failed=1
         return
       fi
       sleep 2
@@ -585,36 +638,42 @@ function dump_nodes_with_logexporter() {
     done
   fi
 
+  # If less than a certain ratio of the nodes got logexported, report an error.
+  if [[ $(((${#NODE_NAMES[@]} - ${#failed_nodes[@]}) * 100)) -lt $((${#NODE_NAMES[@]} * log_dump_expected_success_percentage )) ]]; then
+    logexporter_failed=1
+  fi
+
   # Delete the logexporter resources and dump logs for the failed nodes (if any) through SSH.
   "${KUBECTL}" get pods --namespace "${logexporter_namespace}" || true
   "${KUBECTL}" delete namespace "${logexporter_namespace}" || true
   if [[ "${#failed_nodes[@]}" != 0 ]]; then
-    echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[@]}"
+    echo -e "Dumping logs through SSH for the following nodes:\n${failed_nodes[*]}"
     dump_nodes "${failed_nodes[@]}"
   fi
 }
 
 function detect_node_failures() {
-  if ! [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+  if ! [[ "${gcloud_supported_providers}" =~ ${KUBERNETES_PROVIDER} ]]; then
     return
   fi
 
   detect-node-names
   if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-    local all_instance_groups=(${INSTANCE_GROUPS[@]} ${WINDOWS_INSTANCE_GROUPS[@]})
+    local all_instance_groups=("${INSTANCE_GROUPS[@]}" "${WINDOWS_INSTANCE_GROUPS[@]}")
   else
-    local all_instance_groups=(${INSTANCE_GROUPS[@]})
+    local all_instance_groups=("${INSTANCE_GROUPS[@]}")
   fi
 
   if [ -z "${all_instance_groups:-}" ]; then
     return
   fi
   for group in "${all_instance_groups[@]}"; do
-    local creation_timestamp=$(gcloud compute instance-groups managed describe \
-                              "${group}" \
-                              --project "${PROJECT}" \
-                              --zone "${ZONE}" \
-                              --format='value(creationTimestamp)')
+    local creation_timestamp
+    creation_timestamp=$(gcloud compute instance-groups managed describe \
+                         "${group}" \
+                         --project "${PROJECT}" \
+                         --zone "${ZONE}" \
+                         --format='value(creationTimestamp)')
     echo "Failures for ${group} (if any):"
     gcloud logging read --order=asc \
           --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
@@ -628,12 +687,14 @@ function detect_node_failures() {
 }
 
 function main() {
+  print-deprecation-note
   setup
+  kube::util::ensure-temp-dir
   # Copy master logs to artifacts dir locally (through SSH).
   echo "Dumping logs from master locally to '${report_dir}'"
   dump_masters
   if [[ "${DUMP_ONLY_MASTER_LOGS:-}" == "true" ]]; then
-    echo "Skipping dumping of node logs"
+    echo 'Skipping dumping of node logs'
     return
   fi
 
@@ -647,6 +708,9 @@ function main() {
   fi
 
   detect_node_failures
+  if [[ ${logexporter_failed} -ne 0 && ${log_dump_expected_success_percentage} -gt 0 ]]; then
+    return 1
+  fi
 }
 
 main

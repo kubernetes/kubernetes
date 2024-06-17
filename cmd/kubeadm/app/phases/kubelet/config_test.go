@@ -17,16 +17,18 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -51,12 +53,9 @@ func TestCreateConfigMap(t *testing.T) {
 		return true, nil, nil
 	})
 
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(),
-	}
-	internalcfg, err := configutil.DefaultedInitConfiguration(&kubeadmapiv1beta2.InitConfiguration{}, clusterCfg)
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
-		t.Fatalf("unexpected failure by DefaultedInitConfiguration: %v", err)
+		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
 	}
 
 	if err := CreateConfigMap(&internalcfg.ClusterConfiguration, client); err != nil {
@@ -73,7 +72,34 @@ func TestCreateConfigMapRBACRules(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := createConfigMapRBACRules(client, version.MustParseSemantic("v1.11.0")); err != nil {
+	if err := createConfigMapRBACRules(client); err != nil {
 		t.Errorf("createConfigMapRBACRules: unexpected error %v", err)
+	}
+}
+
+func TestApplyKubeletConfigPatches(t *testing.T) {
+	var (
+		input          = []byte("bar: 0\nfoo: 0\n")
+		patch          = []byte("bar: 1\n")
+		expectedOutput = []byte("bar: 1\nfoo: 0\n")
+	)
+
+	dir, err := os.MkdirTemp("", "patches")
+	if err != nil {
+		t.Fatalf("could not create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := os.WriteFile(filepath.Join(dir, "kubeletconfiguration.yaml"), patch, 0644); err != nil {
+		t.Fatalf("could not write patch file: %v", err)
+	}
+
+	output, err := applyKubeletConfigPatches(input, dir, io.Discard)
+	if err != nil {
+		t.Fatalf("could not apply patch: %v", err)
+	}
+
+	if !bytes.Equal(output, expectedOutput) {
+		t.Fatalf("expected output:\n%s\ngot\n%s\n", expectedOutput, output)
 	}
 }

@@ -17,24 +17,15 @@ limitations under the License.
 package skipper
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"regexp"
-	"runtime"
-	"runtime/debug"
-	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/labels"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -42,84 +33,17 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
-// New local storage types to support local storage capacity isolation
-var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
-
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	framework.Logf(msg)
-	skip(msg, caller+1)
-}
-
-// SkipPanic is the value that will be panicked from Skip.
-type SkipPanic struct {
-	Message        string // The failure message passed to Fail
-	Filename       string // The filename that is the source of the failure
-	Line           int    // The line number of the filename that is the source of the failure
-	FullStackTrace string // A full stack trace starting at the source of the failure
-}
-
-// String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgo.GINKGO_PANIC }
-
-// Skip wraps ginkgo.Skip so that it panics with more useful
-// information about why the test is being skipped. This function will
-// panic with a SkipPanic.
-func skip(message string, callerSkip ...int) {
-	skip := 1
-	if len(callerSkip) > 0 {
-		skip += callerSkip[0]
-	}
-
-	_, file, line, _ := runtime.Caller(skip)
-	sp := SkipPanic{
-		Message:        message,
-		Filename:       file,
-		Line:           line,
-		FullStackTrace: pruneStack(skip),
-	}
-
-	defer func() {
-		e := recover()
-		if e != nil {
-			panic(sp)
-		}
-	}()
-
-	ginkgo.Skip(message, skip)
-}
-
-// ginkgo adds a lot of test running infrastructure to the stack, so
-// we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
-
-func pruneStack(skip int) string {
-	skip += 2 // one for pruneStack and one for debug.Stack
-	stack := debug.Stack()
-	scanner := bufio.NewScanner(bytes.NewBuffer(stack))
-	var prunedStack []string
-
-	// skip the top of the stack
-	for i := 0; i < 2*skip+1; i++ {
-		scanner.Scan()
-	}
-
-	for scanner.Scan() {
-		if stackSkipPattern.Match(scanner.Bytes()) {
-			scanner.Scan() // these come in pairs
-		} else {
-			prunedStack = append(prunedStack, scanner.Text())
-			scanner.Scan() // these come in pairs
-			prunedStack = append(prunedStack, scanner.Text())
-		}
-	}
-
-	return strings.Join(prunedStack, "\n")
+	ginkgo.Skip(msg, caller+1)
+	panic("unreachable")
 }
 
 // Skipf skips with information about why the test is being skipped.
+// The direct caller is recorded in the callstack.
 func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
+	panic("unreachable")
 }
 
 // SkipUnlessAtLeast skips if the value is less than the minValue.
@@ -129,23 +53,41 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 	}
 }
 
-// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
-func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
+var featureGate featuregate.FeatureGate
+
+// InitFeatureGates must be called in test suites that have a --feature-gates parameter.
+// If not called, SkipUnlessFeatureGateEnabled will record a test failure.
+func InitFeatureGates(defaults featuregate.FeatureGate, overrides map[string]bool) error {
+	clone := defaults.DeepCopy()
+	if err := clone.SetFromMap(overrides); err != nil {
+		return err
 	}
+	featureGate = clone
+	return nil
 }
 
-// SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
-	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		// not all resources support list, so we ignore those
-		if apierrors.IsMethodNotSupported(err) || apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
-			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
-		}
-		framework.Failf("Unexpected error getting %v: %v", gvr, err)
+// IsFeatureGateEnabled can be used during e2e tests to figure out if a certain feature gate is enabled.
+// This function is dependent on InitFeatureGates under the hood. Therefore, the test must be called with a
+// --feature-gates parameter.
+func IsFeatureGateEnabled(feature featuregate.Feature) bool {
+	if featureGate == nil {
+		framework.Failf("feature gate interface is not initialized")
+	}
+	return featureGate.Enabled(feature)
+}
+
+// SkipUnlessFeatureGateEnabled skips if the feature is disabled.
+//
+// Beware that this only works in test suites that have a --feature-gate
+// parameter and call InitFeatureGates. In test/e2e, the `Feature: XYZ` tag
+// has to be used instead and invocations have to make sure that they
+// only run tests that work with the given test cluster.
+func SkipUnlessFeatureGateEnabled(gate featuregate.Feature) {
+	if featureGate == nil {
+		framework.Failf("Feature gate checking is not enabled, don't use SkipUnlessFeatureGateEnabled(%v). Instead use the Feature tag.", gate)
+	}
+	if !featureGate.Enabled(gate) {
+		skipInternalf(1, "Only supported when %v feature is enabled", gate)
 	}
 }
 
@@ -178,8 +120,8 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 }
 
 // SkipUnlessMultizone skips if the cluster does not have multizone.
-func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipUnlessMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -189,8 +131,8 @@ func SkipUnlessMultizone(c clientset.Interface) {
 }
 
 // SkipIfMultizone skips if the cluster has multizone.
-func SkipIfMultizone(c clientset.Interface) {
-	zones, err := e2enode.GetClusterZones(c)
+func SkipIfMultizone(ctx context.Context, c clientset.Interface) {
+	zones, err := e2enode.GetClusterZones(ctx, c)
 	if err != nil {
 		skipInternalf(1, "Error listing cluster zones")
 	}
@@ -210,6 +152,13 @@ func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	if !framework.NodeOSDistroIs(supportedNodeOsDistros...) {
 		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, framework.TestContext.NodeOSDistro)
+	}
+}
+
+// SkipUnlessNodeOSArchIs skips if the node OS distro is not included in the supportedNodeOsArchs.
+func SkipUnlessNodeOSArchIs(supportedNodeOsArchs ...string) {
+	if !framework.NodeOSArchIs(supportedNodeOsArchs...) {
+		skipInternalf(1, "Only supported for node OS arch %v (not %s)", supportedNodeOsArchs, framework.TestContext.NodeOSArch)
 	}
 }
 
@@ -242,11 +191,11 @@ func SkipUnlessSSHKeyPresent() {
 func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
 	serverVersion, err := c.ServerVersion()
 	if err != nil {
-		return false, fmt.Errorf("Unable to get server version: %v", err)
+		return false, fmt.Errorf("Unable to get server version: %w", err)
 	}
 	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
 	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+		return false, fmt.Errorf("Unable to parse server version %q: %w", serverVersion.GitVersion, err)
 	}
 	return sv.AtLeast(v), nil
 }
@@ -259,22 +208,31 @@ func SkipIfAppArmorNotSupported() {
 	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
 
-// RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
-func RunIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == framework.TestContext.ContainerRuntime {
-			return
-		}
+// SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem run if the component run as pods and client can delete them
+func SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx context.Context, componentName string, c clientset.Interface, ns string, labelSet labels.Set) {
+	// verify if component run as pod
+	label := labels.SelectorFromSet(labelSet)
+	listOpts := metav1.ListOptions{LabelSelector: label.String()}
+	pods, err := c.CoreV1().Pods(ns).List(ctx, listOpts)
+	framework.Logf("SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem: %v, %v", pods, err)
+	if err != nil {
+		skipInternalf(1, "Skipped because client failed to get component:%s pod err:%v", componentName, err)
 	}
-	skipInternalf(1, "Skipped because container runtime %q is not in %s", framework.TestContext.ContainerRuntime, runtimes)
+
+	if len(pods.Items) == 0 {
+		skipInternalf(1, "Skipped because component:%s is not running as pod.", componentName)
+	}
+
+	// verify if client can delete pod
+	pod := pods.Items[0]
+	if err := c.CoreV1().Pods(ns).Delete(ctx, pod.Name, metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}}); err != nil {
+		skipInternalf(1, "Skipped because client failed to delete component:%s pod, err:%v", componentName, err)
+	}
 }
 
-// RunIfSystemSpecNameIs runs if the system spec name is included in the names.
-func RunIfSystemSpecNameIs(names ...string) {
-	for _, name := range names {
-		if name == framework.TestContext.SystemSpecName {
-			return
-		}
+// SkipIfIPv6 skips if the cluster IP family is IPv6 and the provider is included in the unsupportedProviders.
+func SkipIfIPv6(unsupportedProviders ...string) {
+	if framework.TestContext.ClusterIsIPv6() && framework.ProviderIs(unsupportedProviders...) {
+		skipInternalf(1, "Not supported for IPv6 clusters and providers %v (found %s)", unsupportedProviders, framework.TestContext.Provider)
 	}
-	skipInternalf(1, "Skipped because system spec name %q is not in %v", framework.TestContext.SystemSpecName, names)
 }

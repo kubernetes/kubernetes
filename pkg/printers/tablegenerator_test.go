@@ -51,7 +51,10 @@ func ErrorPrintHandler(obj *TestPrintType, options GenerateOptions) ([]metav1bet
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
 	generator := NewTableGenerator()
-	generator.TableHandler(columns, PrintCustomType)
+	err := generator.TableHandler(columns, PrintCustomType)
+	if err != nil {
+		t.Fatalf("An error occurred when adds a print handler with a given set of columns: %#v", err)
+	}
 
 	obj := TestPrintType{"test object"}
 	table, err := generator.GenerateTable(&obj, GenerateOptions{})
@@ -71,9 +74,13 @@ func TestCustomTypePrinting(t *testing.T) {
 func TestPrintHandlerError(t *testing.T) {
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
 	generator := NewTableGenerator()
-	generator.TableHandler(columns, ErrorPrintHandler)
+	err := generator.TableHandler(columns, ErrorPrintHandler)
+	if err != nil {
+		t.Fatalf("An error occurred when adds a print handler with a given set of columns: %#v", err)
+	}
+
 	obj := TestPrintType{"test object"}
-	_, err := generator.GenerateTable(&obj, GenerateOptions{})
+	_, err = generator.GenerateTable(&obj, GenerateOptions{})
 	if err == nil || err.Error() != "ErrorPrintHandler error" {
 		t.Errorf("Did not get the expected error: %#v", err)
 	}

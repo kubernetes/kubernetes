@@ -17,24 +17,25 @@ cgroupsPerQOS: true
 configMapAndSecretChangeDetectionStrategy: Watch
 containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
+containerLogMaxWorkers: 1
+containerLogMonitorInterval: 10s
+containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
 cpuCFSQuotaPeriod: 100ms
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
+enableDebugFlagsHandler: true
 enableDebuggingHandlers: true
+enableProfilingHandler: true
 enableServer: true
 enableSystemLogHandler: true
+enableSystemLogQuery: false
 enforceNodeAllocatable:
 - pods
-eventBurst: 10
-eventRecordQPS: 5
-evictionHard:
-  imagefs.available: 15%
-  memory.available: 100Mi
-  nodefs.available: 10%
-  nodefs.inodesFree: 5%
+eventBurst: 100
+eventRecordQPS: 50
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s
@@ -44,31 +45,49 @@ healthzPort: 10248
 httpCheckFrequency: 20s
 imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80
+imageMaximumGCAge: 0s
 imageMinimumGCAge: 2m0s
 iptablesDropBit: 15
 iptablesMasqueradeBit: 14
 kind: KubeletConfiguration
-kubeAPIBurst: 10
-kubeAPIQPS: 5
+kubeAPIBurst: 100
+kubeAPIQPS: 50
+localStorageCapacityIsolation: true
 logging:
+  flushFrequency: 5s
   format: text
+  options:
+    json:
+      infoBufferSize: "0"
+    text:
+      infoBufferSize: "0"
+  verbosity: 0
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
+memoryManagerPolicy: None
+memorySwap: {}
+memoryThrottlingFactor: 0.9
 nodeLeaseDurationSeconds: 40
 nodeStatusMaxImages: 50
 nodeStatusReportFrequency: 5m0s
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
+podLogsDir: /var/log/pods
 podPidsLimit: -1
 port: 10250
+registerNode: true
 registryBurst: 10
 registryPullQPS: 5
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
+seccompDefault: false
 serializeImagePulls: true
+shutdownGracePeriod: 0s
+shutdownGracePeriodCriticalPods: 0s
 streamingConnectionIdleTimeout: 4h0m0s
 syncFrequency: 1m0s
 topologyManagerPolicy: none
+topologyManagerScope: container
 volumePluginDir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
 volumeStatsAggPeriod: 1m0s

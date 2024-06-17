@@ -19,6 +19,7 @@ package exec
 import (
 	"context"
 	"io"
+	"io/fs"
 	osexec "os/exec"
 	"syscall"
 	"time"
@@ -98,17 +99,18 @@ func New() Interface {
 
 // Command is part of the Interface interface.
 func (executor *executor) Command(cmd string, args ...string) Cmd {
-	return (*cmdWrapper)(osexec.Command(cmd, args...))
+	return (*cmdWrapper)(maskErrDotCmd(osexec.Command(cmd, args...)))
 }
 
 // CommandContext is part of the Interface interface.
 func (executor *executor) CommandContext(ctx context.Context, cmd string, args ...string) Cmd {
-	return (*cmdWrapper)(osexec.CommandContext(ctx, cmd, args...))
+	return (*cmdWrapper)(maskErrDotCmd(osexec.CommandContext(ctx, cmd, args...)))
 }
 
 // LookPath is part of the Interface interface
 func (executor *executor) LookPath(file string) (string, error) {
-	return osexec.LookPath(file)
+	path, err := osexec.LookPath(file)
+	return path, handleError(maskErrDot(err))
 }
 
 // Wraps exec.Cmd so we can capture errors.
@@ -198,6 +200,8 @@ func handleError(err error) error {
 	switch e := err.(type) {
 	case *osexec.ExitError:
 		return &ExitErrorWrapper{e}
+	case *fs.PathError:
+		return ErrExecutableNotFound
 	case *osexec.Error:
 		if e.Err == osexec.ErrNotFound {
 			return ErrExecutableNotFound

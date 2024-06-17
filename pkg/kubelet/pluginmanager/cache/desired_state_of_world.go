@@ -128,7 +128,7 @@ func (dsw *desiredStateOfWorld) AddOrUpdatePlugin(socketPath string) error {
 		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := dsw.socketFileToInfo[socketPath]; ok {
-		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache, timestamp will be updated", socketPath)
+		klog.V(2).InfoS("Plugin exists in desired state cache, timestamp will be updated", "path", socketPath)
 	}
 
 	// Update the PluginInfo object.

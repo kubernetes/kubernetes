@@ -19,18 +19,17 @@ package config
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -58,29 +57,29 @@ func generatePodName(name string, nodeName types.NodeName) string {
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
+		hash.DeepHashObject(hasher, pod)
+		// DeepHashObject resets the hash, so we should write the pod source
+		// information AFTER it.
 		if isFile {
 			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
-		hash.DeepHashObject(hasher, pod)
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		klog.V(5).Infof("Generated UID %q pod %q from %s", pod.UID, pod.Name, source)
+		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
 
 	pod.Name = generatePodName(pod.Name, nodeName)
-	klog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
+	klog.V(5).InfoS("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 
 	if pod.Namespace == "" {
 		pod.Namespace = metav1.NamespaceDefault
 	}
-	klog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
+	klog.V(5).InfoS("Set namespace for pod", "pod", klog.KObj(pod), "source", source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.NodeName = string(nodeName)
-
-	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
@@ -102,16 +101,10 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	return nil
 }
 
-func getSelfLink(name, namespace string) string {
-	var selfLink string
-	if len(namespace) == 0 {
-		namespace = metav1.NamespaceDefault
-	}
-	selfLink = fmt.Sprintf("/api/v1/namespaces/%s/pods/%s", namespace, name)
-	return selfLink
-}
-
 type defaultFunc func(pod *api.Pod) error
+
+// A static pod tried to use a ClusterTrustBundle projected volume source.
+var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
@@ -131,21 +124,35 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return false, pod, fmt.Errorf("invalid pod: %#v", obj)
 	}
 
+	if newPod.Name == "" {
+		return true, pod, fmt.Errorf("invalid pod: name is needed for the pod")
+	}
+
 	// Apply default values and validate the pod.
 	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
-	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
-	if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
-		klog.Errorf("Pod %q failed to convert to v1", newPod.Name)
+		klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(newPod))
 		return true, nil, err
 	}
+
+	for _, v := range v1Pod.Spec.Volumes {
+		if v.Projected == nil {
+			continue
+		}
+
+		for _, s := range v.Projected.Sources {
+			if s.ClusterTrustBundle != nil {
+				return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
+			}
+		}
+	}
+
 	return true, v1Pod, nil
 }
 
@@ -162,17 +169,16 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		return false, pods, err
 	}
 
-	opts := validation.PodValidationOptions{
-		AllowMultipleHugePageResources: utilfeature.DefaultFeatureGate.Enabled(features.HugePageStorageMediumSize),
-	}
-
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
+		if newPod.Name == "" {
+			return true, pods, fmt.Errorf("invalid pod: name is needed for the pod")
+		}
 		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
-		if errs := validation.ValidatePodCreate(newPod, opts); len(errs) > 0 {
+		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
 		}

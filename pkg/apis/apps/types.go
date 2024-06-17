@@ -27,8 +27,9 @@ import (
 
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
-//  - Network: A single stable DNS and hostname.
-//  - Storage: As many VolumeClaims as requested.
+//   - Network: A single stable DNS and hostname.
+//   - Storage: As many VolumeClaims as requested.
+//
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 type StatefulSet struct {
@@ -92,9 +93,69 @@ const (
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the ordinal at which the StatefulSet should be
-	// partitioned.
+	// Partition indicates the ordinal at which the StatefulSet should be partitioned
+	// for updates. During a rolling update, all pods from ordinal Replicas-1 to
+	// Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
+	// This is helpful in being able to do a canary based deployment. The default value is 0.
 	Partition int32
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. This field is alpha-level and is only honored by servers that enable the
+	// MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
+	// will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString
+}
+
+// PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
+// when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+// deleted or scaled down.
+type PersistentVolumeClaimRetentionPolicyType string
+
+const (
+	// RetainPersistentVolumeClaimRetentionPolicyType is the default
+	// PersistentVolumeClaimRetentionPolicy and specifies that
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// will not be deleted.
+	RetainPersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Retain"
+	// DeletePersistentVolumeClaimRetentionPolicyType specifies that
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// will be deleted in the scenario specified in
+	// StatefulSetPersistentVolumeClaimPolicy.
+	DeletePersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Delete"
+)
+
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
+type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
+	// WhenDeleted specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+	// `Delete` policy causes those PVCs to be deleted.
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType
+	// WhenScaled specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
+	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
+	// `Delete` policy causes the associated PVCs for any excess pods above
+	// the replica count to be deleted.
+	WhenScaled PersistentVolumeClaimRetentionPolicyType
+}
+
+// StatefulSetOrdinals describes the policy used for replica ordinal assignment
+// in this StatefulSet.
+type StatefulSetOrdinals struct {
+	// start is the number representing the first replica's index. It may be used
+	// to number replicas from an alternate index (eg: 1-indexed) over the default
+	// 0-indexed names, or to orchestrate progressive movement of replicas from
+	// one StatefulSet to another.
+	// If set, replica indices will be in the range:
+	//   [.spec.ordinals.start, .spec.ordinals.start + .spec.replicas).
+	// If unset, defaults to 0. Replica indices will be in the range:
+	//   [0, .spec.replicas).
+	// +optional
+	Start int32
 }
 
 // A StatefulSetSpec is the specification of a StatefulSet.
@@ -116,7 +177,10 @@ type StatefulSetSpec struct {
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected. Each pod stamped out by the StatefulSet
 	// will fulfill this Template, but have a unique identity from the rest
-	// of the StatefulSet.
+	// of the StatefulSet. Each pod will be named with the format
+	// <statefulsetname>-<podindex>. For example, a pod in a StatefulSet named
+	// "web" with index number "3" would be named "web-3".
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// VolumeClaimTemplates is a list of claims that pods are allowed to reference.
@@ -157,6 +221,26 @@ type StatefulSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +optional
+	MinReadySeconds int32
+
+	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
+	// the StatefulSet VolumeClaimTemplates. This requires the
+	// StatefulSetAutoDeletePVC feature gate to be enabled, which is beta and default on from 1.27.
+	// +optional
+	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
+
+	// ordinals controls the numbering of replica indices in a StatefulSet. The
+	// default ordinals behavior assigns a "0" index to the first replica and
+	// increments the index by one for each additional replica requested. Using
+	// the ordinals field requires the StatefulSetStartOrdinal feature gate to be
+	// enabled, which is beta.
+	// +optional
+	Ordinals *StatefulSetOrdinals
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -196,6 +280,10 @@ type StatefulSetStatus struct {
 
 	// Represents the latest available observations of a statefulset's current state.
 	Conditions []StatefulSetCondition
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// +optional
+	AvailableReplicas int32
 }
 
 // StatefulSetConditionType describes the condition types of StatefulSets.
@@ -280,9 +368,7 @@ type Deployment struct {
 
 // DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
-	// Number of desired pods. This is a pointer to distinguish between explicit
-	// zero and not specified. Defaults to 1.
-	// +optional
+	// Number of desired pods.
 	Replicas int32
 
 	// Label selector for pods. Existing ReplicaSets whose pods are
@@ -291,6 +377,7 @@ type DeploymentSpec struct {
 	Selector *metav1.LabelSelector
 
 	// Template describes the pods that will be created.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	Template api.PodTemplateSpec
 
 	// The deployment strategy to use to replace existing pods with new ones.
@@ -533,18 +620,39 @@ type RollingUpdateDaemonSet struct {
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
-	// This cannot be 0.
+	// This cannot be 0 if MaxSurge is 0
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
 	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
-	// can have their pods stopped for an update at any given
-	// time. The update starts by stopping at most 30% of those DaemonSet pods
-	// and then brings up new DaemonSet pods in their place. Once the new pods
-	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
-	// that at least 70% of original number of DaemonSet pods are available at
-	// all times during the update.
+	// can have their pods stopped for an update at any given time. The update
+	// starts by stopping at most 30% of those DaemonSet pods and then brings
+	// up new DaemonSet pods in their place. Once the new pods are available,
+	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
+	// 70% of original number of DaemonSet pods are available at all times during
+	// the update.
 	// +optional
 	MaxUnavailable intstr.IntOrString
+
+	// The maximum number of nodes with an existing available DaemonSet pod that
+	// can have an updated DaemonSet pod during during an update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up to a minimum of 1.
+	// Default value is 0.
+	// Example: when this is set to 30%, at most 30% of the total number of nodes
+	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+	// can have their a new pod created before the old pod is marked as deleted.
+	// The update starts by launching new pods on 30% of nodes. Once an updated
+	// pod is available (Ready for at least minReadySeconds) the old DaemonSet pod
+	// on that node is marked deleted. If the old pod becomes unavailable for any
+	// reason (Ready transitions to false, is evicted, or is drained) an updated
+	// pod is immediately created on that node without considering surge limits.
+	// Allowing surge implies the possibility that the resources consumed by the
+	// daemonset on any given node can double if the readiness check fails, and
+	// so resource intensive daemonsets should take into account that they may
+	// cause evictions during disruption.
+	// +optional
+	MaxSurge intstr.IntOrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -560,6 +668,7 @@ type DaemonSetSpec struct {
 	// The DaemonSet will create exactly one copy of this pod on every node
 	// that matches the template's node selector (or on every node if no node
 	// selector is specified).
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
 	Template api.PodTemplateSpec
 
@@ -751,6 +860,7 @@ type ReplicaSetSpec struct {
 
 	// Template is the object that describes the pod that will be created if
 	// insufficient replicas are detected.
+	// The only allowed template.spec.restartPolicy value is "Always".
 	// +optional
 	Template api.PodTemplateSpec
 }

@@ -20,43 +20,29 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
-	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
-	schedulerapi "k8s.io/api/scheduling/v1"
-	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-var kindWhiteList = sets.NewString(
+var kindAllowList = sets.NewString(
 	// k8s.io/api/core
 	"APIGroup",
 	"APIVersions",
@@ -130,68 +116,49 @@ var missingHanlders = sets.NewString(
 	"ResourceQuota",
 	"Role",
 	"PriorityClass",
-	"PodPreset",
 	"AuditSink",
 )
 
-// known types that are no longer served we should tolerate restmapper errors for
-var unservedTypes = map[schema.GroupVersionKind]bool{
-	{Group: "extensions", Version: "v1beta1", Kind: "ControllerRevision"}: true,
-	{Group: "extensions", Version: "v1beta1", Kind: "DaemonSet"}:          true,
-	{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:         true,
-	{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:      true,
-	{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:  true,
-	{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
-
-	{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"}: true,
-	{Group: "apps", Version: "v1beta1", Kind: "DaemonSet"}:          true,
-	{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:         true,
-	{Group: "apps", Version: "v1beta1", Kind: "ReplicaSet"}:         true,
-	{Group: "apps", Version: "v1beta1", Kind: "StatefulSet"}:        true,
-
-	{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"}: true,
-	{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:          true,
-	{Group: "apps", Version: "v1beta2", Kind: "Deployment"}:         true,
-	{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:         true,
-	{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}:        true,
-}
-
 func TestServerSidePrint(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
-
-	s, _, closeFn := setupWithResources(t,
+	_, clientSet, kubeConfig, tearDownFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
 		[]schema.GroupVersion{
-			batchv2alpha1.SchemeGroupVersion,
-			discoveryv1alpha1.SchemeGroupVersion,
-			discoveryv1beta1.SchemeGroupVersion,
-			rbacv1alpha1.SchemeGroupVersion,
-			settingsv1alpha1.SchemeGroupVersion,
-			schedulerapi.SchemeGroupVersion,
-			storagev1alpha1.SchemeGroupVersion,
-			extensionsv1beta1.SchemeGroupVersion,
-			nodev1alpha1.SchemeGroupVersion,
-			flowcontrolv1alpha1.SchemeGroupVersion,
+			{Group: "discovery.k8s.io", Version: "v1"},
+			{Group: "discovery.k8s.io", Version: "v1beta1"},
+			{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"},
+			{Group: "scheduling.k8s.io", Version: "v1"},
+			{Group: "storage.k8s.io", Version: "v1alpha1"},
+			{Group: "storage.k8s.io", Version: "v1beta1"},
+			{Group: "extensions", Version: "v1beta1"},
+			{Group: "node.k8s.io", Version: "v1"},
+			{Group: "node.k8s.io", Version: "v1alpha1"},
+			{Group: "node.k8s.io", Version: "v1beta1"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta3"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1"},
+			{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"},
 		},
 		[]schema.GroupVersionResource{},
 	)
-	defer closeFn()
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("server-print", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "server-print", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
-		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(kubeConfig.Host), &clientcmd.ConfigOverrides{}))
 
 	restConfig, err := configFlags.ToRESTConfig()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	cacheDir, err := os.MkdirTemp(os.TempDir(), "test-integration-apiserver-print")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -217,7 +184,7 @@ func TestServerSidePrint(t *testing.T) {
 		if gvk.Version == runtime.APIVersionInternal || strings.HasSuffix(apiType.Name(), "List") {
 			continue
 		}
-		if kindWhiteList.Has(gvk.Kind) || missingHanlders.Has(gvk.Kind) {
+		if kindAllowList.Has(gvk.Kind) || missingHanlders.Has(gvk.Kind) {
 			continue
 		}
 
@@ -225,10 +192,8 @@ func TestServerSidePrint(t *testing.T) {
 		// read table definition as returned by the server
 		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
-			if unservedTypes[gvk] {
-				continue
-			}
-			t.Errorf("unexpected error getting mapping for GVK %s: %v", gvk, err)
+			// if we have no mapping, we aren't serving it and we don't need to check its printer.
+			t.Logf("unexpected error getting mapping for GVK %s: %v", gvk, err)
 			continue
 		}
 		client, err := factory.ClientForMapping(mapping)

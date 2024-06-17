@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -73,10 +74,10 @@ type ConvertOptions struct {
 	validator func() (validation.Schema, error)
 
 	resource.FilenameOptions
-	genericclioptions.IOStreams
+	genericiooptions.IOStreams
 }
 
-func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
+func NewConvertOptions(ioStreams genericiooptions.IOStreams) *ConvertOptions {
 	return &ConvertOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("converted").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		local:      true,
@@ -86,7 +87,7 @@ func NewConvertOptions(ioStreams genericclioptions.IOStreams) *ConvertOptions {
 
 // NewCmdConvert creates a command object for the generic "convert" action, which
 // translates the config file into a given version.
-func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdConvert(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Command {
 	o := NewConvertOptions(ioStreams)
 
 	cmd := &cobra.Command{
@@ -124,27 +125,20 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 	}
 
 	o.validator = func() (validation.Schema, error) {
-		return f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+		directive, err := cmdutil.GetValidationDirective(cmd)
+		if err != nil {
+			return nil, err
+		}
+		return f.Validator(directive)
 	}
 
 	// build the printer
 	o.Printer, err = o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
-
-	// Convert must be removed from kubectl, since kubectl can not depend on
-	// Kubernetes "internal" dependencies. These "internal" dependencies can
-	// not be removed from convert. Another way to convert a resource is to
-	// "kubectl apply" it to the cluster, then "kubectl get" at the desired version.
-	// Another possible solution is to make convert a plugin.
-	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
-
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
@@ -187,7 +181,7 @@ func (o *ConvertOptions) RunConvert() error {
 
 	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	internalVersionJSONEncoder := unstructured.NewJSONFallbackEncoder(internalEncoder)
-	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
+	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder, o.IOStreams)
 	if err != nil {
 		return err
 	}
@@ -199,8 +193,8 @@ func (o *ConvertOptions) RunConvert() error {
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder) (runtime.Object, error) {
-	objects, err := asVersionedObjects(infos, specifiedOutputVersion, encoder)
+func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) (runtime.Object, error) {
+	objects, err := asVersionedObjects(infos, specifiedOutputVersion, encoder, iostream)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +231,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 // asVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
-func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {
+func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.GroupVersion, encoder runtime.Encoder, iostream genericclioptions.IOStreams) ([]runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object == nil {
@@ -270,6 +264,14 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 
 		converted, err := tryConvert(scheme.Scheme, info.Object, targetVersions...)
 		if err != nil {
+			// Dont fail on not registered error converting objects.
+			// Simply warn the user with the error returned from api-machinery and continue with the rest of the file
+			// fail on all other errors
+			if runtime.IsNotRegisteredError(err) {
+				fmt.Fprintln(iostream.ErrOut, err.Error())
+				continue
+			}
+
 			return nil, err
 		}
 		objects = append(objects, converted)

@@ -22,28 +22,32 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("certificates")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.19
@@ -52,7 +56,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		The certificatesigningrequests resource must accept a request for a certificate signed by kubernetes.io/kube-apiserver-client.
 		The issued certificate must be valid as a client certificate used to authenticate to the kube-apiserver.
 	*/
-	ginkgo.It("should support building a client with a CSR", func() {
+	ginkgo.It("should support building a client with a CSR", func(ctx context.Context) {
 		const commonName = "tester-csr"
 
 		csrClient := f.ClientSet.CertificatesV1().CertificateSigningRequests()
@@ -80,12 +84,13 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					certificatesv1.UsageKeyEncipherment,
 					certificatesv1.UsageClientAuth,
 				},
-				SignerName: certificatesv1.KubeAPIServerClientSignerName,
+				SignerName:        certificatesv1.KubeAPIServerClientSignerName,
+				ExpirationSeconds: csr.DurationToExpirationSeconds(time.Hour),
 			},
 		}
 
 		// Grant permissions to the new user
-		clusterRole, err := f.ClientSet.RbacV1().ClusterRoles().Create(context.TODO(), &rbacv1.ClusterRole{
+		clusterRole, err := f.ClientSet.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
 			Rules:      []rbacv1.PolicyRule{{Verbs: []string{"create"}, APIGroups: []string{"certificates.k8s.io"}, Resources: []string{"certificatesigningrequests"}}},
 		}, metav1.CreateOptions{})
@@ -94,11 +99,11 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
 		} else {
 			defer func() {
-				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoles().Delete(context.TODO(), clusterRole.Name, metav1.DeleteOptions{}))
+				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoles().Delete(ctx, clusterRole.Name, metav1.DeleteOptions{}))
 			}()
 		}
 
-		clusterRoleBinding, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(context.TODO(), &rbacv1.ClusterRoleBinding{
+		clusterRoleBinding, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: commonName + "-"},
 			RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Kind: "ClusterRole", Name: clusterRole.Name},
 			Subjects:   []rbacv1.Subject{{APIGroup: "rbac.authorization.k8s.io", Kind: "User", Name: commonName}},
@@ -108,15 +113,15 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 			framework.Logf("error granting permissions to %s, create certificatesigningrequests permissions must be granted out of band: %v", commonName, err)
 		} else {
 			defer func() {
-				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterRoleBinding.Name, metav1.DeleteOptions{}))
+				framework.ExpectNoError(f.ClientSet.RbacV1().ClusterRoleBindings().Delete(ctx, clusterRoleBinding.Name, metav1.DeleteOptions{}))
 			}()
 		}
 
 		framework.Logf("creating CSR")
-		csr, err := csrClient.Create(context.TODO(), csrTemplate, metav1.CreateOptions{})
+		csr, err := csrClient.Create(ctx, csrTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.ExpectNoError(csrClient.Delete(context.TODO(), csr.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(csrClient.Delete(ctx, csr.Name, metav1.DeleteOptions{}))
 		}()
 
 		framework.Logf("approving CSR")
@@ -129,9 +134,9 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					Message: "Set from an e2e test",
 				},
 			}
-			csr, err = csrClient.UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
+			csr, err = csrClient.UpdateApproval(ctx, csr.Name, csr, metav1.UpdateOptions{})
 			if err != nil {
-				csr, _ = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
+				csr, _ = csrClient.Get(ctx, csr.Name, metav1.GetOptions{})
 				framework.Logf("err updating approval: %v", err)
 				return false, nil
 			}
@@ -140,7 +145,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 
 		framework.Logf("waiting for CSR to be signed")
 		framework.ExpectNoError(wait.Poll(5*time.Second, time.Minute, func() (bool, error) {
-			csr, err = csrClient.Get(context.TODO(), csr.Name, metav1.GetOptions{})
+			csr, err = csrClient.Get(ctx, csr.Name, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error getting csr: %v", err)
 				return false, nil
@@ -159,16 +164,25 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		rcfg.TLSClientConfig.CertData = csr.Status.Certificate
 		rcfg.TLSClientConfig.KeyData = pkpem
 
+		certs, err := cert.ParseCertsPEM(csr.Status.Certificate)
+		framework.ExpectNoError(err)
+		gomega.Expect(certs).To(gomega.HaveLen(1), "expected a single cert, got %#v", certs)
+		cert := certs[0]
+		// make sure the cert is not valid for longer than our requested time (plus allowance for backdating)
+		if e, a := time.Hour+5*time.Minute, cert.NotAfter.Sub(cert.NotBefore); a > e {
+			framework.Failf("expected cert valid for %s or less, got %s: %s", e, a, dynamiccertificates.GetHumanCertDetail(cert))
+		}
+
 		newClient, err := certificatesclient.NewForConfig(rcfg)
 		framework.ExpectNoError(err)
 
 		framework.Logf("creating CSR as new client")
-		newCSR, err := newClient.CertificateSigningRequests().Create(context.TODO(), csrTemplate, metav1.CreateOptions{})
+		newCSR, err := newClient.CertificateSigningRequests().Create(ctx, csrTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.ExpectNoError(csrClient.Delete(context.TODO(), newCSR.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(csrClient.Delete(ctx, newCSR.Name, metav1.DeleteOptions{}))
 		}()
-		framework.ExpectEqual(newCSR.Spec.Username, commonName)
+		gomega.Expect(newCSR.Spec.Username).To(gomega.Equal(commonName))
 	})
 
 	/*
@@ -183,7 +197,7 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		The certificatesigningrequests/approval resource must support get, update, patch.
 		The certificatesigningrequests/status resource must support get, update, patch.
 	*/
-	framework.ConformanceIt("should support CSR API operations", func() {
+	framework.ConformanceIt("should support CSR API operations", func(ctx context.Context) {
 
 		// Setup
 		csrVersion := "v1"
@@ -205,9 +219,10 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		csrTemplate := &certificatesv1.CertificateSigningRequest{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-csr-"},
 			Spec: certificatesv1.CertificateSigningRequestSpec{
-				Request:    csrData,
-				SignerName: signerName,
-				Usages:     []certificatesv1.KeyUsage{certificatesv1.UsageDigitalSignature, certificatesv1.UsageKeyEncipherment, certificatesv1.UsageServerAuth},
+				Request:           csrData,
+				SignerName:        signerName,
+				ExpirationSeconds: csr.DurationToExpirationSeconds(time.Hour),
+				Usages:            []certificatesv1.KeyUsage{certificatesv1.UsageDigitalSignature, certificatesv1.UsageKeyEncipherment, certificatesv1.UsageServerAuth},
 			},
 		}
 
@@ -228,13 +243,15 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected certificates API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected certificates API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 
 		ginkgo.By("getting /apis/certificates.k8s.io")
 		{
 			group := &metav1.APIGroup{}
-			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/certificates.k8s.io").Do(context.TODO()).Into(group)
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/certificates.k8s.io").Do(ctx).Into(group)
 			framework.ExpectNoError(err)
 			found := false
 			for _, version := range group.Versions {
@@ -243,7 +260,9 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected certificates API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected certificates API version, got %#v", group.Versions)
+			}
 		}
 
 		ginkgo.By("getting /apis/certificates.k8s.io/" + csrVersion)
@@ -261,56 +280,67 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 					foundStatus = true
 				}
 			}
-			framework.ExpectEqual(foundCSR, true, fmt.Sprintf("expected certificatesigningrequests, got %#v", resources.APIResources))
-			framework.ExpectEqual(foundApproval, true, fmt.Sprintf("expected certificatesigningrequests/approval, got %#v", resources.APIResources))
-			framework.ExpectEqual(foundStatus, true, fmt.Sprintf("expected certificatesigningrequests/status, got %#v", resources.APIResources))
+			if !foundCSR {
+				framework.Failf("expected certificatesigningrequests, got %#v", resources.APIResources)
+			}
+			if !foundApproval {
+				framework.Failf("expected certificatesigningrequests/approval, got %#v", resources.APIResources)
+			}
+			if !foundStatus {
+				framework.Failf("expected certificatesigningrequests/status, got %#v", resources.APIResources)
+			}
 		}
 
 		// Main resource create/read/update/watch operations
 
 		ginkgo.By("creating")
-		_, err = csrClient.Create(context.TODO(), csrTemplate, metav1.CreateOptions{})
+		_, err = csrClient.Create(ctx, csrTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = csrClient.Create(context.TODO(), csrTemplate, metav1.CreateOptions{})
+		_, err = csrClient.Create(ctx, csrTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		createdCSR, err := csrClient.Create(context.TODO(), csrTemplate, metav1.CreateOptions{})
+		createdCSR, err := csrClient.Create(ctx, csrTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
-		gottenCSR, err := csrClient.Get(context.TODO(), createdCSR.Name, metav1.GetOptions{})
+		gottenCSR, err := csrClient.Get(ctx, createdCSR.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenCSR.UID, createdCSR.UID)
+		gomega.Expect(gottenCSR.UID).To(gomega.Equal(createdCSR.UID))
+		gomega.Expect(gottenCSR.Spec.ExpirationSeconds).To(gomega.Equal(csr.DurationToExpirationSeconds(time.Hour)))
 
 		ginkgo.By("listing")
-		csrs, err := csrClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
+		csrs, err := csrClient.List(ctx, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(csrs.Items), 3, "filtered list should have 3 items")
+		gomega.Expect(csrs.Items).To(gomega.HaveLen(3), "filtered list should have 3 items")
 
 		ginkgo.By("watching")
 		framework.Logf("starting watch")
-		csrWatch, err := csrClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: csrs.ResourceVersion, FieldSelector: "metadata.name=" + createdCSR.Name})
+		csrWatch, err := csrClient.Watch(ctx, metav1.ListOptions{ResourceVersion: csrs.ResourceVersion, FieldSelector: "metadata.name=" + createdCSR.Name})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("patching")
-		patchedCSR, err := csrClient.Patch(context.TODO(), createdCSR.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
+		patchedCSR, err := csrClient.Patch(ctx, createdCSR.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"patched":"true"}}}`), metav1.PatchOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedCSR.Annotations["patched"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedCSR.Annotations).To(gomega.HaveKeyWithValue("patched", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating")
 		csrToUpdate := patchedCSR.DeepCopy()
 		csrToUpdate.Annotations["updated"] = "true"
-		updatedCSR, err := csrClient.Update(context.TODO(), csrToUpdate, metav1.UpdateOptions{})
+		updatedCSR, err := csrClient.Update(ctx, csrToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(updatedCSR.Annotations["updated"], "true", "updated object should have the applied annotation")
+		gomega.Expect(updatedCSR.Annotations).To(gomega.HaveKeyWithValue("updated", "true"), "updated object should have the applied annotation")
 
 		framework.Logf("waiting for watch events with expected annotations")
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-csrWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
-				framework.ExpectEqual(evt.Type, watch.Modified)
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
+				gomega.Expect(evt.Type).To(gomega.Equal(watch.Modified))
 				watchedCSR, isCSR := evt.Object.(*certificatesv1.CertificateSigningRequest)
-				framework.ExpectEqual(isCSR, true, fmt.Sprintf("expected CSR, got %T", evt.Object))
+				if !isCSR {
+					framework.Failf("expected CSR, got %T", evt.Object)
+				}
 				if watchedCSR.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -326,19 +356,19 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 		// /approval subresource operations
 
 		ginkgo.By("getting /approval")
-		gottenApproval, err := f.DynamicClient.Resource(csrResource).Get(context.TODO(), createdCSR.Name, metav1.GetOptions{}, "approval")
+		gottenApproval, err := f.DynamicClient.Resource(csrResource).Get(ctx, createdCSR.Name, metav1.GetOptions{}, "approval")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenApproval.GetObjectKind().GroupVersionKind(), certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
-		framework.ExpectEqual(gottenApproval.GetUID(), createdCSR.UID)
+		gomega.Expect(gottenApproval.GetObjectKind().GroupVersionKind()).To(gomega.Equal(certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest")))
+		gomega.Expect(gottenApproval.GetUID()).To(gomega.Equal(createdCSR.UID))
 
 		ginkgo.By("patching /approval")
-		patchedApproval, err := csrClient.Patch(context.TODO(), createdCSR.Name, types.MergePatchType,
+		patchedApproval, err := csrClient.Patch(ctx, createdCSR.Name, types.MergePatchType,
 			[]byte(`{"metadata":{"annotations":{"patchedapproval":"true"}},"status":{"conditions":[{"type":"ApprovalPatch","status":"True","reason":"e2e"}]}}`),
 			metav1.PatchOptions{}, "approval")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(patchedApproval.Status.Conditions), 1, fmt.Sprintf("patched object should have the applied condition, got %#v", patchedApproval.Status.Conditions))
-		framework.ExpectEqual(string(patchedApproval.Status.Conditions[0].Type), "ApprovalPatch", fmt.Sprintf("patched object should have the applied condition, got %#v", patchedApproval.Status.Conditions))
-		framework.ExpectEqual(patchedApproval.Annotations["patchedapproval"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedApproval.Status.Conditions).To(gomega.HaveLen(1), "patched object should have the applied condition")
+		gomega.Expect(string(patchedApproval.Status.Conditions[0].Type)).To(gomega.Equal("ApprovalPatch"), "patched object should have the applied condition, got %#v", patchedApproval.Status.Conditions)
+		gomega.Expect(patchedApproval.Annotations).To(gomega.HaveKeyWithValue("patchedapproval", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating /approval")
 		approvalToUpdate := patchedApproval.DeepCopy()
@@ -348,26 +378,26 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 			Reason:  "E2E",
 			Message: "Set from an e2e test",
 		})
-		updatedApproval, err := csrClient.UpdateApproval(context.TODO(), approvalToUpdate.Name, approvalToUpdate, metav1.UpdateOptions{})
+		updatedApproval, err := csrClient.UpdateApproval(ctx, approvalToUpdate.Name, approvalToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(updatedApproval.Status.Conditions), 2, fmt.Sprintf("updated object should have the applied condition, got %#v", updatedApproval.Status.Conditions))
-		framework.ExpectEqual(updatedApproval.Status.Conditions[1].Type, certificatesv1.CertificateApproved, fmt.Sprintf("updated object should have the approved condition, got %#v", updatedApproval.Status.Conditions))
+		gomega.Expect(updatedApproval.Status.Conditions).To(gomega.HaveLen(2), "updated object should have the applied condition, got %#v", updatedApproval.Status.Conditions)
+		gomega.Expect(updatedApproval.Status.Conditions[1].Type).To(gomega.Equal(certificatesv1.CertificateApproved), "updated object should have the approved condition, got %#v", updatedApproval.Status.Conditions)
 
 		// /status subresource operations
 
 		ginkgo.By("getting /status")
-		gottenStatus, err := f.DynamicClient.Resource(csrResource).Get(context.TODO(), createdCSR.Name, metav1.GetOptions{}, "status")
+		gottenStatus, err := f.DynamicClient.Resource(csrResource).Get(ctx, createdCSR.Name, metav1.GetOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(gottenStatus.GetObjectKind().GroupVersionKind(), certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest"))
-		framework.ExpectEqual(gottenStatus.GetUID(), createdCSR.UID)
+		gomega.Expect(gottenStatus.GetObjectKind().GroupVersionKind()).To(gomega.Equal(certificatesv1.SchemeGroupVersion.WithKind("CertificateSigningRequest")))
+		gomega.Expect(gottenStatus.GetUID()).To(gomega.Equal(createdCSR.UID))
 
 		ginkgo.By("patching /status")
-		patchedStatus, err := csrClient.Patch(context.TODO(), createdCSR.Name, types.MergePatchType,
+		patchedStatus, err := csrClient.Patch(ctx, createdCSR.Name, types.MergePatchType,
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":{"certificate":`+string(certificateDataJSON)+`}}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(patchedStatus.Status.Certificate, certificateData, "patched object should have the applied certificate")
-		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
+		gomega.Expect(patchedStatus.Status.Certificate).To(gomega.Equal(certificateData), "patched object should have the applied certificate")
+		gomega.Expect(patchedStatus.Annotations).To(gomega.HaveKeyWithValue("patchedstatus", "true"), "patched object should have the applied annotation")
 
 		ginkgo.By("updating /status")
 		statusToUpdate := patchedStatus.DeepCopy()
@@ -377,27 +407,29 @@ var _ = SIGDescribe("Certificates API [Privileged:ClusterAdmin]", func() {
 			Reason:  "E2E",
 			Message: "Set from an e2e test",
 		})
-		updatedStatus, err := csrClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+		updatedStatus, err := csrClient.UpdateStatus(ctx, statusToUpdate, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(updatedStatus.Status.Conditions), len(statusToUpdate.Status.Conditions), fmt.Sprintf("updated object should have the applied condition, got %#v", updatedStatus.Status.Conditions))
-		framework.ExpectEqual(string(updatedStatus.Status.Conditions[len(updatedStatus.Status.Conditions)-1].Type), "StatusUpdate", fmt.Sprintf("updated object should have the approved condition, got %#v", updatedStatus.Status.Conditions))
+		gomega.Expect(updatedStatus.Status.Conditions).To(gomega.HaveLen(len(statusToUpdate.Status.Conditions)), "updated object should have the applied condition, got %#v", updatedStatus.Status.Conditions)
+		gomega.Expect(string(updatedStatus.Status.Conditions[len(updatedStatus.Status.Conditions)-1].Type)).To(gomega.Equal("StatusUpdate"), "updated object should have the approved condition, got %#v", updatedStatus.Status.Conditions)
 
 		// main resource delete operations
 
 		ginkgo.By("deleting")
-		err = csrClient.Delete(context.TODO(), createdCSR.Name, metav1.DeleteOptions{})
+		err = csrClient.Delete(ctx, createdCSR.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
-		_, err = csrClient.Get(context.TODO(), createdCSR.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
-		csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
+		_, err = csrClient.Get(ctx, createdCSR.Name, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %#v", err)
+		}
+		csrs, err = csrClient.List(ctx, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(csrs.Items), 2, "filtered list should have 2 items")
+		gomega.Expect(csrs.Items).To(gomega.HaveLen(2), "filtered list should have 2 items")
 
 		ginkgo.By("deleting a collection")
-		err = csrClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
+		err = csrClient.DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
 		framework.ExpectNoError(err)
-		csrs, err = csrClient.List(context.TODO(), metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
+		csrs, err = csrClient.List(ctx, metav1.ListOptions{FieldSelector: "spec.signerName=" + signerName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(csrs.Items), 0, "filtered list should have 0 items")
+		gomega.Expect(csrs.Items).To(gomega.BeEmpty(), "filtered list should have 0 items")
 	})
 })

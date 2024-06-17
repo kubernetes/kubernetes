@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-syntax = 'proto3';
+syntax = "proto3";
 
 package v1beta2;
+option go_package = "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 

@@ -19,14 +19,15 @@ package auth
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	coordination "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
+	"k8s.io/api/resource/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -52,13 +53,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		tokenNode2       = "node2-token"
 	)
 
-	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
-
-	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
-
-	tokenFile, err := ioutil.TempFile("", "kubeconfig")
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +65,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	}, "\n"))
 	tokenFile.Close()
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--runtime-config=api/all=true",
 		"--authorization-mode", "Node,RBAC",
 		"--token-auth-file", tokenFile.Name(),
 		"--enable-admission-plugins", "NodeRestriction",
@@ -109,9 +107,13 @@ func TestNodeAuthorizer(t *testing.T) {
 	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmapconfigsource"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha2().ResourceClaims("ns").Create(context.TODO(), &v1alpha2.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mynamedresourceclaim"}, Spec: v1alpha2.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := superuserClient.ResourceV1alpha2().ResourceClaims("ns").Create(context.TODO(), &v1alpha2.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}, Spec: v1alpha2.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
 	pvName := "mypv"
 	if _, err := superuserClientExternal.StorageV1().VolumeAttachments().Create(context.TODO(), &storagev1.VolumeAttachment{
 		ObjectMeta: metav1.ObjectMeta{Name: "myattachment"},
@@ -127,7 +129,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "mypvc"},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
-			Resources:   corev1.ResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")}},
+			Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")}},
 		},
 	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
@@ -163,12 +165,6 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
-	getConfigMapConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			_, err := client.CoreV1().ConfigMaps("ns").Get(context.TODO(), "myconfigmapconfigsource", metav1.GetOptions{})
-			return err
-		}
-	}
 	getPVC := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.CoreV1().PersistentVolumeClaims("ns").Get(context.TODO(), "mypvc", metav1.GetOptions{})
@@ -187,6 +183,34 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
+	getResourceClaim := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mynamedresourceclaim", metav1.GetOptions{})
+			return err
+		}
+	}
+	getResourceClaimTemplate := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mytemplatizedresourceclaim", metav1.GetOptions{})
+			return err
+		}
+	}
+	addResourceClaimTemplateReference := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().Pods("ns").Patch(context.TODO(), "node2normalpod", types.MergePatchType,
+				[]byte(`{"status":{"resourceClaimStatuses":[{"name":"templateclaim","resourceClaimName":"mytemplatizedresourceclaim"}]}}`),
+				metav1.PatchOptions{}, "status")
+			return err
+		}
+	}
+	removeResourceClaimReference := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.CoreV1().Pods("ns").Patch(context.TODO(), "node2normalpod", types.MergePatchType,
+				[]byte(`{"status":{"resourceClaimStatuses":null}}`),
+				metav1.PatchOptions{}, "status")
+			return err
+		}
+	}
 
 	createNode2NormalPod := func(client clientset.Interface) func() error {
 		return func() error {
@@ -199,6 +223,10 @@ func TestNodeAuthorizer(t *testing.T) {
 						{Name: "secret", VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "mysecret"}}},
 						{Name: "cm", VolumeSource: corev1.VolumeSource{ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: "myconfigmap"}}}},
 						{Name: "pvc", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}}},
+					},
+					ResourceClaims: []corev1.PodResourceClaim{
+						{Name: "namedclaim", Source: corev1.ClaimSource{ResourceClaimName: pointer.String("mynamedresourceclaim")}},
+						{Name: "templateclaim", Source: corev1.ClaimSource{ResourceClaimTemplateName: pointer.String("myresourceclaimtemplate")}},
 					},
 				},
 			}, metav1.CreateOptions{})
@@ -224,13 +252,26 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	createNode2MirrorPod := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.CoreV1().Pods("ns").Create(context.TODO(), &corev1.Pod{
+			const nodeName = "node2"
+			node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			controller := true
+			_, err = client.CoreV1().Pods("ns").Create(context.TODO(), &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "node2mirrorpod",
 					Annotations: map[string]string{corev1.MirrorPodAnnotationKey: "true"},
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: corev1.SchemeGroupVersion.String(),
+						Kind:       "Node",
+						Name:       nodeName,
+						UID:        node.UID,
+						Controller: &controller,
+					}},
 				},
 				Spec: corev1.PodSpec{
-					NodeName:   "node2",
+					NodeName:   nodeName,
 					Containers: []corev1.Container{{Name: "image", Image: "busybox"}},
 				},
 			}, metav1.CreateOptions{})
@@ -247,34 +288,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2 := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.CoreV1().Nodes().Create(context.TODO(), &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}}, metav1.CreateOptions{})
-			return err
-		}
-	}
-	setNode2ConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			node2, err := client.CoreV1().Nodes().Get(context.TODO(), "node2", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			node2.Spec.ConfigSource = &corev1.NodeConfigSource{
-				ConfigMap: &corev1.ConfigMapNodeConfigSource{
-					Namespace:        "ns",
-					Name:             "myconfigmapconfigsource",
-					KubeletConfigKey: "kubelet",
-				},
-			}
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
-			return err
-		}
-	}
-	unsetNode2ConfigSource := func(client clientset.Interface) func() error {
-		return func() error {
-			node2, err := client.CoreV1().Nodes().Get(context.TODO(), "node2", metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			node2.Spec.ConfigSource = nil
-			_, err = client.CoreV1().Nodes().Update(context.TODO(), node2, metav1.UpdateOptions{})
 			return err
 		}
 	}
@@ -295,9 +308,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2NormalPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.PolicyV1beta1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
+			return client.PolicyV1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 					Kind:       "Eviction",
 				},
 				ObjectMeta: metav1.ObjectMeta{
@@ -311,9 +324,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	createNode2MirrorPodEviction := func(client clientset.Interface) func() error {
 		return func() error {
 			zero := int64(0)
-			return client.PolicyV1beta1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
+			return client.PolicyV1().Evictions("ns").Evict(context.TODO(), &policy.Eviction{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "policy/v1beta1",
+					APIVersion: "policy/v1",
 					Kind:       "Eviction",
 				},
 				ObjectMeta: metav1.ObjectMeta{
@@ -358,8 +371,8 @@ func TestNodeAuthorizer(t *testing.T) {
 					Name: "node1",
 				},
 				Spec: coordination.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("node1"),
-					LeaseDurationSeconds: pointer.Int32Ptr(node1LeaseDurationSeconds),
+					HolderIdentity:       pointer.String("node1"),
+					LeaseDurationSeconds: pointer.Int32(node1LeaseDurationSeconds),
 					RenewTime:            &metav1.MicroTime{Time: time.Now()},
 				},
 			}
@@ -461,10 +474,10 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(nodeanonClient))
 	expectForbidden(t, getPVC(nodeanonClient))
 	expectForbidden(t, getPV(nodeanonClient))
+	expectForbidden(t, getResourceClaim(nodeanonClient))
+	expectForbidden(t, getResourceClaimTemplate(nodeanonClient))
 	expectForbidden(t, createNode2NormalPod(nodeanonClient))
-	expectForbidden(t, createNode2MirrorPod(nodeanonClient))
 	expectForbidden(t, deleteNode2NormalPod(nodeanonClient))
-	expectForbidden(t, deleteNode2MirrorPod(nodeanonClient))
 	expectForbidden(t, createNode2MirrorPodEviction(nodeanonClient))
 	expectForbidden(t, createNode2(nodeanonClient))
 	expectForbidden(t, updateNode2Status(nodeanonClient))
@@ -475,9 +488,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(node1Client))
 	expectForbidden(t, getPVC(node1Client))
 	expectForbidden(t, getPV(node1Client))
+	expectForbidden(t, getResourceClaim(node1Client))
+	expectForbidden(t, getResourceClaimTemplate(node1Client))
 	expectForbidden(t, createNode2NormalPod(nodeanonClient))
-	expectForbidden(t, createNode2MirrorPod(node1Client))
-	expectNotFound(t, deleteNode2MirrorPod(node1Client))
 	expectNotFound(t, createNode2MirrorPodEviction(node1Client))
 	expectForbidden(t, createNode2(node1Client))
 	expectNotFound(t, updateNode2Status(node1Client))
@@ -489,24 +502,28 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(node2Client))
 	expectForbidden(t, getPVC(node2Client))
 	expectForbidden(t, getPV(node2Client))
+	expectForbidden(t, getResourceClaim(node2Client))
+	expectForbidden(t, getResourceClaimTemplate(node2Client))
 
 	expectForbidden(t, createNode2NormalPod(nodeanonClient))
 	// mirror pod and self node lifecycle is allowed
+	expectAllowed(t, createNode2(node2Client))
+	expectAllowed(t, updateNode2Status(node2Client))
+	expectForbidden(t, createNode2MirrorPod(nodeanonClient))
+	expectForbidden(t, deleteNode2MirrorPod(nodeanonClient))
+	expectForbidden(t, createNode2MirrorPod(node1Client))
+	expectNotFound(t, deleteNode2MirrorPod(node1Client))
+	// create a pod as an admin to add object references
+	expectAllowed(t, createNode2NormalPod(superuserClient))
+
 	expectAllowed(t, createNode2MirrorPod(node2Client))
 	expectAllowed(t, deleteNode2MirrorPod(node2Client))
 	expectAllowed(t, createNode2MirrorPod(node2Client))
 	expectAllowed(t, createNode2MirrorPodEviction(node2Client))
-	expectAllowed(t, createNode2(node2Client))
-	expectAllowed(t, updateNode2Status(node2Client))
 	// self deletion is not allowed
 	expectForbidden(t, deleteNode2(node2Client))
 	// modification of another node's status is not allowed
 	expectForbidden(t, updateNode2Status(node1Client))
-	// clean up node2
-	expectAllowed(t, deleteNode2(superuserClient))
-
-	// create a pod as an admin to add object references
-	expectAllowed(t, createNode2NormalPod(superuserClient))
 
 	// unidentifiable node and node1 are still forbidden
 	expectForbidden(t, getSecret(nodeanonClient))
@@ -514,6 +531,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(nodeanonClient))
 	expectForbidden(t, getPVC(nodeanonClient))
 	expectForbidden(t, getPV(nodeanonClient))
+	expectForbidden(t, getResourceClaim(nodeanonClient))
+	expectForbidden(t, getResourceClaimTemplate(nodeanonClient))
 	expectForbidden(t, createNode2NormalPod(nodeanonClient))
 	expectForbidden(t, updateNode2NormalPodStatus(nodeanonClient))
 	expectForbidden(t, deleteNode2NormalPod(nodeanonClient))
@@ -527,6 +546,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, getConfigMap(node1Client))
 	expectForbidden(t, getPVC(node1Client))
 	expectForbidden(t, getPV(node1Client))
+	expectForbidden(t, getResourceClaim(node1Client))
+	expectForbidden(t, getResourceClaimTemplate(node1Client))
 	expectForbidden(t, createNode2NormalPod(node1Client))
 	expectForbidden(t, updateNode2NormalPodStatus(node1Client))
 	expectForbidden(t, deleteNode2NormalPod(node1Client))
@@ -542,6 +563,26 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, getPVC(node2Client))
 	expectAllowed(t, getPV(node2Client))
 
+	// node2 can only get direct claim references
+	expectAllowed(t, getResourceClaim(node2Client))
+	expectForbidden(t, getResourceClaimTemplate(node2Client))
+
+	// node cannot add a claim reference
+	expectForbidden(t, addResourceClaimTemplateReference(node2Client))
+	// superuser can add a claim reference
+	expectAllowed(t, addResourceClaimTemplateReference(superuserClient))
+	// node can get direct and template claim references
+	expectAllowed(t, getResourceClaim(node2Client))
+	expectAllowed(t, getResourceClaimTemplate(node2Client))
+
+	// node cannot remove a claim reference
+	expectForbidden(t, removeResourceClaimReference(node2Client))
+	// superuser can remove a claim reference
+	expectAllowed(t, removeResourceClaimReference(superuserClient))
+	// node2 can only get direct claim references
+	expectAllowed(t, getResourceClaim(node2Client))
+	expectForbidden(t, getResourceClaimTemplate(node2Client))
+
 	expectForbidden(t, createNode2NormalPod(node2Client))
 	expectAllowed(t, updateNode2NormalPodStatus(node2Client))
 	expectAllowed(t, deleteNode2NormalPod(node2Client))
@@ -553,17 +594,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2MirrorPod(superuserClient))
 	expectAllowed(t, createNode2NormalPodEviction(node2Client))
 	expectAllowed(t, createNode2MirrorPodEviction(node2Client))
+	// clean up node2
+	expectAllowed(t, deleteNode2(superuserClient))
 
 	// re-create a pod as an admin to add object references
 	expectAllowed(t, createNode2NormalPod(superuserClient))
 
-	// ExpandPersistentVolumes feature disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
-	expectForbidden(t, updatePVCCapacity(node1Client))
-	expectForbidden(t, updatePVCCapacity(node2Client))
-
-	// ExpandPersistentVolumes feature enabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))
@@ -574,20 +610,6 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// create node2 again
 	expectAllowed(t, createNode2(node2Client))
-	// node2 can not set its own config source
-	expectForbidden(t, setNode2ConfigSource(node2Client))
-	// node2 can not access the configmap config source yet
-	expectForbidden(t, getConfigMapConfigSource(node2Client))
-	// superuser can access the configmap config source
-	expectAllowed(t, getConfigMapConfigSource(superuserClient))
-	// superuser can set node2's config source
-	expectAllowed(t, setNode2ConfigSource(superuserClient))
-	// node2 can now get the configmap assigned as its config source
-	expectAllowed(t, getConfigMapConfigSource(node2Client))
-	// superuser can unset node2's config source
-	expectAllowed(t, unsetNode2ConfigSource(superuserClient))
-	// node2 can no longer get the configmap after it is unassigned as its config source
-	expectForbidden(t, getConfigMapConfigSource(node2Client))
 	// clean up node2
 	expectAllowed(t, deleteNode2(superuserClient))
 

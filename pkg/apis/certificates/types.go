@@ -45,16 +45,56 @@ type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte
 
-	// Requested signer for the request. It is a qualified name in the form:
-	// `scope-hostname.io/name`.
-	// Distribution of trust for signers happens out of band.
-	// You can select on this field using `spec.signerName`.
+	// signerName indicates the requested signer, and is a qualified name.
+	//
+	// List/watch requests for CertificateSigningRequests can filter on this field using a "spec.signerName=NAME" fieldSelector.
+	//
+	// Well-known Kubernetes signers are:
+	//  1. "kubernetes.io/kube-apiserver-client": issues client certificates that can be used to authenticate to kube-apiserver.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  2. "kubernetes.io/kube-apiserver-client-kubelet": issues client certificates that kubelets use to authenticate to kube-apiserver.
+	//   Requests for this signer can be auto-approved by the "csrapproving" controller in kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  3. "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints, which kube-apiserver can connect to securely.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//
+	// More details are available at https://k8s.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers
+	//
+	// Custom signerNames can also be specified. The signer defines:
+	//  1. Trust distribution: how trust (CA bundles) are distributed.
+	//  2. Permitted subjects: and behavior when a disallowed subject is requested.
+	//  3. Required, permitted, or forbidden x509 extensions in the request (including whether subjectAltNames are allowed, which types, restrictions on allowed values) and behavior when a disallowed extension is requested.
+	//  4. Required, permitted, or forbidden key usages / extended key usages.
+	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
+	//  6. Whether or not requests for CA certificates are allowed.
 	SignerName string
+
+	// expirationSeconds is the requested duration of validity of the issued
+	// certificate. The certificate signer may issue a certificate with a different
+	// validity duration so a client must check the delta between the notBefore and
+	// and notAfter fields in the issued certificate to determine the actual duration.
+	//
+	// The v1.22+ in-tree implementations of the well-known Kubernetes signers will
+	// honor this field as long as the requested duration is not greater than the
+	// maximum duration they will honor per the --cluster-signing-duration CLI
+	// flag to the Kubernetes controller manager.
+	//
+	// Certificate signers may not honor this field for various reasons:
+	//
+	//   1. Old signer that is unaware of the field (such as the in-tree
+	//      implementations prior to v1.22)
+	//   2. Signer whose configured maximum is shorter than the requested duration
+	//   3. Signer whose configured minimum is longer than the requested duration
+	//
+	// The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
+	//
+	// +optional
+	ExpirationSeconds *int32
 
 	// usages specifies a set of usage contexts the key will be
 	// valid for.
-	// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-	//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+	// See:
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+	//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 	Usages []KeyUsage
 
 	// Information about the requesting user.
@@ -153,8 +193,10 @@ type CertificateSigningRequestList struct {
 }
 
 // KeyUsages specifies valid usage contexts for keys.
-// See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
-//      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+// See:
+//
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.3
+//	https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 type KeyUsage string
 
 const (
@@ -182,3 +224,59 @@ const (
 	UsageMicrosoftSGC      KeyUsage = "microsoft sgc"
 	UsageNetscapeSGC       KeyUsage = "netscape sgc"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
+// (root certificates).
+//
+// ClusterTrustBundle objects are considered to be readable by any authenticated
+// user in the cluster.
+//
+// It can be optionally associated with a particular assigner, in which case it
+// contains one valid set of trust anchors for that signer. Signers may have
+// multiple associated ClusterTrustBundles; each is an independent set of trust
+// anchors for that signer.
+type ClusterTrustBundle struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains the signer (if any) and trust anchors.
+	// +optional
+	Spec ClusterTrustBundleSpec
+}
+
+// ClusterTrustBundleSpec contains the signer and trust anchors.
+type ClusterTrustBundleSpec struct {
+	// SignerName indicates the associated signer, if any.
+	SignerName string
+
+	// TrustBundle contains the individual X.509 trust anchors for this
+	// bundle, as PEM bundle of PEM-wrapped, DER-formatted X.509 certificates.
+	//
+	// The data must consist only of PEM certificate blocks that parse as valid
+	// X.509 certificates.  Each certificate must include a basic constraints
+	// extension with the CA bit set.  The API server will reject objects that
+	// contain duplicate certificates, or that use PEM block headers.
+	//
+	// Users of ClusterTrustBundles, including Kubelet, are free to reorder and
+	// deduplicate certificate blocks in this file according to their own logic,
+	// as well as to drop PEM block headers and inter-block data.
+	TrustBundle string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterTrustBundleList is a collection of ClusterTrustBundle objects
+type ClusterTrustBundleList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is a collection of ClusterTrustBundle objects
+	Items []ClusterTrustBundle
+}
+
+// MaxTrustBundleSize is the maximimum size of a single trust bundle field.
+const MaxTrustBundleSize = 1 * 1024 * 1024

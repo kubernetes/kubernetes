@@ -3,3 +3,5 @@ linux/arm=arm32v6/alpine:3.8
 linux/arm64=arm64v8/alpine:3.8
 linux/ppc64le=ppc64le/alpine:3.8
 linux/s390x=s390x/alpine:3.8
+windows/amd64/1809=mcr.microsoft.com/windows/nanoserver:1809
+windows/amd64/ltsc2022=mcr.microsoft.com/windows/nanoserver:ltsc2022

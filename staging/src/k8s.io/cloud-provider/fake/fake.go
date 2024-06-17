@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 )
@@ -53,9 +53,16 @@ var _ cloudprovider.Routes = (*Cloud)(nil)
 var _ cloudprovider.Zones = (*Cloud)(nil)
 var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 var _ cloudprovider.Clusters = (*Cloud)(nil)
+var _ cloudprovider.InstancesV2 = (*Cloud)(nil)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {
+	DisableInstances     bool
+	DisableRoutes        bool
+	DisableLoadBalancers bool
+	DisableZones         bool
+	DisableClusters      bool
+
 	Exists bool
 	Err    error
 
@@ -64,26 +71,36 @@ type Cloud struct {
 	ErrByProviderID         error
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
+	MetadataErr             error
 
-	Calls         []string
-	Addresses     []v1.NodeAddress
-	addressesMux  sync.Mutex
-	ExtID         map[types.NodeName]string
-	ExtIDErr      map[types.NodeName]error
-	InstanceTypes map[types.NodeName]string
-	Machines      []types.NodeName
-	NodeResources *v1.NodeResources
-	ClusterList   []string
-	MasterName    string
-	ExternalIP    net.IP
-	Balancers     map[string]Balancer
-	UpdateCalls   []UpdateBalancerCall
-	RouteMap      map[string]*Route
-	Lock          sync.Mutex
-	Provider      string
-	addCallLock   sync.Mutex
+	Calls          []string
+	Addresses      []v1.NodeAddress
+	addressesMux   sync.Mutex
+	ExtID          map[types.NodeName]string
+	ExtIDErr       map[types.NodeName]error
+	InstanceTypes  map[types.NodeName]string
+	Machines       []types.NodeName
+	NodeResources  v1.ResourceList
+	ClusterList    []string
+	MasterName     string
+	ExternalIP     net.IP
+	Balancers      map[string]Balancer
+	updateCallLock sync.Mutex
+	UpdateCalls    []UpdateBalancerCall
+	ensureCallLock sync.Mutex
+	EnsureCalls    []UpdateBalancerCall
+	EnsureCallCb   func(UpdateBalancerCall)
+	UpdateCallCb   func(UpdateBalancerCall)
+	RouteMap       map[string]*Route
+	Lock           sync.Mutex
+	Provider       string
+	ProviderID     map[types.NodeName]string
+	addCallLock    sync.Mutex
 	cloudprovider.Zone
-	VolumeLabelMap map[string]map[string]string
+	VolumeLabelMap   map[string]map[string]string
+	AdditionalLabels map[string]string
+
+	OverrideInstanceMetadata func(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error)
 
 	RequestDelay time.Duration
 }
@@ -95,11 +112,10 @@ type Route struct {
 }
 
 func (f *Cloud) addCall(desc string) {
-	f.addCallLock.Lock()
-	defer f.addCallLock.Unlock()
-
 	time.Sleep(f.RequestDelay)
 
+	f.addCallLock.Lock()
+	defer f.addCallLock.Unlock()
 	f.Calls = append(f.Calls, desc)
 }
 
@@ -124,7 +140,7 @@ func (f *Cloud) Master(ctx context.Context, name string) (string, error) {
 
 // Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Clusters() (cloudprovider.Clusters, bool) {
-	return f, true
+	return f, !f.DisableClusters
 }
 
 // ProviderName returns the cloud provider ID.
@@ -143,14 +159,14 @@ func (f *Cloud) HasClusterID() bool {
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
 func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return f, true
+	return f, !f.DisableLoadBalancers
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
 func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
-	return f, true
+	return f, !f.DisableInstances
 }
 
 // InstancesV2 returns a fake implementation of InstancesV2.
@@ -165,12 +181,12 @@ func (f *Cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 
 // Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
 func (f *Cloud) Zones() (cloudprovider.Zones, bool) {
-	return f, true
+	return f, !f.DisableZones
 }
 
 // Routes returns a routes interface along with whether the interface is supported.
 func (f *Cloud) Routes() (cloudprovider.Routes, bool) {
-	return f, true
+	return f, !f.DisableRoutes
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
@@ -191,6 +207,7 @@ func (f *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, ser
 // It adds an entry "create" into the internal method call record.
 func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	f.addCall("create")
+	f.markEnsureCall(service, nodes)
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]Balancer)
 	}
@@ -212,11 +229,31 @@ func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 	return status, f.Err
 }
 
+func (f *Cloud) markUpdateCall(service *v1.Service, nodes []*v1.Node) {
+	f.updateCallLock.Lock()
+	defer f.updateCallLock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.UpdateCalls = append(f.UpdateCalls, update)
+	if f.UpdateCallCb != nil {
+		f.UpdateCallCb(update)
+	}
+}
+
+func (f *Cloud) markEnsureCall(service *v1.Service, nodes []*v1.Node) {
+	f.ensureCallLock.Lock()
+	defer f.ensureCallLock.Unlock()
+	update := UpdateBalancerCall{service, nodes}
+	f.EnsureCalls = append(f.EnsureCalls, update)
+	if f.EnsureCallCb != nil {
+		f.EnsureCallCb(update)
+	}
+}
+
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
 func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
-	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
+	f.markUpdateCall(service, nodes)
 	return f.Err
 }
 
@@ -300,19 +337,50 @@ func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
 func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-shutdown-by-provider-id")
+
+	if providerID == "" {
+		return false, fmt.Errorf("cannot shutdown instance with empty providerID")
+	}
+
 	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
-// InstanceMetadataByProviderID returns metadata of the specified instance.
-func (f *Cloud) InstanceMetadataByProviderID(ctx context.Context, providerID string) (*cloudprovider.InstanceMetadata, error) {
+// InstanceExists returns true if the instance corresponding to a node still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (f *Cloud) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-exists")
+	return f.ExistsByProviderID, f.ErrByProviderID
+}
+
+// InstanceShutdown returns true if the instances is in safe state to detach volumes
+func (f *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	f.addCall("instance-shutdown")
+	return f.NodeShutdown, f.ErrShutdownByProviderID
+}
+
+// InstanceMetadata returns metadata of the specified instance.
+func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	if f.OverrideInstanceMetadata != nil {
+		return f.OverrideInstanceMetadata(ctx, node)
+	}
 	f.addCall("instance-metadata-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
+
+	providerID := ""
+	id, ok := f.ProviderID[types.NodeName(node.Name)]
+	if ok {
+		providerID = id
+	}
+
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    providerID,
-		Type:          f.InstanceTypes[types.NodeName(providerID)],
-		NodeAddresses: f.Addresses,
-	}, f.Err
+		ProviderID:       providerID,
+		InstanceType:     f.InstanceTypes[types.NodeName(node.Spec.ProviderID)],
+		NodeAddresses:    f.Addresses,
+		Zone:             f.Zone.FailureDomain,
+		Region:           f.Zone.Region,
+		AdditionalLabels: f.AdditionalLabels,
+	}, f.MetadataErr
 }
 
 // List is a test-spy implementation of Instances.List.

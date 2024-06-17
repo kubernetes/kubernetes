@@ -19,22 +19,26 @@ package objectmeta
 import (
 	"bytes"
 	"reflect"
+	"strings"
 	"testing"
 
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/util/json"
+
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestCoerce(t *testing.T) {
 	tests := []struct {
-		name              string
-		json              string
-		includeRoot       bool
-		dropInvalidFields bool
-		schema            *structuralschema.Structural
-		expected          string
-		expectedError     bool
+		name                  string
+		json                  string
+		includeRoot           bool
+		dropInvalidFields     bool
+		schema                *structuralschema.Structural
+		expected              string
+		expectedError         bool
+		expectedUnknownFields []string
 	}{
 		{name: "empty", json: "null", schema: nil, expected: "null"},
 		{name: "scalar", json: "4", schema: &structuralschema.Structural{}, expected: "4"},
@@ -199,7 +203,12 @@ func TestCoerce(t *testing.T) {
     }
   }
 }
-`},
+`, expectedUnknownFields: []string{
+			"nested.metadata.unspecified",
+			"nested.spec.embedded.metadata.unspecified",
+			"preserving.metadata.unspecified",
+			"pruned.metadata.unspecified",
+		}},
 		{name: "x-kubernetes-embedded-resource, with includeRoot=true", json: `
 {
   "apiVersion": "foo/v1",
@@ -356,8 +365,13 @@ func TestCoerce(t *testing.T) {
       }
     }
   }
-}
-`},
+}`, expectedUnknownFields: []string{
+			"metadata.unspecified",
+			"nested.metadata.unspecified",
+			"nested.spec.embedded.metadata.unspecified",
+			"preserving.metadata.unspecified",
+			"pruned.metadata.unspecified",
+		}},
 		{name: "without name", json: `
 {
   "apiVersion": "foo/v1",
@@ -495,7 +509,10 @@ func TestCoerce(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err := Coerce(nil, in, tt.schema, tt.includeRoot, tt.dropInvalidFields)
+			err, unknownFields := CoerceWithOptions(nil, in, tt.schema, tt.includeRoot, CoerceOptions{
+				DropInvalidFields:       tt.dropInvalidFields,
+				ReturnUnknownFieldPaths: true,
+			})
 			if tt.expectedError && err == nil {
 				t.Error("expected error, but did not get any")
 			} else if !tt.expectedError && err != nil {
@@ -508,7 +525,10 @@ func TestCoerce(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected: %s\ngot: %s\ndiff: %s", tt.expected, buf.String(), diff.ObjectDiff(expected, in))
+				t.Errorf("expected: %s\ngot: %s\ndiff: %s", tt.expected, buf.String(), cmp.Diff(expected, in))
+			}
+			if !reflect.DeepEqual(unknownFields, tt.expectedUnknownFields) {
+				t.Errorf("expected unknown fields:\n\t%v\ngot:\n\t%v\n", strings.Join(tt.expectedUnknownFields, "\n\t"), strings.Join(unknownFields, "\n\t"))
 			}
 		})
 	}

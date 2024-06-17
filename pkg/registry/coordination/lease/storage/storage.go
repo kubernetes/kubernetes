@@ -35,9 +35,10 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against leases.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                  func() runtime.Object { return &coordinationapi.Lease{} },
-		NewListFunc:              func() runtime.Object { return &coordinationapi.LeaseList{} },
-		DefaultQualifiedResource: coordinationapi.Resource("leases"),
+		NewFunc:                   func() runtime.Object { return &coordinationapi.Lease{} },
+		NewListFunc:               func() runtime.Object { return &coordinationapi.LeaseList{} },
+		DefaultQualifiedResource:  coordinationapi.Resource("leases"),
+		SingularQualifiedResource: coordinationapi.Resource("lease"),
 
 		CreateStrategy: lease.Strategy,
 		UpdateStrategy: lease.Strategy,

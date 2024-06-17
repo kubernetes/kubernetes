@@ -18,255 +18,139 @@ package etcd3
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/integration"
+	"github.com/google/go-cmp/cmp"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
-	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/ptr"
 )
 
 func TestWatch(t *testing.T) {
-	testWatch(t, false)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatch(ctx, t, store)
 }
 
-func TestWatchList(t *testing.T) {
-	testWatch(t, true)
+func TestClusterScopedWatch(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestClusterScopedWatch(ctx, t, store)
 }
 
-// It tests that
-// - first occurrence of objects should notify Add event
-// - update should trigger Modified event
-// - update that gets filtered should trigger Deleted event
-func testWatch(t *testing.T, recursive bool) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	podFoo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-
-	tests := []struct {
-		key        string
-		pred       storage.SelectionPredicate
-		watchTests []*testWatchStruct
-	}{{ // create a key
-		key:        "/somekey-1",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		pred:       storage.Everything,
-	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
-		key:        "/somekey-3",
-		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
-			},
-		},
-	}, { // update
-		key:        "/somekey-4",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		pred:       storage.Everything,
-	}, { // delete because of being filtered
-		key:        "/somekey-5",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, nil
-			},
-		},
-	}}
-	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, storage.ListOptions{ResourceVersion: "0", Predicate: tt.pred}, recursive)
-		if err != nil {
-			t.Fatalf("Watch failed: %v", err)
-		}
-		var prevObj *example.Pod
-		for _, watchTest := range tt.watchTests {
-			out := &example.Pod{}
-			key := tt.key
-			if recursive {
-				key = key + "/item"
-			}
-			err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-				func(runtime.Object) (runtime.Object, error) {
-					return watchTest.obj, nil
-				}))
-			if err != nil {
-				t.Fatalf("GuaranteedUpdate failed: %v", err)
-			}
-			if watchTest.expectEvent {
-				expectObj := out
-				if watchTest.watchType == watch.Deleted {
-					expectObj = prevObj
-					expectObj.ResourceVersion = out.ResourceVersion
-				}
-				testCheckResult(t, i, watchTest.watchType, w, expectObj)
-			}
-			prevObj = out
-		}
-		w.Stop()
-		testCheckStop(t, i, w)
-	}
+func TestNamespaceScopedWatch(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc); err != nil {
-		t.Fatalf("Delete failed: %v", err)
-	}
-	testCheckEventType(t, watch.Deleted, w)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
 }
 
-// TestWatchFromZero tests that
-// - watch from 0 should sync up and grab the object added before
-// - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
-
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	testCheckResult(t, 0, watch.Added, w, storedObj)
-	w.Stop()
-
-	// Update
-	out := &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
-		}))
-	if err != nil {
-		t.Fatalf("GuaranteedUpdate failed: %v", err)
-	}
-
-	// Make sure when we watch from 0 we receive an ADDED event
-	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	testCheckResult(t, 1, watch.Added, w, out)
-	w.Stop()
-
-	// Update again
-	out = &example.Pod{}
-	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
-		}))
-	if err != nil {
-		t.Fatalf("GuaranteedUpdate failed: %v", err)
-	}
-
-	// Compact previous versions
-	revToCompact, err := store.versioner.ParseResourceVersion(out.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
-	}
-	_, err = cluster.RandClient().Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
-	if err != nil {
-		t.Fatalf("Error compacting: %v", err)
-	}
-
-	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	testCheckResult(t, 2, watch.Added, w, out)
+	ctx, store, client := testSetup(t)
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
 }
 
-// TestWatchFromNoneZero tests that
+// TestWatchFromNonZero tests that
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchFromNonZero(ctx, t, store)
+}
 
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	out := &example.Pod{}
-	store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
-		}))
-	testCheckResult(t, 0, watch.Modified, w, out)
+func TestDelayedWatchDelivery(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDelayedWatchDelivery(ctx, t, store)
 }
 
 func TestWatchError(t *testing.T) {
-	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte("test!")})
-	ctx := context.Background()
-	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	validStore := newStore(cluster.RandClient(), true, codec, "", &prefixTransformer{prefix: []byte("test!")})
-	validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
-		}))
-	testCheckEventType(t, watch.Error, w)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchError(ctx, t, &storeWithPrefixTransformer{store})
 }
 
 func TestWatchContextCancel(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	canceledCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	// When we watch with a canceled context, we should detect that it's context canceled.
-	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	select {
-	case _, ok := <-w.ResultChan():
-		if ok {
-			t.Error("ResultChan() should be closed")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
-	}
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchContextCancel(ctx, t, store)
 }
 
+func TestWatcherTimeout(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatcherTimeout(ctx, t, store)
+}
+
+func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
+}
+
+func TestProgressNotify(t *testing.T) {
+	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+
+	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
+}
+
+// TestWatchDispatchBookmarkEvents makes sure that
+// setting allowWatchBookmarks query param against
+// etcd implementation doesn't have any effect.
+func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+
+	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
+}
+
+func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+}
+
+func TestEtcdWatchSemantics(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemantics(ctx, t, store)
+}
+
+func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
+}
+
+// =======================================================================
+// Implementation-specific tests are following.
+// The following tests are exercising the details of the implementation
+// not the actual user-facing contract of storage interface.
+// As such, they may focus e.g. on non-functional aspects like performance
+// impact.
+// =======================================================================
+
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.Everything)
-	// make resutlChan and errChan blocking to ensure ordering.
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
+	// make resultChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)
 	// The event flow goes like:
@@ -276,7 +160,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		w.run()
+		w.run(false, true)
 		wg.Done()
 	}()
 	w.errChan <- fmt.Errorf("some error")
@@ -284,90 +168,241 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	wg.Wait()
 }
 
-func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-
-	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
+// TestWatchErrorIncorrectConfiguration checks if an error
+// will be returned when the storage hasn't been properly
+// initialised for watch requests
+func TestWatchErrorIncorrectConfiguration(t *testing.T) {
+	scenarios := []struct {
+		name            string
+		setupFn         func(opts *setupOptions)
+		requestOpts     storage.ListOptions
+		enableWatchList bool
+		expectedErr     error
+	}{
+		{
+			name:        "no newFunc provided",
+			setupFn:     func(opts *setupOptions) { opts.newFunc = nil },
+			requestOpts: storage.ListOptions{ProgressNotify: true},
+			expectedErr: apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided")),
+		},
 	}
-	etcdW := cluster.RandClient().Watch(ctx, "/", clientv3.WithPrefix())
-
-	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}, storage.ValidateAllObjectFunc); err != nil {
-		t.Fatalf("Delete failed: %v", err)
-	}
-
-	e := <-w.ResultChan()
-	watchedDeleteObj := e.Object.(*example.Pod)
-	var wres clientv3.WatchResponse
-	wres = <-etcdW
-
-	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
-	if err != nil {
-		t.Fatalf("ParseWatchResourceVersion failed: %v", err)
-	}
-	if int64(watchedDeleteRev) != wres.Events[0].Kv.ModRevision {
-		t.Errorf("Object from delete event have version: %v, should be the same as etcd delete's mod rev: %d",
-			watchedDeleteRev, wres.Events[0].Kv.ModRevision)
-	}
-}
-
-type testWatchStruct struct {
-	obj         *example.Pod
-	expectEvent bool
-	watchType   watch.EventType
-}
-
-type testCodec struct {
-	runtime.Codec
-}
-
-func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	return nil, nil, errTestingDecode
-}
-
-func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
-	select {
-	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
-	}
-}
-
-func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	select {
-	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("#%d: event type want=%v, get=%v", i, expectEventType, res.Type)
-			return
-		}
-		if !reflect.DeepEqual(expectObj, res.Object) {
-			t.Errorf("#%d: obj want=\n%#v\nget=\n%#v", i, expectObj, res.Object)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting %v on ResultChan", i, wait.ForeverTestTimeout)
-	}
-}
-
-func testCheckStop(t *testing.T, i int, w watch.Interface) {
-	select {
-	case e, ok := <-w.ResultChan():
-		if ok {
-			var obj string
-			switch e.Object.(type) {
-			case *example.Pod:
-				obj = e.Object.(*example.Pod).Name
-			case *metav1.Status:
-				obj = e.Object.(*metav1.Status).Message
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			if scenario.enableWatchList {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 			}
-			t.Errorf("#%d: ResultChan should have been closed. Event: %s. Object: %s", i, e.Type, obj)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
+			origCtx, store, _ := testSetup(t, scenario.setupFn)
+			ctx, cancel := context.WithCancel(origCtx)
+			defer cancel()
+
+			w, err := store.watcher.Watch(ctx, "/abc", 0, scenario.requestOpts)
+			if err == nil {
+				t.Fatalf("expected an error but got none")
+			}
+			if w != nil {
+				t.Fatalf("didn't expect a watcher because the test assumes incorrect store initialisation")
+			}
+			if err.Error() != scenario.expectedErr.Error() {
+				t.Fatalf("unexpected err = %v, expected = %v", err, scenario.expectedErr)
+			}
+		})
 	}
+}
+
+func TestTooLargeResourceVersionErrorForWatchList(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
+	origCtx, store, _ := testSetup(t)
+	ctx, cancel := context.WithCancel(origCtx)
+	defer cancel()
+	requestOpts := storage.ListOptions{
+		SendInitialEvents: ptr.To(true),
+		Recursive:         true,
+		Predicate: storage.SelectionPredicate{
+			Field:               fields.Everything(),
+			Label:               labels.Everything(),
+			AllowWatchBookmarks: true,
+		},
+	}
+	var expectedErr *apierrors.StatusError
+	if !errors.As(storage.NewTooLargeResourceVersionError(uint64(102), 1, 0), &expectedErr) {
+		t.Fatalf("Unable to convert NewTooLargeResourceVersionError to apierrors.StatusError")
+	}
+
+	w, err := store.watcher.Watch(ctx, "/abc", int64(102), requestOpts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Stop()
+
+	actualEvent := <-w.ResultChan()
+	if actualEvent.Type != watch.Error {
+		t.Fatalf("Unexpected type of the event: %v, expected: %v", actualEvent.Type, watch.Error)
+	}
+	actualErr, ok := actualEvent.Object.(*metav1.Status)
+	if !ok {
+		t.Fatalf("Expected *apierrors.StatusError, got: %#v", actualEvent.Object)
+	}
+
+	if actualErr.Details.RetryAfterSeconds <= 0 {
+		t.Fatalf("RetryAfterSeconds must be > 0, actual value: %v", actualErr.Details.RetryAfterSeconds)
+	}
+	// rewrite the Details as it contains retry seconds
+	// and validate the whole struct
+	expectedErr.ErrStatus.Details = actualErr.Details
+	if diff := cmp.Diff(*actualErr, expectedErr.ErrStatus); diff != "" {
+		t.Fatalf("Unexpected error returned, diff: %v", diff)
+	}
+}
+
+func TestWatchChanSync(t *testing.T) {
+	testCases := []struct {
+		name             string
+		watchKey         string
+		watcherMaxLimit  int64
+		expectEventCount int
+		expectGetCount   int
+	}{
+		{
+			name:            "None of the current objects match watchKey: sync with empty page",
+			watchKey:        "/pods/test/",
+			watcherMaxLimit: 1,
+			expectGetCount:  1,
+		},
+		{
+			name:             "The number of current objects is less than defaultWatcherMaxLimit: sync with one page",
+			watchKey:         "/pods/",
+			watcherMaxLimit:  3,
+			expectEventCount: 2,
+			expectGetCount:   1,
+		},
+		{
+			name:             "a new item added to etcd before returning a second page is not returned: sync with two page",
+			watchKey:         "/pods/",
+			watcherMaxLimit:  1,
+			expectEventCount: 2,
+			expectGetCount:   2,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defaultWatcherMaxLimit = testCase.watcherMaxLimit
+
+			origCtx, store, _ := testSetup(t)
+			initList, err := initStoreData(origCtx, store)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			kvWrapper := newEtcdClientKVWrapper(store.client.KV)
+			kvWrapper.getReactors = append(kvWrapper.getReactors, func() {
+				barThird := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "third", Name: "bar"}}
+				podKey := fmt.Sprintf("/pods/%s/%s", barThird.Namespace, barThird.Name)
+				storedObj := &example.Pod{}
+
+				err := store.Create(context.Background(), podKey, barThird, storedObj, 0)
+				if err != nil {
+					t.Errorf("failed to create object: %v", err)
+				}
+			})
+
+			store.client.KV = kvWrapper
+
+			w := store.watcher.createWatchChan(
+				origCtx,
+				testCase.watchKey,
+				0,
+				true,
+				false,
+				storage.Everything)
+
+			err = w.sync()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// close incomingEventChan so we can read incomingEventChan non-blocking
+			close(w.incomingEventChan)
+
+			eventsReceived := 0
+			for event := range w.incomingEventChan {
+				eventsReceived++
+				storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
+			}
+
+			if eventsReceived != testCase.expectEventCount {
+				t.Errorf("Unexpected number of events: %v, expected: %v", eventsReceived, testCase.expectEventCount)
+			}
+
+			if kvWrapper.getCallCounter != testCase.expectGetCount {
+				t.Errorf("Unexpected called times of client.KV.Get() : %v, expected: %v", kvWrapper.getCallCounter, testCase.expectGetCount)
+			}
+		})
+	}
+}
+
+// NOTE: it's not thread-safe
+type etcdClientKVWrapper struct {
+	clientv3.KV
+	// keeps track of the number of times Get method is called
+	getCallCounter int
+	// getReactors is called after the etcd KV's get function is executed.
+	getReactors []func()
+}
+
+func newEtcdClientKVWrapper(kv clientv3.KV) *etcdClientKVWrapper {
+	return &etcdClientKVWrapper{
+		KV:             kv,
+		getCallCounter: 0,
+	}
+}
+
+func (ecw *etcdClientKVWrapper) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	resp, err := ecw.KV.Get(ctx, key, opts...)
+	ecw.getCallCounter++
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ecw.getReactors) > 0 {
+		reactor := ecw.getReactors[0]
+		ecw.getReactors = ecw.getReactors[1:]
+		reactor()
+	}
+
+	return resp, nil
+}
+
+func initStoreData(ctx context.Context, store storage.Interface) ([]interface{}, error) {
+	barFirst := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "first", Name: "bar"}}
+	barSecond := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "second", Name: "bar"}}
+
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: fmt.Sprintf("/pods/%s/%s", barFirst.Namespace, barFirst.Name),
+			obj: barFirst,
+		},
+		{
+			key: fmt.Sprintf("/pods/%s/%s", barSecond.Namespace, barSecond.Name),
+			obj: barSecond,
+		},
+	}
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create object: %w", err)
+		}
+	}
+
+	var created []interface{}
+	for _, item := range preset {
+		created = append(created, item.key)
+	}
+	return created, nil
 }

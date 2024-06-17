@@ -32,6 +32,12 @@ const (
 	// VSphereInTreePluginName is the name of the in-tree plugin for vSphere Volume
 	VSphereInTreePluginName = "kubernetes.io/vsphere-volume"
 
+	// vSphereCSITopologyZoneKey is the zonal topology key for vSphere CSI Driver
+	vSphereCSITopologyZoneKey = "topology.csi.vmware.com/zone"
+
+	// vSphereCSITopologyRegionKey is the region topology key for vSphere CSI Driver
+	vSphereCSITopologyRegionKey = "topology.csi.vmware.com/region"
+
 	// paramStoragePolicyName used to supply SPBM Policy name for Volume provisioning
 	paramStoragePolicyName = "storagepolicyname"
 
@@ -104,14 +110,21 @@ func (t *vSphereCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Stor
 	// When this is true, Driver returns initialvolumefilepath in the VolumeContext, which is
 	// used in TranslateCSIPVToInTree
 	params[paramcsiMigration] = "true"
-	// Note: sc.AllowedTopologies for Topology based volume provisioning will be supplied as it is.
+	// translate AllowedTopologies to vSphere CSI Driver topology
+	if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies, vSphereCSITopologyZoneKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
 	sc.Parameters = params
 	return sc, nil
 }
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with VsphereVolume set from in-tree
 // and converts the VsphereVolume source to a CSIPersistentVolumeSource
-func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *vSphereCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.VsphereVolume == nil {
 		return nil, fmt.Errorf("volume is nil or VsphereVolume not defined on volume")
 	}
@@ -154,6 +167,10 @@ func (t *vSphereCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (
 	if pv.Spec.VsphereVolume.StoragePolicyName != "" {
 		csiSource.VolumeAttributes[paramStoragePolicyName] = pv.Spec.VsphereVolume.StoragePolicyName
 	}
+	// translate in-tree topology to CSI topology for migration
+	if err := translateTopologyFromInTreevSphereToCSI(pv, vSphereCSITopologyZoneKey, vSphereCSITopologyRegionKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology: %v", err)
+	}
 	pv.Spec.VsphereVolume = nil
 	pv.Spec.CSI = csiSource
 	return pv, nil
@@ -172,6 +189,10 @@ func (t *vSphereCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (
 	volumeFilePath, ok := csiSource.VolumeAttributes[AttributeInitialVolumeFilepath]
 	if ok {
 		vsphereVirtualDiskVolumeSource.VolumePath = volumeFilePath
+	}
+	// translate CSI topology to In-tree topology for rollback compatibility.
+	if err := translateTopologyFromCSIToInTreevSphere(pv, vSphereCSITopologyZoneKey, vSphereCSITopologyRegionKey); err != nil {
+		return nil, fmt.Errorf("failed to translate topology. PV:%+v. Error:%v", *pv, err)
 	}
 	pv.Spec.CSI = nil
 	pv.Spec.VsphereVolume = vsphereVirtualDiskVolumeSource
@@ -205,4 +226,77 @@ func (t *vSphereCSITranslator) GetCSIPluginName() string {
 // vSphere volume does not need patch to help verify whether that volume is attached.
 func (t *vSphereCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
 	return volumeHandle, nil
+}
+
+// translateTopologyFromInTreevSphereToCSI converts existing zone labels or in-tree vsphere topology to
+// vSphere CSI topology.
+func translateTopologyFromInTreevSphereToCSI(pv *v1.PersistentVolume, csiTopologyKeyZone string, csiTopologyKeyRegion string) error {
+	zoneLabel, regionLabel := getTopologyLabel(pv)
+
+	// If Zone kubernetes topology exist, replace it to use csiTopologyKeyZone
+	zones := getTopologyValues(pv, zoneLabel)
+	if len(zones) > 0 {
+		replaceTopology(pv, zoneLabel, csiTopologyKeyZone)
+	} else {
+		// if nothing is in the NodeAffinity, try to fetch the topology from PV labels
+		if label, ok := pv.Labels[zoneLabel]; ok {
+			if len(label) > 0 {
+				addTopology(pv, csiTopologyKeyZone, []string{label})
+			}
+		}
+	}
+
+	// If region kubernetes topology exist, replace it to use csiTopologyKeyRegion
+	regions := getTopologyValues(pv, regionLabel)
+	if len(regions) > 0 {
+		replaceTopology(pv, regionLabel, csiTopologyKeyRegion)
+	} else {
+		// if nothing is in the NodeAffinity, try to fetch the topology from PV labels
+		if label, ok := pv.Labels[regionLabel]; ok {
+			if len(label) > 0 {
+				addTopology(pv, csiTopologyKeyRegion, []string{label})
+			}
+		}
+	}
+	return nil
+}
+
+// translateTopologyFromCSIToInTreevSphere converts CSI zone/region affinity rules to in-tree vSphere zone/region labels
+func translateTopologyFromCSIToInTreevSphere(pv *v1.PersistentVolume,
+	csiTopologyKeyZone string, csiTopologyKeyRegion string) error {
+	zoneLabel, regionLabel := getTopologyLabel(pv)
+
+	// Replace all CSI topology to Kubernetes Zone label
+	err := replaceTopology(pv, csiTopologyKeyZone, zoneLabel)
+	if err != nil {
+		return fmt.Errorf("failed to replace CSI topology to Kubernetes topology, error: %v", err)
+	}
+
+	// Replace all CSI topology to Kubernetes Region label
+	err = replaceTopology(pv, csiTopologyKeyRegion, regionLabel)
+	if err != nil {
+		return fmt.Errorf("failed to replace CSI topology to Kubernetes topology, error: %v", err)
+	}
+
+	zoneVals := getTopologyValues(pv, zoneLabel)
+	if len(zoneVals) > 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		_, zoneOK := pv.Labels[zoneLabel]
+		if !zoneOK {
+			pv.Labels[zoneLabel] = zoneVals[0]
+		}
+	}
+	regionVals := getTopologyValues(pv, regionLabel)
+	if len(regionVals) > 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		_, regionOK := pv.Labels[regionLabel]
+		if !regionOK {
+			pv.Labels[regionLabel] = regionVals[0]
+		}
+	}
+	return nil
 }

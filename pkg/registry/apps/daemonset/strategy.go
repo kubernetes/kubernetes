@@ -19,10 +19,10 @@ package daemonset
 import (
 	"context"
 
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -45,25 +45,29 @@ type daemonSetStrategy struct {
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
 var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents for extensions/v1beta1 and apps/v1beta2 for backwards compatibility,
-// and DeleteDependents for all other versions.
+// Make sure we correctly implement the interface.
+var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
+
+// DefaultGarbageCollectionPolicy returns DeleteDependents for all currently served versions.
 func (daemonSetStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
-	var groupVersion schema.GroupVersion
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
-	switch groupVersion {
-	case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-		// for back compatibility
-		return rest.OrphanDependents
-	default:
-		return rest.DeleteDependents
-	}
+	return rest.DeleteDependents
 }
 
 // NamespaceScoped returns true because all DaemonSets need to be within a namespace.
 func (daemonSetStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (daemonSetStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a daemon set before creation.
@@ -116,9 +120,14 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new daemon set.
 func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(daemonSet)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&daemonSet.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&daemonSet.Spec.Template, nil)
+	return validation.ValidateDaemonSet(daemonSet, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (daemonSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newDaemonSet := obj.(*apps.DaemonSet)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDaemonSet.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -135,9 +144,12 @@ func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
-	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet))
-	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldDaemonSet.Spec.Selector)
+
+	allErrs := validation.ValidateDaemonSet(obj.(*apps.DaemonSet), opts)
+	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet, opts)...)
 
 	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -157,6 +169,17 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return allErrs
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newDaemonSet := obj.(*apps.DaemonSet)
+	oldDaemonSet := old.(*apps.DaemonSet)
+	if newDaemonSet.Spec.TemplateGeneration != oldDaemonSet.Spec.TemplateGeneration {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	}
+	return warnings
+}
+
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.
 func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
@@ -169,6 +192,16 @@ type daemonSetStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = daemonSetStatusStrategy{Strategy}
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (daemonSetStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
+
 func (daemonSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*apps.DaemonSet)
 	oldDaemonSet := old.(*apps.DaemonSet)
@@ -177,4 +210,9 @@ func (daemonSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 
 func (daemonSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDaemonSetStatusUpdate(obj.(*apps.DaemonSet), old.(*apps.DaemonSet))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (daemonSetStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

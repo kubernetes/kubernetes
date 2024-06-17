@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestVerbsMarshalJSON(t *testing.T) {
@@ -56,10 +56,9 @@ func TestVerbsJsonIterUnmarshalJSON(t *testing.T) {
 		{`{"verbs":["delete"]}`, APIResource{Verbs: Verbs([]string{"delete"})}},
 	}
 
-	iter := json.CaseSensitiveJsonIterator()
 	for i, c := range cases {
 		var result APIResource
-		if err := iter.Unmarshal([]byte(c.input), &result); err != nil {
+		if err := utiljson.Unmarshal([]byte(c.input), &result); err != nil {
 			t.Errorf("[%d] Failed to unmarshal input '%v': %v", i, c.input, err)
 		}
 		if !reflect.DeepEqual(result, c.result) {

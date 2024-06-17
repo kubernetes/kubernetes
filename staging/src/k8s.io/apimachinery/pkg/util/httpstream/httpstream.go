@@ -17,6 +17,7 @@ limitations under the License.
 package httpstream
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,6 +79,8 @@ type Connection interface {
 	// SetIdleTimeout sets the amount of time the connection may remain idle before
 	// it is automatically closed.
 	SetIdleTimeout(timeout time.Duration)
+	// RemoveStreams can be used to remove a set of streams from the Connection.
+	RemoveStreams(streams ...Stream)
 }
 
 // Stream represents a bidirectional communications channel that is part of an
@@ -91,6 +94,26 @@ type Stream interface {
 	Headers() http.Header
 	// Identifier returns the stream's ID.
 	Identifier() uint32
+}
+
+// UpgradeFailureError encapsulates the cause for why the streaming
+// upgrade request failed. Implements error interface.
+type UpgradeFailureError struct {
+	Cause error
+}
+
+func (u *UpgradeFailureError) Error() string {
+	return fmt.Sprintf("unable to upgrade streaming request: %s", u.Cause)
+}
+
+// IsUpgradeFailure returns true if the passed error is (or wrapped error contains)
+// the UpgradeFailureError.
+func IsUpgradeFailure(err error) bool {
+	if err == nil {
+		return false
+	}
+	var upgradeErr *UpgradeFailureError
+	return errors.As(err, &upgradeErr)
 }
 
 // IsUpgradeRequest returns true if the given request is a connection upgrade request

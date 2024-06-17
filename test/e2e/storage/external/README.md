@@ -7,7 +7,7 @@ filename can be absolute or relative to `--repo-root`. The content of
 the file is used to populate a struct that defines how to test the
 driver. For a full definition of the content see:
 - `struct driverDefinition` in [external.go](./external.go)
-- `struct TestDriver` and the `Cap` capability constants in [testdriver.go](../testsuites/testdriver.go)
+- `struct TestDriver` and the `Cap` capability constants in [testdriver.go](../framework/testdriver.go)
 
 Here is a minimal example for the CSI hostpath driver:
 
@@ -34,9 +34,9 @@ are added for that driver with `External Storage [Driver: <Name>]` as
 prefix.
 
 To run just those tests for the example above, put that content into
-`/tmp/hostpath-testdriver.yaml`, ensure `e2e.test` is in your PATH or current directory (downloaded from a test tarball like https://storage.googleapis.com/kubernetes-release/release/v1.14.0/kubernetes-test-linux-amd64.tar.gz or built via `make WHAT=test/e2e/e2e.test`), and invoke:
+`/tmp/hostpath-testdriver.yaml`, ensure `e2e.test` is in your PATH or current directory (downloaded from a test tarball like https://dl.k8s.io/release/v1.14.0/kubernetes-test-linux-amd64.tar.gz or built via `make WHAT=test/e2e/e2e.test`), and invoke:
 
-    ginkgo -p -focus='External.Storage.*csi-hostpath' \
+    ginkgo -p -focus='External.Storage.*hostpath.csi.k8s.io' \
            -skip='\[Feature:|\[Disruptive\]' \
            e2e.test \
            -- \
@@ -46,7 +46,7 @@ This disables tests which depend on optional features. Those tests
 must be run by selecting them explicitly in an environment that
 supports them, for example snapshotting:
 
-    ginkgo -p -focus='External.Storage.*csi-hostpath.*\[Feature:VolumeSnapshotDataSource\]' \
+    ginkgo -p -focus='External.Storage.*hostpath.csi.k8s.io.*\[Feature:VolumeSnapshotDataSource\]' \
            -skip='\[Disruptive\]' \
            e2e.test \
            -- \

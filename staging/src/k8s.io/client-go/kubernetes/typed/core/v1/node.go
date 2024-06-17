@@ -20,14 +20,20 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
+	consistencydetector "k8s.io/client-go/util/consistencydetector"
+	watchlist "k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 // NodesGetter has a method to return a NodeInterface.
@@ -47,6 +53,8 @@ type NodeInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.NodeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Node, err error)
+	Apply(ctx context.Context, node *corev1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error)
+	ApplyStatus(ctx context.Context, node *corev1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error)
 	NodeExpansion
 }
 
@@ -75,7 +83,26 @@ func (c *nodes) Get(ctx context.Context, name string, options metav1.GetOptions)
 }
 
 // List takes label and field selectors, and returns the list of Nodes that match those selectors.
-func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.NodeList, err error) {
+func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (*v1.NodeList, error) {
+	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
+		klog.Warningf("Failed preparing watchlist options for nodes, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+	} else if hasWatchListOptionsPrepared {
+		result, err := c.watchList(ctx, watchListOptions)
+		if err == nil {
+			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for nodes", c.list, opts, result)
+			return result, nil
+		}
+		klog.Warningf("The watchlist request for nodes ended with an error, falling back to the standard LIST semantics, err = %v", err)
+	}
+	result, err := c.list(ctx, opts)
+	if err == nil {
+		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for nodes", c.list, opts, result)
+	}
+	return result, err
+}
+
+// list takes label and field selectors, and returns the list of Nodes that match those selectors.
+func (c *nodes) list(ctx context.Context, opts metav1.ListOptions) (result *v1.NodeList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -86,6 +113,22 @@ func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.N
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
 		Do(ctx).
+		Into(result)
+	return
+}
+
+// watchList establishes a watch stream with the server and returns the list of Nodes
+func (c *nodes) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.NodeList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+	result = &v1.NodeList{}
+	err = c.client.Get().
+		Resource("nodes").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
+		WatchList(ctx).
 		Into(result)
 	return
 }
@@ -177,6 +220,60 @@ func (c *nodes) Patch(ctx context.Context, name string, pt types.PatchType, data
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied node.
+func (c *nodes) Apply(ctx context.Context, node *corev1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error) {
+	if node == nil {
+		return nil, fmt.Errorf("node provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("node.Name must be provided to Apply")
+	}
+	result = &v1.Node{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("nodes").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *nodes) ApplyStatus(ctx context.Context, node *corev1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error) {
+	if node == nil {
+		return nil, fmt.Errorf("node provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(node)
+	if err != nil {
+		return nil, err
+	}
+
+	name := node.Name
+	if name == nil {
+		return nil, fmt.Errorf("node.Name must be provided to Apply")
+	}
+
+	result = &v1.Node{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Resource("nodes").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)

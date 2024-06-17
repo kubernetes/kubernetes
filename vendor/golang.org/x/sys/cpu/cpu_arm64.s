@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !gccgo
+//go:build gc
 
 #include "textflag.h"
 
@@ -27,5 +27,13 @@ TEXT ·getpfr0(SB),NOSPLIT,$0-8
 	// get Processor Feature Register 0 into x0
 	// mrs x0, ID_AA64PFR0_EL1 = d5380400
 	WORD	$0xd5380400
+	MOVD	R0, ret+0(FP)
+	RET
+
+// func getzfr0() uint64
+TEXT ·getzfr0(SB),NOSPLIT,$0-8
+	// get SVE Feature Register 0 into x0
+	// mrs	x0, ID_AA64ZFR0_EL1 = d5380480
+	WORD $0xd5380480
 	MOVD	R0, ret+0(FP)
 	RET

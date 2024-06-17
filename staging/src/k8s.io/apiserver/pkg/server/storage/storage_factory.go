@@ -19,18 +19,14 @@ package storage
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 	"strings"
-
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/apiserver/pkg/storage/value"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 )
 
 // Backend describes the storage servers, the information here should be enough
@@ -46,15 +42,19 @@ type Backend struct {
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
-	NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error)
+	NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error)
 
 	// ResourcePrefix returns the overridden resource prefix for the GroupResource
 	// This allows for cohabitation of resources with different native types and provides
 	// centralized control over the shape of etcd directories
 	ResourcePrefix(groupResource schema.GroupResource) string
 
+	// Configs gets configurations for all of registered storage destinations.
+	Configs() []storagebackend.Config
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
+	// Deprecated: Use Configs instead
 	Backends() []Backend
 }
 
@@ -112,10 +112,6 @@ type groupResourceOverrides struct {
 	// decoderDecoratorFn is optional and may wrap the provided decoders (can add new decoders). The order of
 	// returned decoders will be priority for attempt to decode.
 	decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
-	// transformer is optional and shall encrypt that resource at rest.
-	transformer value.Transformer
-	// disablePaging will prevent paging on the provided resource.
-	disablePaging bool
 }
 
 // Apply overrides the provided config and options if the override has a value in that position
@@ -139,12 +135,6 @@ func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *St
 	if o.decoderDecoratorFn != nil {
 		options.DecoderDecoratorFn = o.decoderDecoratorFn
 	}
-	if o.transformer != nil {
-		config.Transformer = o.transformer
-	}
-	if o.disablePaging {
-		config.Paging = false
-	}
 }
 
 var _ StorageFactory = &DefaultStorageFactory{}
@@ -159,7 +149,6 @@ func NewDefaultStorageFactory(
 	resourceConfig APIResourceConfigSource,
 	specialDefaultResourcePrefixes map[schema.GroupResource]string,
 ) *DefaultStorageFactory {
-	config.Paging = utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	if len(defaultMediaType) == 0 {
 		defaultMediaType = runtime.ContentTypeJSON
 	}
@@ -188,14 +177,6 @@ func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource schema.GroupResource
 	s.Overrides[groupResource] = overrides
 }
 
-// SetDisableAPIListChunking allows a specific resource to disable paging at the storage layer, to prevent
-// exposure of key names in continuations. This may be overridden by feature gates.
-func (s *DefaultStorageFactory) SetDisableAPIListChunking(groupResource schema.GroupResource) {
-	overrides := s.Overrides[groupResource]
-	overrides.disablePaging = true
-	s.Overrides[groupResource] = overrides
-}
-
 // SetResourceEtcdPrefix sets the prefix for a resource, but not the base-dir.  You'll end up in `etcdPrefix/resourceEtcdPrefix`.
 func (s *DefaultStorageFactory) SetResourceEtcdPrefix(groupResource schema.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
@@ -207,12 +188,6 @@ func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource
 	overrides := s.Overrides[groupResource]
 	overrides.mediaType = mediaType
 	overrides.serializer = serializer
-	s.Overrides[groupResource] = overrides
-}
-
-func (s *DefaultStorageFactory) SetTransformer(groupResource schema.GroupResource, transformer value.Transformer) {
-	overrides := s.Overrides[groupResource]
-	overrides.transformer = transformer
 	s.Overrides[groupResource] = overrides
 }
 
@@ -240,7 +215,8 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
+		// TODO deads2k or liggitt determine if have ever stored any of our cohabitating resources in a different location on new clusters
+		if s.APIResourceConfigSource.AnyResourceForGroupEnabled(potentialStorageResource.Group) {
 			return potentialStorageResource
 		}
 	}
@@ -250,7 +226,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.Gro
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
@@ -284,31 +260,68 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 	klog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
 
-	return &storageConfig, nil
+	return storageConfig.ForResource(groupResource), nil
+}
+
+// Configs implements StorageFactory.
+func (s *DefaultStorageFactory) Configs() []storagebackend.Config {
+	return configs(s.StorageConfig, s.Overrides)
+}
+
+// Configs gets configurations for all of registered storage destinations.
+func Configs(storageConfig storagebackend.Config) []storagebackend.Config {
+	return configs(storageConfig, nil)
+}
+
+// Returns all storage configurations including those for group resource overrides
+func configs(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []storagebackend.Config {
+	configs := []storagebackend.Config{storageConfig}
+
+	for _, override := range grOverrides {
+		if len(override.etcdLocation) == 0 {
+			continue
+		}
+		// copy
+		newConfig := storageConfig
+		override.Apply(&newConfig, &StorageCodecConfig{})
+		newConfig.Transport.ServerList = override.etcdLocation
+		configs = append(configs, newConfig)
+	}
+	return configs
+}
+
+// Backends implements StorageFactory.
+func (s *DefaultStorageFactory) Backends() []Backend {
+	return backends(s.StorageConfig, s.Overrides)
 }
 
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
-func (s *DefaultStorageFactory) Backends() []Backend {
-	servers := sets.NewString(s.StorageConfig.Transport.ServerList...)
+// Deprecated: Validate health by passing storagebackend.Config directly to storagefactory.CreateProber.
+func Backends(storageConfig storagebackend.Config) []Backend {
+	return backends(storageConfig, nil)
+}
 
-	for _, overrides := range s.Overrides {
+func backends(storageConfig storagebackend.Config, grOverrides map[schema.GroupResource]groupResourceOverrides) []Backend {
+	servers := sets.NewString(storageConfig.Transport.ServerList...)
+
+	for _, overrides := range grOverrides {
 		servers.Insert(overrides.etcdLocation...)
 	}
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	if len(s.StorageConfig.Transport.CertFile) > 0 && len(s.StorageConfig.Transport.KeyFile) > 0 {
-		cert, err := tls.LoadX509KeyPair(s.StorageConfig.Transport.CertFile, s.StorageConfig.Transport.KeyFile)
+	if len(storageConfig.Transport.CertFile) > 0 && len(storageConfig.Transport.KeyFile) > 0 {
+		cert, err := tls.LoadX509KeyPair(storageConfig.Transport.CertFile, storageConfig.Transport.KeyFile)
 		if err != nil {
 			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.Transport.TrustedCAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.TrustedCAFile); err != nil {
+	if len(storageConfig.Transport.TrustedCAFile) > 0 {
+		if caCert, err := os.ReadFile(storageConfig.Transport.TrustedCAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()
@@ -323,7 +336,7 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 		backends = append(backends, Backend{
 			Server: server,
 			// We can't share TLSConfig across different backends to avoid races.
-			// For more details see: http://pr.k8s.io/59338
+			// For more details see: https://pr.k8s.io/59338
 			TLSConfig: tlsConfig.Clone(),
 		})
 	}

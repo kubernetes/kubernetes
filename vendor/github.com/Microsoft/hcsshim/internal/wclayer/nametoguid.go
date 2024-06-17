@@ -14,7 +14,7 @@ import (
 // across all clients.
 func NameToGuid(ctx context.Context, name string) (_ guid.GUID, err error) {
 	title := "hcsshim::NameToGuid"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("name", name))
