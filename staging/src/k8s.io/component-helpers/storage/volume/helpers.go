@@ -71,10 +71,11 @@ func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) er
 }
 
 func CheckCSINodeDriverAffinity(csiNode *storageV1.CSINode, pv *v1.PersistentVolume) error {
-	err := fmt.Errorf("no matching CSI node driver")
 	if pv.Spec.CSI == nil {
 		return nil
 	}
+
+	err := fmt.Errorf("no matching CSI node driver")
 	if csiNode == nil || len(csiNode.Spec.Drivers) == 0 {
 		return fmt.Errorf("%s, csinode is empty or csinode drivers is empty", err.Error())
 	}
