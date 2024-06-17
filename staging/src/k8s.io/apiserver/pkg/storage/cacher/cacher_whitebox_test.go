@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
@@ -221,6 +222,15 @@ func TestGetListCacheBypass(t *testing.T) {
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+
+		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
+		//
+		// If you were to run only TestGetListCacheBypass you would see that the test fail.
+		// However in CI all test are run and there must be a test(s) that properly
+		// initialize the storage layer so that the mentioned method evaluates to true
+		forceRequestWatchProgressSupport(t)
+
 		testCases := append(commonTestCases,
 			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
 		)
@@ -1741,6 +1751,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchList, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	forceRequestWatchProgressSupport(t)
 
 	scenarios := []struct {
 		name               string
@@ -2582,5 +2593,24 @@ func watchAndWaitForBookmark(t *testing.T, ctx context.Context, etcdStorage stor
 			t.Fatal(err)
 		}
 		return rv
+	}
+}
+
+// TODO(p0lyn0mial): forceRequestWatchProgressSupport inits the storage layer
+// so that tests that require storage.RequestWatchProgress pass
+//
+// In the future we could have a function that would allow for setting the feature
+// only for duration of a test.
+func forceRequestWatchProgressSupport(t *testing.T) {
+	if etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress) {
+		return
+	}
+
+	server, _ := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
+		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil
+	}); err != nil {
+		t.Fatalf("failed to wait for required %v storage feature to initialize", storage.RequestWatchProgress)
 	}
 }
