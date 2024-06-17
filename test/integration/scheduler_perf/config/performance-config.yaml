@@ -1075,3 +1075,29 @@
       gatedPods: 10000
       deletingPods: 20000
       measurePods: 20000
+
+- name: SchedulingGatedPodsWithPodAffinityImpactForThroughput
+  defaultPodTemplatePath: config/templates/pod-with-label.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: config/templates/node-with-name.yaml
+  - opcode: createPods
+    countParam: $gatedPods
+    podTemplatePath: config/templates/gated-pod-with-pod-affinity.yaml
+    skipWaitToCompletion: true
+  - opcode: sleep
+    # To produce a stable scheduler_perf result, here we make sure all gated Pods are stored in the scheduling queue.
+    duration: 5s
+  - opcode: createPods
+    # The scheduling of those Pods will result in many cluster events (AssignedPodAdded)
+    # and each of them will be processed by the scheduling queue.
+    # But, the scheduling throughput should only be minimally impacted by the number of gated Pods.
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 1000Node
+    labels: [performance, fast]
+    params:
+      gatedPods: 10000
+      measurePods: 20000
