@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/util/retry"
 	"sort"
 	"strings"
 	"time"
@@ -480,15 +481,14 @@ func (b *volumeBinder) AssumePodVolumes(logger klog.Logger, assumedPod *v1.Pod, 
 	// Assume PVCs
 	newProvisionedPVCs := []*v1.PersistentVolumeClaim{}
 	for _, claim := range podVolumes.DynamicProvisions {
-		// The claims from method args can be pointing to watcher cache. We must not
-		// modify these, therefore create a copy.
-		claimClone := claim.DeepCopy()
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, volume.AnnSelectedNode, nodeName)
-		err = b.pvcCache.Assume(claimClone)
-		if err != nil {
-			b.revertAssumedPVs(newBindings)
-			b.revertAssumedPVCs(newProvisionedPVCs)
-			return
+		claimClone, dirty := annotateClaimWithNodeName(claim, nodeName)
+		if dirty {
+			err = b.pvcCache.Assume(claimClone)
+			if err != nil {
+				b.revertAssumedPVs(newBindings)
+				b.revertAssumedPVCs(newProvisionedPVCs)
+				return
+			}
 		}
 
 		newProvisionedPVCs = append(newProvisionedPVCs, claimClone)
@@ -497,6 +497,24 @@ func (b *volumeBinder) AssumePodVolumes(logger klog.Logger, assumedPod *v1.Pod, 
 	podVolumes.StaticBindings = newBindings
 	podVolumes.DynamicProvisions = newProvisionedPVCs
 	return
+}
+
+// annotateClaimWithNodeName annotates pvc with specified nodeName. If pvc already annotated with same nodeName,
+// it will return <nil, false> to indicate this pvc is clean. Others, pvc will be deep copied and annotated
+// with this nodeName, then return <deepCopiedPVC, true>.
+func annotateClaimWithNodeName(claim *v1.PersistentVolumeClaim, nodeName string) (*v1.PersistentVolumeClaim, bool) {
+
+	selectedNodeName, ok := claim.Annotations[volume.AnnSelectedNode]
+	if ok && selectedNodeName == nodeName {
+		return nil, false
+	}
+
+	// The claims from method args can be pointing to watcher cache. We must not
+	// modify these, therefore create a copy.
+	claimClone := claim.DeepCopy()
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, volume.AnnSelectedNode, nodeName)
+
+	return claimClone, true
 }
 
 // RevertAssumedPodVolumes will revert assumed PV and PVC cache.
@@ -580,7 +598,7 @@ func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings 
 	for _, binding = range bindings {
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
 		logger.V(5).Info("Updating PersistentVolume: binding to claim", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
-		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
+		newPV, err := b.retryableUpdatePV(ctx, binding)
 		if err != nil {
 			logger.V(4).Info("Updating PersistentVolume: binding to claim failed", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
 			return err
@@ -596,7 +614,7 @@ func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings 
 	// PV controller is expected to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		logger.V(5).Info("Updating claims objects to trigger volume provisioning", "pod", klog.KObj(pod), "PVC", klog.KObj(claim))
-		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+		newClaim, err := b.retryableUpdatePVC(ctx, claim, pod.Spec.NodeName)
 		if err != nil {
 			logger.V(4).Info("Updating PersistentVolumeClaim: binding to volume failed", "PVC", klog.KObj(claim), "err", err)
 			return err
@@ -608,6 +626,89 @@ func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings 
 	}
 
 	return nil
+}
+
+// retryableUpdatePV will retry updating pv when any conflicts occur.
+func (b *volumeBinder) retryableUpdatePV(ctx context.Context, binding *BindingInfo) (latestAPIPV *v1.PersistentVolume, err error) {
+	logger := klog.FromContext(ctx)
+
+	// Updating binding.pv directly to maintain the same approach as before.
+	latestAPIPV, err = b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
+	if err == nil {
+		// This will success for most cases.
+		return
+	}
+	if !apierrors.IsConflict(err) {
+		return
+	}
+
+	logger.V(10).Info("Binding pv to pvc conflicted, will retry", "pv", binding.pv.Name, "pvc", klog.KObj(binding.pvc))
+
+	// Retry updating pv for conflict scenario.
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+
+		apiPV, err := b.pvCache.GetAPIPV(binding.pv.Name) // pv & pvc in binding must not nil.
+		if err != nil {
+			return err
+		}
+
+		apiPVClone, dirty, err := volume.GetBindVolumeToClaim(apiPV, binding.pvc)
+		if err != nil {
+			return err
+		}
+
+		if !dirty {
+			// apiPV already bound to binding.pvc, so nothing need to update.
+			return nil
+		}
+
+		latestAPIPV, err = b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, apiPVClone, metav1.UpdateOptions{})
+		return err
+	})
+
+	return
+}
+
+// retryableUpdatePVC will retry annotating pvc with nodeName when any conflicts occur. For more detail: see https://github.com/kubernetes/kubernetes/issues/125338.
+func (b *volumeBinder) retryableUpdatePVC(ctx context.Context, pvc *v1.PersistentVolumeClaim, nodeName string) (latestAPIClaim *v1.PersistentVolumeClaim, err error) {
+	logger := klog.FromContext(ctx)
+
+	// Updating pvc directly to maintain the same approach as before. Note: this pvc already deep copied.
+	latestAPIClaim, err = b.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, metav1.UpdateOptions{})
+	if err == nil {
+		// This will success for most cases.
+		return
+	}
+	if !apierrors.IsConflict(err) {
+		return
+	}
+
+	logger.V(10).Info("Annotating pvc with nodeName conflicted, will retry", "pvc", klog.KObj(pvc), "nodeName", nodeName)
+
+	// Retry updating pvc for conflict scenario.
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+
+		apiClaim, err := b.pvcCache.GetAPIPVC(getPVCName(pvc))
+		if err != nil {
+			return err
+		}
+
+		apiClaimClone, dirty := annotateClaimWithNodeName(apiClaim, nodeName)
+
+		if !dirty {
+			// Claim already annotated with this nodeName, so nothing need to update.
+			return nil
+		}
+
+		latestAPIClaim, err = b.kubeClient.CoreV1().PersistentVolumeClaims(apiClaimClone.Namespace).Update(ctx, apiClaimClone, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return latestAPIClaim, err
 }
 
 var (
