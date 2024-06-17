@@ -177,6 +177,10 @@ users:
 		}
 		t.Log("serverTimeout", sar)
 		time.Sleep(2 * time.Second)
+		sar.Status.Reason = "no opinion"
+		if err := json.NewEncoder(w).Encode(sar); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer serverTimeout.Close()
 	serverTimeoutKubeconfigName := filepath.Join(dir, "serverTimeout.yaml")
@@ -331,6 +335,13 @@ users:
 
 		assertCount(errorName, c.errorCount, &serverErrorCalled)
 		assertCount(timeoutName, c.timeoutCount, &serverTimeoutCalled)
+		expectedTimeoutCounts := map[string]int{}
+		if c.timeoutCount > 0 {
+			expectedTimeoutCounts[timeoutName] = int(c.timeoutCount)
+		}
+		if !reflect.DeepEqual(expectedTimeoutCounts, metrics.whTimeoutTotal) {
+			t.Fatalf("expected timeouts %#v, got %#v", expectedTimeoutCounts, metrics.whTimeoutTotal)
+		}
 		assertCount(denyName, c.denyCount, &serverDenyCalled)
 		if e, a := c.denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
 			t.Fatalf("expected deny webhook denied metrics calls: %d, got %d", e, a)
@@ -770,6 +781,7 @@ type metrics struct {
 	evalErrors    int
 
 	whTotal         map[string]int
+	whTimeoutTotal  map[string]int
 	whFailOpenTotal map[string]int
 	whDurationCount map[string]int
 }
@@ -803,6 +815,7 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 	var m metrics
 
 	m.whTotal = map[string]int{}
+	m.whTimeoutTotal = map[string]int{}
 	m.whFailOpenTotal = map[string]int{}
 	m.whDurationCount = map[string]int{}
 	m.exclusions = 0
@@ -849,6 +862,9 @@ func getMetrics(t *testing.T, client *clientset.Clientset) (*metrics, error) {
 			}
 			t.Log(count)
 			m.whTotal[matches[1]] += count
+			if matches[2] == "timeout" {
+				m.whTimeoutTotal[matches[1]] += count
+			}
 		}
 		if matches := webhookDurationMetric.FindStringSubmatch(line); matches != nil {
 			t.Log(matches)
