@@ -295,7 +295,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
 	}
 	path = evaluated
-	f, err := os.Open(path)
+	f, err := openFileShareDelete(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
@@ -364,7 +364,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 					return err
 				}
 				if recreated {
-					newF, err := os.Open(path)
+					newF, err := openFileShareDelete(path)
 					if err != nil {
 						if os.IsNotExist(err) {
 							continue
