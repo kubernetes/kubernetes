@@ -53,8 +53,14 @@ func TestDoProbe(t *testing.T) {
 		}
 		otherStatus := getTestRunningStatusWithStarted(probeType != startup)
 		otherStatus.ContainerStatuses[0].Name = "otherContainer"
+
+		failedButRunningStatus := getTestRunningStatusWithStarted(probeType != startup)
+		failedButRunningStatus.Phase = v1.PodFailed
+
 		failedStatus := getTestRunningStatusWithStarted(probeType != startup)
 		failedStatus.Phase = v1.PodFailed
+		failedStatus.ContainerStatuses[0].State.Running = nil
+		failedStatus.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{ExitCode: 1}
 
 		tests := []struct {
 			probe                v1.Probe
@@ -71,8 +77,25 @@ func TestDoProbe(t *testing.T) {
 					startup.String():   true,
 				},
 			},
-			{ // Pod failed
+			{ // Pod failed and containers running
+				podStatus: &failedButRunningStatus,
+				expectSet: true,
+				expectContinue: map[string]bool{
+					liveness.String():  true,
+					readiness.String(): true,
+					startup.String():   true,
+				},
+				expectedResult: results.Success,
+			},
+			{ // Pod failed and containers exited
 				podStatus: &failedStatus,
+				expectSet: true,
+				expectContinue: map[string]bool{
+					liveness.String():  false,
+					readiness.String(): false,
+					startup.String():   false,
+				},
+				expectedResult: results.Failure,
 			},
 			{ // Pod deletion
 				podStatus:            &runningStatus,

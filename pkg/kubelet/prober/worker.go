@@ -207,13 +207,6 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		return true
 	}
 
-	// Worker should terminate if pod is terminated.
-	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		klog.V(3).InfoS("Pod is terminated, exiting probe worker",
-			"pod", klog.KObj(w.pod), "phase", status.Phase)
-		return false
-	}
-
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		c, ok = podutil.GetContainerStatus(status.InitContainerStatuses, w.container.Name)
