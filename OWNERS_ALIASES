@@ -297,9 +297,8 @@ aliases:
   # - tnozicka
 
   sig-autoscaling-maintainers:
-    - bskiba
+    - gjtempleton
     - MaciekPytel
-    - mwielgus
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -504,6 +503,7 @@ aliases:
     - eddiezane # CLI
     - ehashman # Instrumentation
     - enj # Auth
+    - gjtempleton # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
     - jpbetz # API Machinery
@@ -514,11 +514,11 @@ aliases:
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
+    - maciekpytel # Autoscaling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
-    - mwielgus # Autoscaling
     - rexagod # Instrumentation
     - saad-ali # Storage
     - sergeykanzhelev # Node
