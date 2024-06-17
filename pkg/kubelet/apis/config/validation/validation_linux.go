@@ -1,8 +1,8 @@
-//go:build !windows && !linux
-// +build !windows,!linux
+//go:build linux
+// +build linux
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,10 +20,17 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
 func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) error {
+	if kc.FailCgroupV1 && !libcontainercgroups.IsCgroup2UnifiedMode() {
+		return fmt.Errorf("kubelet is configured to not run on a host using cgroup v1. cgroup v1 support is in maintenance mode")
+	}
+
 	return nil
 }
