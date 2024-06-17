@@ -1254,7 +1254,7 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job
 		*oldCounters = jobCtx.job.Status
 		needsFlush = false
 	}
-	recordJobPodFailurePolicyActions(jobCtx.job, podFailureCountByPolicyAction)
+	recordJobPodFailurePolicyActions(podFailureCountByPolicyAction)
 
 	jobKey, err := controller.KeyFunc(jobCtx.job)
 	if err != nil {
@@ -1935,7 +1935,7 @@ func backoffLimitMetricsLabel(job *batch.Job) string {
 	return "global"
 }
 
-func recordJobPodFailurePolicyActions(job *batch.Job, podFailureCountByPolicyAction map[string]int) {
+func recordJobPodFailurePolicyActions(podFailureCountByPolicyAction map[string]int) {
 	for action, count := range podFailureCountByPolicyAction {
 		metrics.PodFailuresHandledByFailurePolicy.WithLabelValues(action).Add(float64(count))
 	}
