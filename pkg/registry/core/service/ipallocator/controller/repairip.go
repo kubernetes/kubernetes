@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/servicecidr"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
@@ -200,6 +201,20 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 	defer klog.Info("Shutting down ipallocator-repair-controller")
 
 	if !cache.WaitForNamedCacheSync("ipallocator-repair-controller", stopCh, r.ipAddressSynced, r.servicesSynced, r.serviceCIDRSynced) {
+		return
+	}
+
+	// wait for the default ServiceCIDR
+	ctx := wait.ContextForChannel(stopCh)
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(context.Context) (bool, error) {
+		_, err := r.serviceCIDRLister.Get(defaultservicecidr.DefaultServiceCIDRName)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		runtime.HandleError(err)
 		return
 	}
 
