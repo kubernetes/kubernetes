@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -1234,12 +1235,24 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 // getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
 // any affinity term that matches "pod".
+//
+// This function is supposed to get called when AssignedPodAdded or AssignedPodUpdated happen
+// so that we can reduce the number of pods evaluated in a further process.
+// We know it depends on the logic of InterPodAffinity plugin, which is not ideal since the scheduling queue should be pure,
+// and after all QueueingHint work finishes, we'll cleanup this function along with PreEnqueueCheck.
+//
 // NOTE: this function assumes lock has been acquired in caller.
 func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
 	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(logger, pod.Namespace, p.nsLister)
 
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
+		if pInfo.Gated && pInfo.UnschedulablePlugins.Has(names.SchedulingGates) {
+			// Pods gated by scheduling gates are not moved to activeQ or backoffQ with this event for sure.
+			// So, we skip them here so that they wouldn't go through the expensive PodAffinity check below.
+			continue
+		}
+
 		for _, term := range pInfo.RequiredAffinityTerms {
 			if term.Matches(pod, nsLabels) {
 				podsToMove = append(podsToMove, pInfo)
