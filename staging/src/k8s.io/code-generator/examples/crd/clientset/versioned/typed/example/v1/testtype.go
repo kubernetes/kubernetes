@@ -55,6 +55,8 @@ type TestTypeInterface interface {
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TestType, err error)
 	Apply(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
 	ApplyStatus(ctx context.Context, testType *examplev1.TestTypeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TestType, err error)
+	GetClusterTestType(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TestType, error)
+
 	TestTypeExpansion
 }
 
