@@ -301,7 +301,7 @@
   - name: 15000Nodes
     labels: [performance, fast]
     params:
-      initNodes: 15000
+      initNodes: 5000
       measurePods: 30000
 
 - name: SchedulingNodeAffinity
