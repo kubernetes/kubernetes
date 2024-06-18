@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/go-cmp/cmp"
@@ -54,7 +55,14 @@ type ExamplePlugin struct {
 	prepared       map[ClaimID]any
 	gRPCCalls      []GRPCCall
 
-	block bool
+	blockPrepareResourcesMutex   sync.Mutex
+	blockUnprepareResourcesMutex sync.Mutex
+
+	prepareResourcesFailure   error
+	failPrepareResourcesMutex sync.Mutex
+
+	unprepareResourcesFailure   error
+	failUnprepareResourcesMutex sync.Mutex
 }
 
 type GRPCCall struct {
@@ -162,10 +170,60 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
-// Block sets a flag to block Node[Un]PrepareResources
-// to emulate time consuming or stuck calls
-func (ex *ExamplePlugin) Block() {
-	ex.block = true
+// BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockNodePrepareResources() func() {
+	ex.blockPrepareResourcesMutex.Lock()
+	return func() {
+		ex.blockPrepareResourcesMutex.Unlock()
+	}
+}
+
+// BlockNodeUnprepareResources locks blockUnprepareResourcesMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockNodeUnprepareResources() func() {
+	ex.blockUnprepareResourcesMutex.Lock()
+	return func() {
+		ex.blockUnprepareResourcesMutex.Unlock()
+	}
+}
+
+// SetNodePrepareResourcesFailureMode sets the failure mode for NodePrepareResources call
+// and returns a function to unset the failure mode
+func (ex *ExamplePlugin) SetNodePrepareResourcesFailureMode() func() {
+	ex.failPrepareResourcesMutex.Lock()
+	ex.prepareResourcesFailure = errors.New("simulated PrepareResources failure")
+	ex.failPrepareResourcesMutex.Unlock()
+
+	return func() {
+		ex.failPrepareResourcesMutex.Lock()
+		ex.prepareResourcesFailure = nil
+		ex.failPrepareResourcesMutex.Unlock()
+	}
+}
+
+func (ex *ExamplePlugin) getPrepareResourcesFailure() error {
+	ex.failPrepareResourcesMutex.Lock()
+	defer ex.failPrepareResourcesMutex.Unlock()
+	return ex.prepareResourcesFailure
+}
+
+// SetNodeUnprepareResourcesFailureMode sets the failure mode for NodeUnprepareResources call
+// and returns a function to unset the failure mode
+func (ex *ExamplePlugin) SetNodeUnprepareResourcesFailureMode() func() {
+	ex.failUnprepareResourcesMutex.Lock()
+	ex.unprepareResourcesFailure = errors.New("simulated UnprepareResources failure")
+	ex.failUnprepareResourcesMutex.Unlock()
+
+	return func() {
+		ex.failUnprepareResourcesMutex.Lock()
+		ex.unprepareResourcesFailure = nil
+		ex.failUnprepareResourcesMutex.Unlock()
+	}
+}
+
+func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
+	ex.failUnprepareResourcesMutex.Lock()
+	defer ex.failUnprepareResourcesMutex.Unlock()
+	return ex.unprepareResourcesFailure
 }
 
 // NodePrepareResource ensures that the CDI file for the claim exists. It uses
@@ -175,15 +233,10 @@ func (ex *ExamplePlugin) Block() {
 func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) ([]string, error) {
 	logger := klog.FromContext(ctx)
 
-	// Block to emulate plugin stuckness or slowness.
-	// By default the call will not be blocked as ex.block = false.
-	if ex.block {
-		<-ctx.Done()
-		return nil, ctx.Err()
-	}
-
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
+	ex.blockPrepareResourcesMutex.Lock()
+	defer ex.blockPrepareResourcesMutex.Unlock()
 
 	deviceName := "claim-" + claimUID
 	vendor := ex.driverName
@@ -309,6 +362,11 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 	resp := &drapbv1alpha3.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodePrepareResourceResponse),
 	}
+
+	if failure := ex.getPrepareResourcesFailure(); failure != nil {
+		return resp, failure
+	}
+
 	for _, claimReq := range req.Claims {
 		cdiDevices, err := ex.nodePrepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
 		if err != nil {
@@ -328,14 +386,10 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapbv1a
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
 func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimName string, claimUID string, resourceHandle string, structuredResourceHandle []*resourceapi.StructuredResourceHandle) error {
-	logger := klog.FromContext(ctx)
+	ex.blockUnprepareResourcesMutex.Lock()
+	defer ex.blockUnprepareResourcesMutex.Unlock()
 
-	// Block to emulate plugin stuckness or slowness.
-	// By default the call will not be blocked as ex.block = false.
-	if ex.block {
-		<-ctx.Done()
-		return ctx.Err()
-	}
+	logger := klog.FromContext(ctx)
 
 	filePath := ex.getJSONFilePath(claimUID)
 	if err := ex.fileOps.Remove(filePath); err != nil {
@@ -381,6 +435,11 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapbv
 	resp := &drapbv1alpha3.NodeUnprepareResourcesResponse{
 		Claims: make(map[string]*drapbv1alpha3.NodeUnprepareResourceResponse),
 	}
+
+	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
+		return resp, failure
+	}
+
 	for _, claimReq := range req.Claims {
 		err := ex.nodeUnprepareResource(ctx, claimReq.Name, claimReq.Uid, claimReq.ResourceHandle, claimReq.StructuredResourceHandle)
 		if err != nil {
@@ -486,4 +545,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	calls := make([]GRPCCall, 0, len(ex.gRPCCalls))
 	calls = append(calls, ex.gRPCCalls...)
 	return calls
+}
+
+// CountCalls counts GRPC calls with the given method suffix.
+func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
+	count := 0
+	for _, call := range ex.GetGRPCCalls() {
+		if strings.HasSuffix(call.FullMethod, methodSuffix) {
+			count += 1
+		}
+	}
+	return count
 }
