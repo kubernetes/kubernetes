@@ -1029,6 +1029,18 @@ authentication:
   x509:
     clientCAFile: /etc/srv/kubernetes/pki/ca-certificates.crt
 EOF
+
+  if [[ -n "${SHUTDOWN_GRACE_PERIOD:-}" ]]; then
+  cat <<EOF
+shutdownGracePeriod: ${SHUTDOWN_GRACE_PERIOD}
+EOF
+  fi
+
+  if [[ -n "${SHUTDOWN_GRACE_PERIOD_CRITICAL_PODS:-}" ]]; then
+  cat <<EOF
+shutdownGracePeriodCriticalPods: ${SHUTDOWN_GRACE_PERIOD_CRITICAL_PODS}
+EOF
+  fi
 }
 
 # cat the Kubelet config yaml for windows nodes
