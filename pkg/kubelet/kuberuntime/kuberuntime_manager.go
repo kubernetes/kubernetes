@@ -549,7 +549,10 @@ func isInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 	return true
 }
 
-func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) bool {
+// computePodResizeAction determines whether the container needs resizing and adds necessary actions to the changes.
+// This returns true if the container will be kept running.
+// This returns false if the container will be restarted.
+func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepRunning bool) {
 	container := pod.Spec.Containers[containerIdx]
 	if container.Resources.Limits == nil || len(pod.Status.ContainerStatuses) == 0 {
 		return true
