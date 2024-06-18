@@ -2441,6 +2441,11 @@ type ResourceClaim struct {
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.
 	Name string
+
+	// A name set in claim.spec.requests[].name.
+	//
+	// +optional
+	RequestName *string
 }
 
 // Container represents a single container that is expected to be run on the host.

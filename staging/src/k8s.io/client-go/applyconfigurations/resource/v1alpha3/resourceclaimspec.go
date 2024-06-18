@@ -21,8 +21,10 @@ package v1alpha3
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
-	ResourceClassName *string                                             `json:"resourceClassName,omitempty"`
-	ParametersRef     *ResourceClaimParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
+	Requests       []RequestApplyConfiguration            `json:"requests,omitempty"`
+	Constraints    []ConstraintApplyConfiguration         `json:"constraints,omitempty"`
+	Config         []ClaimConfigurationApplyConfiguration `json:"config,omitempty"`
+	ControllerName *string                                `json:"controllerName,omitempty"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimSpec type for use with
@@ -31,18 +33,49 @@ func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 	return &ResourceClaimSpecApplyConfiguration{}
 }
 
-// WithResourceClassName sets the ResourceClassName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourceClassName field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithResourceClassName(value string) *ResourceClaimSpecApplyConfiguration {
-	b.ResourceClassName = &value
+// WithRequests adds the given value to the Requests field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Requests field.
+func (b *ResourceClaimSpecApplyConfiguration) WithRequests(values ...*RequestApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithRequests")
+		}
+		b.Requests = append(b.Requests, *values[i])
+	}
 	return b
 }
 
-// WithParametersRef sets the ParametersRef field in the declarative configuration to the given value
+// WithConstraints adds the given value to the Constraints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Constraints field.
+func (b *ResourceClaimSpecApplyConfiguration) WithConstraints(values ...*ConstraintApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConstraints")
+		}
+		b.Constraints = append(b.Constraints, *values[i])
+	}
+	return b
+}
+
+// WithConfig adds the given value to the Config field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Config field.
+func (b *ResourceClaimSpecApplyConfiguration) WithConfig(values ...*ClaimConfigurationApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithConfig")
+		}
+		b.Config = append(b.Config, *values[i])
+	}
+	return b
+}
+
+// WithControllerName sets the ControllerName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ParametersRef field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithParametersRef(value *ResourceClaimParametersReferenceApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
-	b.ParametersRef = value
+// If called multiple times, the ControllerName field is set to the value of the last call.
+func (b *ResourceClaimSpecApplyConfiguration) WithControllerName(value string) *ResourceClaimSpecApplyConfiguration {
+	b.ControllerName = &value
 	return b
 }

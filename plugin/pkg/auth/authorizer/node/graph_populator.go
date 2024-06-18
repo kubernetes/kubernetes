@@ -29,6 +29,7 @@ import (
 	resourceinformers "k8s.io/client-go/informers/resource/v1alpha3"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 )
 
 type graphPopulator struct {
@@ -206,7 +207,7 @@ func (g *graphPopulator) addResourceSlice(obj interface{}) {
 		klog.Infof("unexpected type %T", obj)
 		return
 	}
-	g.graph.AddResourceSlice(slice.Name, slice.NodeName)
+	g.graph.AddResourceSlice(slice.Name, ptr.Deref(slice.Spec.NodeName, ""))
 }
 
 func (g *graphPopulator) deleteResourceSlice(obj interface{}) {

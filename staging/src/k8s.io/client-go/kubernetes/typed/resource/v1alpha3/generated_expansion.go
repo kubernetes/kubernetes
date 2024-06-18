@@ -18,16 +18,12 @@ limitations under the License.
 
 package v1alpha3
 
+type DeviceClassExpansion interface{}
+
 type PodSchedulingContextExpansion interface{}
 
 type ResourceClaimExpansion interface{}
 
-type ResourceClaimParametersExpansion interface{}
-
 type ResourceClaimTemplateExpansion interface{}
-
-type ResourceClassExpansion interface{}
-
-type ResourceClassParametersExpansion interface{}
 
 type ResourceSliceExpansion interface{}

@@ -2635,6 +2635,11 @@ type ResourceClaim struct {
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// A name set in claim.spec.requests[].name.
+	//
+	// +optional
+	RequestName *string `json:"requestName,omitempty" protobuf:"bytes,2,opt,name=requestName"`
 }
 
 const (

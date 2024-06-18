@@ -24,18 +24,14 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// DeviceClasses returns a DeviceClassInformer.
+	DeviceClasses() DeviceClassInformer
 	// PodSchedulingContexts returns a PodSchedulingContextInformer.
 	PodSchedulingContexts() PodSchedulingContextInformer
 	// ResourceClaims returns a ResourceClaimInformer.
 	ResourceClaims() ResourceClaimInformer
-	// ResourceClaimParameters returns a ResourceClaimParametersInformer.
-	ResourceClaimParameters() ResourceClaimParametersInformer
 	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
 	ResourceClaimTemplates() ResourceClaimTemplateInformer
-	// ResourceClasses returns a ResourceClassInformer.
-	ResourceClasses() ResourceClassInformer
-	// ResourceClassParameters returns a ResourceClassParametersInformer.
-	ResourceClassParameters() ResourceClassParametersInformer
 	// ResourceSlices returns a ResourceSliceInformer.
 	ResourceSlices() ResourceSliceInformer
 }
@@ -51,6 +47,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// DeviceClasses returns a DeviceClassInformer.
+func (v *version) DeviceClasses() DeviceClassInformer {
+	return &deviceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // PodSchedulingContexts returns a PodSchedulingContextInformer.
 func (v *version) PodSchedulingContexts() PodSchedulingContextInformer {
 	return &podSchedulingContextInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -61,24 +62,9 @@ func (v *version) ResourceClaims() ResourceClaimInformer {
 	return &resourceClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// ResourceClaimParameters returns a ResourceClaimParametersInformer.
-func (v *version) ResourceClaimParameters() ResourceClaimParametersInformer {
-	return &resourceClaimParametersInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
 // ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
 func (v *version) ResourceClaimTemplates() ResourceClaimTemplateInformer {
 	return &resourceClaimTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ResourceClasses returns a ResourceClassInformer.
-func (v *version) ResourceClasses() ResourceClassInformer {
-	return &resourceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// ResourceClassParameters returns a ResourceClassParametersInformer.
-func (v *version) ResourceClassParameters() ResourceClassParametersInformer {
-	return &resourceClassParametersInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceSlices returns a ResourceSliceInformer.

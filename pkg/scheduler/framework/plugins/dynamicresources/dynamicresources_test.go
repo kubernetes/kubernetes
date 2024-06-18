@@ -34,7 +34,6 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -1363,13 +1362,6 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	reactor := createReactor(tc.client.Tracker())
 	tc.client.PrependReactor("*", "*", reactor)
 
-	// Quick-and-dirty workaround for fake client storing ResourceClassParameters and
-	// ResourceClaimParameters as "resourceclassparameterses" and "resourceclaimparameterses":
-	// intercept the correct LIST from the informers and reply to them with the incorrect
-	// LIST result.
-	tc.client.PrependReactor("list", "resourceclaimparameters", createListReactor(tc.client.Tracker(), "ResourceClaimParameters"))
-	tc.client.PrependReactor("list", "resourceclassparameters", createListReactor(tc.client.Tracker(), "ResourceClassParameters"))
-
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
 	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha3().ResourceClaims().Informer(), "resource claim", "", nil)
 	opts := []runtime.Option{
@@ -1482,17 +1474,6 @@ func createReactor(tracker cgotesting.ObjectTracker) func(action cgotesting.Acti
 			resourceVersionCounter++
 		}
 		return false, nil, nil
-	}
-}
-
-func createListReactor(tracker cgotesting.ObjectTracker, kind string) func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-	return func(action cgotesting.Action) (handled bool, ret apiruntime.Object, err error) {
-		// listAction := action.(cgotesting.ListAction)
-		gvr := action.GetResource()
-		ns := action.GetNamespace()
-		gvr.Resource += "es"
-		list, err := tracker.List(gvr, schema.GroupVersionKind{Group: gvr.Group, Version: gvr.Version, Kind: kind}, ns)
-		return true, list, err
 	}
 }
 

@@ -21,7 +21,6 @@ package v1alpha3
 // ResourceClaimStatusApplyConfiguration represents a declarative configuration of the ResourceClaimStatus type for use
 // with apply.
 type ResourceClaimStatusApplyConfiguration struct {
-	DriverName            *string                                            `json:"driverName,omitempty"`
 	Allocation            *AllocationResultApplyConfiguration                `json:"allocation,omitempty"`
 	ReservedFor           []ResourceClaimConsumerReferenceApplyConfiguration `json:"reservedFor,omitempty"`
 	DeallocationRequested *bool                                              `json:"deallocationRequested,omitempty"`
@@ -31,14 +30,6 @@ type ResourceClaimStatusApplyConfiguration struct {
 // apply.
 func ResourceClaimStatus() *ResourceClaimStatusApplyConfiguration {
 	return &ResourceClaimStatusApplyConfiguration{}
-}
-
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *ResourceClaimStatusApplyConfiguration) WithDriverName(value string) *ResourceClaimStatusApplyConfiguration {
-	b.DriverName = &value
-	return b
 }
 
 // WithAllocation sets the Allocation field in the declarative configuration to the given value

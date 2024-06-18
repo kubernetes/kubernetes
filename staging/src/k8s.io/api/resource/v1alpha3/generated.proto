@@ -30,177 +30,421 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/resource/v1alpha3";
 
+// AllocationConfiguration gets embedded in an AllocationResult.
+message AllocationConfiguration {
+  // Admins is true if the source of the configuration was a class and thus
+  // not something that a normal user would have been able to set.
+  optional bool admin = 1;
+
+  // The configuration applies to devices in these requests.
+  //
+  // If empty, the configuration applies to all devices in the claim.
+  //
+  // +optional
+  // +listType=atomic
+  repeated string requestNames = 2;
+
+  optional Configuration configuration = 3;
+}
+
 // AllocationResult contains attributes of an allocated resource.
 message AllocationResult {
-  // ResourceHandles contain the state associated with an allocation that
-  // should be maintained throughout the lifetime of a claim. Each
-  // ResourceHandle contains data that should be passed to a specific kubelet
-  // plugin once it lands on a node. This data is returned by the driver
-  // after a successful allocation and is opaque to Kubernetes. Driver
-  // documentation may explain to users how to interpret this data if needed.
+  // Results lists all allocated devices.
   //
-  // Setting this field is optional. It has a maximum size of 32 entries.
-  // If null (or empty), it is assumed this allocation will be processed by a
-  // single kubelet plugin with no ResourceHandle data attached. The name of
-  // the kubelet plugin invoked will match the DriverName set in the
-  // ResourceClaimStatus this AllocationResult is embedded in.
-  //
+  // +optional
   // +listType=atomic
-  // +optional
-  repeated ResourceHandle resourceHandles = 1;
+  repeated RequestAllocationResult results = 1;
 
-  // This field will get set by the resource driver after it has allocated
-  // the resource to inform the scheduler where it can schedule Pods using
-  // the ResourceClaim.
+  // This field is a combination of all the claim and class configuration parameters.
+  // Drivers can distinguish between those based on a flag.
   //
-  // Setting this field is optional. If null, the resource is available
-  // everywhere.
-  // +optional
-  optional .k8s.io.api.core.v1.NodeSelector availableOnNodes = 2;
-}
-
-// AllocationResultModel must have one and only one field set.
-message AllocationResultModel {
-  // NamedResources describes the allocation result when using the named resources model.
+  // This includes configuration parameters for drivers which have no allocated
+  // devices in the result because it is up to the drivers which configuration
+  // parameters they support. They can silently ignore unknown configuration
+  // parameters.
   //
   // +optional
-  optional NamedResourcesAllocationResult namedResources = 1;
-}
-
-// DriverAllocationResult contains vendor parameters and the allocation result for
-// one request.
-message DriverAllocationResult {
-  // VendorRequestParameters are the per-request configuration parameters
-  // from the time that the claim was allocated.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorRequestParameters = 1;
-
-  optional AllocationResultModel allocationResultModel = 2;
-}
-
-// DriverRequests describes all resources that are needed from one particular driver.
-message DriverRequests {
-  // DriverName is the name used by the DRA driver kubelet plugin.
-  optional string driverName = 1;
-
-  // VendorParameters are arbitrary setup parameters for all requests of the
-  // claim. They are ignored while allocating the claim.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorParameters = 2;
-
-  // Requests describes all resources that are needed from the driver.
   // +listType=atomic
-  repeated ResourceRequest requests = 3;
+  repeated AllocationConfiguration config = 2;
+
+  // Setting this field is optional. If unset, the allocated devices are available everywhere.
+  //
+  // +optional
+  optional .k8s.io.api.core.v1.NodeSelector availableOnNodes = 3;
+
+  // ControllerName is the name of the DRA driver which handled the
+  // allocation. That driver is also responsible for deallocating the
+  // claim. It is empty when the claim can be deallocated without
+  // involving a driver.
+  //
+  // A driver may allocate devices provided by other drivers, so this
+  // driver name here can be different from the driver names listed for
+  // the results.
+  //
+  // This is an alpha field and requires enabling the DRAControlPlaneController
+  // feature gate.
+  //
+  // +optional
+  optional string controllerName = 4;
 }
 
-// NamedResourcesAllocationResult is used in AllocationResultModel.
-message NamedResourcesAllocationResult {
-  // Name is the name of the selected resource instance.
+// Exactly one field must be set.
+message Amount {
+  // All, if set, asks for all devices matching the selectors.
+  // Allocation fails if not all of them are available, unless admin
+  // access is requested. Admin access is granted also for
+  // devices which are in use.
+  //
+  // May only be set to true.
+  //
+  // +optional
+  optional bool all = 1;
+
+  // A fixed number of devices matching the selectors.
+  //
+  // Must be greater than 0.
+  //
+  // +optional
+  optional int64 exactCount = 2;
+}
+
+// CELSelector contains a CEL expression for selecting a device.
+message CELSelector {
+  // This CEL expression must evaluate to true if a device is suitable.
+  // This covers qualitative aspects of device selection.
+  //
+  // The language is as defined in
+  // https://kubernetes.io/docs/reference/using-api/cel/
+  // with several additions that are specific to device selectors.
+  //
+  // Attributes of a device are made available through a nested
+  // `device.attributes` map with the domain part of the attribute name
+  // as key in the outer map and the identifier as key in the inner
+  // map. All identifiers can be used in a field lookup:
+  //
+  //    device.attributes["dra.example.com"].driverVersion
+  //
+  // The type of each entry varies, depending on the attribute
+  // that is being looked up. The domain lookup returns an empty
+  // map if there is no attribute with that domain. However,
+  // unknown identifiers then trigger a runtime error.
+  //
+  // The `cel.bind` function is enabled and can be used to simplify
+  // expressions that access multiple attributes with the same domain:
+  //
+  //    cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
+  //
+  // Capacities associated with a device are made available through a
+  // nested `device.capacities` map the same way as attributes.
+  //
+  // The `device.driverName` string variable can be used to check for a specific
+  // driver explicitly in a filter that is meant to work for devices from
+  // different vendors. It is provided by Kubernetes and matches the
+  // `driverName` from the ResourceSlice which provides the device.
+  //
+  // The CEL expression is applied to *all* available devices from any driver.
+  // The expression has to check for existence of an attribute when it is not
+  // certain that it is provided because runtime errors are not automatically
+  // treated as "don't select device". Instead, device selection fails completely
+  // and reports the error.
+  //
+  // Some more examples:
+  //
+  //    "memory" in device.capacities["dra.example.com"] && # Is the capacity available?
+  //       device.capacities["dra.example.com"].memory.isGreaterThan(quantity("1Gi")) # >= 1Gi
+  //
+  //    device.attributes["dra.example.com"].driverVersion.isGreaterThan(semver("1.0.0")) # >= v1.0.0, runtime error if not available
+  //
+  //    device.driverName == "dra.example.com" # any device from that driver
+  //
+  // +required
+  optional string expression = 1;
+}
+
+// ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.
+message ClaimConfiguration {
+  // The configuration applies to devices in these requests.
+  //
+  // If empty, the configuration applies to all devices in the claim.
+  //
+  // +optional
+  // +listType=atomic
+  repeated string requestNames = 1;
+
+  optional Configuration configuration = 2;
+}
+
+// ClassConfiguration is used in DeviceClass.
+message ClassConfiguration {
+  optional Configuration configuration = 1;
+}
+
+// Configuration must have exactly one field set. It gets embedded
+// inline in some other structs which have other fields, so field names must
+// not conflict with those.
+message Configuration {
+  // Opaque provides driver-specific configuration parameters.
+  //
+  // +required
+  optional OpaqueConfiguration opaque = 1;
+}
+
+// Besides the request name slice, constraint must have exactly one field set.
+message Constraint {
+  // The constraint applies to devices in these requests. A single entry is okay
+  // and used when that request is for multiple devices.
+  //
+  // If empty, the constrain applies to all devices in the claim.
+  //
+  // +optional
+  // +listType=atomic
+  repeated string requestNames = 1;
+
+  // The devices must have this attribute and its value must be the same.
+  //
+  // For example, if you specified "dra.example.com/numa" (a hypothetical example!),
+  // then only devices in the same NUMA node will be chosen.
+  //
+  // +required
+  optional string matchAttribute = 2;
+}
+
+// Device represents one individual hardware instance that can be selected based
+// on its attributes.
+message Device {
+  // Name is unique identifier among all devices managed by
+  // the driver in the pool. It must be a DNS label.
+  //
+  // +required
   optional string name = 1;
+
+  // Attributes defines the set of attributes for this device.
+  // The name of each attribute must be unique in that set.
+  //
+  // The maximum number of attributes and capacities is 32.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceAttribute attributes = 2;
+
+  // Capacities defines the set of capacities for this device.
+  // The name of each capacity must be unique in that set.
+  //
+  // The maximum number of attributes and capacities is 32.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceCapacity capacities = 3;
 }
 
-// NamedResourcesAttribute is a combination of an attribute name and its value.
-message NamedResourcesAttribute {
-  // Name is unique identifier among all resource instances managed by
-  // the driver on the node. It must be a DNS subdomain.
+// DeviceAttribute is a combination of an attribute name and its value.
+// Exactly one value must be set.
+message DeviceAttribute {
+  // Name is a unique identifier for this attribute, which will be
+  // referenced when selecting devices.
+  //
+  // Attributes are defined either by the owner of the specific driver
+  // (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+  // project). Because attributes are sometimes compared across devices,
+  // a given name is expected to mean the same thing and have the same
+  // type on all devices.
+  //
+  // Attribute names must be either a DNS label
+  // (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+  // followed by a DNS label
+  // (e.g. "example.com/theName"). Attributes whose name do not
+  // include the domain prefix are assumed to be part of the driver's
+  // domain. Attributes defined by 3rd parties must include the domain
+  // prefix.
+  //
+  // The maximum length for the DNS subdomain is 63 characters (same as
+  // for driver names) and the maximum length of the DNS label identifier
+  // is 32.
+  //
+  // +required
   optional string name = 1;
 
-  optional NamedResourcesAttributeValue attributeValue = 2;
-}
-
-// NamedResourcesAttributeValue must have one and only one field set.
-message NamedResourcesAttributeValue {
-  // QuantityValue is a quantity.
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 6;
+  // IntValue is a number.
+  //
+  // +optional
+  optional int64 int = 2;
 
   // BoolValue is a true/false value.
-  optional bool bool = 2;
+  //
+  // +optional
+  optional bool bool = 3;
 
-  // IntValue is a 64-bit integer.
-  optional int64 int = 7;
-
-  // IntSliceValue is an array of 64-bit integers.
-  optional NamedResourcesIntSlice intSlice = 8;
-
-  // StringValue is a string.
-  optional string string = 5;
-
-  // StringSliceValue is an array of strings.
-  optional NamedResourcesStringSlice stringSlice = 9;
+  // StringValue is a string. Must not be longer than 64 characters.
+  //
+  // +optional
+  optional string string = 4;
 
   // VersionValue is a semantic version according to semver.org spec 2.0.0.
-  optional string version = 10;
+  // Must not be longer than 64 characters.
+  //
+  // +optional
+  optional string version = 5;
 }
 
-// NamedResourcesFilter is used in ResourceFilterModel.
-message NamedResourcesFilter {
-  // Selector is a CEL expression which must evaluate to true if a
-  // resource instance is suitable. The language is as defined in
-  // https://kubernetes.io/docs/reference/using-api/cel/
+// DeviceCapacity is a combination of a capacity name and its value.
+// Exactly one value must be set.
+message DeviceCapacity {
+  // Name is a unique identifier for this capacity, which will be
+  // referenced when selecting devices.
   //
-  // In addition, for each type in NamedResourcesAttributeValue there is a map that
-  // resolves to the corresponding value of the instance under evaluation.
-  // For example:
+  // Capacities are defined either by the owner of the specific driver
+  // (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+  // project). Because capacities are sometimes compared across devices,
+  // a given name is expected to mean the same thing and have the same
+  // type on all devices.
   //
-  //    attributes.quantity["a"].isGreaterThan(quantity("0")) &&
-  //    attributes.stringslice["b"].isSorted()
-  optional string selector = 1;
-}
-
-// NamedResourcesInstance represents one individual hardware instance that can be selected based
-// on its attributes.
-message NamedResourcesInstance {
-  // Name is unique identifier among all resource instances managed by
-  // the driver on the node. It must be a DNS subdomain.
+  // Capacity names must be either a DNS label
+  // (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+  // followed by a DNS label
+  // (e.g. "example.com/theName"). Capacities whose name do not
+  // include the domain prefix are assumed to be part of the driver's
+  // domain. Capacities defined by 3rd parties must include the domain
+  // prefix.
+  //
+  // The maximum length for the DNS subdomain is 63 characters (same as
+  // for driver names) and the maximum length of the DNS label identifier
+  // is 32.
+  //
+  // +required
   optional string name = 1;
 
-  // Attributes defines the attributes of this resource instance.
-  // The name of each attribute must be unique.
+  // Quantity determines the size of the capacity.
   //
-  // +listType=atomic
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
+}
+
+// DeviceClass is a vendor or admin-provided resource that contains
+// device configuration and selectors. It can be referenced in
+// the device requests of a claim to apply these presets.
+// Cluster scoped.
+message DeviceClass {
+  // Standard object metadata
   // +optional
-  repeated NamedResourcesAttribute attributes = 2;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines what can be allocated and how to configure it.
+  //
+  // This is mutable. Consumers have to be prepared for classes changing
+  // at any time, either because they get updated or replaced. Claim
+  // allocations are done once based on whatever was set in classes at
+  // the time of allocation.
+  //
+  // Changing the spec bumps up the generation number.
+  optional DeviceClassSpec spec = 2;
 }
 
-// NamedResourcesIntSlice contains a slice of 64-bit integers.
-message NamedResourcesIntSlice {
-  // Ints is the slice of 64-bit integers.
+// DeviceClassList is a collection of classes.
+message DeviceClassList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of resource classes.
+  repeated DeviceClass items = 2;
+}
+
+message DeviceClassSpec {
+  // Each selector must be satisfied by a device which is claimed via this class.
   //
+  // +optional
   // +listType=atomic
-  repeated int64 ints = 1;
-}
+  repeated Selector selectors = 1;
 
-// NamedResourcesRequest is used in ResourceRequestModel.
-message NamedResourcesRequest {
-  // Selector is a CEL expression which must evaluate to true if a
-  // resource instance is suitable. The language is as defined in
-  // https://kubernetes.io/docs/reference/using-api/cel/
+  // Config defines configuration parameters that apply to each device that is claimed via this class.
+  // Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor
+  // configuration applies to exactly one driver.
   //
-  // In addition, for each type NamedResourcesin AttributeValue there is a map that
-  // resolves to the corresponding value of the instance under evaluation.
-  // For example:
+  // They are passed to the driver, but are not considered while allocating the claim.
   //
-  //    attributes.quantity["a"].isGreaterThan(quantity("0")) &&
-  //    attributes.stringslice["b"].isSorted()
-  optional string selector = 1;
-}
-
-// NamedResourcesResources is used in ResourceModel.
-message NamedResourcesResources {
-  // The list of all individual resources instances currently available.
-  //
+  // +optional
   // +listType=atomic
-  repeated NamedResourcesInstance instances = 1;
+  repeated ClassConfiguration config = 2;
+
+  // Only nodes matching the selector will be considered by the scheduler
+  // when trying to find a Node that fits a Pod when that Pod uses
+  // a claim that has not been allocated yet *and* that claim
+  // gets allocated through a control plane controller. It is ignored
+  // when the claim does not use a control plane controller
+  // for allocation.
+  //
+  // Setting this field is optional. If unset, all Nodes are candidates.
+  //
+  // This is an alpha field and requires enabling the DRAControlPlaneController
+  // feature gate.
+  //
+  // +optional
+  optional .k8s.io.api.core.v1.NodeSelector suitableNodes = 3;
 }
 
-// NamedResourcesStringSlice contains a slice of strings.
-message NamedResourcesStringSlice {
-  // Strings is the slice of strings.
+// DeviceRequest is currently the only permitted alternative in RequestDetail.
+message DeviceRequest {
+  // By referencing a DeviceClass, a request inherits additional
+  // configuration parameters and selectors.
   //
+  // A class is required. Which classes are available depends on the cluster.
+  //
+  // Administrators may use this to restrict which devices may get
+  // requested by only installing classes with selectors for permitted
+  // devices. If users are free to request anything without restrictions,
+  // then an empty class called "none" can get created to permit
+  // `deviceClassName: none`.
+  //
+  // +required
+  optional string deviceClassName = 1;
+
+  // Each selector must be satisfied by a device which is requested.
+  //
+  // +optional
   // +listType=atomic
-  repeated string strings = 1;
+  repeated Selector selectors = 2;
+
+  // Amount determines how many devices to allocate for the request.
+  // The default if unset is exactly one device.
+  //
+  // +optional
+  optional Amount amount = 3;
+
+  // AdminAccess indicates that this is a claim for administrative access
+  // to the device(s). Claims with AdminAccess are expected to be used for
+  // monitoring or other management services for a device.  They ignore
+  // all ordinary claims to the device with respect to access modes and
+  // any resource allocations. Ability to request this kind of access is
+  // controlled via ResourceQuota in the resource.k8s.io API.
+  //
+  // Default is false.
+  //
+  // +optional
+  optional bool adminAccess = 4;
+}
+
+// OpaqueConfiguration contains configuration parameters for a driver
+// in a format defined by the driver vendor.
+message OpaqueConfiguration {
+  // DriverName is used to determine which kubelet plugin needs
+  // to be passed these configuration parameters.
+  //
+  // An admission webhook provided by the driver developer could use this
+  // to decide whether it needs to validate them.
+  //
+  // Must be a DNS subdomain and should end with a DNS domain owned by the
+  // vendor of the driver.
+  //
+  // +required
+  optional string driverName = 1;
+
+  // Parameters can contain arbitrary data. It is the responsibility of
+  // the driver developer to handle validation and versioning. Typically this
+  // includes self-identification and a version ("kind" + "apiVersion" for
+  // Kubernetes types), with conversion between different versions.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
 }
 
 // PodSchedulingContext objects hold information that is needed to schedule
@@ -218,6 +462,7 @@ message PodSchedulingContext {
   optional PodSchedulingContextSpec spec = 2;
 
   // Status describes where resources for the Pod can be allocated.
+  //
   // +optional
   optional PodSchedulingContextStatus status = 3;
 }
@@ -237,6 +482,7 @@ message PodSchedulingContextSpec {
   // SelectedNode is the node for which allocation of ResourceClaims that
   // are referenced by the Pod and that use "WaitForFirstConsumer"
   // allocation is to be attempted.
+  //
   // +optional
   optional string selectedNode = 1;
 
@@ -247,8 +493,8 @@ message PodSchedulingContextSpec {
   // that suits all pending resources. This may get increased in the
   // future, but not reduced.
   //
-  // +listType=atomic
   // +optional
+  // +listType=atomic
   repeated string potentialNodes = 2;
 }
 
@@ -264,8 +510,66 @@ message PodSchedulingContextStatus {
   repeated ResourceClaimSchedulingStatus resourceClaims = 1;
 }
 
-// ResourceClaim describes which resources are needed by a resource consumer.
-// Its status tracks whether the resource has been allocated and what the
+// Request is a request for one of many resources required for a claim.
+// This is typically a request for a single resource like a device, but can
+// also ask for several identical devices. It might get extended to support
+// asking for one of several different alternatives.
+message Request {
+  // The name can be used to reference this request in a pod.spec.containers[].resources.claims
+  // entry and in a constraint of the claim.
+  //
+  // Must be a DNS label.
+  optional string name = 1;
+
+  optional RequestDetail requestDetail = 2;
+}
+
+// RequestAllocationResult contains the allocation result for one request.
+message RequestAllocationResult {
+  // RequestName identifies the request in the claim which caused this
+  // device to be allocated. Multiple devices may have been allocated
+  // per request.
+  //
+  // +required
+  optional string requestName = 1;
+
+  // DriverName specifies the name of the DRA driver whose kubelet
+  // plugin should be invoked to process the allocation once the claim is
+  // needed on a node.
+  //
+  // Must be a DNS subdomain and should end with a DNS domain owned by the
+  // vendor of the driver.
+  //
+  // +required
+  optional string driverName = 2;
+
+  // This name together with the driver name and the device name field
+  // identify which device was allocated (`<driver name>/<pool name>/<device name>`).
+  //
+  // Must not be longer than 253 characters and may contain one or more
+  // DNS sub-domains separated by slashes.
+  //
+  // +required
+  optional string poolName = 3;
+
+  // DeviceName references one device instance via its name in the driver's
+  // resource pool. It must be a DNS label.
+  //
+  // +required
+  optional string deviceName = 4;
+}
+
+// RequestDetail is embedded inside Request. Exactly one field must be set.
+message RequestDetail {
+  // Device requests one or more devices.
+  //
+  // +required
+  optional DeviceRequest device = 1;
+}
+
+// ResourceClaim describes which resources (typically one or more devices)
+// are needed by a claim consumer.
+// Its status tracks whether the claim has been allocated and what the
 // resulting attributes are.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
@@ -275,13 +579,11 @@ message ResourceClaim {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec describes the desired attributes of a resource that then needs
-  // to be allocated. It can only be set once when creating the
-  // ResourceClaim.
+  // Spec defines what to allocated and how to configure it.
+  // The spec is immutable.
   optional ResourceClaimSpec spec = 2;
 
-  // Status describes whether the resource is available and with which
-  // attributes.
+  // Status describes whether the claim is ready for use.
   // +optional
   optional ResourceClaimStatus status = 3;
 }
@@ -316,63 +618,12 @@ message ResourceClaimList {
   repeated ResourceClaim items = 2;
 }
 
-// ResourceClaimParameters defines resource requests for a ResourceClaim in an
-// in-tree format understood by Kubernetes.
-message ResourceClaimParameters {
-  // Standard object metadata
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // If this object was created from some other resource, then this links
-  // back to that resource. This field is used to find the in-tree representation
-  // of the claim parameters when the parameter reference of the claim refers
-  // to some unknown type.
-  // +optional
-  optional ResourceClaimParametersReference generatedFrom = 2;
-
-  // DriverRequests describes all resources that are needed for the
-  // allocated claim. A single claim may use resources coming from
-  // different drivers. For each driver, this array has at most one
-  // entry which then may have one or more per-driver requests.
-  //
-  // May be empty, in which case the claim can always be allocated.
-  //
-  // +listType=atomic
-  repeated DriverRequests driverRequests = 4;
-}
-
-// ResourceClaimParametersList is a collection of ResourceClaimParameters.
-message ResourceClaimParametersList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated ResourceClaimParameters items = 2;
-}
-
-// ResourceClaimParametersReference contains enough information to let you
-// locate the parameters for a ResourceClaim. The object must be in the same
-// namespace as the ResourceClaim.
-message ResourceClaimParametersReference {
-  // APIGroup is the group for the resource being referenced. It is
-  // empty for the core API. This matches the group in the APIVersion
-  // that is used when creating the resources.
-  // +optional
-  optional string apiGroup = 1;
-
-  // Kind is the type of resource being referenced. This is the same
-  // value as in the parameter object's metadata, for example "ConfigMap".
-  optional string kind = 2;
-
-  // Name is the name of resource being referenced.
-  optional string name = 3;
-}
-
 // ResourceClaimSchedulingStatus contains information about one particular
 // ResourceClaim with "WaitForFirstConsumer" allocation mode.
 message ResourceClaimSchedulingStatus {
   // Name matches the pod.spec.resourceClaims[*].Name field.
-  // +optional
+  //
+  // +required
   optional string name = 1;
 
   // UnsuitableNodes lists nodes that the ResourceClaim cannot be
@@ -382,65 +633,98 @@ message ResourceClaimSchedulingStatus {
   // PodSchedulingSpec.PotentialNodes. This may get increased in the
   // future, but not reduced.
   //
-  // +listType=atomic
   // +optional
+  // +listType=atomic
   repeated string unsuitableNodes = 2;
 }
 
 // ResourceClaimSpec defines how a resource is to be allocated.
 message ResourceClaimSpec {
-  // ResourceClassName references the driver and additional parameters
-  // via the name of a ResourceClass that was created as part of the
-  // driver deployment.
-  optional string resourceClassName = 1;
-
-  // ParametersRef references a separate object with arbitrary parameters
-  // that will be used by the driver when allocating a resource for the
-  // claim.
+  // Requests are individual requests for separate resources for the claim.
+  // An empty list is valid and means that the claim can always be allocated
+  // without needing anything. A class can be referenced to use the default
+  // requests from that class.
   //
-  // The object must be in the same namespace as the ResourceClaim.
+  // +required
+  // +listType=atomic
+  repeated Request requests = 1;
+
+  // These constraints must be satisfied by the set of devices that get
+  // allocated for the claim.
+  //
   // +optional
-  optional ResourceClaimParametersReference parametersRef = 2;
+  // +listType=atomic
+  repeated Constraint constraints = 2;
+
+  // This field holds configuration for multiple potential drivers which
+  // could satisfy requests in this claim. It is ignored while allocating
+  // the claim.
+  //
+  // +optional
+  // +listType=atomic
+  repeated ClaimConfiguration config = 3;
+
+  // ControllerName defines the name of the DRA driver that is meant
+  // to handle allocation of this claim. If empty, allocation is handled
+  // by the scheduler while scheduling a pod.
+  //
+  // Must be a DNS subdomain and should end with a DNS domain owned by the
+  // vendor of the driver.
+  //
+  // This is an alpha field and requires enabling the DRAControlPlaneController
+  // feature gate.
+  //
+  // +optional
+  optional string controllerName = 4;
 }
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
-// the resulting attributes are.
+// the result of that was.
 message ResourceClaimStatus {
-  // DriverName is a copy of the driver name from the ResourceClass at
-  // the time when allocation started.
+  // Allocation is set once the claim has been allocated successfully.
+  //
   // +optional
-  optional string driverName = 1;
-
-  // Allocation is set by the resource driver once a resource or set of
-  // resources has been allocated successfully. If this is not specified, the
-  // resources have not been allocated yet.
-  // +optional
-  optional AllocationResult allocation = 2;
+  optional AllocationResult allocation = 1;
 
   // ReservedFor indicates which entities are currently allowed to use
   // the claim. A Pod which references a ResourceClaim which is not
-  // reserved for that Pod will not be started.
+  // reserved for that Pod will not be started. A claim that is in
+  // use or might be in use because it has been reserved must not get
+  // deallocated.
+  //
+  // In a cluster with multiple scheduler instances, two pods might get
+  // scheduled concurrently by different schedulers. When they reference
+  // the same ResourceClaim which already has reached its maximum number
+  // of consumers, only one pod can be scheduled.
+  //
+  // Both schedulers try to add their pod to the claim.status.reservedFor
+  // field, but only the update that reaches the API server first gets
+  // stored. The other one fails with an error and the scheduler
+  // which issued it knows that it must put the pod back into the queue,
+  // waiting for the ResourceClaim to become usable again.
   //
   // There can be at most 32 such reservations. This may get increased in
   // the future, but not reduced.
   //
+  // +optional
   // +listType=map
   // +listMapKey=uid
   // +patchStrategy=merge
   // +patchMergeKey=uid
-  // +optional
-  repeated ResourceClaimConsumerReference reservedFor = 3;
+  repeated ResourceClaimConsumerReference reservedFor = 2;
 
-  // DeallocationRequested indicates that a ResourceClaim is to be
-  // deallocated.
+  // Indicates that a claim is to be deallocated. While this is set,
+  // no new consumers may be added to ReservedFor.
   //
-  // The driver then must deallocate this claim and reset the field
+  // This is only used if the claim needs to be deallocated by a DRA driver.
+  // That driver then must deallocate this claim and reset the field
   // together with clearing the Allocation field.
   //
-  // While DeallocationRequested is set, no new consumers may be added to
-  // ReservedFor.
+  // This is an alpha field and requires enabling the DRAControlPlaneController
+  // feature gate.
+  //
   // +optional
-  optional bool deallocationRequested = 4;
+  optional bool deallocationRequested = 3;
 }
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
@@ -481,254 +765,116 @@ message ResourceClaimTemplateSpec {
   optional ResourceClaimSpec spec = 2;
 }
 
-// ResourceClass is used by administrators to influence how resources
-// are allocated.
+// One or more slices represent a pool of devices managed by a given driver.
+// How many slices the driver uses to publish that pool is driver-specific.
+// Each device in a given pool must have a unique name.
 //
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
-message ResourceClass {
-  // Standard object metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // DriverName defines the name of the dynamic resource driver that is
-  // used for allocation of a ResourceClaim that uses this class.
-  //
-  // Resource drivers have a unique name in forward domain order
-  // (acme.example.com).
-  optional string driverName = 2;
-
-  // ParametersRef references an arbitrary separate object that may hold
-  // parameters that will be used by the driver when allocating a
-  // resource that uses this class. A dynamic resource driver can
-  // distinguish between parameters stored here and and those stored in
-  // ResourceClaimSpec.
-  // +optional
-  optional ResourceClassParametersReference parametersRef = 3;
-
-  // Only nodes matching the selector will be considered by the scheduler
-  // when trying to find a Node that fits a Pod when that Pod uses
-  // a ResourceClaim that has not been allocated yet.
-  //
-  // Setting this field is optional. If null, all nodes are candidates.
-  // +optional
-  optional .k8s.io.api.core.v1.NodeSelector suitableNodes = 4;
-
-  // If and only if allocation of claims using this class is handled
-  // via structured parameters, then StructuredParameters must be set to true.
-  // +optional
-  optional bool structuredParameters = 5;
-}
-
-// ResourceClassList is a collection of classes.
-message ResourceClassList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of resource classes.
-  repeated ResourceClass items = 2;
-}
-
-// ResourceClassParameters defines resource requests for a ResourceClass in an
-// in-tree format understood by Kubernetes.
-message ResourceClassParameters {
-  // Standard object metadata
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // If this object was created from some other resource, then this links
-  // back to that resource. This field is used to find the in-tree representation
-  // of the class parameters when the parameter reference of the class refers
-  // to some unknown type.
-  // +optional
-  optional ResourceClassParametersReference generatedFrom = 2;
-
-  // VendorParameters are arbitrary setup parameters for all claims using
-  // this class. They are ignored while allocating the claim. There must
-  // not be more than one entry per driver.
-  //
-  // +listType=atomic
-  // +optional
-  repeated VendorParameters vendorParameters = 3;
-
-  // Filters describes additional contraints that must be met when using the class.
-  //
-  // +listType=atomic
-  repeated ResourceFilter filters = 4;
-}
-
-// ResourceClassParametersList is a collection of ResourceClassParameters.
-message ResourceClassParametersList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of node resource capacity objects.
-  repeated ResourceClassParameters items = 2;
-}
-
-// ResourceClassParametersReference contains enough information to let you
-// locate the parameters for a ResourceClass.
-message ResourceClassParametersReference {
-  // APIGroup is the group for the resource being referenced. It is
-  // empty for the core API. This matches the group in the APIVersion
-  // that is used when creating the resources.
-  // +optional
-  optional string apiGroup = 1;
-
-  // Kind is the type of resource being referenced. This is the same
-  // value as in the parameter object's metadata.
-  optional string kind = 2;
-
-  // Name is the name of resource being referenced.
-  optional string name = 3;
-
-  // Namespace that contains the referenced resource. Must be empty
-  // for cluster-scoped resources and non-empty for namespaced
-  // resources.
-  // +optional
-  optional string namespace = 4;
-}
-
-// ResourceFilter is a filter for resources from one particular driver.
-message ResourceFilter {
-  // DriverName is the name used by the DRA driver kubelet plugin.
-  optional string driverName = 1;
-
-  optional ResourceFilterModel resourceFilterModel = 2;
-}
-
-// ResourceFilterModel must have one and only one field set.
-message ResourceFilterModel {
-  // NamedResources describes a resource filter using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesFilter namedResources = 1;
-}
-
-// ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.
-message ResourceHandle {
-  // DriverName specifies the name of the resource driver whose kubelet
-  // plugin should be invoked to process this ResourceHandle's data once it
-  // lands on a node. This may differ from the DriverName set in
-  // ResourceClaimStatus this ResourceHandle is embedded in.
-  optional string driverName = 1;
-
-  // Data contains the opaque data associated with this ResourceHandle. It is
-  // set by the controller component of the resource driver whose name
-  // matches the DriverName set in the ResourceClaimStatus this
-  // ResourceHandle is embedded in. It is set at allocation time and is
-  // intended for processing by the kubelet plugin whose name matches
-  // the DriverName set in this ResourceHandle.
-  //
-  // The maximum size of this field is 16KiB. This may get increased in the
-  // future, but not reduced.
-  // +optional
-  optional string data = 2;
-
-  // If StructuredData is set, then it needs to be used instead of Data.
-  //
-  // +optional
-  optional StructuredResourceHandle structuredData = 5;
-}
-
-// ResourceModel must have one and only one field set.
-message ResourceModel {
-  // NamedResources describes available resources using the named resources model.
-  //
-  // +optional
-  optional NamedResourcesResources namedResources = 1;
-}
-
-// ResourceRequest is a request for resources from one particular driver.
-message ResourceRequest {
-  // VendorParameters are arbitrary setup parameters for the requested
-  // resource. They are ignored while allocating a claim.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorParameters = 1;
-
-  optional ResourceRequestModel resourceRequestModel = 2;
-}
-
-// ResourceRequestModel must have one and only one field set.
-message ResourceRequestModel {
-  // NamedResources describes a request for resources with the named resources model.
-  //
-  // +optional
-  optional NamedResourcesRequest namedResources = 1;
-}
-
-// ResourceSlice provides information about available
-// resources on individual nodes.
+// The slice in which a device gets published may change over time. The unique identifier
+// for a device is the tuple `<driver name>/<pool name>/<device name>`. Driver name
+// and device name don't contain slashes, so it is okay to concatenate them
+// like this in a string with a slash as separator. The pool name itself may contain
+// additional slashes.
+//
+// Whenever a driver needs to update a pool, it bumps the pool generation number
+// and updates all slices with that new number and any new device definitions. A consumer
+// must only use device definitions from slices with the highest generation number
+// and ignore all others.
+//
+// If necessary, a consumer can check the number of total devices in a pool (included
+// in each slice) to determine whether its view of a pool is complete.
+//
+// For devices that are not local to a node, the node name is not set. Instead,
+// the driver may use a node selector to specify where the devices are available.
 message ResourceSlice {
   // Standard object metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // NodeName identifies the node which provides the resources
-  // if they are local to a node.
+  // Contains the information published by the driver.
   //
-  // A field selector can be used to list only ResourceSlice
-  // objects with a certain node name.
-  //
-  // +optional
-  optional string nodeName = 2;
-
-  // DriverName identifies the DRA driver providing the capacity information.
-  // A field selector can be used to list only ResourceSlice
-  // objects with a certain driver name.
-  optional string driverName = 3;
-
-  optional ResourceModel resourceModel = 4;
+  // Changing the spec bumps up the generation number.
+  optional ResourceSliceSpec spec = 2;
 }
 
-// ResourceSliceList is a collection of ResourceSlices.
+// ResourceSliceList is a collection of slices.
 message ResourceSliceList {
   // Standard list metadata
   // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta listMeta = 1;
 
-  // Items is the list of node resource capacity objects.
+  // Items is the list of resource slices.
   repeated ResourceSlice items = 2;
 }
 
-// StructuredResourceHandle is the in-tree representation of the allocation result.
-message StructuredResourceHandle {
-  // VendorClassParameters are the per-claim configuration parameters
-  // from the resource class at the time that the claim was allocated.
+// ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
+message ResourceSliceSpec {
+  // DriverName identifies the DRA driver providing the capacity information.
+  // A field selector can be used to list only ResourceSlice
+  // objects with a certain driver name.
   //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorClassParameters = 1;
-
-  // VendorClaimParameters are the per-claim configuration parameters
-  // from the resource claim parameters at the time that the claim was
-  // allocated.
+  // Must be a DNS subdomain and should end with a DNS domain owned by the
+  // vendor of the driver.
   //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension vendorClaimParameters = 2;
-
-  // NodeName is the name of the node providing the necessary resources
-  // if the resources are local to a node.
-  //
-  // +optional
-  optional string nodeName = 4;
-
-  // Results lists all allocated driver resources.
-  //
-  // +listType=atomic
-  repeated DriverAllocationResult results = 5;
-}
-
-// VendorParameters are opaque parameters for one particular driver.
-message VendorParameters {
-  // DriverName is the name used by the DRA driver kubelet plugin.
+  // +required
   optional string driverName = 1;
 
-  // Parameters can be arbitrary setup parameters. They are ignored while
-  // allocating a claim.
+  // PoolName is used to identify devices. For node-local devices, this
+  // is often the node name, but this is not required.
+  //
+  // It must not be longer than 253 and must consist of one or more DNS sub-domains
+  // separated by slashes.
+  //
+  // +required
+  optional string poolName = 2;
+
+  // NodeName identifies the node which provides the devices.
+  // A field selector can be used to list only ResourceSlice
+  // objects belonging to a certain node.
+  //
+  // This field can be used to limit access from nodes to slices with
+  // the same node name. It also indicates to autoscalers that adding
+  // new nodes of the same type as some old node might also make new
+  // devices available.
+  //
+  // NodeName and NodeSelector are mutually exclusive. One of them
+  // must be set.
   //
   // +optional
-  optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
+  optional string nodeName = 3;
+
+  // Defines which nodes have access to the devices in the pool.
+  // If the node selector is empty, all nodes have access.
+  //
+  // NodeName and NodeSelector are mutually exclusive. One of them
+  // must be set.
+  //
+  // +optional
+  optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 4;
+
+  // The generation gets bumped in all slices of a pool whenever device
+  // definitions change. A consumer must only use device definitions from slices
+  // with the highest generation number and ignore all others.
+  optional int64 poolGeneration = 5;
+
+  // The total number of slices in the pool.
+  // Consumers can use this to check whether they have
+  // seen all slices.
+  optional int64 poolSliceCount = 6;
+
+  // Devices lists all available devices in this pool.
+  //
+  // Must not have more than 128 entries.
+  //
+  // +required
+  // +listType=atomic
+  repeated Device devices = 7;
+}
+
+// Exactly one field must be set.
+message Selector {
+  // CEL contains a CEL expression for selecting a device.
+  //
+  // +required
+  optional CELSelector cel = 1;
 }
 

@@ -24,12 +24,10 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
 	podschedulingcontextsstore "k8s.io/kubernetes/pkg/registry/resource/podschedulingcontext/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
-	resourceclaimparametersstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimparameters/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
-	resourceclassstore "k8s.io/kubernetes/pkg/registry/resource/resourceclass/storage"
-	resourceclassparametersstore "k8s.io/kubernetes/pkg/registry/resource/resourceclassparameters/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
 )
 
@@ -52,12 +50,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
-	if resource := "resourceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClassStorage, err := resourceclassstore.NewREST(restOptionsGetter)
+	if resource := "deviceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
+		deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err
 		}
-		storage[resource] = resourceClassStorage
+		storage[resource] = deviceclassStorage
 	}
 
 	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
@@ -84,22 +82,6 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 		}
 		storage[resource] = podSchedulingStorage
 		storage[resource+"/status"] = podSchedulingStatusStorage
-	}
-
-	if resource := "resourceclaimparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClaimParametersStorage, err := resourceclaimparametersstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = resourceClaimParametersStorage
-	}
-
-	if resource := "resourceclassparameters"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
-		resourceClassParametersStorage, err := resourceclassparametersstore.NewREST(restOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage[resource] = resourceClassParametersStorage
 	}
 
 	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {

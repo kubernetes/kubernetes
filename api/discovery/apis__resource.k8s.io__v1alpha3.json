@@ -4,6 +4,23 @@
   "kind": "APIResourceList",
   "resources": [
     {
+      "kind": "DeviceClass",
+      "name": "deviceclasses",
+      "namespaced": false,
+      "singularName": "deviceclass",
+      "storageVersionHash": "12soGlw2WzE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "PodSchedulingContext",
       "name": "podschedulingcontexts",
       "namespaced": true,
@@ -29,23 +46,6 @@
         "get",
         "patch",
         "update"
-      ]
-    },
-    {
-      "kind": "ResourceClaimParameters",
-      "name": "resourceclaimparameters",
-      "namespaced": true,
-      "singularName": "resourceclaimparameters",
-      "storageVersionHash": "42WVd9cucrU=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
       ]
     },
     {
@@ -82,40 +82,6 @@
       "namespaced": true,
       "singularName": "resourceclaimtemplate",
       "storageVersionHash": "lbw3G0J+kqQ=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "ResourceClass",
-      "name": "resourceclasses",
-      "namespaced": false,
-      "singularName": "resourceclass",
-      "storageVersionHash": "gv35DluSP3c=",
-      "verbs": [
-        "create",
-        "delete",
-        "deletecollection",
-        "get",
-        "list",
-        "patch",
-        "update",
-        "watch"
-      ]
-    },
-    {
-      "kind": "ResourceClassParameters",
-      "name": "resourceclassparameters",
-      "namespaced": true,
-      "singularName": "resourceclassparameters",
-      "storageVersionHash": "369PrU9Yi/E=",
       "verbs": [
         "create",
         "delete",

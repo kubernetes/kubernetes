@@ -45,6 +45,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // PluginName is a string with the name of the plugin
@@ -654,7 +655,7 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
 
-		if slice.NodeName != nodeName {
+		if ptr.Deref(slice.Spec.NodeName, "") != nodeName {
 			return admission.NewForbidden(a, errors.New("can only create ResourceSlice with the same NodeName as the requesting node"))
 		}
 	case admission.Delete:
@@ -663,7 +664,7 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
 		}
 
-		if slice.NodeName != nodeName {
+		if ptr.Deref(slice.Spec.NodeName, "") != nodeName {
 			return admission.NewForbidden(a, errors.New("can only delete ResourceSlice with the same NodeName as the requesting node"))
 		}
 	}

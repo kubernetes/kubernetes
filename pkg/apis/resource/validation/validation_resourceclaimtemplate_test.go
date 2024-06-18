@@ -252,7 +252,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateClaimTemplate(scenario.template)
+			errs := ValidateResourceClaimTemplate(scenario.template)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}
@@ -307,7 +307,7 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClaimTemplate.ResourceVersion = "1"
-			errs := ValidateClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
+			errs := ValidateResourceClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}

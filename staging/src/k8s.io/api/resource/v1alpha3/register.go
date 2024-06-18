@@ -44,8 +44,8 @@ var (
 // Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&ResourceClass{},
-		&ResourceClassList{},
+		&DeviceClass{},
+		&DeviceClassList{},
 		&ResourceClaim{},
 		&ResourceClaimList{},
 		&ResourceClaimTemplate{},
@@ -54,10 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodSchedulingContextList{},
 		&ResourceSlice{},
 		&ResourceSliceList{},
-		&ResourceClaimParameters{},
-		&ResourceClaimParametersList{},
-		&ResourceClassParameters{},
-		&ResourceClassParametersList{},
 	)
 
 	// Add common types

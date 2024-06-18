@@ -163,10 +163,6 @@ func TestRoundtripToUnstructured(t *testing.T) {
 			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
 			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaim"},
 			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimList"},
-			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimParametersList"},
-			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClassParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClassParametersList"},
 		},
 	}
 

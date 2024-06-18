@@ -28,6 +28,10 @@ type FakeResourceV1alpha3 struct {
 	*testing.Fake
 }
 
+func (c *FakeResourceV1alpha3) DeviceClasses() v1alpha3.DeviceClassInterface {
+	return &FakeDeviceClasses{c}
+}
+
 func (c *FakeResourceV1alpha3) PodSchedulingContexts(namespace string) v1alpha3.PodSchedulingContextInterface {
 	return &FakePodSchedulingContexts{c, namespace}
 }
@@ -36,20 +40,8 @@ func (c *FakeResourceV1alpha3) ResourceClaims(namespace string) v1alpha3.Resourc
 	return &FakeResourceClaims{c, namespace}
 }
 
-func (c *FakeResourceV1alpha3) ResourceClaimParameters(namespace string) v1alpha3.ResourceClaimParametersInterface {
-	return &FakeResourceClaimParameters{c, namespace}
-}
-
 func (c *FakeResourceV1alpha3) ResourceClaimTemplates(namespace string) v1alpha3.ResourceClaimTemplateInterface {
 	return &FakeResourceClaimTemplates{c, namespace}
-}
-
-func (c *FakeResourceV1alpha3) ResourceClasses() v1alpha3.ResourceClassInterface {
-	return &FakeResourceClasses{c}
-}
-
-func (c *FakeResourceV1alpha3) ResourceClassParameters(namespace string) v1alpha3.ResourceClassParametersInterface {
-	return &FakeResourceClassParameters{c, namespace}
 }
 
 func (c *FakeResourceV1alpha3) ResourceSlices() v1alpha3.ResourceSliceInterface {

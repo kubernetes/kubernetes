@@ -32,9 +32,7 @@ import (
 type ResourceSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	NodeName                         *string `json:"nodeName,omitempty"`
-	DriverName                       *string `json:"driverName,omitempty"`
-	ResourceModelApplyConfiguration  `json:",inline"`
+	Spec                             *ResourceSliceSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceSlice constructs a declarative configuration of the ResourceSlice type for use with
@@ -240,27 +238,11 @@ func (b *ResourceSliceApplyConfiguration) ensureObjectMetaApplyConfigurationExis
 	}
 }
 
-// WithNodeName sets the NodeName field in the declarative configuration to the given value
+// WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the NodeName field is set to the value of the last call.
-func (b *ResourceSliceApplyConfiguration) WithNodeName(value string) *ResourceSliceApplyConfiguration {
-	b.NodeName = &value
-	return b
-}
-
-// WithDriverName sets the DriverName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the DriverName field is set to the value of the last call.
-func (b *ResourceSliceApplyConfiguration) WithDriverName(value string) *ResourceSliceApplyConfiguration {
-	b.DriverName = &value
-	return b
-}
-
-// WithNamedResources sets the NamedResources field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the NamedResources field is set to the value of the last call.
-func (b *ResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *ResourceSliceApplyConfiguration {
-	b.NamedResources = value
+// If called multiple times, the Spec field is set to the value of the last call.
+func (b *ResourceSliceApplyConfiguration) WithSpec(value *ResourceSliceSpecApplyConfiguration) *ResourceSliceApplyConfiguration {
+	b.Spec = value
 	return b
 }
 
