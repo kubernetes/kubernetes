@@ -746,6 +746,7 @@
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
     DynamicResourceAllocation: true
+    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -812,6 +813,7 @@
 - name: SchedulingWithMultipleResourceClaims
   featureGates:
     DynamicResourceAllocation: true
+    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -887,6 +889,7 @@
 - name: SchedulingWithResourceClaimTemplateStructured
   featureGates:
     DynamicResourceAllocation: true
+    # SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $nodesWithoutDRA
@@ -935,8 +938,6 @@
   - name: 2000pods_100nodes
     labels: [performance, fast]
     params:
-      # In this testcase, the number of nodes is smaller
-      # than the limit for the PodScheduling slices.
       nodesWithDRA: 100
       nodesWithoutDRA: 0
       initPods: 1000
@@ -944,11 +945,102 @@
       maxClaimsPerNode: 20
   - name: 2000pods_200nodes
     params:
-      # In this testcase, the driver and scheduler must
-      # truncate the PotentialNodes and UnsuitableNodes
-      # slices.
       nodesWithDRA: 200
       nodesWithoutDRA: 0
       initPods: 1000
       measurePods: 1000
       maxClaimsPerNode: 10
+  - name: 5000pods_500nodes
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
+
+# SchedulingWithResourceClaimTemplate uses ResourceClaims
+# with deterministic names that are shared between pods.
+# There is a fixed ratio of 1:5 between claims and pods.
+#
+# The driver uses structured parameters.
+- name: SchedulingWithResourceClaimStructured
+  featureGates:
+    DynamicResourceAllocation: true
+    # SchedulerQueueingHints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: config/dra/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+    structuredParameters: true
+  - opcode: createAny
+    templatePath: config/dra/resourceclass-structured.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameters.yaml
+    namespace: init
+  - opcode: createAny
+    templatePath: config/dra/resourceclaim-structured.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: config/dra/pod-with-claim-ref.yaml
+  - opcode: createAny
+    templatePath: config/dra/resourceclaimparameters.yaml
+    namespace: test
+  - opcode: createAny
+    templatePath: config/dra/resourceclaim-structured.yaml
+    namespace: test
+    countParam: $measureClaims
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: config/dra/pod-with-claim-ref.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    labels: [integration-test, fast]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      initClaims: 0
+      measurePods: 10
+      measureClaims: 2 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: 2000pods_100nodes
+    labels: [performance, fast]
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      initClaims: 200 # must be initPods / 5
+      measurePods: 1000
+      measureClaims: 200 # must be initPods / 5
+      maxClaimsPerNode: 4
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      initClaims: 200 # must be initPods / 5
+      measurePods: 1000
+      measureClaims: 200 # must be measurePods / 5
+      maxClaimsPerNode: 2
+  - name: 5000pods_500nodes
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      initClaims: 500 # must be initPods / 5
+      measurePods: 2500
+      measureClaims: 500 # must be measurePods / 5
+      maxClaimsPerNode: 2
