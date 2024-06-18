@@ -187,13 +187,5 @@ func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 // IsAllocatedWithStructuredParameters checks whether the claim is allocated
 // and the allocation was done with structured parameters.
 func IsAllocatedWithStructuredParameters(claim *resourceapi.ResourceClaim) bool {
-	if claim.Status.Allocation == nil {
-		return false
-	}
-	for _, handle := range claim.Status.Allocation.ResourceHandles {
-		if handle.StructuredData != nil {
-			return true
-		}
-	}
-	return false
+	return claim.Status.Allocation != nil && claim.Status.Allocation.Controller == ""
 }

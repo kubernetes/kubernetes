@@ -33,14 +33,56 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  parametersRef:
-    apiGroup: apiGroupValue
-    kind: kindValue
-    name: nameValue
-  resourceClassName: resourceClassNameValue
+  controller: controllerValue
+  devices:
+    config:
+    - opaque:
+        driver: driverValue
+        parameters:
+          apiVersion: example.com/v1
+          kind: CustomType
+          spec:
+            replicas: 1
+          status:
+            available: 1
+      requests:
+      - requestsValue
+    constraints:
+    - matchAttribute: matchAttributeValue
+      requests:
+      - requestsValue
+    requests:
+    - adminAccess: true
+      allocationMode: allocationModeValue
+      count: 5
+      deviceClassName: deviceClassNameValue
+      name: nameValue
+      selectors:
+      - cel:
+          expression: expressionValue
 status:
   allocation:
-    availableOnNodes:
+    controller: controllerValue
+    devices:
+      config:
+      - opaque:
+          driver: driverValue
+          parameters:
+            apiVersion: example.com/v1
+            kind: CustomType
+            spec:
+              replicas: 1
+            status:
+              available: 1
+        requests:
+        - requestsValue
+        source: sourceValue
+      results:
+      - device: deviceValue
+        driver: driverValue
+        pool: poolValue
+        request: requestValue
+    nodeSelector:
       nodeSelectorTerms:
       - matchExpressions:
         - key: keyValue
@@ -52,37 +94,7 @@ status:
           operator: operatorValue
           values:
           - valuesValue
-    resourceHandles:
-    - data: dataValue
-      driverName: driverNameValue
-      structuredData:
-        nodeName: nodeNameValue
-        results:
-        - namedResources:
-            name: nameValue
-          vendorRequestParameters:
-            apiVersion: example.com/v1
-            kind: CustomType
-            spec:
-              replicas: 1
-            status:
-              available: 1
-        vendorClaimParameters:
-          apiVersion: example.com/v1
-          kind: CustomType
-          spec:
-            replicas: 1
-          status:
-            available: 1
-        vendorClassParameters:
-          apiVersion: example.com/v1
-          kind: CustomType
-          spec:
-            replicas: 1
-          status:
-            available: 1
   deallocationRequested: true
-  driverName: driverNameValue
   reservedFor:
   - apiGroup: apiGroupValue
     name: nameValue

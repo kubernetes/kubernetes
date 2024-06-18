@@ -87,12 +87,53 @@
       ]
     },
     "spec": {
-      "resourceClassName": "resourceClassNameValue",
-      "parametersRef": {
-        "apiGroup": "apiGroupValue",
-        "kind": "kindValue",
-        "name": "nameValue"
-      }
+      "devices": {
+        "requests": [
+          {
+            "name": "nameValue",
+            "deviceClassName": "deviceClassNameValue",
+            "selectors": [
+              {
+                "cel": {
+                  "expression": "expressionValue"
+                }
+              }
+            ],
+            "allocationMode": "allocationModeValue",
+            "count": 5,
+            "adminAccess": true
+          }
+        ],
+        "constraints": [
+          {
+            "requests": [
+              "requestsValue"
+            ],
+            "matchAttribute": "matchAttributeValue"
+          }
+        ],
+        "config": [
+          {
+            "requests": [
+              "requestsValue"
+            ],
+            "opaque": {
+              "driver": "driverValue",
+              "parameters": {
+                "apiVersion": "example.com/v1",
+                "kind": "CustomType",
+                "spec": {
+                  "replicas": 1
+                },
+                "status": {
+                  "available": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "controller": "controllerValue"
     }
   }
 }

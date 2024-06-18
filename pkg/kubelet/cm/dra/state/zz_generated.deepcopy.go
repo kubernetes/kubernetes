@@ -22,7 +22,6 @@ limitations under the License.
 package state
 
 import (
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	sets "k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -34,13 +33,6 @@ func (in *ClaimInfoState) DeepCopyInto(out *ClaimInfoState) {
 		*out = make(sets.Set[string], len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
-		}
-	}
-	if in.ResourceHandles != nil {
-		in, out := &in.ResourceHandles, &out.ResourceHandles
-		*out = make([]v1alpha3.ResourceHandle, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.CDIDevices != nil {

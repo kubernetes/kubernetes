@@ -21,8 +21,8 @@ package v1alpha3
 // ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
-	ResourceClassName *string                                             `json:"resourceClassName,omitempty"`
-	ParametersRef     *ResourceClaimParametersReferenceApplyConfiguration `json:"parametersRef,omitempty"`
+	Devices    *DeviceClaimApplyConfiguration `json:"devices,omitempty"`
+	Controller *string                        `json:"controller,omitempty"`
 }
 
 // ResourceClaimSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimSpec type for use with
@@ -31,18 +31,18 @@ func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 	return &ResourceClaimSpecApplyConfiguration{}
 }
 
-// WithResourceClassName sets the ResourceClassName field in the declarative configuration to the given value
+// WithDevices sets the Devices field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ResourceClassName field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithResourceClassName(value string) *ResourceClaimSpecApplyConfiguration {
-	b.ResourceClassName = &value
+// If called multiple times, the Devices field is set to the value of the last call.
+func (b *ResourceClaimSpecApplyConfiguration) WithDevices(value *DeviceClaimApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
+	b.Devices = value
 	return b
 }
 
-// WithParametersRef sets the ParametersRef field in the declarative configuration to the given value
+// WithController sets the Controller field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ParametersRef field is set to the value of the last call.
-func (b *ResourceClaimSpecApplyConfiguration) WithParametersRef(value *ResourceClaimParametersReferenceApplyConfiguration) *ResourceClaimSpecApplyConfiguration {
-	b.ParametersRef = value
+// If called multiple times, the Controller field is set to the value of the last call.
+func (b *ResourceClaimSpecApplyConfiguration) WithController(value string) *ResourceClaimSpecApplyConfiguration {
+	b.Controller = &value
 	return b
 }

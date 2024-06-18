@@ -54,20 +54,36 @@ type assumeCacheLister interface {
 // with an unknown structured parameter model silently ignored. An error gets
 // logged later when parameters required for a pod depend on such an unknown
 // model.
-func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceLister, claimAssumeCache assumeCacheLister, inFlightAllocations *sync.Map) (resources, error) {
-	model := make(resources)
+func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceLister, claimAssumeCache assumeCacheLister, inFlightAllocations *sync.Map) (resourceMap, error) {
+	model := make(resourceMap)
 
 	slices, err := resourceSliceLister.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("list node resource slices: %w", err)
 	}
 	for _, slice := range slices {
-		if model[slice.NodeName] == nil {
-			model[slice.NodeName] = make(map[string]ResourceModels)
+		if slice.NamedResources == nil {
+			// Ignore unknown resource. We don't know what it is,
+			// so we cannot allocated anything depending on
+			// it. This is only an error if we actually see a claim
+			// which needs this unknown model.
+			continue
 		}
-		resource := model[slice.NodeName][slice.DriverName]
-		namedresourcesmodel.AddResources(&resource.NamedResources, slice.NamedResources)
-		model[slice.NodeName][slice.DriverName] = resource
+		instances := slice.NamedResources.Instances
+		if model[slice.NodeName] == nil {
+			model[slice.NodeName] = make(map[string]Resources)
+		}
+		resources := model[slice.NodeName][slice.DriverName]
+		resources.Instances = make([]Instance, 0, len(instances))
+		for i := range instances {
+			instance := Instance{
+				NodeName:               slice.NodeName,
+				DriverName:             slice.DriverName,
+				NamedResourcesInstance: &instances[i],
+			}
+			resources.Instances = append(resources.Instances, instance)
+		}
+		model[slice.NodeName][slice.DriverName] = resources
 	}
 
 	objs := claimAssumeCache.List(nil)
@@ -90,12 +106,23 @@ func newResourceModel(logger klog.Logger, resourceSliceLister resourceSliceListe
 				continue
 			}
 			if model[structured.NodeName] == nil {
-				model[structured.NodeName] = make(map[string]ResourceModels)
+				model[structured.NodeName] = make(map[string]Resources)
 			}
-			resource := model[structured.NodeName][handle.DriverName]
+			resources := model[structured.NodeName][handle.DriverName]
 			for _, result := range structured.Results {
-				// Call AddAllocation for each known model. Each call itself needs to check for nil.
-				namedresourcesmodel.AddAllocation(&resource.NamedResources, result.NamedResources)
+				// Same as above: if we don't know the allocation result model, ignore it.
+				if result.NamedResources == nil {
+					continue
+				}
+				instanceName := result.NamedResources.Name
+				for i := range resources.Instances {
+					if resources.Instances[i].NamedResourcesInstance.Name == instanceName {
+						resources.Instances[i].Allocated = true
+						break
+					}
+				}
+				// It could be that we don't know the instance. That's okay,
+				// we simply ignore the allocation result.
 			}
 		}
 	}

@@ -1,5 +1,4 @@
 apiVersion: resource.k8s.io/v1alpha3
-driverName: driverNameValue
 kind: ResourceSlice
 metadata:
   annotations:
@@ -33,20 +32,34 @@ metadata:
   resourceVersion: resourceVersionValue
   selfLink: selfLinkValue
   uid: uidValue
-namedResources:
-  instances:
-  - attributes:
-    - bool: true
-      int: 7
-      intSlice:
-        ints:
-        - 1
-      name: nameValue
-      quantity: "0"
-      string: stringValue
-      stringSlice:
-        strings:
-        - stringsValue
-      version: versionValue
+spec:
+  allNodes: true
+  devices:
+  - basic:
+      attributes:
+        attributesKey:
+          bool: true
+          int: 2
+          string: stringValue
+          version: versionValue
+      capacity:
+        capacityKey: "0"
     name: nameValue
-nodeName: nodeNameValue
+  driver: driverValue
+  nodeName: nodeNameValue
+  nodeSelector:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
+      matchFields:
+      - key: keyValue
+        operator: operatorValue
+        values:
+        - valuesValue
+  pool:
+    generation: 2
+    name: nameValue
+    resourceSliceCount: 3

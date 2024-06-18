@@ -29,9 +29,6 @@ var resourceClaim = &resource.ResourceClaim{
 		Name:      "valid-claim",
 		Namespace: "default",
 	},
-	Spec: resource.ResourceClaimSpec{
-		ResourceClassName: "valid-class",
-	},
 }
 
 func TestClaimStrategy(t *testing.T) {

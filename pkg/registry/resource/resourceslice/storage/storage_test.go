@@ -51,10 +51,13 @@ func validNewResourceSlice(name string) *resource.ResourceSlice {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		NodeName:   name,
-		DriverName: "cdi.example.com",
-		ResourceModel: resource.ResourceModel{
-			NamedResources: &resource.NamedResourcesResources{},
+		Spec: resource.ResourceSliceSpec{
+			NodeName: name,
+			Driver:   "cdi.example.com",
+			Pool: resource.ResourcePool{
+				Name:               "worker-1",
+				ResourceSliceCount: 1,
+			},
 		},
 	}
 }
@@ -93,7 +96,7 @@ func TestUpdate(t *testing.T) {
 		// invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.ResourceSlice)
-			object.DriverName = ""
+			object.Spec.Driver = ""
 			return object
 		},
 	)

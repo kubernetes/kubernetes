@@ -44,63 +44,88 @@
     ]
   },
   "spec": {
-    "resourceClassName": "resourceClassNameValue",
-    "parametersRef": {
-      "apiGroup": "apiGroupValue",
-      "kind": "kindValue",
-      "name": "nameValue"
-    }
-  },
-  "status": {
-    "driverName": "driverNameValue",
-    "allocation": {
-      "resourceHandles": [
+    "devices": {
+      "requests": [
         {
-          "driverName": "driverNameValue",
-          "data": "dataValue",
-          "structuredData": {
-            "vendorClassParameters": {
-              "apiVersion": "example.com/v1",
-              "kind": "CustomType",
-              "spec": {
-                "replicas": 1
-              },
-              "status": {
-                "available": 1
+          "name": "nameValue",
+          "deviceClassName": "deviceClassNameValue",
+          "selectors": [
+            {
+              "cel": {
+                "expression": "expressionValue"
               }
-            },
-            "vendorClaimParameters": {
-              "apiVersion": "example.com/v1",
-              "kind": "CustomType",
-              "spec": {
-                "replicas": 1
-              },
-              "status": {
-                "available": 1
-              }
-            },
-            "nodeName": "nodeNameValue",
-            "results": [
-              {
-                "vendorRequestParameters": {
-                  "apiVersion": "example.com/v1",
-                  "kind": "CustomType",
-                  "spec": {
-                    "replicas": 1
-                  },
-                  "status": {
-                    "available": 1
-                  }
-                },
-                "namedResources": {
-                  "name": "nameValue"
-                }
-              }
-            ]
-          }
+            }
+          ],
+          "allocationMode": "allocationModeValue",
+          "count": 5,
+          "adminAccess": true
         }
       ],
-      "availableOnNodes": {
+      "constraints": [
+        {
+          "requests": [
+            "requestsValue"
+          ],
+          "matchAttribute": "matchAttributeValue"
+        }
+      ],
+      "config": [
+        {
+          "requests": [
+            "requestsValue"
+          ],
+          "opaque": {
+            "driver": "driverValue",
+            "parameters": {
+              "apiVersion": "example.com/v1",
+              "kind": "CustomType",
+              "spec": {
+                "replicas": 1
+              },
+              "status": {
+                "available": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "controller": "controllerValue"
+  },
+  "status": {
+    "allocation": {
+      "devices": {
+        "results": [
+          {
+            "request": "requestValue",
+            "driver": "driverValue",
+            "pool": "poolValue",
+            "device": "deviceValue"
+          }
+        ],
+        "config": [
+          {
+            "source": "sourceValue",
+            "requests": [
+              "requestsValue"
+            ],
+            "opaque": {
+              "driver": "driverValue",
+              "parameters": {
+                "apiVersion": "example.com/v1",
+                "kind": "CustomType",
+                "spec": {
+                  "replicas": 1
+                },
+                "status": {
+                  "available": 1
+                }
+              }
+            }
+          }
+        ]
+      },
+      "nodeSelector": {
         "nodeSelectorTerms": [
           {
             "matchExpressions": [
@@ -123,7 +148,8 @@
             ]
           }
         ]
-      }
+      },
+      "controller": "controllerValue"
     },
     "reservedFor": [
       {

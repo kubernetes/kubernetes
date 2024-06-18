@@ -332,6 +332,7 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:
@@ -547,6 +548,7 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:
@@ -764,6 +766,7 @@ spec:
         resources:
           claims:
           - name: nameValue
+            request: requestValue
           limits:
             limitsKey: "0"
           requests:

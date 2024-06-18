@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,7 +49,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 	// Start the server with the desired feature enablement
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		fmt.Sprintf("--feature-gates=AuthorizeWithSelectors=%v", featureEnabled),
-		"--runtime-config=resource.k8s.io/v1alpha2=true",
+		"--runtime-config=resource.k8s.io/v1alpha3=true",
 	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -161,21 +161,30 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 			},
 		},
 		{
-			name: "ResourceClaimParameters",
+			name: "ResourceClaim",
 			createObject: func() error {
-				obj := &resourcev1alpha2.ResourceClaimParameters{
+				obj := &resourcev1alpha3.ResourceClaim{
 					ObjectMeta: metav1.ObjectMeta{Name: "test"},
-					DriverRequests: []resourcev1alpha2.DriverRequests{{
-						DriverName: "example.com",
-						Requests: []resourcev1alpha2.ResourceRequest{{
-							ResourceRequestModel: resourcev1alpha2.ResourceRequestModel{
-								NamedResources: &resourcev1alpha2.NamedResourcesRequest{Selector: boolFieldSelectorExpression}}}}}}}
-				_, err := c.ResourceV1alpha2().ResourceClaimParameters("default").Create(context.TODO(), obj, metav1.CreateOptions{})
+					Spec: resourcev1alpha3.ResourceClaimSpec{
+						Devices: resourcev1alpha3.DeviceClaim{
+							Requests: []resourcev1alpha3.DeviceRequest{{
+								Name:            "req-0",
+								DeviceClassName: "example-class",
+								Selectors: []resourcev1alpha3.DeviceSelector{{
+									CEL: &resourcev1alpha3.CELDeviceSelector{
+										Expression: boolFieldSelectorExpression,
+									},
+								}},
+							}},
+						},
+					},
+				}
+				_, err := c.ResourceV1alpha3().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
 			// authorizer is not available to resource APIs
-			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`driverRequests\[0\]\.requests\[0\]\.namedResources\.selector:.*undeclared reference to 'authorizer'`)},
-			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`driverRequests\[0\]\.requests\[0\]\.namedResources\.selector:.*undeclared reference to 'authorizer'`)},
+			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
+			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
 		},
 		{
 			name: "CustomResourceDefinition - rule",

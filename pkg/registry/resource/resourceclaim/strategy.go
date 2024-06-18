@@ -69,7 +69,7 @@ func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	claim := obj.(*resource.ResourceClaim)
-	return validation.ValidateClaim(claim)
+	return validation.ValidateResourceClaim(claim)
 }
 
 func (resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -92,8 +92,8 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 func (resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	errorList := validation.ValidateClaim(newClaim)
-	return append(errorList, validation.ValidateClaimUpdate(newClaim, oldClaim)...)
+	errorList := validation.ValidateResourceClaim(newClaim)
+	return append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
 }
 
 func (resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -132,7 +132,7 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 func (resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	return validation.ValidateClaimStatusUpdate(newClaim, oldClaim)
+	return validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

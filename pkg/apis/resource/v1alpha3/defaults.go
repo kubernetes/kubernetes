@@ -17,9 +17,20 @@ limitations under the License.
 package v1alpha3
 
 import (
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
+	if obj.AllocationMode == "" {
+		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
+	}
+
+	if obj.AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.Count == 0 {
+		obj.Count = 1
+	}
 }

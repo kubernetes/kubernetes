@@ -60,7 +60,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		uniqueResourceClaimsPerPod:         1,
 		uniqueResourceClaimTemplatesPerPod: 1,
 		uniqueResourceClaimTemplatesWithClaimPerPod: 1,
-		nodeResourceCapacitiesPerNode:               2,
+		nodeResourceSlicesPerNode:                   2,
 	}
 	nodes, pods, pvs, attachments, slices := generate(opts)
 	populate(g, nodes, pods, pvs, attachments, slices)
@@ -386,7 +386,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		{
 			name:   "allowed filtered list ResourceSlices",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -403,7 +403,7 @@ func TestNodeAuthorizer(t *testing.T) {
 		},
 		{
 			name:   "allowed filtered watch ResourceSlices",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("nodeName==node0")},
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io", FieldSelectorRequirements: mustParseFields("spec.nodeName==node0")},
 			expect: authorizer.DecisionAllow,
 		},
 		{
@@ -880,7 +880,7 @@ type sampleDataOpts struct {
 	uniqueResourceClaimTemplatesPerPod          int
 	uniqueResourceClaimTemplatesWithClaimPerPod int
 
-	nodeResourceCapacitiesPerNode int
+	nodeResourceSlicesPerNode int
 }
 
 func mustParseFields(s string) fields.Requirements {
@@ -1191,7 +1191,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
-	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceCapacitiesPerNode)
+	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
 
 	rand.Seed(12345)
 
@@ -1218,11 +1218,13 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			Spec:       corev1.NodeSpec{},
 		})
 
-		for p := 0; p <= opts.nodeResourceCapacitiesPerNode; p++ {
+		for p := 0; p <= opts.nodeResourceSlicesPerNode; p++ {
 			name := fmt.Sprintf("slice%d-%s", p, nodeName)
 			slice := &resourceapi.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
-				NodeName:   nodeName,
+				Spec: resourceapi.ResourceSliceSpec{
+					NodeName: nodeName,
+				},
 			}
 			slices = append(slices, slice)
 		}

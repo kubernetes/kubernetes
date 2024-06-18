@@ -43,32 +43,55 @@
       }
     ]
   },
-  "nodeName": "nodeNameValue",
-  "driverName": "driverNameValue",
-  "namedResources": {
-    "instances": [
+  "spec": {
+    "driver": "driverValue",
+    "pool": {
+      "name": "nameValue",
+      "generation": 2,
+      "resourceSliceCount": 3
+    },
+    "nodeName": "nodeNameValue",
+    "nodeSelector": {
+      "nodeSelectorTerms": [
+        {
+          "matchExpressions": [
+            {
+              "key": "keyValue",
+              "operator": "operatorValue",
+              "values": [
+                "valuesValue"
+              ]
+            }
+          ],
+          "matchFields": [
+            {
+              "key": "keyValue",
+              "operator": "operatorValue",
+              "values": [
+                "valuesValue"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "allNodes": true,
+    "devices": [
       {
         "name": "nameValue",
-        "attributes": [
-          {
-            "name": "nameValue",
-            "quantity": "0",
-            "bool": true,
-            "int": 7,
-            "intSlice": {
-              "ints": [
-                1
-              ]
-            },
-            "string": "stringValue",
-            "stringSlice": {
-              "strings": [
-                "stringsValue"
-              ]
-            },
-            "version": "versionValue"
+        "basic": {
+          "attributes": {
+            "attributesKey": {
+              "int": 2,
+              "bool": true,
+              "string": "stringValue",
+              "version": "versionValue"
+            }
+          },
+          "capacity": {
+            "capacityKey": "0"
           }
-        ]
+        }
       }
     ]
   }

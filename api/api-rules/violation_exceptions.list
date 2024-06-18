@@ -52,13 +52,10 @@ API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1alpha1,ServiceCIDRSpec,CIDRs
 API rule violation: names_match,k8s.io/api/networking/v1beta1,ServiceCIDRSpec,CIDRs
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,BoolValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,IntSliceValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,IntValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,QuantityValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,StringSliceValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,StringValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NamedResourcesAttributeValue,VersionValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,BoolValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,IntValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,StringValue
+API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,VersionValue
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource

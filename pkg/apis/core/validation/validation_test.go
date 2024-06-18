@@ -23816,6 +23816,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
+	requestName := "req-0"
+	anotherRequestName := "req-1"
 	goodClaimTemplate := podtest.MakePod("",
 		podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}))),
 		podtest.SetRestartPolicy(core.RestartPolicyAlways),
@@ -23845,6 +23847,26 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 				},
 				core.PodResourceClaim{
 					Name:              "another-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"multiple claims with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: requestName}, {Name: "another-claim", Request: requestName}}}))),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
+					ResourceClaimName: &externalClaimName,
+				},
+				core.PodResourceClaim{
+					Name:              "another-claim",
+					ResourceClaimName: &externalClaimName,
+				}),
+		),
+		"single claim with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: requestName}, {Name: "my-claim", Request: anotherRequestName}}}))),
+			podtest.SetResourceClaims(
+				core.PodResourceClaim{
+					Name:              "my-claim",
 					ResourceClaimName: &externalClaimName,
 				}),
 		),
@@ -23923,6 +23945,34 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		),
 		"pod claim name duplicates": podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates without and with request": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim"}, {Name: "my-claim", Request: "req-0"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates with and without request": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "req-0"}, {Name: "my-claim"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"pod claim name duplicates with requests": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "req-0"}, {Name: "my-claim", Request: "req-0"}}}))),
+			podtest.SetResourceClaims(core.PodResourceClaim{
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
+			}),
+		),
+		"bad request name": podtest.MakePod("",
+			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim", Request: "*$@%^"}}}))),
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "my-claim",
 				ResourceClaimName: &externalClaimName,
