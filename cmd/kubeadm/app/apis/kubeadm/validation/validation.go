@@ -609,7 +609,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		"print-join-command", "rootfs", "v", "log-file")
+		"print-join-command", "rootfs", "v", "log-file", "yes")
 	if allowedFlags.Has(flagName) {
 		return true
 	}
