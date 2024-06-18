@@ -1552,30 +1552,44 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=resource.k8s.io, Version=v1alpha3
 	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResultModel"):
-		return &resourcev1alpha3.AllocationResultModelApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DriverAllocationResult"):
-		return &resourcev1alpha3.DriverAllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("DriverRequests"):
-		return &resourcev1alpha3.DriverRequestsApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesAllocationResult"):
-		return &resourcev1alpha3.NamedResourcesAllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesAttribute"):
-		return &resourcev1alpha3.NamedResourcesAttributeApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesAttributeValue"):
-		return &resourcev1alpha3.NamedResourcesAttributeValueApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesFilter"):
-		return &resourcev1alpha3.NamedResourcesFilterApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesInstance"):
-		return &resourcev1alpha3.NamedResourcesInstanceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesIntSlice"):
-		return &resourcev1alpha3.NamedResourcesIntSliceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesRequest"):
-		return &resourcev1alpha3.NamedResourcesRequestApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesResources"):
-		return &resourcev1alpha3.NamedResourcesResourcesApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("NamedResourcesStringSlice"):
-		return &resourcev1alpha3.NamedResourcesStringSliceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
+		return &resourcev1alpha3.CELDeviceSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ClassConfiguration"):
+		return &resourcev1alpha3.ClassConfigurationApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("Device"):
+		return &resourcev1alpha3.DeviceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
+		return &resourcev1alpha3.DeviceAllocationConfigurationApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAllocationResult"):
+		return &resourcev1alpha3.DeviceAllocationResultApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAttribute"):
+		return &resourcev1alpha3.DeviceAttributeApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCapacity"):
+		return &resourcev1alpha3.DeviceCapacityApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaim"):
+		return &resourcev1alpha3.DeviceClaimApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
+		return &resourcev1alpha3.DeviceClaimConfigurationApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClass"):
+		return &resourcev1alpha3.DeviceClassApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClassSpec"):
+		return &resourcev1alpha3.DeviceClassSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConfiguration"):
+		return &resourcev1alpha3.DeviceConfigurationApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConstraint"):
+		return &resourcev1alpha3.DeviceConstraintApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequest"):
+		return &resourcev1alpha3.DeviceRequestApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
+		return &resourcev1alpha3.DeviceRequestAllocationResultApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestDetail"):
+		return &resourcev1alpha3.DeviceRequestDetailApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestDetails"):
+		return &resourcev1alpha3.DeviceRequestDetailsApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
+		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
+		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("PodSchedulingContext"):
 		return &resourcev1alpha3.PodSchedulingContextApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("PodSchedulingContextSpec"):
@@ -1586,10 +1600,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourceClaimApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimConsumerReference"):
 		return &resourcev1alpha3.ResourceClaimConsumerReferenceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimParameters"):
-		return &resourcev1alpha3.ResourceClaimParametersApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimParametersReference"):
-		return &resourcev1alpha3.ResourceClaimParametersReferenceApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
 		return &resourcev1alpha3.ResourceClaimSchedulingStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
@@ -1600,30 +1610,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourceClaimTemplateApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaimTemplateSpec"):
 		return &resourcev1alpha3.ResourceClaimTemplateSpecApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClass"):
-		return &resourcev1alpha3.ResourceClassApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClassParameters"):
-		return &resourcev1alpha3.ResourceClassParametersApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
-		return &resourcev1alpha3.ResourceClassParametersReferenceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceFilter"):
-		return &resourcev1alpha3.ResourceFilterApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceFilterModel"):
-		return &resourcev1alpha3.ResourceFilterModelApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceHandle"):
-		return &resourcev1alpha3.ResourceHandleApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceModel"):
-		return &resourcev1alpha3.ResourceModelApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceRequest"):
-		return &resourcev1alpha3.ResourceRequestApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("ResourceRequestModel"):
-		return &resourcev1alpha3.ResourceRequestModelApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePool"):
+		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("StructuredResourceHandle"):
-		return &resourcev1alpha3.StructuredResourceHandleApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("VendorParameters"):
-		return &resourcev1alpha3.VendorParametersApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
+		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1
 	case schedulingv1.SchemeGroupVersion.WithKind("PriorityClass"):

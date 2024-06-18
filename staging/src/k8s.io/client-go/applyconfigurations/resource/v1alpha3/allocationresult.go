@@ -25,8 +25,9 @@ import (
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
-	ResourceHandles  []ResourceHandleApplyConfiguration `json:"resourceHandles,omitempty"`
-	AvailableOnNodes *v1.NodeSelectorApplyConfiguration `json:"availableOnNodes,omitempty"`
+	Devices      *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
+	NodeSelector *v1.NodeSelectorApplyConfiguration        `json:"nodeSelector,omitempty"`
+	Controller   *string                                   `json:"controller,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
@@ -35,23 +36,26 @@ func AllocationResult() *AllocationResultApplyConfiguration {
 	return &AllocationResultApplyConfiguration{}
 }
 
-// WithResourceHandles adds the given value to the ResourceHandles field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the ResourceHandles field.
-func (b *AllocationResultApplyConfiguration) WithResourceHandles(values ...*ResourceHandleApplyConfiguration) *AllocationResultApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithResourceHandles")
-		}
-		b.ResourceHandles = append(b.ResourceHandles, *values[i])
-	}
+// WithDevices sets the Devices field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Devices field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithDevices(value *DeviceAllocationResultApplyConfiguration) *AllocationResultApplyConfiguration {
+	b.Devices = value
 	return b
 }
 
-// WithAvailableOnNodes sets the AvailableOnNodes field in the declarative configuration to the given value
+// WithNodeSelector sets the NodeSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AvailableOnNodes field is set to the value of the last call.
-func (b *AllocationResultApplyConfiguration) WithAvailableOnNodes(value *v1.NodeSelectorApplyConfiguration) *AllocationResultApplyConfiguration {
-	b.AvailableOnNodes = value
+// If called multiple times, the NodeSelector field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *AllocationResultApplyConfiguration {
+	b.NodeSelector = value
+	return b
+}
+
+// WithController sets the Controller field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Controller field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithController(value string) *AllocationResultApplyConfiguration {
+	b.Controller = &value
 	return b
 }

@@ -22,16 +22,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/utils/ptr"
 )
 
 var slice = &resource.ResourceSlice{
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "valid-class",
 	},
-	NodeName:   "valid-node-name",
-	DriverName: "testdriver.example.com",
-	ResourceModel: resource.ResourceModel{
-		NamedResources: &resource.NamedResourcesResources{},
+	Spec: resource.ResourceSliceSpec{
+		NodeName:   ptr.To("valid-node-name"),
+		Driver: "testdriver.example.com",
 	},
 }
 

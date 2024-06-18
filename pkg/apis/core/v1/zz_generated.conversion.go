@@ -7373,6 +7373,7 @@ func Convert_core_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(
 
 func autoConvert_v1_ResourceClaim_To_core_ResourceClaim(in *v1.ResourceClaim, out *core.ResourceClaim, s conversion.Scope) error {
 	out.Name = in.Name
+	out.Request = in.Request
 	return nil
 }
 
@@ -7383,6 +7384,7 @@ func Convert_v1_ResourceClaim_To_core_ResourceClaim(in *v1.ResourceClaim, out *c
 
 func autoConvert_core_ResourceClaim_To_v1_ResourceClaim(in *core.ResourceClaim, out *v1.ResourceClaim, s conversion.Scope) error {
 	out.Name = in.Name
+	out.Request = in.Request
 	return nil
 }
 

@@ -367,18 +367,14 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Rbac().V1beta1().RoleBindings().Informer()}, nil
 
 		// Group=resource.k8s.io, Version=v1alpha3
+	case v1alpha3.SchemeGroupVersion.WithResource("deviceclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().DeviceClasses().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("podschedulingcontexts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().PodSchedulingContexts().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaims"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaims().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaimparameters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaimParameters().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceclaimtemplates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClaimTemplates().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceclasses"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClasses().Informer()}, nil
-	case v1alpha3.SchemeGroupVersion.WithResource("resourceclassparameters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceClassParameters().Informer()}, nil
 	case v1alpha3.SchemeGroupVersion.WithResource("resourceslices"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Resource().V1alpha3().ResourceSlices().Informer()}, nil
 

@@ -153,8 +153,8 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"):                        `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("apiregistration.k8s.io", "v1", "apiservices"):                             `{"metadata": {"labels": {"a":"c"}}, "spec": {"group": "foo2.com"}}`,
 	gvr("resource.k8s.io", "v1alpha3", "podschedulingcontexts"):                    `{"spec": {"selectedNode": "node2name"}}`,
-	gvr("resource.k8s.io", "v1alpha3", "resourceclasses"):                          `{"driverName": "other.example.com"}`,
-	gvr("resource.k8s.io", "v1alpha3", "resourceclaims"):                           `{"spec": {"resourceClassName": "class2name"}}`, // ResourceClassName is immutable, but that doesn't matter for the test.
+	gvr("resource.k8s.io", "v1alpha3", "deviceclasses"):                            `{"metadata": {"labels":{"a":"c"}}}`,
+	gvr("resource.k8s.io", "v1alpha3", "resourceclaims"):                           `{"spec": {"requests": [{"device": {"deviceClassName": "class2name"}}]}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
 	gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"):                `{}`,
 	gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): `{"metadata": {"labels": {"a":"c"}}, "spec": {"paramKind": {"apiVersion": "apps/v1", "kind": "Deployment"}}}`,

@@ -48,6 +48,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -1614,13 +1615,25 @@ func TestAdmitResourceSlice(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename,
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: ptr.To(nodename),
+		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename + "-other",
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: ptr.To(nodename + "-other"),
+		},
+	}
+	sliceNoNode := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "something",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nil,
+		},
 	}
 
 	tests := map[string]struct {
@@ -1644,6 +1657,13 @@ func TestAdmitResourceSlice(t *testing.T) {
 			featureEnabled: true,
 			expectError:    createErr,
 		},
+		"create disallowed, no node name, enabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    createErr,
+		},
 		"create allowed, disabled": {
 			operation:      admission.Create,
 			options:        &metav1.CreateOptions{},
@@ -1655,6 +1675,13 @@ func TestAdmitResourceSlice(t *testing.T) {
 			operation:      admission.Create,
 			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
+			featureEnabled: false,
+			expectError:    createErr,
+		},
+		"create disallowed, no node name, disabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
 			featureEnabled: false,
 			expectError:    createErr,
 		},
@@ -1672,6 +1699,13 @@ func TestAdmitResourceSlice(t *testing.T) {
 			featureEnabled: true,
 			expectError:    "",
 		},
+		"update allowed, no node": {
+			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
 		"delete allowed, enabled": {
 			operation:      admission.Delete,
 			options:        &metav1.DeleteOptions{},
@@ -1686,6 +1720,13 @@ func TestAdmitResourceSlice(t *testing.T) {
 			featureEnabled: true,
 			expectError:    deleteErr,
 		},
+		"delete disallowed, no node name, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
 		"delete allowed, disabled": {
 			operation:      admission.Delete,
 			options:        &metav1.DeleteOptions{},
@@ -1697,6 +1738,13 @@ func TestAdmitResourceSlice(t *testing.T) {
 			operation:      admission.Delete,
 			options:        &metav1.DeleteOptions{},
 			oldObj:         sliceOtherNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
+		},
+		"delete disallowed, no node name, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
 			featureEnabled: false,
 			expectError:    deleteErr,
 		},
