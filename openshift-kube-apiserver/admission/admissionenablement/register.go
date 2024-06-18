@@ -88,7 +88,6 @@ var (
 	additionalDefaultOnPlugins = sets.NewString(
 		"NodeRestriction",
 		"OwnerReferencesPermissionEnforcement",
-		"PersistentVolumeLabel",
 		"PodNodeSelector",
 		"PodTolerationRestriction",
 		"Priority",
