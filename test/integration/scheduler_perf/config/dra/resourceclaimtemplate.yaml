@@ -4,4 +4,8 @@ metadata:
   name: test-claim-template
 spec:
   spec:
-    resourceClassName: test-class
+    controllerName: test-driver.cdi.k8s.io
+    requests:
+    - name: req-0
+      device:
+        deviceClassName: test-class

@@ -3,8 +3,7 @@ kind: ResourceClaim
 metadata:
   name: test-claim-{{.Index}}
 spec:
-  resourceClassName: test-class
-  parametersRef:
-    apiGroup: resource.k8s.io
-    kind: ResourceClaimParameters
-    name: test-claim-parameters
+  requests:
+  - name: req-0
+    device:
+      deviceClassName: test-class

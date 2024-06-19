@@ -234,17 +234,16 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 			Name: nodeName,
 		},
 
-		NodeName:   nodeName,
-		DriverName: driverName,
-
-		ResourceModel: resourceapi.ResourceModel{
-			NamedResources: &resourceapi.NamedResourcesResources{},
+		Spec: resourceapi.ResourceSliceSpec{
+			DriverName: driverName,
+			PoolName:   nodeName,
+			NodeName:   &nodeName,
 		},
 	}
 
 	for i := 0; i < capacity; i++ {
-		slice.ResourceModel.NamedResources.Instances = append(slice.ResourceModel.NamedResources.Instances,
-			resourceapi.NamedResourcesInstance{
+		slice.Spec.Devices = append(slice.Spec.Devices,
+			resourceapi.Device{
 				Name: fmt.Sprintf("instance-%d", i),
 			},
 		)

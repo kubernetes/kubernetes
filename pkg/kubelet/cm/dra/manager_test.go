@@ -852,8 +852,6 @@ func TestPrepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName:      driverName,
-					ClassName:       "test-class",
 					ClaimName:       "test-pod-claim",
 					ClaimUID:        "test-reserved",
 					Namespace:       "test-namespace",
@@ -953,12 +951,6 @@ func TestPrepareResources(t *testing.T) {
 			claimInfo, ok := manager.cache.get(*claimName, test.pod.Namespace)
 			if !ok {
 				t.Fatalf("claimInfo not found in cache for claim %s", *claimName)
-			}
-			if claimInfo.DriverName != test.resourceClaim.Status.DriverName {
-				t.Fatalf("driverName mismatch: expected %s, got %s", test.resourceClaim.Status.DriverName, claimInfo.DriverName)
-			}
-			if claimInfo.ClassName != test.resourceClaim.Spec.ResourceClassName {
-				t.Fatalf("resourceClassName mismatch: expected %s, got %s", test.resourceClaim.Spec.ResourceClassName, claimInfo.ClassName)
 			}
 			if len(claimInfo.PodUIDs) != 1 || !claimInfo.PodUIDs.Has(string(test.pod.UID)) {
 				t.Fatalf("podUIDs mismatch: expected [%s], got %v", test.pod.UID, claimInfo.PodUIDs)

@@ -20,16 +20,13 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
-	"strings"
+	"slices"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -68,13 +65,15 @@ func (r Resources) AllNodes(nodeLister listersv1.NodeLister) []string {
 	return r.Nodes
 }
 
-func (r Resources) NewAllocation(node string, data []byte) *resourceapi.AllocationResult {
-	allocation := &resourceapi.AllocationResult{}
-	allocation.ResourceHandles = []resourceapi.ResourceHandle{
-		{
-			DriverName: r.DriverName,
-			Data:       string(data),
-		},
+func (r Resources) newAllocation(requestName, node string, config []resourceapi.AllocationConfiguration) *resourceapi.AllocationResult {
+	allocation := &resourceapi.AllocationResult{
+		Results: []resourceapi.RequestAllocationResult{{
+			DriverName:  r.DriverName,
+			PoolName:    "none",
+			RequestName: requestName,
+			DeviceName:  "none",
+		}},
+		Config: config,
 	}
 	if node == "" && len(r.NodeLabels) > 0 {
 		// Available on all nodes matching the labels.
@@ -193,36 +192,6 @@ func (c *ExampleController) GetNumDeallocations() int64 {
 	return c.numDeallocations
 }
 
-func (c *ExampleController) GetClassParameters(ctx context.Context, class *resourceapi.ResourceClass) (interface{}, error) {
-	if class.ParametersRef != nil {
-		if class.ParametersRef.APIGroup != "" ||
-			class.ParametersRef.Kind != "ConfigMap" {
-			return nil, fmt.Errorf("class parameters are only supported in APIVersion v1, Kind ConfigMap, got: %v", class.ParametersRef)
-		}
-		return c.readParametersFromConfigMap(ctx, class.ParametersRef.Namespace, class.ParametersRef.Name)
-	}
-	return nil, nil
-}
-
-func (c *ExampleController) GetClaimParameters(ctx context.Context, claim *resourceapi.ResourceClaim, class *resourceapi.ResourceClass, classParameters interface{}) (interface{}, error) {
-	if claim.Spec.ParametersRef != nil {
-		if claim.Spec.ParametersRef.APIGroup != "" ||
-			claim.Spec.ParametersRef.Kind != "ConfigMap" {
-			return nil, fmt.Errorf("claim parameters are only supported in APIVersion v1, Kind ConfigMap, got: %v", claim.Spec.ParametersRef)
-		}
-		return c.readParametersFromConfigMap(ctx, claim.Namespace, claim.Spec.ParametersRef.Name)
-	}
-	return nil, nil
-}
-
-func (c *ExampleController) readParametersFromConfigMap(ctx context.Context, namespace, name string) (map[string]string, error) {
-	configMap, err := c.clientset.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("get config map: %w", err)
-	}
-	return configMap.Data, nil
-}
-
 func (c *ExampleController) Allocate(ctx context.Context, claimAllocations []*controller.ClaimAllocation, selectedNode string) {
 
 	if c.resources.AllocateWrapper != nil {
@@ -236,7 +205,7 @@ func (c *ExampleController) Allocate(ctx context.Context, claimAllocations []*co
 
 func (c *ExampleController) allocateOneByOne(ctx context.Context, claimAllocations []*controller.ClaimAllocation, selectedNode string) {
 	for _, ca := range claimAllocations {
-		allocationResult, err := c.allocateOne(ctx, ca.Claim, ca.ClaimParameters, ca.Class, ca.ClassParameters, selectedNode)
+		allocationResult, err := c.allocateOne(ctx, ca.Claim, ca.DeviceClasses, selectedNode)
 		if err != nil {
 			ca.Error = err
 			continue
@@ -246,11 +215,26 @@ func (c *ExampleController) allocateOneByOne(ctx context.Context, claimAllocatio
 }
 
 // allocate simply copies parameters as JSON map into a ResourceHandle.
-func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.ResourceClaim, claimParameters interface{}, class *resourceapi.ResourceClass, classParameters interface{}, selectedNode string) (result *resourceapi.AllocationResult, err error) {
+func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.ResourceClaim, deviceClasses map[string]*resourceapi.DeviceClass, selectedNode string) (result *resourceapi.AllocationResult, err error) {
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.FromContext(ctx), "Allocate"), "claim", klog.KObj(claim), "uid", claim.UID)
 	defer func() {
 		logger.V(3).Info("done", "result", result, "err", err)
 	}()
+
+	if len(claim.Spec.Requests) != 1 {
+		// TODO: check requested amount
+		return nil, errors.New("only claims with one request are supported")
+	}
+	request := claim.Spec.Requests[0]
+	deviceRequest := request.Device
+	if deviceRequest == nil {
+		return nil, errors.New("only claims asking for a device are supported")
+	}
+	class := deviceClasses[deviceRequest.DeviceClassName]
+	if len(deviceRequest.Selectors) > 0 ||
+		class != nil && len(class.Spec.Selectors) > 0 {
+		return nil, errors.New("device selectors are not supported")
+	}
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -267,24 +251,7 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.
 		nodes := c.resources.AllNodes(c.nodeLister)
 		if c.resources.NodeLocal {
 			node = selectedNode
-			if node == "" {
-				// If none has been selected because we do immediate allocation,
-				// then we need to pick one ourselves.
-				var viableNodes []string
-				for _, n := range nodes {
-					if c.resources.MaxAllocations == 0 ||
-						c.claimsPerNode[n] < c.resources.MaxAllocations {
-						viableNodes = append(viableNodes, n)
-					}
-				}
-				if len(viableNodes) == 0 {
-					return nil, errors.New("resources exhausted on all nodes")
-				}
-				// Pick randomly. We could also prefer the one with the least
-				// number of allocations (even spreading) or the most (packing).
-				node = viableNodes[rand.Intn(len(viableNodes))]
-				logger.V(3).Info("picked a node ourselves", "selectedNode", selectedNode)
-			} else if !contains(nodes, node) ||
+			if !slices.Contains(nodes, node) ||
 				c.resources.MaxAllocations > 0 &&
 					c.claimsPerNode[node] >= c.resources.MaxAllocations {
 				return nil, fmt.Errorf("resources exhausted on node %q", node)
@@ -297,17 +264,46 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.
 		}
 	}
 
-	p := parameters{
-		EnvVars:  make(map[string]string),
-		NodeName: node,
+	var configs []resourceapi.AllocationConfiguration
+	for i, config := range claim.Spec.Config {
+		if len(config.RequestNames) != 0 &&
+			!slices.Contains(config.RequestNames, request.Name) {
+			// Does not apply to request.
+			continue
+		}
+		if config.Opaque == nil {
+			return nil, fmt.Errorf("claim config #%d: only opaque configuration supported", i)
+		}
+		if config.Opaque.DriverName != c.resources.DriverName {
+			// Does not apply to driver.
+			continue
+		}
+		// A normal driver would validate the config here. The test
+		// driver just passes it through.
+		configs = append(configs,
+			resourceapi.AllocationConfiguration{
+				Configuration: config.Configuration,
+			},
+		)
 	}
-	toEnvVars("user", claimParameters, p.EnvVars)
-	toEnvVars("admin", classParameters, p.EnvVars)
-	data, err := json.Marshal(p)
-	if err != nil {
-		return nil, fmt.Errorf("encode parameters: %w", err)
+	if class != nil {
+		for i, config := range class.Spec.Config {
+			if config.Opaque == nil {
+				return nil, fmt.Errorf("class config #%d: only opaque configuration supported", i)
+			}
+			if config.Opaque.DriverName != c.resources.DriverName {
+				// Does not apply to driver.
+				continue
+			}
+			configs = append(configs,
+				resourceapi.AllocationConfiguration{
+					Admin:         true,
+					Configuration: config.Configuration,
+				},
+			)
+		}
 	}
-	allocation := c.resources.NewAllocation(node, data)
+	allocation := c.resources.newAllocation(request.Name, node, configs)
 	if !alreadyAllocated {
 		c.numAllocations++
 		c.allocated[claim.UID] = node
@@ -359,7 +355,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 				// can only work if a node has capacity left
 				// for all of them. Also, nodes that the driver
 				// doesn't run on cannot be used.
-				if !contains(nodes, node) ||
+				if !slices.Contains(nodes, node) ||
 					c.claimsPerNode[node]+len(claims) > c.resources.MaxAllocations {
 					claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 				}
@@ -372,7 +368,7 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	for _, claim := range claims {
 		claim.UnsuitableNodes = nil
 		for _, node := range potentialNodes {
-			if !contains(nodes, node) ||
+			if !slices.Contains(nodes, node) ||
 				allocations+len(claims) > c.resources.MaxAllocations {
 				claim.UnsuitableNodes = append(claim.UnsuitableNodes, node)
 			}
@@ -380,25 +376,4 @@ func (c *ExampleController) UnsuitableNodes(ctx context.Context, pod *v1.Pod, cl
 	}
 
 	return nil
-}
-
-func toEnvVars(what string, from interface{}, to map[string]string) {
-	if from == nil {
-		return
-	}
-
-	env := from.(map[string]string)
-	for key, value := range env {
-		to[what+"_"+strings.ToLower(key)] = value
-	}
-}
-
-func contains[T comparable](list []T, value T) bool {
-	for _, v := range list {
-		if v == value {
-			return true
-		}
-	}
-
-	return false
 }

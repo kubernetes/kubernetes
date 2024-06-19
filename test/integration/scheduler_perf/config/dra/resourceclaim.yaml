@@ -3,4 +3,8 @@ kind: ResourceClaim
 metadata:
   name: test-claim-{{.Index}}
 spec:
-  resourceClassName: test-class
+  controllerName: test-driver.cdi.k8s.io
+  requests:
+  - name: req-0
+    device:
+      deviceClassName: test-class

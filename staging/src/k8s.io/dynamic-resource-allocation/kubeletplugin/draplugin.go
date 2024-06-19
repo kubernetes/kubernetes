@@ -53,13 +53,19 @@ type DRAPlugin interface {
 	// after it returns before all information is actually written
 	// to the API server.
 	//
-	// The caller must not modify the content of the slice.
-	PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel)
+	// The caller must not modify the content after the call.
+	PublishResources(ctx context.Context, resources Resources)
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
+}
+
+// Resources currently only supports named devices. Might get extended in the
+// future.
+type Resources struct {
+	Devices []resourceapi.Device
 }
 
 // Option implements the functional options pattern for Start.
@@ -224,7 +230,7 @@ type draPlugin struct {
 	// must be protected by the mutex.
 	mutex                   sync.Mutex
 	publishResources        bool
-	nodeResources           []*resourceapi.ResourceModel
+	resources               Resources
 	resourceSliceController *resourceslice.Controller
 }
 
@@ -327,17 +333,17 @@ func Start(ctx context.Context, nodeServer interface{}, opts ...Option) (result 
 	return d, nil
 }
 
-func (d *draPlugin) PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel) {
+func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	d.publishResources = true
-	d.nodeResources = nodeResources
+	d.resources = resources
 	d.updatePublishResources()
 }
 
 // updatePublishResources is called each time something changed that might
-// affect how resources are published.
+// affect how resources are published. Called while the mutex is locked.
 func (d *draPlugin) updatePublishResources() {
 	ctx := d.ctx
 	logger := klog.FromContext(ctx)
@@ -357,8 +363,20 @@ func (d *draPlugin) updatePublishResources() {
 		Name:       d.nodeName,
 		// UID will be determined by the controller.
 	}
-	resources := &resourceslice.Resources{NodeResources: d.nodeResources}
-	d.resourceSliceController = resourceslice.StartController(klog.NewContext(ctx, klog.LoggerWithName(logger, "ResourceSlice controller")), d.kubeClient, d.driverName, owner, resources)
+
+	driverResources := &resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{
+			d.nodeName: resourceslice.Pool{
+				Devices: d.resources.Devices,
+			},
+		},
+	}
+	if d.resourceSliceController == nil {
+		d.resourceSliceController = resourceslice.StartController(klog.NewContext(ctx, klog.LoggerWithName(logger, "ResourceSlice controller")), d.kubeClient, d.driverName, owner, driverResources)
+		return
+	}
+
+	d.resourceSliceController.Update(driverResources)
 }
 
 func (d *draPlugin) Stop() {

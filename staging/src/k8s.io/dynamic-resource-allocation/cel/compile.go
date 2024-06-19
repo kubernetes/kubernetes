@@ -18,12 +18,17 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/common/types/traits"
+	"github.com/google/cel-go/ext"
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -35,6 +40,7 @@ import (
 const (
 	driverNameVar = "device.driverName"
 	attributesVar = "device.attributes"
+	capacitiesVar = "device.capacities"
 )
 
 var (
@@ -48,15 +54,18 @@ type CompilationResult struct {
 	Expression  string
 	OutputType  *cel.Type
 	Environment *cel.Env
+
+	emptyMapVal ref.Val
 }
 
-// DeviceAttributes defines the input values for a CEL selector expression.
-type DeviceAttributes struct {
+// Device defines the input values for a CEL selector expression.
+type Device struct {
 	// DriverName gets appended to any attribute which does not already have
 	// a fully qualified name. If set, then it is also made available as
 	// a string attribute.
 	DriverName string
 	Attributes []resourceapi.DeviceAttribute
+	Capacities []resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -111,68 +120,77 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
+		emptyMapVal: env.TypeAdapter().NativeToValue(map[string]any{}),
 	}
 }
 
-var valueTypes = map[string]struct {
-	celType *cel.Type
-	// get returns nil if the attribute doesn't have the type, otherwise
-	// the value of that type.
-	get func(attr resourceapi.DeviceAttribute) (any, error)
-}{
-	"int": {apiservercel.QuantityType, func(attr resourceapi.DeviceAttribute) (any, error) {
-		if attr.IntValue == nil {
-			return nil, nil
-		}
+// getAttributeValue returns the native representation of the one value that
+// should be stored in the attribute, otherwise an error. An error is
+// also returned when there is no supported value.
+func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+	switch {
+	case attr.IntValue != nil:
 		return *attr.IntValue, nil
-	}},
-	"bool": {cel.BoolType, func(attr resourceapi.DeviceAttribute) (any, error) {
-		if attr.BoolValue == nil {
-			return nil, nil
-		}
+	case attr.BoolValue != nil:
 		return *attr.BoolValue, nil
-	}},
-	"string": {cel.StringType, func(attr resourceapi.DeviceAttribute) (any, error) {
-		if attr.StringValue == nil {
-			return nil, nil
-		}
+	case attr.StringValue != nil:
 		return *attr.StringValue, nil
-	}},
-	"version": {SemverType, func(attr resourceapi.DeviceAttribute) (any, error) {
-		if attr.VersionValue == nil {
-			return nil, nil
-		}
+	case attr.VersionValue != nil:
 		v, err := semver.Parse(*attr.VersionValue)
 		if err != nil {
 			return nil, fmt.Errorf("parse semantic version: %v", err)
 		}
-
 		return Semver{Version: v}, nil
-	}},
+	default:
+		return nil, errors.New("unsupported attribute value")
+	}
+}
+
+// getCapacityValue returns the native representation of the one value that
+// should be stored in the attribute, otherwise an error. An error is
+// also returned when there is no supported value.
+func getCapacityValue(cap resourceapi.DeviceCapacity) (any, error) {
+	switch {
+	case cap.Quantity != nil:
+		return apiservercel.Quantity{Quantity: cap.Quantity}, nil
+	default:
+		return nil, errors.New("unsupported capacity value")
+	}
 }
 
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input DeviceAttributes) (bool, error) {
-	attributes := make(map[string]any, len(input.Attributes))
-	for _, attribute := range input.Attributes {
-		for _, valueType := range valueTypes {
-			value, err := valueType.get(attribute)
-			if err != nil {
-				return false, err
-			}
-			if value == nil {
-				continue
-			}
-			name := qualifyAttributeName(attribute.Name, input.DriverName)
-			attributes[name] = value
-			break
+func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
+	attributes := make(map[string]any)
+	for _, attr := range input.Attributes {
+		value, err := getAttributeValue(attr)
+		if err != nil {
+			return false, fmt.Errorf("attribute %s: %w", attr.Name, err)
 		}
+		domain, id := parseAttributeName(attr.Name, input.DriverName)
+		if attributes[domain] == nil {
+			attributes[domain] = make(map[string]any)
+		}
+		attributes[domain].(map[string]any)[id] = value
+	}
+
+	capacities := make(map[string]any)
+	for _, cap := range input.Capacities {
+		value, err := getCapacityValue(cap)
+		if err != nil {
+			return false, fmt.Errorf("capacity %s: %w", cap.Name, err)
+		}
+		domain, id := parseAttributeName(cap.Name, input.DriverName)
+		if capacities[domain] == nil {
+			capacities[domain] = make(map[string]any)
+		}
+		capacities[domain].(map[string]any)[id] = value
 	}
 
 	variables := map[string]any{
 		driverNameVar: input.DriverName,
-		attributesVar: attributes,
+		attributesVar: newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), attributes, c.emptyMapVal),
+		capacitiesVar: newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), capacities, c.emptyMapVal),
 	}
 
 	result, _, err := c.Program.ContextEval(ctx, variables)
@@ -194,15 +212,27 @@ func mustBuildEnv() *environment.EnvSet {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
 	versioned := []environment.VersionedOptions{
 		{
-			// Feature epoch was actually 1.30, but we artificially set it to 1.0 because these
+			// Feature epoch was actually 1.31, but we artificially set it to 1.0 because these
 			// options should always be present.
 			//
 			// TODO (https://github.com/kubernetes/kubernetes/issues/123687): set this
 			// version properly before going to beta.
 			IntroducedVersion: version.MajorMinor(1, 0),
-			EnvOptions: append(buildVersionedAttributes(),
+			EnvOptions: []cel.EnvOption{
+				cel.Variable(driverNameVar, cel.StringType),
+				cel.Variable(attributesVar, cel.MapType(cel.StringType, cel.MapType(cel.StringType, cel.AnyType))),
+				cel.Variable(capacitiesVar, cel.MapType(cel.StringType, cel.MapType(cel.StringType, cel.AnyType))),
+
 				SemverLib(),
-			),
+
+				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
+				//
+				// This is useful to simplify attribute lookups because the
+				// domain only needs to be given once:
+				//
+				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
+				ext.Bindings(),
+			},
 		},
 	}
 	envset, err := envset.Extend(versioned...)
@@ -212,17 +242,38 @@ func mustBuildEnv() *environment.EnvSet {
 	return envset
 }
 
-func buildVersionedAttributes() []cel.EnvOption {
-	options := []cel.EnvOption{
-		cel.Variable(driverNameVar, cel.StringType),
-		cel.Variable(attributesVar, cel.MapType(cel.StringType, cel.AnyType)),
+// parseAttributeName splits into domain and identified, using the default domain
+// if the name does not contain one.
+func parseAttributeName(name, defaultDomain string) (string, string) {
+	sep := strings.Index(name, "/")
+	if sep == -1 {
+		return defaultDomain, name
 	}
-	return options
+	return name[0:sep], name[sep+1:]
 }
 
-func qualifyAttributeName(name, domain string) string {
-	if domain == "" || strings.Contains(name, "/") {
-		return name
+// newStringInterfaceMapWithDefault is like
+// https://pkg.go.dev/github.com/google/cel-go@v0.20.1/common/types#NewStringInterfaceMap,
+// except that looking up an unknown key returns a default value.
+func newStringInterfaceMapWithDefault(adapter types.Adapter, value map[string]any, defaultValue ref.Val) traits.Mapper {
+	return mapper{
+		Mapper:       types.NewStringInterfaceMap(adapter, value),
+		defaultValue: defaultValue,
 	}
-	return domain + "/" + name
+}
+
+type mapper struct {
+	traits.Mapper
+	defaultValue ref.Val
+}
+
+// Find wraps the mapper's Find so that a default empty map is returned when
+// the lookup did not find the entry.
+func (m mapper) Find(key ref.Val) (ref.Val, bool) {
+	value, found := m.Mapper.Find(key)
+	if found {
+		return value, true
+	}
+
+	return m.defaultValue, true
 }

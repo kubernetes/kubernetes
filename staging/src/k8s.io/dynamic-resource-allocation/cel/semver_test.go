@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	library "k8s.io/dynamic-resource-allocation/structured/namedresources/cel"
+	library "k8s.io/dynamic-resource-allocation/cel"
 )
 
 func testSemver(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
