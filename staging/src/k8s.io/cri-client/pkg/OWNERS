@@ -1,5 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+# Disable inheritance as this is owned by sig-node
+options:
+  no_parent_owners: true
 approvers:
   - sig-node-approvers
   - api-approvers

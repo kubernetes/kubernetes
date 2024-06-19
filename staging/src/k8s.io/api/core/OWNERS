@@ -7,12 +7,9 @@ filters:
   ".*":
     approvers:
       - api-approvers
-      - sig-storage-api-approvers
     reviewers:
       - api-reviewers
-      - sig-storage-api-reviewers
   # only auto-label go file changes as kind/api-change
   "\\.go$":
     labels:
       - kind/api-change
-      - sig/storage
