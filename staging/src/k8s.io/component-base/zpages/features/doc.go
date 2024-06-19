@@ -1,8 +1,5 @@
-//go:build !windows
-// +build !windows
-
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,23 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metrics
-
-import (
-	"os"
-
-	"github.com/prometheus/procfs"
-)
-
-func GetProcessStart() (float64, error) {
-	pid := os.Getpid()
-	p, err := procfs.NewProc(pid)
-	if err != nil {
-		return 0, err
-	}
-
-	if stat, err := p.Stat(); err == nil {
-		return stat.StartTime()
-	}
-	return 0, err
-}
+// Package features contains a separate feature set specifically designed for
+// managing zpages related features. These feature gates control the
+// availability and behavior of various zpages within Kubernetes components.
+// New zpages added to Kubernetes components should utilize this feature set
+// to ensure proper management of their availability.
+package features
