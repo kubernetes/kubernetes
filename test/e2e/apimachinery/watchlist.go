@@ -39,11 +39,10 @@ import (
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), feature.WatchList, func() {
+var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("watchlist")
 	ginkgo.It("should be requested by informers when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
