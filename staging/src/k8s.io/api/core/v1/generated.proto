@@ -2045,6 +2045,7 @@ message ISCSIPersistentVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2102,6 +2103,7 @@ message ISCSIVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.

@@ -311,16 +311,6 @@ func SetDefaults_PersistentVolumeClaimSpec(obj *v1.PersistentVolumeClaimSpec) {
 		*obj.VolumeMode = v1.PersistentVolumeFilesystem
 	}
 }
-func SetDefaults_ISCSIVolumeSource(obj *v1.ISCSIVolumeSource) {
-	if obj.ISCSIInterface == "" {
-		obj.ISCSIInterface = "default"
-	}
-}
-func SetDefaults_ISCSIPersistentVolumeSource(obj *v1.ISCSIPersistentVolumeSource) {
-	if obj.ISCSIInterface == "" {
-		obj.ISCSIInterface = "default"
-	}
-}
 func SetDefaults_AzureDiskVolumeSource(obj *v1.AzureDiskVolumeSource) {
 	if obj.CachingMode == nil {
 		obj.CachingMode = new(v1.AzureDataDiskCachingMode)
