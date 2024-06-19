@@ -1679,7 +1679,20 @@ var _ = common.SIGDescribe("Services", func() {
 		service.Spec.Type = v1.ServiceTypeNodePort
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
-		service, err := t.CreateService(service)
+    		// Retry mechanism for picking a node port between 30000 and 30085
+    		const maxRetries = 5
+    		var nodePort int
+    		for i := 0; i < maxRetries; i++ {
+    	    		nodePort = 30000 + rand.Intn(86)
+        		service.Spec.Ports[0].NodePort = int32(nodePort)
+        		service, err = t.CreateService(service)
+        		if err == nil {
+            			break
+       			}
+        		if i == maxRetries-1 {
+            			framework.Failf("failed to create service: %s in namespace: %s after %d attempts, last error: %v", serviceName, ns, maxRetries, err)
+        		}
+    		}
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
