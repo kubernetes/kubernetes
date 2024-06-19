@@ -85,6 +85,9 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// instead of the default, a cbor.Tag representing a (number, content) pair.
 		UnrecognizedTagToAny: cbor.UnrecognizedTagContentToAny,
 
+		// Decode time tags to interface{} as strings containing RFC 3339 timestamps.
+		TimeTagToAny: cbor.TimeTagToRFC3339Nano,
+
 		// For parity with JSON, strings can be decoded into time.Time if they are RFC 3339
 		// timestamps.
 		ByteStringToTime: cbor.ByteStringToTimeAllowed,
