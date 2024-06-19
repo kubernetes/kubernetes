@@ -1681,10 +1681,11 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		// Retry mechanism for picking a node port between 30000 and 30085
 		const maxRetries = 5
-		var nodePort int
+		var err error
+		var nodePort int32
 		for i := 0; i < maxRetries; i++ {
-			nodePort = 30000 + rand.Intn(86)
-			service.Spec.Ports[0].NodePort = int32(nodePort)
+			nodePort = int32(30000 + rand.Intn(86))
+			service.Spec.Ports[0].NodePort = nodePort
 			service, err = t.CreateService(service)
 			if err == nil {
 				break
