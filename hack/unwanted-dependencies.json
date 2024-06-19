@@ -82,7 +82,6 @@
       ],
       "cloud.google.com/go/compute": [
         "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/genproto",
         "google.golang.org/grpc"
       ],
@@ -153,7 +152,6 @@
         "github.com/prometheus/client_golang",
         "go.etcd.io/etcd/client/v2",
         "go.etcd.io/etcd/server/v3",
-        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
@@ -187,23 +185,17 @@
         "github.com/google/cel-go"
       ],
       "google.golang.org/appengine": [
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/prometheus/client_golang",
         "github.com/prometheus/common",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/grpc"
       ],
       "google.golang.org/genproto": [
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "google.golang.org/genproto/googleapis/api",
-        "google.golang.org/genproto/googleapis/rpc",
-        "google.golang.org/grpc"
+        "go.etcd.io/etcd/server/v3"
       ]
     },
     "unwantedVendored": [
