@@ -56,14 +56,10 @@ func (c *FakePods) GetBinding(name string) (result *v1.Binding, err error) {
 }
 
 func (c *FakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
-	action := core.GenericActionImpl{}
-	action.Verb = "get"
-	action.Namespace = c.ns
-	action.Resource = podsResource
-	action.Subresource = "log"
-	action.Value = opts
-
-	_, _ = c.Fake.Invokes(action, &v1.Pod{})
+	if resp := c.Fake.InvokesProxy(core.NewGetLogAction(podsResource, c.ns, name, opts.Container, opts.SinceSeconds, opts.SinceTime)); resp != nil {
+		return resp.(*restclient.Request)
+	}
+	// Fallback to current behavior in case if there is no  Proxy Reactors found for the sub resource action
 	fakeClient := &fakerest.RESTClient{
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
 			resp := &http.Response{

@@ -57,7 +57,7 @@ func TestLogsForObject(t *testing.T) {
 			name: "pod logs",
 			obj:  testPodWithOneContainers(),
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -76,11 +76,11 @@ func TestLogsForObject(t *testing.T) {
 			allContainers: true,
 			allPods:       false,
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-e1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-initc2"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c2"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-e1"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -124,7 +124,7 @@ func TestLogsForObject(t *testing.T) {
 			name: "pod logs: default to first container",
 			obj:  testPodWithTwoContainers(),
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-c1"}),
+				getLogsAction("test", "foo-two-containers", &corev1.PodLogOptions{Container: "foo-2-c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -142,7 +142,7 @@ func TestLogsForObject(t *testing.T) {
 				Items: []corev1.Pod{*testPodWithOneContainers()},
 			},
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -199,8 +199,8 @@ func TestLogsForObject(t *testing.T) {
 				},
 			},
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "bar", &corev1.PodLogOptions{Container: "c2"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       "pod",
@@ -225,10 +225,10 @@ func TestLogsForObject(t *testing.T) {
 			allContainers: true,
 			allPods:       false,
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-initc1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-initc2"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-c1"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-c2"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-initc1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-initc2"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-c1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-c2"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -267,7 +267,7 @@ func TestLogsForObject(t *testing.T) {
 				Items: []corev1.Pod{*testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers()},
 			},
 			actions: []testclient.Action{
-				getLogsAction("test", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
+				getLogsAction("test", "foo-two-containers-and-two-init-containers", &corev1.PodLogOptions{Container: "foo-2-and-2-and-1-c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{
 				{
@@ -290,7 +290,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -311,7 +311,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -332,7 +332,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -353,7 +353,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -374,7 +374,7 @@ func TestLogsForObject(t *testing.T) {
 			clientsetPods: []runtime.Object{testPodWithOneContainers()},
 			actions: []testclient.Action{
 				testclient.NewListAction(podsResource, podsKind, "test", metav1.ListOptions{LabelSelector: "foo=bar"}),
-				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
+				getLogsAction("test", "foo", &corev1.PodLogOptions{Container: "c1"}),
 			},
 			expectedSources: []corev1.ObjectReference{{
 				Kind:       testPodWithOneContainers().Kind,
@@ -631,12 +631,15 @@ func testPodWithTwoContainersAndTwoInitAndOneEphemeralContainers() *corev1.Pod {
 	}
 }
 
-func getLogsAction(namespace string, opts *corev1.PodLogOptions) testclient.Action {
-	action := testclient.GenericActionImpl{}
+func getLogsAction(namespace string, name string, opts *corev1.PodLogOptions) testclient.Action {
+	action := testclient.GetLogActionImpl{}
 	action.Verb = "get"
 	action.Namespace = namespace
 	action.Resource = podsResource
 	action.Subresource = "log"
-	action.Value = opts
+	action.SinceTime = opts.SinceTime
+	action.SinceSeconds = opts.SinceSeconds
+	action.ContainerName = opts.Container
+	action.PodName = name
 	return action
 }

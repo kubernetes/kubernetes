@@ -302,6 +302,19 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 	return action
 }
 
+func NewGetLogAction(resource schema.GroupVersionResource, namespace string, name string, containerName string, sinceSeconds *int64, sinceTime *metav1.Time) GetLogActionImpl {
+	action := GetLogActionImpl{}
+	action.Verb = "get"
+	action.Subresource = "log"
+	action.Resource = resource
+	action.Namespace = namespace
+	action.PodName = name
+	action.SinceTime = sinceTime
+	action.SinceSeconds = sinceSeconds
+	action.ContainerName = containerName
+	return action
+}
+
 func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fieldSelector fields.Selector, resourceVersion string) {
 	var err error
 	switch t := opts.(type) {
@@ -428,6 +441,14 @@ type ProxyGetAction interface {
 	GetPort() string
 	GetPath() string
 	GetParams() map[string]string
+}
+
+type LogGetAction interface {
+	Action
+	GetPodName() string
+	GetContainerName() string
+	GetSinceSeconds() *int64
+	GetSinceTime() *metav1.Time
 }
 
 type ActionImpl struct {
@@ -694,5 +715,43 @@ func (a ProxyGetActionImpl) DeepCopy() Action {
 		Port:       a.Port,
 		Path:       a.Path,
 		Params:     params,
+	}
+}
+
+type GetLogActionImpl struct {
+	ActionImpl
+	PodName       string
+	ContainerName string
+	SinceSeconds  *int64
+	SinceTime     *metav1.Time
+}
+
+func (g GetLogActionImpl) GetName() string {
+	return g.PodName
+}
+
+func (g GetLogActionImpl) GetPodName() string {
+	return g.PodName
+}
+
+func (g GetLogActionImpl) GetContainerName() string {
+	return g.ContainerName
+}
+
+func (g GetLogActionImpl) GetSinceSeconds() *int64 {
+	return g.SinceSeconds
+}
+
+func (g GetLogActionImpl) GetSinceTime() *metav1.Time {
+	return g.SinceTime
+}
+
+func (g GetLogActionImpl) DeepCopy() Action {
+	return GetLogActionImpl{
+		ActionImpl:    g.ActionImpl.DeepCopy().(ActionImpl),
+		PodName:       g.PodName,
+		ContainerName: g.ContainerName,
+		SinceSeconds:  g.SinceSeconds,
+		SinceTime:     g.SinceTime,
 	}
 }
