@@ -31,7 +31,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.11.1
+    version: 1.10.1
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: registry.k8s.io/coredns
@@ -41,7 +41,7 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.11.1
+    version: 1.10.1
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
