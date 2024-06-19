@@ -54,7 +54,9 @@ func SetObjectDefaults_VolumeAttachment(in *v1alpha1.VolumeAttachment) {
 			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)

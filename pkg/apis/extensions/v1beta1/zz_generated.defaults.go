@@ -57,7 +57,9 @@ func SetObjectDefaults_DaemonSet(in *v1beta1.DaemonSet) {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {
@@ -340,7 +342,9 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {
@@ -653,7 +657,9 @@ func SetObjectDefaults_ReplicaSet(in *v1beta1.ReplicaSet) {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			v1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {

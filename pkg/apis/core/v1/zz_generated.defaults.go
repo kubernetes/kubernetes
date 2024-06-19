@@ -148,7 +148,9 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		}
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
-		SetDefaults_ISCSIPersistentVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
+		if in.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface == "" {
+			in.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface = "default"
+		}
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
@@ -194,7 +196,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {
@@ -527,7 +531,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {
@@ -811,7 +817,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 			}
 			if a.VolumeSource.ISCSI != nil {
-				SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+				if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+					a.VolumeSource.ISCSI.ISCSIInterface = "default"
+				}
 			}
 			if a.VolumeSource.RBD != nil {
 				if a.VolumeSource.RBD.RBDPool == "" {

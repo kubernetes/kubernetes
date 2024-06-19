@@ -51,7 +51,9 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {
@@ -334,7 +336,9 @@ func SetObjectDefaults_Job(in *v1.Job) {
 			corev1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
 		if a.VolumeSource.ISCSI != nil {
-			corev1.SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
+			if a.VolumeSource.ISCSI.ISCSIInterface == "" {
+				a.VolumeSource.ISCSI.ISCSIInterface = "default"
+			}
 		}
 		if a.VolumeSource.RBD != nil {
 			if a.VolumeSource.RBD.RBDPool == "" {

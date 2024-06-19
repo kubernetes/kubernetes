@@ -2873,6 +2873,7 @@
             "type": "string"
           },
           "iscsiInterface": {
+            "default": "default",
             "description": "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
             "type": "string"
           },
@@ -2941,6 +2942,7 @@
             "type": "string"
           },
           "iscsiInterface": {
+            "default": "default",
             "description": "iscsiInterface is the interface Name that uses an iSCSI transport. Defaults to 'default' (tcp).",
             "type": "string"
           },
