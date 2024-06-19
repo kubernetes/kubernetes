@@ -35,7 +35,7 @@ func TestScheduling(t *testing.T) {
 	}
 
 	// Check for leaks at the very end.
-	// framework.GoleakCheck(t)
+	framework.GoleakCheck(t)
 
 	// All integration test cases share the same etcd, similar to
 	// https://github.com/kubernetes/kubernetes/blob/18d05b646d09b2971dc5400bc288062b0414e8cf/test/integration/framework/etcd.go#L186-L222.
