@@ -261,8 +261,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	mounts := []kubecontainer.Mount{}
 	var cleanupAction func()
 	for i, mount := range container.VolumeMounts {
+		// mouthPath support
+		mountPath := mount.MountPath
+		mountPath, _ = kubecontainer.ExpandContainerVolumeMountPath(mount, expandEnvs)
 		// do not mount /etc/hosts if container is already mounting on the path
-		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
+		mountEtcHostsFile = mountEtcHostsFile && (mountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
 		if !ok || vol.Mounter == nil {
 			klog.ErrorS(nil, "Mount cannot be satisfied for the container, because the volume is missing or the volume mounter (vol.Mounter) is nil",
@@ -343,7 +346,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			hostPath = volumeutil.MakeAbsolutePath(runtime.GOOS, hostPath)
 		}
 
-		containerPath := mount.MountPath
+		containerPath := mountPath
 		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
 		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !utilfs.IsAbs(containerPath) {
 			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
