@@ -4,8 +4,8 @@ metadata:
   name: test-claim-template
 spec:
   spec:
-    resourceClassName: test-class
-    parametersRef:
-      apiGroup: resource.k8s.io
-      kind: ResourceClaimParameters
-      name: test-claim-parameters
+    devices:
+      requests:
+      - name: req-0
+        device:
+          deviceClassName: test-class

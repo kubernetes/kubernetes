@@ -52,11 +52,6 @@ func validNewClaimTemplate(name string) *resource.ResourceClaimTemplate {
 			Name:      name,
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: resource.ResourceClaimTemplateSpec{
-			Spec: resource.ResourceClaimSpec{
-				ResourceClassName: "valid-class",
-			},
-		},
 	}
 }
 
@@ -94,7 +89,7 @@ func TestUpdate(t *testing.T) {
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.ResourceClaimTemplate)
-			object.Spec.Spec.ResourceClassName = ""
+			object.Name = "^%$#@#%"
 			return object
 		},
 	)

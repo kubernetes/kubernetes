@@ -93,18 +93,16 @@ const (
 	// unschedulable pod pool.
 	// This behavior will be removed when we remove the preCheck feature.
 	// See: https://github.com/kubernetes/kubernetes/issues/110175
-	Node                    GVK = "Node"
-	PersistentVolume        GVK = "PersistentVolume"
-	PersistentVolumeClaim   GVK = "PersistentVolumeClaim"
-	CSINode                 GVK = "storage.k8s.io/CSINode"
-	CSIDriver               GVK = "storage.k8s.io/CSIDriver"
-	CSIStorageCapacity      GVK = "storage.k8s.io/CSIStorageCapacity"
-	StorageClass            GVK = "storage.k8s.io/StorageClass"
-	PodSchedulingContext    GVK = "PodSchedulingContext"
-	ResourceClaim           GVK = "ResourceClaim"
-	ResourceClass           GVK = "ResourceClass"
-	ResourceClaimParameters GVK = "ResourceClaimParameters"
-	ResourceClassParameters GVK = "ResourceClassParameters"
+	Node                  GVK = "Node"
+	PersistentVolume      GVK = "PersistentVolume"
+	PersistentVolumeClaim GVK = "PersistentVolumeClaim"
+	CSINode               GVK = "storage.k8s.io/CSINode"
+	CSIDriver             GVK = "storage.k8s.io/CSIDriver"
+	CSIStorageCapacity    GVK = "storage.k8s.io/CSIStorageCapacity"
+	StorageClass          GVK = "storage.k8s.io/StorageClass"
+	PodSchedulingContext  GVK = "PodSchedulingContext"
+	ResourceClaim         GVK = "ResourceClaim"
+	DeviceClass           GVK = "DeviceClass"
 
 	// WildCard is a special GVK to match all resources.
 	// e.g., If you register `{Resource: "*", ActionType: All}` in EventsToRegister,
@@ -197,9 +195,7 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 		{Event: ClusterEvent{Resource: StorageClass, ActionType: All}},
 		{Event: ClusterEvent{Resource: PodSchedulingContext, ActionType: All}},
 		{Event: ClusterEvent{Resource: ResourceClaim, ActionType: All}},
-		{Event: ClusterEvent{Resource: ResourceClass, ActionType: All}},
-		{Event: ClusterEvent{Resource: ResourceClaimParameters, ActionType: All}},
-		{Event: ClusterEvent{Resource: ResourceClassParameters, ActionType: All}},
+		{Event: ClusterEvent{Resource: DeviceClass, ActionType: All}},
 	}
 }
 

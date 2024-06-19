@@ -38,7 +38,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,6 +98,7 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 		for _, node := range nodeList.Items {
 			nodes.NodeNames = append(nodes.NodeNames, node.Name)
 		}
+		sort.Strings(nodes.NodeNames)
 		framework.Logf("testing on nodes %v", nodes.NodeNames)
 
 		// Watch claims in the namespace. This is useful for monitoring a test
@@ -153,7 +153,7 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
-func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string][]resourceapi.DeviceAttribute) *Driver {
 	d := &Driver{
 		f:            f,
 		fail:         map[MethodInstance]bool{},
@@ -169,7 +169,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() a
 			resources.Nodes = nodes.NodeNames
 		}
 		ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
-		d.SetUp(nodes, resources)
+		d.SetUp(nodes, resources, devicesPerNode...)
 		ginkgo.DeferCleanup(d.TearDown)
 	})
 	return d
@@ -191,13 +191,8 @@ type Driver struct {
 	Name       string
 	Nodes      map[string]*app.ExamplePlugin
 
-	parameterMode         parameterMode
-	parameterAPIGroup     string
-	parameterAPIVersion   string
-	claimParameterAPIKind string
-	classParameterAPIKind string
-
-	NodeV1alpha3 bool
+	parameterMode parameterMode // empty == parameterModeStructured
+	NodeV1alpha3  bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -207,12 +202,11 @@ type Driver struct {
 type parameterMode string
 
 const (
-	parameterModeConfigMap  parameterMode = "configmap"  // ConfigMap parameters, control plane controller.
-	parameterModeStructured parameterMode = "structured" // No ConfigMaps, directly create and reference in-tree parameter objects.
-	parameterModeTranslated parameterMode = "translated" // Reference ConfigMaps in claim and class, generate in-tree parameter objects.
+	parameterModeClassicDRA parameterMode = "classic"    // control plane controller
+	parameterModeStructured parameterMode = "structured" // allocation through scheduler
 )
 
-func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
+func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string][]resourceapi.DeviceAttribute) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
@@ -227,8 +221,12 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, cancel)
 
+	if d.parameterMode == "" {
+		d.parameterMode = parameterModeStructured
+	}
+
 	switch d.parameterMode {
-	case "", parameterModeConfigMap:
+	case parameterModeClassicDRA:
 		// The controller is easy: we simply connect to the API server.
 		d.Controller = app.NewController(d.f.ClientSet, resources)
 		d.wg.Add(1)
@@ -236,6 +234,40 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			defer d.wg.Done()
 			d.Controller.Run(d.ctx, 5 /* workers */)
 		}()
+	case parameterModeStructured:
+		if !resources.NodeLocal {
+			// Publish one resource pool with "network-attached" devices.
+			slice := &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: d.Name, // globally unique
+				},
+				Spec: resourceapi.ResourceSliceSpec{
+					Driver: d.Name,
+					Pool: resourceapi.ResourcePool{
+						Name:               "network",
+						Generation:         1,
+						ResourceSliceCount: 1,
+					},
+					NodeSelector: &v1.NodeSelector{}, // All nodes.
+				},
+			}
+			maxAllocations := resources.MaxAllocations
+			if maxAllocations <= 0 {
+				// Cannot be empty, otherwise nothing runs.
+				maxAllocations = 10
+			}
+			for i := 0; i < maxAllocations; i++ {
+				slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+					Name: fmt.Sprintf("device-%d", i),
+				})
+			}
+
+			_, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				framework.ExpectNoError(d.f.ClientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
+			})
+		}
 	}
 
 	manifests := []string{
@@ -243,24 +275,12 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
 	}
-	if d.parameterMode == "" {
-		d.parameterMode = parameterModeConfigMap
-	}
-	var numResourceInstances = -1 // disabled
-	if d.parameterMode != parameterModeConfigMap {
-		numResourceInstances = resources.MaxAllocations
+	var numDevices = -1 // disabled
+	if d.parameterMode != parameterModeClassicDRA && resources.NodeLocal {
+		numDevices = resources.MaxAllocations
 	}
 	switch d.parameterMode {
-	case parameterModeConfigMap, parameterModeTranslated:
-		d.parameterAPIGroup = ""
-		d.parameterAPIVersion = "v1"
-		d.claimParameterAPIKind = "ConfigMap"
-		d.classParameterAPIKind = "ConfigMap"
-	case parameterModeStructured:
-		d.parameterAPIGroup = "resource.k8s.io"
-		d.parameterAPIVersion = "v1alpha3"
-		d.claimParameterAPIKind = "ResourceClaimParameters"
-		d.classParameterAPIKind = "ResourceClassParameters"
+	case parameterModeClassicDRA, parameterModeStructured:
 	default:
 		framework.Failf("unknown test driver parameter mode: %s", d.parameterMode)
 	}
@@ -304,10 +324,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
 			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
 			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
-		case *apiextensionsv1.CustomResourceDefinition:
-			item.Name = strings.ReplaceAll(item.Name, "dra.e2e.example.com", d.parameterAPIGroup)
-			item.Spec.Group = d.parameterAPIGroup
-
 		}
 		return nil
 	}, manifests...)
@@ -326,9 +342,12 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err, "list proxy pods")
 	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
+	sort.Slice(pods.Items, func(i, j int) bool {
+		return pods.Items[i].Spec.NodeName < pods.Items[j].Spec.NodeName
+	})
 
 	// Run registrar and plugin for each of the pods.
-	for _, pod := range pods.Items {
+	for i, pod := range pods.Items {
 		// Need a local variable, not the loop variable, for the anonymous
 		// callback functions below.
 		pod := pod
@@ -353,18 +372,23 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		framework.ExpectNoError(err, "create client for driver")
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
-		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename,
-			app.FileOperations{
-				Create: func(name string, content []byte) error {
-					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
-					return d.createFile(&pod, name, content)
-				},
-				Remove: func(name string) error {
-					klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
-					return d.removeFile(&pod, name)
-				},
-				NumResourceInstances: numResourceInstances,
+		fileOps := app.FileOperations{
+			Create: func(name string, content []byte) error {
+				klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
+				return d.createFile(&pod, name, content)
 			},
+			Remove: func(name string) error {
+				klog.Background().Info("deleting CDI file", "node", nodename, "filename", name)
+				return d.removeFile(&pod, name)
+			},
+		}
+		if i < len(devicesPerNode) {
+			fileOps.Devices = devicesPerNode[i]
+			fileOps.NumDevices = -1
+		} else {
+			fileOps.NumDevices = numDevices
+		}
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)
@@ -499,7 +523,7 @@ func (d *Driver) TearDown() {
 
 func (d *Driver) IsGone(ctx context.Context) {
 	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: "driverName=" + d.Name})
+		slices, err := d.f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 		if err != nil {
 			return nil, err
 		}

@@ -62,12 +62,22 @@ message NodePrepareResourcesResponse {
 
 message NodePrepareResourceResponse {
     // These are the additional devices that kubelet must
-    // make available via the container runtime. A resource
+    // make available via the container runtime. A claim
+    // may have zero or more requests and each request
     // may have zero or more devices.
-    repeated string cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
+    repeated Device cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
     // If non-empty, preparing the ResourceClaim failed.
     // cdi_devices is ignored in that case.
     string error = 2;
+}
+
+message Device {
+    // The request in the claim that this device is associated with.
+    string request_name = 1;
+
+    // A single device instance may map to several CDI device IDs.
+    // None is also valid.
+    repeated string cdi_ids = 2;
 }
 
 message NodeUnprepareResourcesRequest {

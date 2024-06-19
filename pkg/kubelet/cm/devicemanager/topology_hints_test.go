@@ -440,7 +440,6 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 			}
 		}
-
 		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string]())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)

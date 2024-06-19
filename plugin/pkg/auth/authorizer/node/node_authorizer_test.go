@@ -37,7 +37,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
-	"k8s.io/utils/ptr"
 )
 
 func TestAuthorizer(t *testing.T) {
@@ -897,7 +896,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			slice := &resourceapi.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: resourceapi.ResourceSliceSpec{
-					NodeName: ptr.To(nodeName),
+					NodeName: nodeName,
 				},
 			}
 			slices = append(slices, slice)

@@ -528,7 +528,16 @@ func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) 
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: classname,
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name: "req1",
+					DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
+						Device: &resourceapi.DeviceRequestDetail{
+							DeviceClassName: classname,
+						},
+					},
+				}},
+			},
 		},
 	}
 	if owner != nil {
@@ -547,7 +556,16 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 			Annotations:  map[string]string{"resource.kubernetes.io/pod-claim-name": podClaimName},
 		},
 		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: classname,
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name: "req1",
+					DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
+						Device: &resourceapi.DeviceRequestDetail{
+							DeviceClassName: classname,
+						},
+					},
+				}},
+			},
 		},
 	}
 	if owner != nil {
@@ -606,7 +624,16 @@ func makeTemplate(name, namespace, classname string) *resourceapi.ResourceClaimT
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: resourceapi.ResourceClaimTemplateSpec{
 			Spec: resourceapi.ResourceClaimSpec{
-				ResourceClassName: classname,
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{{
+						Name: "req1",
+						DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
+							Device: &resourceapi.DeviceRequestDetail{
+								DeviceClassName: classname,
+							},
+						},
+					}},
+				},
 			},
 		},
 	}

@@ -108,17 +108,16 @@ func TestNodeAuthorizer(t *testing.T) {
 	if _, err := superuserClient.CoreV1().ConfigMaps("ns").Create(context.TODO(), &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "myconfigmap"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mynamedresourceclaim"}, Spec: resourceapi.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mynamedresourceclaim"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}, Spec: resourceapi.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceClaims("ns").Create(context.TODO(), &resourceapi.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	model := resourceapi.ResourceModel{NamedResources: &resourceapi.NamedResourcesResources{}}
-	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice1"}, NodeName: "node1", DriverName: "dra.example.com", ResourceModel: model}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice1"}, Spec: resourceapi.ResourceSliceSpec{NodeName: "node1", Driver: "dra.example.com"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice2"}, NodeName: "node2", DriverName: "dra.example.com", ResourceModel: model}, metav1.CreateOptions{}); err != nil {
+	if _, err := superuserClient.ResourceV1alpha3().ResourceSlices().Create(context.TODO(), &resourceapi.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice2"}, Spec: resourceapi.ResourceSliceSpec{NodeName: "node2", Driver: "dra.example.com"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -670,7 +669,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	if len(slices.Items) != 1 {
 		t.Fatalf("unexpected slices: %v", slices.Items)
 	}
-	if slices.Items[0].NodeName != "node2" {
+	if slices.Items[0].Spec.NodeName != "node2" {
 		t.Fatal("wrong slice deleted")
 	}
 

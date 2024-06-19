@@ -14,6 +14,7 @@ nodes:
     scheduler:
         extraArgs:
           v: "5"
+          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           v: "5"

@@ -82,8 +82,8 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.DeviceClass)
-			object.Selectors = []resource.Selector{{
-				CEL: &resource.CELSelector{
+			object.Spec.Selectors = []resource.DeviceSelector{{
+				CEL: &resource.CELDeviceSelector{
 					Expression: "true",
 				},
 			}}
@@ -92,8 +92,8 @@ func TestUpdate(t *testing.T) {
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*resource.DeviceClass)
-			object.Selectors = []resource.Selector{{
-				CEL: &resource.CELSelector{
+			object.Spec.Selectors = []resource.DeviceSelector{{
+				CEL: &resource.CELDeviceSelector{
 					Expression: "?!#$",
 				},
 			}}

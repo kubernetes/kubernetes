@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -72,7 +73,7 @@ func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1
 }
 
 // wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
-func (h *RegistrationHandler) wipeResourceSlices(pluginName string) {
+func (h *RegistrationHandler) wipeResourceSlices(driver string) {
 	if h.kubeClient == nil {
 		return
 	}
@@ -97,9 +98,9 @@ func (h *RegistrationHandler) wipeResourceSlices(pluginName string) {
 			logger.Error(err, "Unexpected error checking for node")
 			return false, nil
 		}
-		fieldSelector := fields.Set{"nodeName": node.Name}
-		if pluginName != "" {
-			fieldSelector["driverName"] = pluginName
+		fieldSelector := fields.Set{resourceapi.ResourceSliceSelectorNodeName: node.Name}
+		if driver != "" {
+			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
 		err = h.kubeClient.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})

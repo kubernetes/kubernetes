@@ -48,7 +48,6 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/utils/pointer"
-	"k8s.io/utils/ptr"
 )
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -1616,7 +1615,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: ptr.To(nodename),
+			NodeName: nodename,
 		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
@@ -1624,7 +1623,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: ptr.To(nodename + "-other"),
+			NodeName: nodename + "-other",
 		},
 	}
 	sliceNoNode := &resourceapi.ResourceSlice{
@@ -1632,7 +1631,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nil,
+			NodeName: "",
 		},
 	}
 

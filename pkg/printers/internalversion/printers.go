@@ -655,8 +655,8 @@ func AddHandlers(h printers.PrintHandler) {
 
 	nodeResourceSliceColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Node", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["nodeName"]},
-		{Name: "Driver", Type: "string", Description: resourceapi.ResourceSlice{}.SwaggerDoc()["driverName"]},
+		{Name: "Node", Type: "string", Description: resourceapi.ResourceSliceSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "Driver", Type: "string", Description: resourceapi.ResourceSliceSpec{}.SwaggerDoc()["driver"]},
 		{Name: "Pool", Type: "string", Description: resourceapi.ResourcePool{}.SwaggerDoc()["name"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}

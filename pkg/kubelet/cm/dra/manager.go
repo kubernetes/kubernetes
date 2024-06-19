@@ -198,7 +198,11 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			// If there isn't one yet, then add it to the cache.
 			claimInfo, exists := m.cache.get(resourceClaim.Name, resourceClaim.Namespace)
 			if !exists {
-				claimInfo = m.cache.add(newClaimInfoFromClaim(resourceClaim))
+				ci, err := newClaimInfoFromClaim(resourceClaim)
+				if err != nil {
+					return fmt.Errorf("claim %s: %v", klog.KObj(resourceClaim), err)
+				}
+				claimInfo = m.cache.add(ci)
 			}
 
 			// Add a reference to the current pod in the claim info.
@@ -222,14 +226,13 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			resourceClaims[claimInfo.ClaimUID] = resourceClaim
 
 			// Loop through all plugins and prepare for calling NodePrepareResources.
-			for _, resourceHandle := range claimInfo.ResourceHandles {
-				claim := &drapb.Claim{
-					Namespace: claimInfo.Namespace,
-					Uid:       string(claimInfo.ClaimUID),
-					Name:      claimInfo.ClaimName,
-				}
-				pluginName := resourceHandle.DriverName
-				batches[pluginName] = append(batches[pluginName], claim)
+			claim := &drapb.Claim{
+				Namespace: claimInfo.Namespace,
+				Uid:       string(claimInfo.ClaimUID),
+				Name:      claimInfo.ClaimName,
+			}
+			for driverName := range claimInfo.Drivers {
+				batches[driverName] = append(batches[driverName], claim)
 			}
 
 			return nil
@@ -242,11 +245,11 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 	// Call NodePrepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
 	// We could try to continue, but that would make the code more complex.
-	for pluginName, claims := range batches {
+	for driverName, claims := range batches {
 		// Call NodePrepareResources RPC for all resource handles.
-		client, err := dra.NewDRAPluginClient(pluginName)
+		client, err := dra.NewDRAPluginClient(driverName)
 		if err != nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s: %v", pluginName, err)
+			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s: %v", driverName, err)
 		}
 		response, err := client.NodePrepareResources(context.Background(), &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
@@ -270,8 +273,8 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				if !exists {
 					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claim.Name, claim.Namespace)
 				}
-				if err := info.setCDIDevices(pluginName, result.GetCDIDevices()); err != nil {
-					return fmt.Errorf("unable to add CDI devices for plugin %s of claim %s in namespace %s", pluginName, claim.Name, claim.Namespace)
+				for _, device := range result.GetCDIDevices() {
+					info.setCDIDevices(driverName, device.RequestName, device.CdiIds)
 				}
 				return nil
 			})
@@ -352,7 +355,6 @@ func claimIsUsedByContainer(podClaim *v1.PodResourceClaim, container *v1.Contain
 // GetResources gets a ContainerInfo object from the claimInfo cache.
 // This information is used by the caller to update a container config.
 func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
-	annotations := []kubecontainer.Annotation{}
 	cdiDevices := []kubecontainer.CDIDevice{}
 
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
@@ -377,13 +379,17 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
 				}
 
-				claimAnnotations := claimInfo.annotationsAsList()
-				klog.V(3).InfoS("Add resource annotations", "claim", *claimName, "annotations", claimAnnotations)
-				annotations = append(annotations, claimAnnotations...)
-
-				devices := claimInfo.cdiDevicesAsList()
-				klog.V(3).InfoS("Add CDI devices", "claim", *claimName, "CDI devices", devices)
-				cdiDevices = append(cdiDevices, devices...)
+				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+				for _, driverData := range claimInfo.Drivers {
+					for requestName, devices := range driverData.CDIDevices {
+						claimRequestName := claim.Request
+						if claimRequestName == "" || claimRequestName == requestName {
+							for _, deviceID := range devices {
+								cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: deviceID})
+							}
+						}
+					}
+				}
 
 				return nil
 			})
@@ -393,7 +399,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 		}
 	}
 
-	return &ContainerInfo{Annotations: annotations, CDIDevices: cdiDevices}, nil
+	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
 // UnprepareResources calls a plugin's NodeUnprepareResource API for each resource claim owned by a pod.
@@ -449,14 +455,13 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 			claimNamesMap[claimInfo.ClaimUID] = claimInfo.ClaimName
 
 			// Loop through all plugins and prepare for calling NodeUnprepareResources.
-			for _, resourceHandle := range claimInfo.ResourceHandles {
-				claim := &drapb.Claim{
-					Namespace: claimInfo.Namespace,
-					Uid:       string(claimInfo.ClaimUID),
-					Name:      claimInfo.ClaimName,
-				}
-				pluginName := resourceHandle.DriverName
-				batches[pluginName] = append(batches[pluginName], claim)
+			claim := &drapb.Claim{
+				Namespace: claimInfo.Namespace,
+				Uid:       string(claimInfo.ClaimUID),
+				Name:      claimInfo.ClaimName,
+			}
+			for driverName := range claimInfo.Drivers {
+				batches[driverName] = append(batches[driverName], claim)
 			}
 
 			return nil
@@ -469,11 +474,11 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 	// Call NodeUnprepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
 	// We could try to continue, but that would make the code more complex.
-	for pluginName, claims := range batches {
+	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
-		client, err := dra.NewDRAPluginClient(pluginName)
+		client, err := dra.NewDRAPluginClient(driverName)
 		if err != nil {
-			return fmt.Errorf("failed to get DRA Plugin client for plugin name %s: %v", pluginName, err)
+			return fmt.Errorf("get gRPC client for DRA driver %s: %v", driverName, err)
 		}
 		response, err := client.NodeUnprepareResources(context.Background(), &drapb.NodeUnprepareResourcesRequest{Claims: claims})
 		if err != nil {
