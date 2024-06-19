@@ -25,7 +25,7 @@ import (
 	example2v1 "k8s.io/code-generator/examples/crd/apis/example2/v1"
 )
 
-// TestTypeApplyConfiguration represents an declarative configuration of the TestType type for use
+// TestTypeApplyConfiguration represents a declarative configuration of the TestType type for use
 // with apply.
 type TestTypeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -33,7 +33,7 @@ type TestTypeApplyConfiguration struct {
 	Status                           *example2v1.TestTypeStatus `json:"status,omitempty"`
 }
 
-// TestType constructs an declarative configuration of the TestType type for use with
+// TestType constructs a declarative configuration of the TestType type for use with
 // apply.
 func TestType(name, namespace string) *TestTypeApplyConfiguration {
 	b := &TestTypeApplyConfiguration{}
@@ -208,4 +208,10 @@ func (b *TestTypeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() 
 func (b *TestTypeApplyConfiguration) WithStatus(value example2v1.TestTypeStatus) *TestTypeApplyConfiguration {
 	b.Status = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *TestTypeApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

@@ -22,7 +22,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
-// CustomResourceDefinitionSpecApplyConfiguration represents an declarative configuration of the CustomResourceDefinitionSpec type for use
+// CustomResourceDefinitionSpecApplyConfiguration represents a declarative configuration of the CustomResourceDefinitionSpec type for use
 // with apply.
 type CustomResourceDefinitionSpecApplyConfiguration struct {
 	Group                 *string                                             `json:"group,omitempty"`
@@ -33,7 +33,7 @@ type CustomResourceDefinitionSpecApplyConfiguration struct {
 	PreserveUnknownFields *bool                                               `json:"preserveUnknownFields,omitempty"`
 }
 
-// CustomResourceDefinitionSpecApplyConfiguration constructs an declarative configuration of the CustomResourceDefinitionSpec type for use with
+// CustomResourceDefinitionSpecApplyConfiguration constructs a declarative configuration of the CustomResourceDefinitionSpec type for use with
 // apply.
 func CustomResourceDefinitionSpec() *CustomResourceDefinitionSpecApplyConfiguration {
 	return &CustomResourceDefinitionSpecApplyConfiguration{}

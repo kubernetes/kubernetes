@@ -22,7 +22,7 @@ import (
 	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
-// NamedResourcesAttributeValueApplyConfiguration represents an declarative configuration of the NamedResourcesAttributeValue type for use
+// NamedResourcesAttributeValueApplyConfiguration represents a declarative configuration of the NamedResourcesAttributeValue type for use
 // with apply.
 type NamedResourcesAttributeValueApplyConfiguration struct {
 	QuantityValue    *resource.Quantity                           `json:"quantity,omitempty"`
@@ -34,7 +34,7 @@ type NamedResourcesAttributeValueApplyConfiguration struct {
 	VersionValue     *string                                      `json:"version,omitempty"`
 }
 
-// NamedResourcesAttributeValueApplyConfiguration constructs an declarative configuration of the NamedResourcesAttributeValue type for use with
+// NamedResourcesAttributeValueApplyConfiguration constructs a declarative configuration of the NamedResourcesAttributeValue type for use with
 // apply.
 func NamedResourcesAttributeValue() *NamedResourcesAttributeValueApplyConfiguration {
 	return &NamedResourcesAttributeValueApplyConfiguration{}

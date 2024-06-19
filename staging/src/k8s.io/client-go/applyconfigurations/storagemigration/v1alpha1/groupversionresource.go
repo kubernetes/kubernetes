@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// GroupVersionResourceApplyConfiguration represents an declarative configuration of the GroupVersionResource type for use
+// GroupVersionResourceApplyConfiguration represents a declarative configuration of the GroupVersionResource type for use
 // with apply.
 type GroupVersionResourceApplyConfiguration struct {
 	Group    *string `json:"group,omitempty"`
@@ -26,7 +26,7 @@ type GroupVersionResourceApplyConfiguration struct {
 	Resource *string `json:"resource,omitempty"`
 }
 
-// GroupVersionResourceApplyConfiguration constructs an declarative configuration of the GroupVersionResource type for use with
+// GroupVersionResourceApplyConfiguration constructs a declarative configuration of the GroupVersionResource type for use with
 // apply.
 func GroupVersionResource() *GroupVersionResourceApplyConfiguration {
 	return &GroupVersionResourceApplyConfiguration{}

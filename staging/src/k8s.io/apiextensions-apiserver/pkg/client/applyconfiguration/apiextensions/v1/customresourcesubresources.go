@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
-// CustomResourceSubresourcesApplyConfiguration represents an declarative configuration of the CustomResourceSubresources type for use
+// CustomResourceSubresourcesApplyConfiguration represents a declarative configuration of the CustomResourceSubresources type for use
 // with apply.
 type CustomResourceSubresourcesApplyConfiguration struct {
 	Status *v1.CustomResourceSubresourceStatus               `json:"status,omitempty"`
 	Scale  *CustomResourceSubresourceScaleApplyConfiguration `json:"scale,omitempty"`
 }
 
-// CustomResourceSubresourcesApplyConfiguration constructs an declarative configuration of the CustomResourceSubresources type for use with
+// CustomResourceSubresourcesApplyConfiguration constructs a declarative configuration of the CustomResourceSubresources type for use with
 // apply.
 func CustomResourceSubresources() *CustomResourceSubresourcesApplyConfiguration {
 	return &CustomResourceSubresourcesApplyConfiguration{}

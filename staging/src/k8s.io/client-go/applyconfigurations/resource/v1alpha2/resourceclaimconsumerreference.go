@@ -22,7 +22,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 )
 
-// ResourceClaimConsumerReferenceApplyConfiguration represents an declarative configuration of the ResourceClaimConsumerReference type for use
+// ResourceClaimConsumerReferenceApplyConfiguration represents a declarative configuration of the ResourceClaimConsumerReference type for use
 // with apply.
 type ResourceClaimConsumerReferenceApplyConfiguration struct {
 	APIGroup *string    `json:"apiGroup,omitempty"`
@@ -31,7 +31,7 @@ type ResourceClaimConsumerReferenceApplyConfiguration struct {
 	UID      *types.UID `json:"uid,omitempty"`
 }
 
-// ResourceClaimConsumerReferenceApplyConfiguration constructs an declarative configuration of the ResourceClaimConsumerReference type for use with
+// ResourceClaimConsumerReferenceApplyConfiguration constructs a declarative configuration of the ResourceClaimConsumerReference type for use with
 // apply.
 func ResourceClaimConsumerReference() *ResourceClaimConsumerReferenceApplyConfiguration {
 	return &ResourceClaimConsumerReferenceApplyConfiguration{}

@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// VolumeResourceRequirementsApplyConfiguration represents an declarative configuration of the VolumeResourceRequirements type for use
+// VolumeResourceRequirementsApplyConfiguration represents a declarative configuration of the VolumeResourceRequirements type for use
 // with apply.
 type VolumeResourceRequirementsApplyConfiguration struct {
 	Limits   *v1.ResourceList `json:"limits,omitempty"`
 	Requests *v1.ResourceList `json:"requests,omitempty"`
 }
 
-// VolumeResourceRequirementsApplyConfiguration constructs an declarative configuration of the VolumeResourceRequirements type for use with
+// VolumeResourceRequirementsApplyConfiguration constructs a declarative configuration of the VolumeResourceRequirements type for use with
 // apply.
 func VolumeResourceRequirements() *VolumeResourceRequirementsApplyConfiguration {
 	return &VolumeResourceRequirementsApplyConfiguration{}

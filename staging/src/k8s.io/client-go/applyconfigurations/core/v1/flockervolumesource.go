@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// FlockerVolumeSourceApplyConfiguration represents an declarative configuration of the FlockerVolumeSource type for use
+// FlockerVolumeSourceApplyConfiguration represents a declarative configuration of the FlockerVolumeSource type for use
 // with apply.
 type FlockerVolumeSourceApplyConfiguration struct {
 	DatasetName *string `json:"datasetName,omitempty"`
 	DatasetUUID *string `json:"datasetUUID,omitempty"`
 }
 
-// FlockerVolumeSourceApplyConfiguration constructs an declarative configuration of the FlockerVolumeSource type for use with
+// FlockerVolumeSourceApplyConfiguration constructs a declarative configuration of the FlockerVolumeSource type for use with
 // apply.
 func FlockerVolumeSource() *FlockerVolumeSourceApplyConfiguration {
 	return &FlockerVolumeSourceApplyConfiguration{}

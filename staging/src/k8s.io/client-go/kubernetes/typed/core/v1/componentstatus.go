@@ -20,20 +20,14 @@ package v1
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
-	consistencydetector "k8s.io/client-go/util/consistencydetector"
-	watchlist "k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
 )
 
 // ComponentStatusesGetter has a method to return a ComponentStatusInterface.
@@ -58,178 +52,18 @@ type ComponentStatusInterface interface {
 
 // componentStatuses implements ComponentStatusInterface
 type componentStatuses struct {
-	client rest.Interface
+	*gentype.ClientWithListAndApply[*v1.ComponentStatus, *v1.ComponentStatusList, *corev1.ComponentStatusApplyConfiguration]
 }
 
 // newComponentStatuses returns a ComponentStatuses
 func newComponentStatuses(c *CoreV1Client) *componentStatuses {
 	return &componentStatuses{
-		client: c.RESTClient(),
+		gentype.NewClientWithListAndApply[*v1.ComponentStatus, *v1.ComponentStatusList, *corev1.ComponentStatusApplyConfiguration](
+			"componentstatuses",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1.ComponentStatus { return &v1.ComponentStatus{} },
+			func() *v1.ComponentStatusList { return &v1.ComponentStatusList{} }),
 	}
-}
-
-// Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
-	err = c.client.Get().
-		Resource("componentstatuses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(ctx context.Context, opts metav1.ListOptions) (*v1.ComponentStatusList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for componentstatuses, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for componentstatuses", c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for componentstatuses ended with an error, falling back to the standard LIST semantics, err = %v", err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for componentstatuses", c.list, opts, result)
-	}
-	return result, err
-}
-
-// list takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) list(ctx context.Context, opts metav1.ListOptions) (result *v1.ComponentStatusList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.ComponentStatusList{}
-	err = c.client.Get().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// watchList establishes a watch stream with the server and returns the list of ComponentStatuses
-func (c *componentStatuses) watchList(ctx context.Context, opts metav1.ListOptions) (result *v1.ComponentStatusList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1.ComponentStatusList{}
-	err = c.client.Get().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *componentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
-	err = c.client.Post().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(componentStatus).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a componentStatus and updates it. Returns the server's representation of the componentStatus, and an error, if there is any.
-func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
-	err = c.client.Put().
-		Resource("componentstatuses").
-		Name(componentStatus.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(componentStatus).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
-func (c *componentStatuses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("componentstatuses").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("componentstatuses").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched componentStatus.
-func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
-	result = &v1.ComponentStatus{}
-	err = c.client.Patch(pt).
-		Resource("componentstatuses").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied componentStatus.
-func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.ComponentStatusApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ComponentStatus, err error) {
-	if componentStatus == nil {
-		return nil, fmt.Errorf("componentStatus provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(componentStatus)
-	if err != nil {
-		return nil, err
-	}
-	name := componentStatus.Name
-	if name == nil {
-		return nil, fmt.Errorf("componentStatus.Name must be provided to Apply")
-	}
-	result = &v1.ComponentStatus{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Resource("componentstatuses").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

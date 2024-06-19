@@ -22,13 +22,13 @@ import (
 	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
 )
 
-// FlowDistinguisherMethodApplyConfiguration represents an declarative configuration of the FlowDistinguisherMethod type for use
+// FlowDistinguisherMethodApplyConfiguration represents a declarative configuration of the FlowDistinguisherMethod type for use
 // with apply.
 type FlowDistinguisherMethodApplyConfiguration struct {
 	Type *v1beta2.FlowDistinguisherMethodType `json:"type,omitempty"`
 }
 
-// FlowDistinguisherMethodApplyConfiguration constructs an declarative configuration of the FlowDistinguisherMethod type for use with
+// FlowDistinguisherMethodApplyConfiguration constructs a declarative configuration of the FlowDistinguisherMethod type for use with
 // apply.
 func FlowDistinguisherMethod() *FlowDistinguisherMethodApplyConfiguration {
 	return &FlowDistinguisherMethodApplyConfiguration{}

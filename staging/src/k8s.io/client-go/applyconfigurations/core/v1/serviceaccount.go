@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ServiceAccountApplyConfiguration represents an declarative configuration of the ServiceAccount type for use
+// ServiceAccountApplyConfiguration represents a declarative configuration of the ServiceAccount type for use
 // with apply.
 type ServiceAccountApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ServiceAccountApplyConfiguration struct {
 	AutomountServiceAccountToken     *bool                                    `json:"automountServiceAccountToken,omitempty"`
 }
 
-// ServiceAccount constructs an declarative configuration of the ServiceAccount type for use with
+// ServiceAccount constructs a declarative configuration of the ServiceAccount type for use with
 // apply.
 func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 	b := &ServiceAccountApplyConfiguration{}
@@ -274,4 +274,10 @@ func (b *ServiceAccountApplyConfiguration) WithImagePullSecrets(values ...*Local
 func (b *ServiceAccountApplyConfiguration) WithAutomountServiceAccountToken(value bool) *ServiceAccountApplyConfiguration {
 	b.AutomountServiceAccountToken = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ServiceAccountApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

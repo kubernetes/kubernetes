@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// TopologySelectorTermApplyConfiguration represents an declarative configuration of the TopologySelectorTerm type for use
+// TopologySelectorTermApplyConfiguration represents a declarative configuration of the TopologySelectorTerm type for use
 // with apply.
 type TopologySelectorTermApplyConfiguration struct {
 	MatchLabelExpressions []TopologySelectorLabelRequirementApplyConfiguration `json:"matchLabelExpressions,omitempty"`
 }
 
-// TopologySelectorTermApplyConfiguration constructs an declarative configuration of the TopologySelectorTerm type for use with
+// TopologySelectorTermApplyConfiguration constructs a declarative configuration of the TopologySelectorTerm type for use with
 // apply.
 func TopologySelectorTerm() *TopologySelectorTermApplyConfiguration {
 	return &TopologySelectorTermApplyConfiguration{}

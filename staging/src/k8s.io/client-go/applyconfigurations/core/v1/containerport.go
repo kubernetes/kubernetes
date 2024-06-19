@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ContainerPortApplyConfiguration represents an declarative configuration of the ContainerPort type for use
+// ContainerPortApplyConfiguration represents a declarative configuration of the ContainerPort type for use
 // with apply.
 type ContainerPortApplyConfiguration struct {
 	Name          *string      `json:"name,omitempty"`
@@ -32,7 +32,7 @@ type ContainerPortApplyConfiguration struct {
 	HostIP        *string      `json:"hostIP,omitempty"`
 }
 
-// ContainerPortApplyConfiguration constructs an declarative configuration of the ContainerPort type for use with
+// ContainerPortApplyConfiguration constructs a declarative configuration of the ContainerPort type for use with
 // apply.
 func ContainerPort() *ContainerPortApplyConfiguration {
 	return &ContainerPortApplyConfiguration{}

@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceClaimTemplateApplyConfiguration represents an declarative configuration of the ResourceClaimTemplate type for use
+// ResourceClaimTemplateApplyConfiguration represents a declarative configuration of the ResourceClaimTemplate type for use
 // with apply.
 type ResourceClaimTemplateApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type ResourceClaimTemplateApplyConfiguration struct {
 	Spec                             *ResourceClaimTemplateSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// ResourceClaimTemplate constructs an declarative configuration of the ResourceClaimTemplate type for use with
+// ResourceClaimTemplate constructs a declarative configuration of the ResourceClaimTemplate type for use with
 // apply.
 func ResourceClaimTemplate(name, namespace string) *ResourceClaimTemplateApplyConfiguration {
 	b := &ResourceClaimTemplateApplyConfiguration{}
@@ -246,4 +246,10 @@ func (b *ResourceClaimTemplateApplyConfiguration) ensureObjectMetaApplyConfigura
 func (b *ResourceClaimTemplateApplyConfiguration) WithSpec(value *ResourceClaimTemplateSpecApplyConfiguration) *ResourceClaimTemplateApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceClaimTemplateApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

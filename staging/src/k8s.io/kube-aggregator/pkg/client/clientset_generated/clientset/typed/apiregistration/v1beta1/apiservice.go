@@ -20,15 +20,11 @@ package v1beta1
 
 import (
 	"context"
-	"time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
-	consistencydetector "k8s.io/client-go/util/consistencydetector"
-	watchlist "k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
+	gentype "k8s.io/client-go/gentype"
 	v1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
@@ -43,6 +39,7 @@ type APIServicesGetter interface {
 type APIServiceInterface interface {
 	Create(ctx context.Context, aPIService *v1beta1.APIService, opts v1.CreateOptions) (*v1beta1.APIService, error)
 	Update(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (*v1beta1.APIService, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (*v1beta1.APIService, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
@@ -55,168 +52,18 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	client rest.Interface
+	*gentype.ClientWithList[*v1beta1.APIService, *v1beta1.APIServiceList]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 	return &aPIServices{
-		client: c.RESTClient(),
+		gentype.NewClientWithList[*v1beta1.APIService, *v1beta1.APIServiceList](
+			"apiservices",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *v1beta1.APIService { return &v1beta1.APIService{} },
+			func() *v1beta1.APIServiceList { return &v1beta1.APIServiceList{} }),
 	}
-}
-
-// Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.APIService, err error) {
-	result = &v1beta1.APIService{}
-	err = c.client.Get().
-		Resource("apiservices").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) List(ctx context.Context, opts v1.ListOptions) (*v1beta1.APIServiceList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for apiservices, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for apiservices", c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for apiservices ended with an error, falling back to the standard LIST semantics, err = %v", err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, "list request for apiservices", c.list, opts, result)
-	}
-	return result, err
-}
-
-// list takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) list(ctx context.Context, opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1beta1.APIServiceList{}
-	err = c.client.Get().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// watchList establishes a watch stream with the server and returns the list of APIServices
-func (c *aPIServices) watchList(ctx context.Context, opts v1.ListOptions) (result *v1beta1.APIServiceList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1beta1.APIServiceList{}
-	err = c.client.Get().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *aPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Create(ctx context.Context, aPIService *v1beta1.APIService, opts v1.CreateOptions) (result *v1beta1.APIService, err error) {
-	result = &v1beta1.APIService{}
-	err = c.client.Post().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIService).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a aPIService and updates it. Returns the server's representation of the aPIService, and an error, if there is any.
-func (c *aPIServices) Update(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
-	result = &v1beta1.APIService{}
-	err = c.client.Put().
-		Resource("apiservices").
-		Name(aPIService.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIService).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
-	result = &v1beta1.APIService{}
-	err = c.client.Put().
-		Resource("apiservices").
-		Name(aPIService.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(aPIService).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the aPIService and deletes it. Returns an error if one occurs.
-func (c *aPIServices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("apiservices").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *aPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("apiservices").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched aPIService.
-func (c *aPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.APIService, err error) {
-	result = &v1beta1.APIService{}
-	err = c.client.Patch(pt).
-		Resource("apiservices").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

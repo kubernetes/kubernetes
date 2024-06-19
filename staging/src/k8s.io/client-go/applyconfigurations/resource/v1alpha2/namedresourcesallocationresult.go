@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesAllocationResultApplyConfiguration represents an declarative configuration of the NamedResourcesAllocationResult type for use
+// NamedResourcesAllocationResultApplyConfiguration represents a declarative configuration of the NamedResourcesAllocationResult type for use
 // with apply.
 type NamedResourcesAllocationResultApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// NamedResourcesAllocationResultApplyConfiguration constructs an declarative configuration of the NamedResourcesAllocationResult type for use with
+// NamedResourcesAllocationResultApplyConfiguration constructs a declarative configuration of the NamedResourcesAllocationResult type for use with
 // apply.
 func NamedResourcesAllocationResult() *NamedResourcesAllocationResultApplyConfiguration {
 	return &NamedResourcesAllocationResultApplyConfiguration{}

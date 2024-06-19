@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ReplicationControllerConditionApplyConfiguration represents an declarative configuration of the ReplicationControllerCondition type for use
+// ReplicationControllerConditionApplyConfiguration represents a declarative configuration of the ReplicationControllerCondition type for use
 // with apply.
 type ReplicationControllerConditionApplyConfiguration struct {
 	Type               *v1.ReplicationControllerConditionType `json:"type,omitempty"`
@@ -33,7 +33,7 @@ type ReplicationControllerConditionApplyConfiguration struct {
 	Message            *string                                `json:"message,omitempty"`
 }
 
-// ReplicationControllerConditionApplyConfiguration constructs an declarative configuration of the ReplicationControllerCondition type for use with
+// ReplicationControllerConditionApplyConfiguration constructs a declarative configuration of the ReplicationControllerCondition type for use with
 // apply.
 func ReplicationControllerCondition() *ReplicationControllerConditionApplyConfiguration {
 	return &ReplicationControllerConditionApplyConfiguration{}

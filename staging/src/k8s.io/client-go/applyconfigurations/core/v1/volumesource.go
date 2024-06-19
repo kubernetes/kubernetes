@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// VolumeSourceApplyConfiguration represents an declarative configuration of the VolumeSource type for use
+// VolumeSourceApplyConfiguration represents a declarative configuration of the VolumeSource type for use
 // with apply.
 type VolumeSourceApplyConfiguration struct {
 	HostPath              *HostPathVolumeSourceApplyConfiguration              `json:"hostPath,omitempty"`
@@ -52,7 +52,7 @@ type VolumeSourceApplyConfiguration struct {
 	Ephemeral             *EphemeralVolumeSourceApplyConfiguration             `json:"ephemeral,omitempty"`
 }
 
-// VolumeSourceApplyConfiguration constructs an declarative configuration of the VolumeSource type for use with
+// VolumeSourceApplyConfiguration constructs a declarative configuration of the VolumeSource type for use with
 // apply.
 func VolumeSource() *VolumeSourceApplyConfiguration {
 	return &VolumeSourceApplyConfiguration{}

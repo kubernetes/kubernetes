@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// DownwardAPIVolumeSourceApplyConfiguration represents an declarative configuration of the DownwardAPIVolumeSource type for use
+// DownwardAPIVolumeSourceApplyConfiguration represents a declarative configuration of the DownwardAPIVolumeSource type for use
 // with apply.
 type DownwardAPIVolumeSourceApplyConfiguration struct {
 	Items       []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
 	DefaultMode *int32                                    `json:"defaultMode,omitempty"`
 }
 
-// DownwardAPIVolumeSourceApplyConfiguration constructs an declarative configuration of the DownwardAPIVolumeSource type for use with
+// DownwardAPIVolumeSourceApplyConfiguration constructs a declarative configuration of the DownwardAPIVolumeSource type for use with
 // apply.
 func DownwardAPIVolumeSource() *DownwardAPIVolumeSourceApplyConfiguration {
 	return &DownwardAPIVolumeSourceApplyConfiguration{}

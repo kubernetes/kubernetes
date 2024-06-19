@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// TolerationApplyConfiguration represents an declarative configuration of the Toleration type for use
+// TolerationApplyConfiguration represents a declarative configuration of the Toleration type for use
 // with apply.
 type TolerationApplyConfiguration struct {
 	Key               *string                `json:"key,omitempty"`
@@ -32,7 +32,7 @@ type TolerationApplyConfiguration struct {
 	TolerationSeconds *int64                 `json:"tolerationSeconds,omitempty"`
 }
 
-// TolerationApplyConfiguration constructs an declarative configuration of the Toleration type for use with
+// TolerationApplyConfiguration constructs a declarative configuration of the Toleration type for use with
 // apply.
 func Toleration() *TolerationApplyConfiguration {
 	return &TolerationApplyConfiguration{}

@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// AggregationRuleApplyConfiguration represents an declarative configuration of the AggregationRule type for use
+// AggregationRuleApplyConfiguration represents a declarative configuration of the AggregationRule type for use
 // with apply.
 type AggregationRuleApplyConfiguration struct {
 	ClusterRoleSelectors []v1.LabelSelectorApplyConfiguration `json:"clusterRoleSelectors,omitempty"`
 }
 
-// AggregationRuleApplyConfiguration constructs an declarative configuration of the AggregationRule type for use with
+// AggregationRuleApplyConfiguration constructs a declarative configuration of the AggregationRule type for use with
 // apply.
 func AggregationRule() *AggregationRuleApplyConfiguration {
 	return &AggregationRuleApplyConfiguration{}

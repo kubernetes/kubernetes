@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// StorageVersionStatusApplyConfiguration represents an declarative configuration of the StorageVersionStatus type for use
+// StorageVersionStatusApplyConfiguration represents a declarative configuration of the StorageVersionStatus type for use
 // with apply.
 type StorageVersionStatusApplyConfiguration struct {
 	StorageVersions       []ServerStorageVersionApplyConfiguration    `json:"storageVersions,omitempty"`
@@ -26,7 +26,7 @@ type StorageVersionStatusApplyConfiguration struct {
 	Conditions            []StorageVersionConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 
-// StorageVersionStatusApplyConfiguration constructs an declarative configuration of the StorageVersionStatus type for use with
+// StorageVersionStatusApplyConfiguration constructs a declarative configuration of the StorageVersionStatus type for use with
 // apply.
 func StorageVersionStatus() *StorageVersionStatusApplyConfiguration {
 	return &StorageVersionStatusApplyConfiguration{}

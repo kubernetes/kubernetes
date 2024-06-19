@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LabelSelectorRequirementApplyConfiguration represents an declarative configuration of the LabelSelectorRequirement type for use
+// LabelSelectorRequirementApplyConfiguration represents a declarative configuration of the LabelSelectorRequirement type for use
 // with apply.
 type LabelSelectorRequirementApplyConfiguration struct {
 	Key      *string                   `json:"key,omitempty"`
@@ -30,7 +30,7 @@ type LabelSelectorRequirementApplyConfiguration struct {
 	Values   []string                  `json:"values,omitempty"`
 }
 
-// LabelSelectorRequirementApplyConfiguration constructs an declarative configuration of the LabelSelectorRequirement type for use with
+// LabelSelectorRequirementApplyConfiguration constructs a declarative configuration of the LabelSelectorRequirement type for use with
 // apply.
 func LabelSelectorRequirement() *LabelSelectorRequirementApplyConfiguration {
 	return &LabelSelectorRequirementApplyConfiguration{}

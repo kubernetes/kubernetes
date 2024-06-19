@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ReplicationControllerSpecApplyConfiguration represents an declarative configuration of the ReplicationControllerSpec type for use
+// ReplicationControllerSpecApplyConfiguration represents a declarative configuration of the ReplicationControllerSpec type for use
 // with apply.
 type ReplicationControllerSpecApplyConfiguration struct {
 	Replicas        *int32                             `json:"replicas,omitempty"`
@@ -27,7 +27,7 @@ type ReplicationControllerSpecApplyConfiguration struct {
 	Template        *PodTemplateSpecApplyConfiguration `json:"template,omitempty"`
 }
 
-// ReplicationControllerSpecApplyConfiguration constructs an declarative configuration of the ReplicationControllerSpec type for use with
+// ReplicationControllerSpecApplyConfiguration constructs a declarative configuration of the ReplicationControllerSpec type for use with
 // apply.
 func ReplicationControllerSpec() *ReplicationControllerSpecApplyConfiguration {
 	return &ReplicationControllerSpecApplyConfiguration{}

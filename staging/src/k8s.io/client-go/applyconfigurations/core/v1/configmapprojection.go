@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1
 
-// ConfigMapProjectionApplyConfiguration represents an declarative configuration of the ConfigMapProjection type for use
+// ConfigMapProjectionApplyConfiguration represents a declarative configuration of the ConfigMapProjection type for use
 // with apply.
 type ConfigMapProjectionApplyConfiguration struct {
 	LocalObjectReferenceApplyConfiguration `json:",inline"`
@@ -26,7 +26,7 @@ type ConfigMapProjectionApplyConfiguration struct {
 	Optional                               *bool                         `json:"optional,omitempty"`
 }
 
-// ConfigMapProjectionApplyConfiguration constructs an declarative configuration of the ConfigMapProjection type for use with
+// ConfigMapProjectionApplyConfiguration constructs a declarative configuration of the ConfigMapProjection type for use with
 // apply.
 func ConfigMapProjection() *ConfigMapProjectionApplyConfiguration {
 	return &ConfigMapProjectionApplyConfiguration{}

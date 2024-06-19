@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceClaimSchedulingStatusApplyConfiguration represents an declarative configuration of the ResourceClaimSchedulingStatus type for use
+// ResourceClaimSchedulingStatusApplyConfiguration represents a declarative configuration of the ResourceClaimSchedulingStatus type for use
 // with apply.
 type ResourceClaimSchedulingStatusApplyConfiguration struct {
 	Name            *string  `json:"name,omitempty"`
 	UnsuitableNodes []string `json:"unsuitableNodes,omitempty"`
 }
 
-// ResourceClaimSchedulingStatusApplyConfiguration constructs an declarative configuration of the ResourceClaimSchedulingStatus type for use with
+// ResourceClaimSchedulingStatusApplyConfiguration constructs a declarative configuration of the ResourceClaimSchedulingStatus type for use with
 // apply.
 func ResourceClaimSchedulingStatus() *ResourceClaimSchedulingStatusApplyConfiguration {
 	return &ResourceClaimSchedulingStatusApplyConfiguration{}

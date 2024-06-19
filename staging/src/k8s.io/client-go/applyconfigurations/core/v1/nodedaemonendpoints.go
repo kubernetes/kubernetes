@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// NodeDaemonEndpointsApplyConfiguration represents an declarative configuration of the NodeDaemonEndpoints type for use
+// NodeDaemonEndpointsApplyConfiguration represents a declarative configuration of the NodeDaemonEndpoints type for use
 // with apply.
 type NodeDaemonEndpointsApplyConfiguration struct {
 	KubeletEndpoint *DaemonEndpointApplyConfiguration `json:"kubeletEndpoint,omitempty"`
 }
 
-// NodeDaemonEndpointsApplyConfiguration constructs an declarative configuration of the NodeDaemonEndpoints type for use with
+// NodeDaemonEndpointsApplyConfiguration constructs a declarative configuration of the NodeDaemonEndpoints type for use with
 // apply.
 func NodeDaemonEndpoints() *NodeDaemonEndpointsApplyConfiguration {
 	return &NodeDaemonEndpointsApplyConfiguration{}

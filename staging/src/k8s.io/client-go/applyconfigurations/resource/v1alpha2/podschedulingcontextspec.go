@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1alpha2
 
-// PodSchedulingContextSpecApplyConfiguration represents an declarative configuration of the PodSchedulingContextSpec type for use
+// PodSchedulingContextSpecApplyConfiguration represents a declarative configuration of the PodSchedulingContextSpec type for use
 // with apply.
 type PodSchedulingContextSpecApplyConfiguration struct {
 	SelectedNode   *string  `json:"selectedNode,omitempty"`
 	PotentialNodes []string `json:"potentialNodes,omitempty"`
 }
 
-// PodSchedulingContextSpecApplyConfiguration constructs an declarative configuration of the PodSchedulingContextSpec type for use with
+// PodSchedulingContextSpecApplyConfiguration constructs a declarative configuration of the PodSchedulingContextSpec type for use with
 // apply.
 func PodSchedulingContextSpec() *PodSchedulingContextSpecApplyConfiguration {
 	return &PodSchedulingContextSpecApplyConfiguration{}

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceFilterApplyConfiguration represents an declarative configuration of the ResourceFilter type for use
+// ResourceFilterApplyConfiguration represents a declarative configuration of the ResourceFilter type for use
 // with apply.
 type ResourceFilterApplyConfiguration struct {
 	DriverName                            *string `json:"driverName,omitempty"`
 	ResourceFilterModelApplyConfiguration `json:",inline"`
 }
 
-// ResourceFilterApplyConfiguration constructs an declarative configuration of the ResourceFilter type for use with
+// ResourceFilterApplyConfiguration constructs a declarative configuration of the ResourceFilter type for use with
 // apply.
 func ResourceFilter() *ResourceFilterApplyConfiguration {
 	return &ResourceFilterApplyConfiguration{}

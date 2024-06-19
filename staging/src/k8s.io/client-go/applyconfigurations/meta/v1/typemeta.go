@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// TypeMetaApplyConfiguration represents an declarative configuration of the TypeMeta type for use
+// TypeMetaApplyConfiguration represents a declarative configuration of the TypeMeta type for use
 // with apply.
 type TypeMetaApplyConfiguration struct {
 	Kind       *string `json:"kind,omitempty"`
 	APIVersion *string `json:"apiVersion,omitempty"`
 }
 
-// TypeMetaApplyConfiguration constructs an declarative configuration of the TypeMeta type for use with
+// TypeMetaApplyConfiguration constructs a declarative configuration of the TypeMeta type for use with
 // apply.
 func TypeMeta() *TypeMetaApplyConfiguration {
 	return &TypeMetaApplyConfiguration{}

@@ -22,13 +22,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// NamespaceSpecApplyConfiguration represents an declarative configuration of the NamespaceSpec type for use
+// NamespaceSpecApplyConfiguration represents a declarative configuration of the NamespaceSpec type for use
 // with apply.
 type NamespaceSpecApplyConfiguration struct {
 	Finalizers []v1.FinalizerName `json:"finalizers,omitempty"`
 }
 
-// NamespaceSpecApplyConfiguration constructs an declarative configuration of the NamespaceSpec type for use with
+// NamespaceSpecApplyConfiguration constructs a declarative configuration of the NamespaceSpec type for use with
 // apply.
 func NamespaceSpec() *NamespaceSpecApplyConfiguration {
 	return &NamespaceSpecApplyConfiguration{}

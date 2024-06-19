@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// PodAffinityApplyConfiguration represents an declarative configuration of the PodAffinity type for use
+// PodAffinityApplyConfiguration represents a declarative configuration of the PodAffinity type for use
 // with apply.
 type PodAffinityApplyConfiguration struct {
 	RequiredDuringSchedulingIgnoredDuringExecution  []PodAffinityTermApplyConfiguration         `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTermApplyConfiguration `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
 }
 
-// PodAffinityApplyConfiguration constructs an declarative configuration of the PodAffinity type for use with
+// PodAffinityApplyConfiguration constructs a declarative configuration of the PodAffinity type for use with
 // apply.
 func PodAffinity() *PodAffinityApplyConfiguration {
 	return &PodAffinityApplyConfiguration{}

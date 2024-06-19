@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// PodSecurityContextApplyConfiguration represents an declarative configuration of the PodSecurityContext type for use
+// PodSecurityContextApplyConfiguration represents a declarative configuration of the PodSecurityContext type for use
 // with apply.
 type PodSecurityContextApplyConfiguration struct {
 	SELinuxOptions           *SELinuxOptionsApplyConfiguration                `json:"seLinuxOptions,omitempty"`
@@ -39,7 +39,7 @@ type PodSecurityContextApplyConfiguration struct {
 	AppArmorProfile          *AppArmorProfileApplyConfiguration               `json:"appArmorProfile,omitempty"`
 }
 
-// PodSecurityContextApplyConfiguration constructs an declarative configuration of the PodSecurityContext type for use with
+// PodSecurityContextApplyConfiguration constructs a declarative configuration of the PodSecurityContext type for use with
 // apply.
 func PodSecurityContext() *PodSecurityContextApplyConfiguration {
 	return &PodSecurityContextApplyConfiguration{}

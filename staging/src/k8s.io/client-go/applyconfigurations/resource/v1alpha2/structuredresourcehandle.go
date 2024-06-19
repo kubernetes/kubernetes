@@ -22,7 +22,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// StructuredResourceHandleApplyConfiguration represents an declarative configuration of the StructuredResourceHandle type for use
+// StructuredResourceHandleApplyConfiguration represents a declarative configuration of the StructuredResourceHandle type for use
 // with apply.
 type StructuredResourceHandleApplyConfiguration struct {
 	VendorClassParameters *runtime.RawExtension                      `json:"vendorClassParameters,omitempty"`
@@ -31,7 +31,7 @@ type StructuredResourceHandleApplyConfiguration struct {
 	Results               []DriverAllocationResultApplyConfiguration `json:"results,omitempty"`
 }
 
-// StructuredResourceHandleApplyConfiguration constructs an declarative configuration of the StructuredResourceHandle type for use with
+// StructuredResourceHandleApplyConfiguration constructs a declarative configuration of the StructuredResourceHandle type for use with
 // apply.
 func StructuredResourceHandle() *StructuredResourceHandleApplyConfiguration {
 	return &StructuredResourceHandleApplyConfiguration{}

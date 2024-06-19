@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ManagedFieldsEntryApplyConfiguration represents an declarative configuration of the ManagedFieldsEntry type for use
+// ManagedFieldsEntryApplyConfiguration represents a declarative configuration of the ManagedFieldsEntry type for use
 // with apply.
 type ManagedFieldsEntryApplyConfiguration struct {
 	Manager     *string                        `json:"manager,omitempty"`
@@ -34,7 +34,7 @@ type ManagedFieldsEntryApplyConfiguration struct {
 	Subresource *string                        `json:"subresource,omitempty"`
 }
 
-// ManagedFieldsEntryApplyConfiguration constructs an declarative configuration of the ManagedFieldsEntry type for use with
+// ManagedFieldsEntryApplyConfiguration constructs a declarative configuration of the ManagedFieldsEntry type for use with
 // apply.
 func ManagedFieldsEntry() *ManagedFieldsEntryApplyConfiguration {
 	return &ManagedFieldsEntryApplyConfiguration{}
