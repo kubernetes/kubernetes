@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -818,6 +819,14 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
 	}
+	// For recursive lists, we need to make sure the key ended with "/" so that we only
+	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
+	// with prefix "/a" will return all three, while with prefix "/a/" will return only
+	// "/a/b" which is the correct answer.
+	preparedKey := key
+	if opts.Recursive && !strings.HasSuffix(key, "/") {
+		preparedKey += "/"
+	}
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	if resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
@@ -856,9 +865,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	filter := filterWithAttrsFunction(key, pred)
+	filter := filterWithAttrsFunction(preparedKey, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, key, pred, recursive)
+	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
 	if err != nil {
 		return err
 	}
