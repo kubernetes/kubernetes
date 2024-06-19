@@ -204,6 +204,7 @@ func aberrantLoadMessageDescReentrant(t reflect.Type, name protoreflect.FullName
 		}
 	}
 
+	md.L1.EditionFeatures = md.L0.ParentFile.L1.EditionFeatures
 	// Obtain a list of oneof wrapper types.
 	var oneofWrappers []reflect.Type
 	methods := make([]reflect.Method, 0, 2)
@@ -250,6 +251,7 @@ func aberrantLoadMessageDescReentrant(t reflect.Type, name protoreflect.FullName
 			od := &md.L2.Oneofs.List[n]
 			od.L0.FullName = md.FullName().Append(protoreflect.Name(tag))
 			od.L0.ParentFile = md.L0.ParentFile
+			od.L1.EditionFeatures = md.L1.EditionFeatures
 			od.L0.Parent = md
 			od.L0.Index = n
 
@@ -260,6 +262,7 @@ func aberrantLoadMessageDescReentrant(t reflect.Type, name protoreflect.FullName
 						aberrantAppendField(md, f.Type, tag, "", "")
 						fd := &md.L2.Fields.List[len(md.L2.Fields.List)-1]
 						fd.L1.ContainingOneof = od
+						fd.L1.EditionFeatures = od.L1.EditionFeatures
 						od.L1.Fields.List = append(od.L1.Fields.List, fd)
 					}
 				}
@@ -307,14 +310,14 @@ func aberrantAppendField(md *filedesc.Message, goType reflect.Type, tag, tagKey,
 	fd.L0.Parent = md
 	fd.L0.Index = n
 
-	if fd.L1.IsWeak || fd.L1.HasPacked {
+	if fd.L1.IsWeak || fd.L1.EditionFeatures.IsPacked {
 		fd.L1.Options = func() protoreflect.ProtoMessage {
 			opts := descopts.Field.ProtoReflect().New()
 			if fd.L1.IsWeak {
 				opts.Set(opts.Descriptor().Fields().ByName("weak"), protoreflect.ValueOfBool(true))
 			}
-			if fd.L1.HasPacked {
-				opts.Set(opts.Descriptor().Fields().ByName("packed"), protoreflect.ValueOfBool(fd.L1.IsPacked))
+			if fd.L1.EditionFeatures.IsPacked {
+				opts.Set(opts.Descriptor().Fields().ByName("packed"), protoreflect.ValueOfBool(fd.L1.EditionFeatures.IsPacked))
 			}
 			return opts.Interface()
 		}
@@ -344,6 +347,7 @@ func aberrantAppendField(md *filedesc.Message, goType reflect.Type, tag, tagKey,
 				md2.L0.ParentFile = md.L0.ParentFile
 				md2.L0.Parent = md
 				md2.L0.Index = n
+				md2.L1.EditionFeatures = md.L1.EditionFeatures
 
 				md2.L1.IsMapEntry = true
 				md2.L2.Options = func() protoreflect.ProtoMessage {

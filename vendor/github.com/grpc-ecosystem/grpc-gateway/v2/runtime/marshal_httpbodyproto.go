@@ -26,7 +26,7 @@ func (h *HTTPBodyMarshaler) ContentType(v interface{}) string {
 // google.api.HttpBody message, otherwise it falls back to the default Marshaler.
 func (h *HTTPBodyMarshaler) Marshal(v interface{}) ([]byte, error) {
 	if httpBody, ok := v.(*httpbody.HttpBody); ok {
-		return httpBody.Data, nil
+		return httpBody.GetData(), nil
 	}
 	return h.Marshaler.Marshal(v)
 }

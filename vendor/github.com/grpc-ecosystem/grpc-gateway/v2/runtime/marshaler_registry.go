@@ -46,7 +46,7 @@ func MarshalerForRequest(mux *ServeMux, r *http.Request) (inbound Marshaler, out
 	for _, contentTypeVal := range r.Header[contentTypeHeader] {
 		contentType, _, err := mime.ParseMediaType(contentTypeVal)
 		if err != nil {
-			grpclog.Infof("Failed to parse Content-Type %s: %v", contentTypeVal, err)
+			grpclog.Errorf("Failed to parse Content-Type %s: %v", contentTypeVal, err)
 			continue
 		}
 		if m, ok := mux.marshalers.mimeMap[contentType]; ok {
