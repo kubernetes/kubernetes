@@ -544,6 +544,12 @@ type EnumDescriptor interface {
 	// ReservedRanges is a list of reserved ranges of enum numbers.
 	ReservedRanges() EnumRanges
 
+	// IsClosed reports whether this enum uses closed semantics.
+	// See https://protobuf.dev/programming-guides/enum/#definitions.
+	// Note: the Go protobuf implementation is not spec compliant and treats
+	// all enums as open enums.
+	IsClosed() bool
+
 	isEnumDescriptor
 }
 type isEnumDescriptor interface{ ProtoType(EnumDescriptor) }

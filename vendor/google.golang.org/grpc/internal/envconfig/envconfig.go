@@ -28,17 +28,11 @@ import (
 var (
 	// TXTErrIgnore is set if TXT errors should be ignored ("GRPC_GO_IGNORE_TXT_ERRORS" is not "false").
 	TXTErrIgnore = boolFromEnv("GRPC_GO_IGNORE_TXT_ERRORS", true)
-	// AdvertiseCompressors is set if registered compressor should be advertised
-	// ("GRPC_GO_ADVERTISE_COMPRESSORS" is not "false").
-	AdvertiseCompressors = boolFromEnv("GRPC_GO_ADVERTISE_COMPRESSORS", true)
 	// RingHashCap indicates the maximum ring size which defaults to 4096
 	// entries but may be overridden by setting the environment variable
 	// "GRPC_RING_HASH_CAP".  This does not override the default bounds
 	// checking which NACKs configs specifying ring sizes > 8*1024*1024 (~8M).
 	RingHashCap = uint64FromEnv("GRPC_RING_HASH_CAP", 4096, 1, 8*1024*1024)
-	// PickFirstLBConfig is set if we should support configuration of the
-	// pick_first LB policy.
-	PickFirstLBConfig = boolFromEnv("GRPC_EXPERIMENTAL_PICKFIRST_LB_CONFIG", true)
 	// LeastRequestLB is set if we should support the least_request_experimental
 	// LB policy, which can be enabled by setting the environment variable
 	// "GRPC_EXPERIMENTAL_ENABLE_LEAST_REQUEST" to "true".

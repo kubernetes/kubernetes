@@ -87,3 +87,18 @@ func InvalidUTF8(name string) error {
 func RequiredNotSet(name string) error {
 	return New("required field %v not set", name)
 }
+
+type SizeMismatchError struct {
+	Calculated, Measured int
+}
+
+func (e *SizeMismatchError) Error() string {
+	return fmt.Sprintf("size mismatch (see https://github.com/golang/protobuf/issues/1609): calculated=%d, measured=%d", e.Calculated, e.Measured)
+}
+
+func MismatchedSizeCalculation(calculated, measured int) error {
+	return &SizeMismatchError{
+		Calculated: calculated,
+		Measured:   measured,
+	}
+}
