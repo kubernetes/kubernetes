@@ -6123,7 +6123,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
 
-			podWorkers, _, processed := createPodWorkers()
+			podWorkers, _, processed := createPodWorkers(nil)
 			kl.podWorkers = podWorkers
 			originalPodSyncer := podWorkers.podSyncer
 			syncFuncs := newPodSyncerFuncs(originalPodSyncer)
