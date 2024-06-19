@@ -69,7 +69,15 @@ func SetObjectDefaults_VolumeAttachment(in *v1beta1.VolumeAttachment) {
 			v1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD != nil {
-			v1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RBDPool = "rbd"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.RadosUser = "admin"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
 			v1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)

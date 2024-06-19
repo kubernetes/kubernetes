@@ -6206,6 +6206,7 @@
             "type": "string"
           },
           "keyring": {
+            "default": "/etc/ceph/keyring",
             "description": "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -6219,6 +6220,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "pool": {
+            "default": "rbd",
             "description": "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -6235,6 +6237,7 @@
             "description": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
           },
           "user": {
+            "default": "admin",
             "description": "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           }
@@ -6258,6 +6261,7 @@
             "type": "string"
           },
           "keyring": {
+            "default": "/etc/ceph/keyring",
             "description": "keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -6271,6 +6275,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "pool": {
+            "default": "rbd",
             "description": "pool is the rados pool name. Default is rbd. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           },
@@ -6287,6 +6292,7 @@
             "description": "secretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it"
           },
           "user": {
+            "default": "admin",
             "description": "user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it",
             "type": "string"
           }

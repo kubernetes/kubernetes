@@ -7262,6 +7262,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: keyring
       type:
         scalar: string
+      default: /etc/ceph/keyring
     - name: monitors
       type:
         list:
@@ -7271,6 +7272,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+      default: rbd
     - name: readOnly
       type:
         scalar: boolean
@@ -7280,6 +7282,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+      default: admin
 - name: io.k8s.api.core.v1.RBDVolumeSource
   map:
     fields:
@@ -7293,6 +7296,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: keyring
       type:
         scalar: string
+      default: /etc/ceph/keyring
     - name: monitors
       type:
         list:
@@ -7302,6 +7306,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+      default: rbd
     - name: readOnly
       type:
         scalar: boolean
@@ -7311,6 +7316,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+      default: admin
 - name: io.k8s.api.core.v1.ReplicationController
   map:
     fields:

@@ -137,7 +137,15 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		SetDefaults_HostPathVolumeSource(in.Spec.PersistentVolumeSource.HostPath)
 	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
-		SetDefaults_RBDPersistentVolumeSource(in.Spec.PersistentVolumeSource.RBD)
+		if in.Spec.PersistentVolumeSource.RBD.RBDPool == "" {
+			in.Spec.PersistentVolumeSource.RBD.RBDPool = "rbd"
+		}
+		if in.Spec.PersistentVolumeSource.RBD.RadosUser == "" {
+			in.Spec.PersistentVolumeSource.RBD.RadosUser = "admin"
+		}
+		if in.Spec.PersistentVolumeSource.RBD.Keyring == "" {
+			in.Spec.PersistentVolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+		}
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIPersistentVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)
@@ -189,7 +197,15 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -514,7 +530,15 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 		}
 		if a.VolumeSource.RBD != nil {
-			SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+			if a.VolumeSource.RBD.RBDPool == "" {
+				a.VolumeSource.RBD.RBDPool = "rbd"
+			}
+			if a.VolumeSource.RBD.RadosUser == "" {
+				a.VolumeSource.RBD.RadosUser = "admin"
+			}
+			if a.VolumeSource.RBD.Keyring == "" {
+				a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+			}
 		}
 		if a.VolumeSource.DownwardAPI != nil {
 			SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
@@ -790,7 +814,15 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_ISCSIVolumeSource(a.VolumeSource.ISCSI)
 			}
 			if a.VolumeSource.RBD != nil {
-				SetDefaults_RBDVolumeSource(a.VolumeSource.RBD)
+				if a.VolumeSource.RBD.RBDPool == "" {
+					a.VolumeSource.RBD.RBDPool = "rbd"
+				}
+				if a.VolumeSource.RBD.RadosUser == "" {
+					a.VolumeSource.RBD.RadosUser = "admin"
+				}
+				if a.VolumeSource.RBD.Keyring == "" {
+					a.VolumeSource.RBD.Keyring = "/etc/ceph/keyring"
+				}
 			}
 			if a.VolumeSource.DownwardAPI != nil {
 				SetDefaults_DownwardAPIVolumeSource(a.VolumeSource.DownwardAPI)
