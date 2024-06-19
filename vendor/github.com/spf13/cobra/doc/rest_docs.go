@@ -140,7 +140,7 @@ func GenReSTTree(cmd *cobra.Command, dir string) error {
 	return GenReSTTreeCustom(cmd, dir, emptyStr, defaultLinkHandler)
 }
 
-// GenReSTTreeCustom is the the same as GenReSTTree, but
+// GenReSTTreeCustom is the same as GenReSTTree, but
 // with custom filePrepender and linkHandler.
 func GenReSTTreeCustom(cmd *cobra.Command, dir string, filePrepender func(string) string, linkHandler func(string, string) string) error {
 	for _, c := range cmd.Commands() {
