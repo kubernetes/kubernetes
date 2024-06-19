@@ -1684,9 +1684,24 @@ var _ = common.SIGDescribe("Services", func() {
 		service.Spec.Type = v1.ServiceTypeNodePort
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
-		service, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
-
+		// Retry mechanism for picking a node port between 30000 and 30085
+		// to avoid conflicts
+		// https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3668-reserved-service-nodeport-range
+		const maxRetries = 5
+		created := false
+		for i := 0; i < maxRetries; i++ {
+			service.Spec.Ports[0].NodePort = int32(30000 + rand.Intn(86))
+			createdService, err := t.CreateService(service)
+			if err == nil {
+				service = createdService
+				created = true
+				break
+			}
+			framework.Logf("failed to create service: %s in namespace: %s attempt %d, error: %v", serviceName, ns, i, err)
+		}
+		if !created {
+			framework.Failf("failed to create service: %s in namespace: %s after %d attempts", serviceName, ns, maxRetries)
+		}
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
 		}
@@ -1703,7 +1718,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodePort := port.NodePort
 
 		ginkgo.By("deleting original service " + serviceName)
-		err = t.DeleteService(serviceName)
+		err := t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
 		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec")
