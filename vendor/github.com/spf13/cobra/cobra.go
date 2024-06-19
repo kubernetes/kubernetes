@@ -193,8 +193,6 @@ func ld(s, t string, ignoreCase bool) int {
 	d := make([][]int, len(s)+1)
 	for i := range d {
 		d[i] = make([]int, len(t)+1)
-	}
-	for i := range d {
 		d[i][0] = i
 	}
 	for j := range d[0] {
