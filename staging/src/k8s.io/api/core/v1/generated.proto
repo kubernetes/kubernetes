@@ -2713,7 +2713,7 @@ message NodeSpec {
 // NodeStatus is information about the current status of a node.
 message NodeStatus {
   // Capacity represents the total resources of a node.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#capacity
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
