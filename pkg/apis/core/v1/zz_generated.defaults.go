@@ -171,7 +171,12 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		}
 	}
 	if in.Spec.PersistentVolumeSource.ScaleIO != nil {
-		SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
+		if in.Spec.PersistentVolumeSource.ScaleIO.StorageMode == "" {
+			in.Spec.PersistentVolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+		}
+		if in.Spec.PersistentVolumeSource.ScaleIO.FSType == "" {
+			in.Spec.PersistentVolumeSource.ScaleIO.FSType = "xfs"
+		}
 	}
 }
 
@@ -274,7 +279,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
@@ -624,7 +634,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
@@ -925,7 +940,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				}
 			}
 			if a.VolumeSource.ScaleIO != nil {
-				SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+				if a.VolumeSource.ScaleIO.StorageMode == "" {
+					a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+				}
+				if a.VolumeSource.ScaleIO.FSType == "" {
+					a.VolumeSource.ScaleIO.FSType = "xfs"
+				}
 			}
 			if a.VolumeSource.Ephemeral != nil {
 				if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
