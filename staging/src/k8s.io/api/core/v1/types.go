@@ -1625,17 +1625,21 @@ type AzureDiskVolumeSource struct {
 	DataDiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
 	// cachingMode is the Host Caching mode: None, Read Only, Read Write.
 	// +optional
+	// +default=ref(AzureDataDiskCachingReadWrite)
 	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
 	// fsType is Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
+	// +default="ext4"
 	FSType *string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
+	// +default=false
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 	// kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+	// +default=ref(AzureSharedBlobDisk)
 	Kind *AzureDataDiskKind `json:"kind,omitempty" protobuf:"bytes,6,opt,name=kind,casttype=AzureDataDiskKind"`
 }
 

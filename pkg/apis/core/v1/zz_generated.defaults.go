@@ -153,7 +153,22 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		}
 	}
 	if in.Spec.PersistentVolumeSource.AzureDisk != nil {
-		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
+		if in.Spec.PersistentVolumeSource.AzureDisk.CachingMode == nil {
+			ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+			in.Spec.PersistentVolumeSource.AzureDisk.CachingMode = &ptrVar1
+		}
+		if in.Spec.PersistentVolumeSource.AzureDisk.FSType == nil {
+			var ptrVar1 string = "ext4"
+			in.Spec.PersistentVolumeSource.AzureDisk.FSType = &ptrVar1
+		}
+		if in.Spec.PersistentVolumeSource.AzureDisk.ReadOnly == nil {
+			var ptrVar1 bool = false
+			in.Spec.PersistentVolumeSource.AzureDisk.ReadOnly = &ptrVar1
+		}
+		if in.Spec.PersistentVolumeSource.AzureDisk.Kind == nil {
+			ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+			in.Spec.PersistentVolumeSource.AzureDisk.Kind = &ptrVar1
+		}
 	}
 	if in.Spec.PersistentVolumeSource.ScaleIO != nil {
 		SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
@@ -224,7 +239,22 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
@@ -559,7 +589,22 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 			SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
 		if a.VolumeSource.AzureDisk != nil {
-			SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+			if a.VolumeSource.AzureDisk.CachingMode == nil {
+				ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+				a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.FSType == nil {
+				var ptrVar1 string = "ext4"
+				a.VolumeSource.AzureDisk.FSType = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.ReadOnly == nil {
+				var ptrVar1 bool = false
+				a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+			}
+			if a.VolumeSource.AzureDisk.Kind == nil {
+				ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+				a.VolumeSource.AzureDisk.Kind = &ptrVar1
+			}
 		}
 		if a.VolumeSource.Projected != nil {
 			SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)
@@ -845,7 +890,22 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 				SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 			}
 			if a.VolumeSource.AzureDisk != nil {
-				SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
+				if a.VolumeSource.AzureDisk.CachingMode == nil {
+					ptrVar1 := v1.AzureDataDiskCachingMode(v1.AzureDataDiskCachingReadWrite)
+					a.VolumeSource.AzureDisk.CachingMode = &ptrVar1
+				}
+				if a.VolumeSource.AzureDisk.FSType == nil {
+					var ptrVar1 string = "ext4"
+					a.VolumeSource.AzureDisk.FSType = &ptrVar1
+				}
+				if a.VolumeSource.AzureDisk.ReadOnly == nil {
+					var ptrVar1 bool = false
+					a.VolumeSource.AzureDisk.ReadOnly = &ptrVar1
+				}
+				if a.VolumeSource.AzureDisk.Kind == nil {
+					ptrVar1 := v1.AzureDataDiskKind(v1.AzureSharedBlobDisk)
+					a.VolumeSource.AzureDisk.Kind = &ptrVar1
+				}
 			}
 			if a.VolumeSource.Projected != nil {
 				SetDefaults_ProjectedVolumeSource(a.VolumeSource.Projected)

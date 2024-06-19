@@ -4454,6 +4454,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: cachingMode
       type:
         scalar: string
+      default: ReadWrite
     - name: diskName
       type:
         scalar: string
@@ -4465,12 +4466,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: ext4
     - name: kind
       type:
         scalar: string
+      default: Shared
     - name: readOnly
       type:
         scalar: boolean
+      default: false
 - name: io.k8s.api.core.v1.AzureFilePersistentVolumeSource
   map:
     fields:
