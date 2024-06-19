@@ -5114,6 +5114,7 @@ message ScaleIOPersistentVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5125,6 +5126,7 @@ message ScaleIOPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5160,6 +5162,7 @@ message ScaleIOVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5171,6 +5174,7 @@ message ScaleIOVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force

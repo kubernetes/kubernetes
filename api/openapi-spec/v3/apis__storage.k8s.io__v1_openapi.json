@@ -1012,6 +1012,7 @@
         "description": "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
         "properties": {
           "fsType": {
+            "default": "xfs",
             "description": "fsType is the filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Default is \"xfs\"",
             "type": "string"
           },
@@ -1041,6 +1042,7 @@
             "type": "boolean"
           },
           "storageMode": {
+            "default": "ThinProvisioned",
             "description": "storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned. Default is ThinProvisioned.",
             "type": "string"
           },

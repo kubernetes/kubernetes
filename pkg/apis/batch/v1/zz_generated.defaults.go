@@ -115,7 +115,12 @@ func SetObjectDefaults_CronJob(in *v1.CronJob) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			apiscorev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {
@@ -415,7 +420,12 @@ func SetObjectDefaults_Job(in *v1.Job) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			apiscorev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {

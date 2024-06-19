@@ -113,7 +113,12 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 			}
 		}
 		if a.VolumeSource.ScaleIO != nil {
-			corev1.SetDefaults_ScaleIOVolumeSource(a.VolumeSource.ScaleIO)
+			if a.VolumeSource.ScaleIO.StorageMode == "" {
+				a.VolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if a.VolumeSource.ScaleIO.FSType == "" {
+				a.VolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 		if a.VolumeSource.Ephemeral != nil {
 			if a.VolumeSource.Ephemeral.VolumeClaimTemplate != nil {

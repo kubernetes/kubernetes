@@ -78,7 +78,12 @@ func SetObjectDefaults_VolumeAttachment(in *v1alpha1.VolumeAttachment) {
 			}
 		}
 		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
-			corev1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.StorageMode = "ThinProvisioned"
+			}
+			if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType == "" {
+				in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO.FSType = "xfs"
+			}
 		}
 	}
 }

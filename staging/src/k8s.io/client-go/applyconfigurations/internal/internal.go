@@ -7523,6 +7523,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: xfs
     - name: gateway
       type:
         scalar: string
@@ -7542,6 +7543,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageMode
       type:
         scalar: string
+      default: ThinProvisioned
     - name: storagePool
       type:
         scalar: string
@@ -7558,6 +7560,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: xfs
     - name: gateway
       type:
         scalar: string
@@ -7577,6 +7580,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageMode
       type:
         scalar: string
+      default: ThinProvisioned
     - name: storagePool
       type:
         scalar: string

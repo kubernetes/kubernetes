@@ -1678,6 +1678,7 @@ type ScaleIOVolumeSource struct {
 	// storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// Default is ThinProvisioned.
 	// +optional
+	// +default="ThinProvisioned"
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// volumeName is the name of a volume already created in the ScaleIO system
 	// that is associated with this volume source.
@@ -1687,6 +1688,7 @@ type ScaleIOVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs".
 	// Default is "xfs".
 	// +optional
+	// +default="xfs"
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// readOnly Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
@@ -1715,6 +1717,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// Default is ThinProvisioned.
 	// +optional
+	// +default="ThinProvisioned"
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// volumeName is the name of a volume already created in the ScaleIO system
 	// that is associated with this volume source.
@@ -1724,6 +1727,7 @@ type ScaleIOPersistentVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs".
 	// Default is "xfs"
 	// +optional
+	// +default="xfs"
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// readOnly defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
