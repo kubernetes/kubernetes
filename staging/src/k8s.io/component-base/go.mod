@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.4.1
 	github.com/go-logr/zapr v1.3.0
 	github.com/google/go-cmp v0.6.0
-	github.com/moby/term v0.0.0-20221205130635-1aeaba878587
+	github.com/moby/term v0.5.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/client_model v0.6.0
 	github.com/prometheus/common v0.48.0

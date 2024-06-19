@@ -429,7 +429,7 @@ github.com/moby/spdystream/spdy
 # github.com/moby/sys/mountinfo v0.6.2
 ## explicit; go 1.16
 github.com/moby/sys/mountinfo
-# github.com/moby/term v0.0.0-20221205130635-1aeaba878587
+# github.com/moby/term v0.5.0
 ## explicit; go 1.18
 github.com/moby/term
 github.com/moby/term/windows
