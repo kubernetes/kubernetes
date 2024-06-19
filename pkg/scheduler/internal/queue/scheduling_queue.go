@@ -986,6 +986,25 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
+	if p.isSchedulingQueueHintEnabled {
+		// the inflight pod will be requeued using the latest version from the informer cache, which matches what the event delivers.
+		if _, ok := p.inFlightPods[newPod.UID]; ok {
+			logger.V(6).Info("The pod doesn't be queued for now because it's being scheduled and will be queued back if necessary", "pod", klog.KObj(newPod))
+
+			// Record this update as Pod/Update because
+			// this update may make the Pod schedulable in case it gets rejected and comes back to the queue.
+			// We can clean it up once we change updatePodInSchedulingQueue to call MoveAllToActiveOrBackoffQueue.
+			// See https://github.com/kubernetes/kubernetes/pull/125578#discussion_r1648338033 for more context.
+			p.inFlightEvents.PushBack(&clusterEvent{
+				event:  UnscheduledPodUpdate,
+				oldObj: oldPod,
+				newObj: newPod,
+			})
+
+			return nil
+		}
+	}
+
 	if oldPod != nil {
 		oldPodInfo := newQueuedPodInfoForLookup(oldPod)
 		// If the pod is already in the active queue, just update it there.
