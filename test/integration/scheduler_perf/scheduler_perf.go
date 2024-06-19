@@ -1110,7 +1110,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 				churnFns = append(churnFns, func(name string) string {
 					if name != "" {
-						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil {
+						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 							tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 						}
 						return ""
