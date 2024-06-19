@@ -1693,7 +1693,6 @@ var _ = common.SIGDescribe("Services", func() {
             			framework.Failf("failed to create service: %s in namespace: %s after %d attempts, last error: %v", serviceName, ns, maxRetries, err)
         		}
     		}
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
