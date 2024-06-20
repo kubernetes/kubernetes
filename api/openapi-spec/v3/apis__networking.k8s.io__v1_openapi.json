@@ -2011,7 +2011,8 @@
           {
             "type": "string"
           }
-        ]
+        ],
+        "x-kubernetes-int-or-string": true
       }
     },
     "securitySchemes": {

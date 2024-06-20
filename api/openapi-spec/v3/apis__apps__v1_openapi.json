@@ -3963,7 +3963,7 @@
             "type": "string"
           },
           "setHostnameAsFQDN": {
-            "description": "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
+            "description": "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\CurrentControlSet\\\\Services\\\\Tcpip\\\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
             "type": "boolean"
           },
           "shareProcessNamespace": {
@@ -5342,7 +5342,8 @@
           {
             "type": "number"
           }
-        ]
+        ],
+        "x-kubernetes-int-or-string": true
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
         "description": "APIResource specifies the name of a resource and whether it is namespaced.",
@@ -6554,7 +6555,8 @@
           {
             "type": "string"
           }
-        ]
+        ],
+        "x-kubernetes-int-or-string": true
       }
     },
     "securitySchemes": {
