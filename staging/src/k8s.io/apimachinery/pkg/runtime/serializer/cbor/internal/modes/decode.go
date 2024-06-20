@@ -91,6 +91,11 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// For parity with JSON, strings can be decoded into time.Time if they are RFC 3339
 		// timestamps.
 		ByteStringToTime: cbor.ByteStringToTimeAllowed,
+
+		// Reject NaN and infinite floating-point values since they don't have a JSON
+		// representation (RFC 8259 Section 6).
+		NaN: cbor.NaNDecodeForbidden,
+		Inf: cbor.InfDecodeForbidden,
 	}.DecMode()
 	if err != nil {
 		panic(err)
