@@ -18,6 +18,9 @@ package common
 
 import (
 	"net/http"
+
+	"golang.org/x/exp/slices"
+
 	"strings"
 
 	"github.com/emicklei/go-restful/v3"
@@ -286,4 +289,16 @@ func GenerateOpenAPIV3OneOfSchema(types []string) (oneOf []spec.Schema) {
 		oneOf = append(oneOf, spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{t}}})
 	}
 	return
+}
+
+// MaybePopulateIntOrString populates the x-int-or-string extension only if
+// the oneOf type refers to supporting both an int (integer/number) and string.
+func MaybePopulateIntOrString(oneOf []string, ext spec.Extensions) spec.Extensions {
+	if len(oneOf) != 2 {
+		return ext
+	}
+	if slices.Contains(oneOf, "string") && (slices.Contains(oneOf, "integer") || slices.Contains(oneOf, "number")) {
+		ext["x-kubernetes-int-or-string"] = true
+	}
+	return ext
 }

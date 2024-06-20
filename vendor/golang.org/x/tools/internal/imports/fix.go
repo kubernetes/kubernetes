@@ -104,7 +104,10 @@ type packageInfo struct {
 
 // parseOtherFiles parses all the Go files in srcDir except filename, including
 // test files if filename looks like a test.
-func parseOtherFiles(fset *token.FileSet, srcDir, filename string) []*ast.File {
+//
+// It returns an error only if ctx is cancelled. Files with parse errors are
+// ignored.
+func parseOtherFiles(ctx context.Context, fset *token.FileSet, srcDir, filename string) ([]*ast.File, error) {
 	// This could use go/packages but it doesn't buy much, and it fails
 	// with https://golang.org/issue/26296 in LoadFiles mode in some cases.
 	considerTests := strings.HasSuffix(filename, "_test.go")
@@ -112,11 +115,14 @@ func parseOtherFiles(fset *token.FileSet, srcDir, filename string) []*ast.File {
 	fileBase := filepath.Base(filename)
 	packageFileInfos, err := os.ReadDir(srcDir)
 	if err != nil {
-		return nil
+		return nil, ctx.Err()
 	}
 
 	var files []*ast.File
 	for _, fi := range packageFileInfos {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		if fi.Name() == fileBase || !strings.HasSuffix(fi.Name(), ".go") {
 			continue
 		}
@@ -132,7 +138,7 @@ func parseOtherFiles(fset *token.FileSet, srcDir, filename string) []*ast.File {
 		files = append(files, f)
 	}
 
-	return files
+	return files, ctx.Err()
 }
 
 // addGlobals puts the names of package vars into the provided map.
@@ -557,12 +563,7 @@ func (p *pass) addCandidate(imp *ImportInfo, pkg *packageInfo) {
 
 // fixImports adds and removes imports from f so that all its references are
 // satisfied and there are no unused imports.
-//
-// This is declared as a variable rather than a function so goimports can
-// easily be extended by adding a file with an init function.
-var fixImports = fixImportsDefault
-
-func fixImportsDefault(fset *token.FileSet, f *ast.File, filename string, env *ProcessEnv) error {
+func fixImports(fset *token.FileSet, f *ast.File, filename string, env *ProcessEnv) error {
 	fixes, err := getFixes(context.Background(), fset, f, filename, env)
 	if err != nil {
 		return err
@@ -592,7 +593,10 @@ func getFixes(ctx context.Context, fset *token.FileSet, f *ast.File, filename st
 		return fixes, nil
 	}
 
-	otherFiles := parseOtherFiles(fset, srcDir, filename)
+	otherFiles, err := parseOtherFiles(ctx, fset, srcDir, filename)
+	if err != nil {
+		return nil, err
+	}
 
 	// Second pass: add information from other files in the same package,
 	// like their package vars and imports.
@@ -1192,7 +1196,7 @@ func addExternalCandidates(ctx context.Context, pass *pass, refs references, fil
 	if err != nil {
 		return err
 	}
-	if err = resolver.scan(context.Background(), callback); err != nil {
+	if err = resolver.scan(ctx, callback); err != nil {
 		return err
 	}
 
@@ -1203,7 +1207,7 @@ func addExternalCandidates(ctx context.Context, pass *pass, refs references, fil
 	}
 	results := make(chan result, len(refs))
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	defer func() {
 		cancel()

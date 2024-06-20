@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/internal/gocommand"
 )
 
+// TODO(adonovan): move back into go/packages.
 func GetSizesForArgsGolist(ctx context.Context, inv gocommand.Invocation, gocmdRunner *gocommand.Runner) (string, string, error) {
 	inv.Verb = "list"
 	inv.Args = []string{"-f", "{{context.GOARCH}} {{context.Compiler}}", "--", "unsafe"}
