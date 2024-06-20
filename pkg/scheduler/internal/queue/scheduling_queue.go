@@ -1194,10 +1194,15 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	activated := false
 	for _, pInfo := range podInfoList {
+		// When handling events takes time, a scheduling throughput gets impacted negatively
+		// because of a shared lock within PriorityQueue, which Pop() also requires.
+		//
 		// Scheduling-gated Pods never get schedulable with any events,
 		// except the Pods themselves got updated, which isn't handled by movePodsToActiveOrBackoffQueue.
-		// So, here we skip them early here so that they don't go through isPodWorthRequeuing,
+		// So, we can skip them early here so that they don't go through isPodWorthRequeuing,
 		// which isn't fast enough when the number of scheduling-gated Pods in unschedulablePods is large.
+		// This is a hotfix, which might be changed
+		// once we have a better general solution for the shared lock issue.
 		//
 		// Note that we cannot skip all pInfo.Gated Pods here
 		// because PreEnqueue plugins apart from the scheduling gate plugin may change the gating status
