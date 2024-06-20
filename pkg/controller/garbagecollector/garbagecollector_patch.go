@@ -32,25 +32,28 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 )
 
-func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient discovery.ServerResourcesInterface) {
+func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient discovery.ServerResourcesInterface) error {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
-	func() {
+	if err := func() error {
 		logger := klog.FromContext(ctx)
 
 		// Get the current resource list from discovery.
-		newResources := GetDeletableResources(logger, discoveryClient)
+		newResources, err := GetDeletableResources(logger, discoveryClient)
+		if err != nil {
+			return err
+		}
 
 		// This can occur if there is an internal error in GetDeletableResources.
 		if len(newResources) == 0 {
 			logger.V(2).Info("no resources reported by discovery, skipping garbage collector sync")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
-			return
+			return nil
 		}
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
 			logger.V(5).Info("no resource updates from discovery, skipping garbage collector sync")
-			return
+			return nil
 		}
 
 		// Ensure workers are paused to avoid processing events before informers
@@ -65,7 +68,10 @@ func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient 
 
 			// On a reattempt, check if available resources have changed
 			if attempt > 1 {
-				newResources = GetDeletableResources(logger, discoveryClient)
+				newResources, err = GetDeletableResources(logger, discoveryClient)
+				if err != nil {
+					return false, err
+				}
 				if len(newResources) == 0 {
 					logger.V(2).Info("no resources reported by discovery", "attempt", attempt)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
@@ -123,5 +129,11 @@ func (gc *GarbageCollector) ResyncMonitors(ctx context.Context, discoveryClient 
 		// occurred.
 		oldResources = newResources
 		logger.V(2).Info("synced garbage collector")
-	}()
+
+		return nil
+	}(); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -37,7 +37,7 @@ func TestCreateClusterAwareContext(t *testing.T) {
 		{
 			name:            "scoped, built-in type",
 			existingObject:  makePod("pod1", "root:org:abc", "default"),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 		{
 			name: "cluster wide, built-in type",
@@ -46,28 +46,28 @@ func TestCreateClusterAwareContext(t *testing.T) {
 				p.Namespace = ""
 				return p
 			}(),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 		{
 			name:            "scoped, identity, built-in type",
 			existingObject:  makePod("pod1", "root:org:abc", "default"),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 
 		{
 			name:            "scoped, unstructured type",
 			existingObject:  makeUnstructured("root:org:abc", "default"),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 		{
 			name:            "cluster wide, unstructured type",
 			existingObject:  makeUnstructured("root:org:abc", ""),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 		{
 			name:            "scoped, identity, unstructured type",
 			existingObject:  makeUnstructured("root:org:abc", "default"),
-			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.New("root:org:abc")},
+			expectedCluster: genericapirequest.Cluster{Name: logicalcluster.Name("root:org:abc")},
 		},
 	}
 

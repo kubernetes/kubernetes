@@ -510,7 +510,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		&noneConverterFactory{},
 		1,
 		dummyAuthorizerImpl{},
-		time.Minute, time.Minute, nil, 3*1024*1024)
+		time.Minute, time.Minute, nil, 3*1024*1024, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1035,7 +1035,7 @@ func TestBuildOpenAPIModelsForApply(t *testing.T) {
 
 	for i, test := range tests {
 		crd.Spec.Versions[0].Schema = &test
-		models, err := buildOpenAPIModelsForApply(convertedDefs, &crd)
+		models, err := buildOpenAPIModelsForApply(convertedDefs, &crd, true)
 		if err != nil {
 			t.Fatalf("failed to convert to apply model: %v", err)
 		}
