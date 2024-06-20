@@ -1200,8 +1200,10 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 		// Scheduling-gated Pods never get schedulable with any events,
 		// except the Pods themselves got updated, which isn't handled by movePodsToActiveOrBackoffQueue.
 		// So, we can skip them early here so that they don't go through isPodWorthRequeuing,
-		// which isn't fast enough when the number of scheduling-gated Pods in unschedulablePods is large.
-		// This is a hotfix, which might be changed
+		// which isn't fast enough to keep a sufficient scheduling throughput
+		// when the number of scheduling-gated Pods in unschedulablePods is large.
+		// https://github.com/kubernetes/kubernetes/issues/124384
+		// This is a hotfix for this issue, which might be changed
 		// once we have a better general solution for the shared lock issue.
 		//
 		// Note that we cannot skip all pInfo.Gated Pods here
