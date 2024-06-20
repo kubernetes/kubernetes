@@ -513,7 +513,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 		{
 			desc: "list nodes",
 			apiCall: func(c *client.Clientset) error {
-				_, err = clientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				_, err = clientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{Limit: 1})
 				return err
 			},
 			expectedTrace: []*spanExpectation{
@@ -524,7 +524,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return strings.HasPrefix(v.GetStringValue(), "tracing.test")
 						},
 						"http.target": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "/api/v1/nodes"
+							return v.GetStringValue() == "/api/v1/nodes?limit=1"
 						},
 						"http.method": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == "GET"
@@ -578,7 +578,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 							return v.GetStringValue() == ""
 						},
 						"limit": func(v *commonv1.AnyValue) bool {
-							return v.GetIntValue() == 0
+							return v.GetIntValue() == 1
 						},
 						"continue": func(v *commonv1.AnyValue) bool {
 							return v.GetStringValue() == ""
