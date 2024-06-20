@@ -2651,8 +2651,8 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterE
 	return nil
 }
 
-// This test helps to verify registering nil events for schedulingGates plugin works as expected.
-func TestSchedulingGatesPluginEventsToRegister(t *testing.T) {
+// This test helps to verify registering nil events for PreEnqueue plugin works as expected.
+func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 
 	num := func(pl framework.Plugin) int {
