@@ -1178,7 +1178,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 	if jobCtx.job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, jobCtx, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush); err != nil {
 		return err
 	}
-	jobFinished := !reachedMaxUncountedPods && jm.enactJobFinished(jobCtx.job, jobCtx.finishedCondition)
+	jobFinished := !reachedMaxUncountedPods && jm.enactJobFinished(logger, jobCtx)
 	if jobFinished {
 		needsFlush = true
 	}
@@ -1353,15 +1353,18 @@ func (jm *Controller) removeTrackingFinalizerFromPods(ctx context.Context, jobKe
 
 // enactJobFinished adds the Complete or Failed condition and records events.
 // Returns whether the Job was considered finished.
-func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCondition) bool {
-	if finishedCond == nil {
+func (jm *Controller) enactJobFinished(logger klog.Logger, jobCtx *syncJobCtx) bool {
+	if jobCtx.finishedCondition == nil {
 		return false
 	}
+	job := jobCtx.job
 	if uncounted := job.Status.UncountedTerminatedPods; uncounted != nil {
-		if len(uncounted.Succeeded) > 0 || len(uncounted.Failed) > 0 {
+		if count := len(uncounted.Succeeded) + len(uncounted.Failed); count > 0 {
+			logger.V(4).Info("Delaying marking the Job as finished, because there are still uncounted pod(s)", "job", klog.KObj(job), "condition", jobCtx.finishedCondition.Type, "count", count)
 			return false
 		}
 	}
+	finishedCond := jobCtx.finishedCondition
 	job.Status.Conditions, _ = ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message, jm.clock.Now())
 	if finishedCond.Type == batch.JobComplete {
 		job.Status.CompletionTime = &finishedCond.LastTransitionTime
