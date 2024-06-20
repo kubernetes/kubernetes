@@ -23,6 +23,7 @@ import (
 	"k8s.io/component-base/featuregate"
 )
 
+// Test ClientAdapterEnabled
 func TestClientAdapterEnabled(t *testing.T) {
 	fg := featuregate.NewFeatureGate()
 	if err := fg.Add(map[featuregate.Feature]featuregate.FeatureSpec{
