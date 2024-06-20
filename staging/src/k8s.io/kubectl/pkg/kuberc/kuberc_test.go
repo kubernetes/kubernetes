@@ -140,6 +140,63 @@ func TestApplyOverride(t *testing.T) {
 			},
 		},
 		{
+			name: "subcommand override with prefix incorrectly matches",
+			nestedCmds: []fakeCmds{
+				{
+					name:  "command1",
+					flags: nil,
+				},
+				{
+					name: "command2",
+					flags: []fakeFlag{
+						{
+							name:  "first",
+							value: "test",
+						},
+						{
+							name:  "firstflag",
+							value: "test2",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"command1",
+				"command2",
+				"--firstflag",
+				"explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Overrides: []v1alpha1.PreferencesCommandOverride{
+							{
+								Command: "command1 command2",
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "first",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "first",
+					value: "changed",
+				},
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+		},
+		{
 			name: "use explicit kuberc, subcommand explicit takes precedence",
 			nestedCmds: []fakeCmds{
 				{

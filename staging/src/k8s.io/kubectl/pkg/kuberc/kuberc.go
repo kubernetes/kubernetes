@@ -95,7 +95,7 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 	args = args[1:]
 	cmd, _, err := rootCmd.Find(args)
 	if err != nil {
-		fmt.Fprintf(errOut, "command not found %v\n", err)
+		fmt.Fprintf(errOut, "Warning: command not found %v\n", err)
 		return nil
 	}
 
@@ -103,9 +103,8 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 		parsedCmds := strings.Split(c.Command, " ")
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
-			// this may be referring to the alias command which is not initialized
-			// because the actual command is totally different.
-			return nil
+			fmt.Fprintf(errOut, "Warning: command %q not found to set kuberc override\n", c.Command)
+			continue
 		}
 		if overrideCmd.Name() != cmd.Name() {
 			continue
@@ -126,7 +125,7 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 			}
 			err = cmd.Flags().Set(fl.Name, fl.Default)
 			if err != nil {
-				return fmt.Errorf("could not apply value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
+				return fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
 			}
 		}
 	}
@@ -173,7 +172,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 	for _, alias := range kuberc.Spec.Aliases {
 		// do not allow shadowing built-ins
 		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
-			fmt.Fprintf(errOut, "Setting alias %q to a built-in command is not supported\n", alias.Name)
+			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
 			continue
 		}
 
@@ -185,7 +184,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 		commands := strings.Split(alias.Command, " ")
 		existingCmd, flags, err := rootCmd.Find(commands)
 		if err != nil {
-			fmt.Fprintf(errOut, "command %q not found to set alias %q: %v\n", alias.Command, alias.Name, flags)
+			fmt.Fprintf(errOut, "Warning: command %q not found to set alias %q: %v\n", alias.Command, alias.Name, flags)
 			continue
 		}
 
@@ -234,7 +233,7 @@ func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut
 		}
 		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 		if err != nil {
-			fmt.Fprintf(errOut, "could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
+			fmt.Fprintf(errOut, "Warning: could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
 			return args, nil
 		}
 	}
@@ -307,7 +306,8 @@ func getExplicitKuberc(args []string) string {
 
 func explicitFlagUse(flagName string, args []string) bool {
 	for _, arg := range args {
-		if strings.HasPrefix(arg, fmt.Sprintf("--%s", flagName)) || strings.HasPrefix(arg, fmt.Sprintf("--%s=", flagName)) {
+		// For instance, --user flag can be represented by 2 formations, "--user test", "--user=test"
+		if arg == fmt.Sprintf("--%s", flagName) || strings.HasPrefix(arg, fmt.Sprintf("--%s=", flagName)) {
 			return true
 		}
 	}
