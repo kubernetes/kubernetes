@@ -9,7 +9,7 @@ require (
 	github.com/opencontainers/runc v1.1.12
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sys v0.20.0
-	k8s.io/klog/v2 v2.120.1
+	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
