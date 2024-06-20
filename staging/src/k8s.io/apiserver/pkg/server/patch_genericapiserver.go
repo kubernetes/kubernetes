@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -31,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
@@ -38,6 +40,7 @@ import (
 // EventSink allows to create events.
 type EventSink interface {
 	Create(event *corev1.Event) (*corev1.Event, error)
+	Destroy()
 }
 
 type OpenShiftGenericAPIServerPatch struct {
@@ -108,6 +111,39 @@ func (s *GenericAPIServer) Eventf(eventType, reason, messageFmt string, args ...
 			s.shutdownInitiatedEventID = ev.GetUID()
 		}
 	}
+}
+
+func eventReference() (*corev1.ObjectReference, error) {
+	ns := os.Getenv("POD_NAMESPACE")
+	pod := os.Getenv("POD_NAME")
+	if len(ns) == 0 && len(pod) > 0 {
+		serviceAccountNamespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+		if _, err := os.Stat(serviceAccountNamespaceFile); err == nil {
+			bs, err := ioutil.ReadFile(serviceAccountNamespaceFile)
+			if err != nil {
+				return nil, err
+			}
+			ns = string(bs)
+		}
+	}
+	if len(ns) == 0 {
+		pod = ""
+		ns = "openshift-kube-apiserver"
+	}
+	if len(pod) == 0 {
+		return &corev1.ObjectReference{
+			Kind:       "Namespace",
+			Name:       ns,
+			APIVersion: "v1",
+		}, nil
+	}
+
+	return &corev1.ObjectReference{
+		Kind:       "Pod",
+		Namespace:  ns,
+		Name:       pod,
+		APIVersion: "v1",
+	}, nil
 }
 
 // terminationLoggingListener wraps the given listener to mark late connections
@@ -229,4 +265,20 @@ func isLocal(req *http.Request) bool {
 
 func isKubeApiserverLoopBack(req *http.Request) bool {
 	return strings.HasPrefix(req.UserAgent(), "kube-apiserver/")
+}
+
+type nullEventSink struct{}
+
+func (nullEventSink) Create(event *corev1.Event) (*corev1.Event, error) {
+	return nil, nil
+}
+
+func (nullEventSink) Destroy() {
+}
+
+type clientEventSink struct {
+	*v1.EventSinkImpl
+}
+
+func (clientEventSink) Destroy() {
 }
