@@ -1,6 +1,6 @@
 /*
 Copyright 2019 The Kubernetes Authors.
-Copyright 2020 Intel Coporation.
+Copyright 2020 Intel Corporation.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -217,8 +217,19 @@ type tloggerShared struct {
 	// t gets cleared when the test is completed.
 	t TL
 
-	// We warn once when a leaked goroutine is detected because
-	// it logs after test completion.
+	// The time when the test completed.
+	stopTime time.Time
+
+	// We warn once when a leaked goroutine logs after test completion.
+	//
+	// Not terminating immediately is fairly normal: many controllers
+	// log "terminating" messages while they shut down, which often is
+	// right after test completion, if that is when the test cancels the
+	// context and then doesn't wait for goroutines (which is often
+	// not possible).
+	//
+	// Therefore there is the [stopGracePeriod] during which messages get
+	// logged to the global logger without the warning.
 	goroutineWarningDone bool
 
 	formatter serialize.Formatter
@@ -228,10 +239,15 @@ type tloggerShared struct {
 	callDepth int
 }
 
+// Log output of a leaked goroutine during this period after test completion
+// does not trigger the warning.
+const stopGracePeriod = 10 * time.Second
+
 func (ls *tloggerShared) stop() {
 	ls.mutex.Lock()
 	defer ls.mutex.Unlock()
 	ls.t = nil
+	ls.stopTime = time.Now()
 }
 
 // tlogger is the actual LogSink implementation.
@@ -241,6 +257,8 @@ type tlogger struct {
 	values []interface{}
 }
 
+// fallbackLogger is called while l.shared.mutex is locked and after it has
+// been determined that the original testing.TB is no longer usable.
 func (l tlogger) fallbackLogger() logr.Logger {
 	logger := klog.Background().WithValues(l.values...).WithName(l.shared.testName + " leaked goroutine")
 	if l.prefix != "" {
@@ -250,8 +268,12 @@ func (l tlogger) fallbackLogger() logr.Logger {
 	logger = logger.WithCallDepth(l.shared.callDepth + 1)
 
 	if !l.shared.goroutineWarningDone {
-		logger.WithCallDepth(1).Error(nil, "WARNING: test kept at least one goroutine running after test completion", "callstack", string(dbg.Stacks(false)))
-		l.shared.goroutineWarningDone = true
+		duration := time.Since(l.shared.stopTime)
+		if duration > stopGracePeriod {
+
+			logger.WithCallDepth(1).Info("WARNING: test kept at least one goroutine running after test completion", "timeSinceCompletion", duration.Round(time.Second), "callstack", string(dbg.Stacks(false)))
+			l.shared.goroutineWarningDone = true
+		}
 	}
 	return logger
 }

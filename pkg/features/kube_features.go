@@ -136,7 +136,10 @@ const (
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
 	// owner: @trierra
+	// kep:  http://kep.k8s.io/2589
 	// alpha: v1.23
+	// beta: v1.25 (off by default)
+	// beta: v1.31 (on by default)
 	//
 	// Enables the Portworx in-tree driver to Portworx migration feature.
 	CSIMigrationPortworx featuregate.Feature = "CSIMigrationPortworx"
@@ -256,8 +259,9 @@ const (
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
 	// owner: @deepakkinni @xing-yang
-	// kep: https://kep.k8s.io/2680
+	// kep: https://kep.k8s.io/2644
 	// alpha: v1.23
+	// beta: v1.31
 	//
 	// Honor Persistent Volume Reclaim Policy when it is "Delete" irrespective of PV-PVC
 	// deletion ordering.
@@ -986,7 +990,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CPUManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
-	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
+	CSIMigrationPortworx: {Default: true, PreRelease: featuregate.Beta}, // On by default (requires Portworx CSI driver)
 
 	CSIVolumeHealth: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1018,7 +1022,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	HPAContainerMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
-	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	HonorPVReclaimPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	ImageMaximumGCAge: {Default: true, PreRelease: featuregate.Beta},
 
@@ -1211,7 +1215,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
