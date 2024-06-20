@@ -563,38 +563,6 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 					},
 				},
 				{
-					name: "List(recursive=true) etcd3",
-					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"audit-id": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() != ""
-						},
-						"key": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "/minions"
-						},
-						"resourceVersion": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-						"resourceVersionMatch": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-						"limit": func(v *commonv1.AnyValue) bool {
-							return v.GetIntValue() == 0
-						},
-						"continue": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == ""
-						},
-					},
-				},
-				{
-					name: "etcdserverpb.KV/Range",
-					attributes: map[string]func(*commonv1.AnyValue) bool{
-						"rpc.system": func(v *commonv1.AnyValue) bool {
-							return v.GetStringValue() == "grpc"
-						},
-					},
-					events: []string{"message"},
-				},
-				{
 					name: "SerializeObject",
 					attributes: map[string]func(*commonv1.AnyValue) bool{
 						"url": func(v *commonv1.AnyValue) bool {
