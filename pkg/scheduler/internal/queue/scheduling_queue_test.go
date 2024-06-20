@@ -1508,11 +1508,9 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			expectedQ: unschedulablePods,
 		},
 		{
-			name:    "QueueHintFunction is called when Pod is gated by a plugin other than SchedulingGates",
-			podInfo: setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
-			hint:    queueHintReturnQueue,
-			// FIXME: This should be backoffQ.
-			// https://github.com/kubernetes/kubernetes/issues/125538
+			name:      "QueueHintFunction is called when Pod is gated by a plugin other than SchedulingGates",
+			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
+			hint:      queueHintReturnQueue,
 			expectedQ: activeQ,
 		},
 	}
