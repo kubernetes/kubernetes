@@ -1975,7 +1975,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return false, false, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &apiPodStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && isPodResizeInProgress(pod, &pod.Status) {
 		// While resize is in progress, periodically call PLEG to update pod cache
 		runningPod := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err, _ := kl.pleg.UpdateCache(&runningPod, pod.UID); err != nil {
