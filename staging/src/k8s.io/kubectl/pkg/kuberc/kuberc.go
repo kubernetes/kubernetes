@@ -218,7 +218,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 	for _, fl := range aliasArgs.flags {
 		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 		if err != nil {
-			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
+			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %w", fl.Default, fl.Name, args[0], err)
 		}
 	}
 
