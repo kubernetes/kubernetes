@@ -251,6 +251,58 @@ func TestApplyOverride(t *testing.T) {
 			},
 		},
 		{
+			name: "use explicit kuberc, subcommand explicit takes precedence kuberc flag first",
+			nestedCmds: []fakeCmds{
+				{
+					name:  "command1",
+					flags: nil,
+				},
+				{
+					name: "command2",
+					flags: []fakeFlag{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"--kuberc=test-custom-kuberc-path",
+				"command1",
+				"command2",
+				"--firstflag=explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				if kuberc != "test-custom-kuberc-path" {
+					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
+				}
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Overrides: []v1alpha1.PreferencesCommandOverride{
+							{
+								Command: "command1 command2",
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+		},
+		{
 			name: "use explicit kuberc equal, subcommand explicit takes precedence",
 			nestedCmds: []fakeCmds{
 				{
@@ -1014,6 +1066,112 @@ func TestApplyAlias(t *testing.T) {
 			args: []string{
 				"root",
 				"aliascmd",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Aliases: []v1alpha1.PreferencesAliasOverride{
+							{
+								Name:    "aliascmd",
+								Command: "command1",
+								Args: []string{
+									"resources",
+									"nodes",
+								},
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "changed",
+				},
+			},
+			expectedCmd: "aliascmd",
+			expectedArgs: []string{
+				"resources",
+				"nodes",
+			},
+		},
+		{
+			name: "simple aliasing with kuberc flag first",
+			nestedCmds: []fakeCmds{
+				{
+					name: "command1",
+					flags: []fakeFlag{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"--kuberc=kuberc",
+				"aliascmd",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Aliases: []v1alpha1.PreferencesAliasOverride{
+							{
+								Name:    "aliascmd",
+								Command: "command1",
+								Args: []string{
+									"resources",
+									"nodes",
+								},
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "changed",
+				},
+			},
+			expectedCmd: "aliascmd",
+			expectedArgs: []string{
+				"resources",
+				"nodes",
+			},
+		},
+		{
+			name: "simple aliasing with kuberc flag after",
+			nestedCmds: []fakeCmds{
+				{
+					name: "command1",
+					flags: []fakeFlag{
+						{
+							name:  "firstflag",
+							value: "test",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"aliascmd",
+				"--kuberc=kuberc",
 			},
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{

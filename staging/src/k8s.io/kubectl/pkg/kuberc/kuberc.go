@@ -200,7 +200,13 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 		rootCmd.AddCommand(val.command)
 	}
 
-	aliasName := args[1]
+	var aliasName string // first "non-flag" arguments
+	for _, arg := range args[1:] {
+		if !strings.HasPrefix(arg, "-") {
+			aliasName = arg
+			break
+		}
+	}
 
 	foundAliasCmd, _, err := rootCmd.Find([]string{aliasName})
 	if err != nil {
