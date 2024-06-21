@@ -131,11 +131,6 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *v1alpha1.Pr
 		_ = cmd.InheritedFlags()
 
 		for _, fl := range c.Flags {
-			// explicit flag usage has higher precedence than the kuberc default flag value.
-			// We should set the default flag values in kuberc, unless there is any in args.
-			if explicitFlagUse(fl.Name, args) {
-				continue
-			}
 			err = cmd.Flags().Set(fl.Name, fl.Default)
 			if err != nil {
 				return fmt.Errorf("could not apply override value %s to flag %s in command %s err: %w", fl.Default, fl.Name, c.Command, err)
@@ -221,11 +216,6 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 	_ = foundAliasCmd.InheritedFlags()
 
 	for _, fl := range aliasArgs.flags {
-		// explicit flag usage has higher precedence than the kuberc default flag value.
-		// We should set the default flag values in kuberc, unless there is any in args.
-		if explicitFlagUse(fl.Name, args) {
-			continue
-		}
 		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 		if err != nil {
 			fmt.Fprintf(errOut, "Warning: could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
@@ -297,14 +287,4 @@ func getExplicitKuberc(args []string) string {
 	}
 
 	return kubercPath
-}
-
-func explicitFlagUse(flagName string, args []string) bool {
-	for _, arg := range args {
-		// For instance, --user flag can be represented by 2 formations, "--user test", "--user=test"
-		if arg == fmt.Sprintf("--%s", flagName) || strings.HasPrefix(arg, fmt.Sprintf("--%s=", flagName)) {
-			return true
-		}
-	}
-	return false
 }
