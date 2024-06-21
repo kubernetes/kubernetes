@@ -748,7 +748,7 @@ func pollTimed(ctx context.Context, interval, timeout time.Duration, condition w
 		elapsed := time.Since(start)
 		framework.Logf(msg, elapsed)
 	}(time.Now(), msg)
-	return wait.PollWithContext(ctx, interval, timeout, condition)
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, condition)
 }
 
 func validateErrorWithDebugInfo(ctx context.Context, f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {

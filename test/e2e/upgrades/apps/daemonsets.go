@@ -60,7 +60,7 @@ func (t *DaemonSetUpgradeTest) Setup(ctx context.Context, f *framework.Framework
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
-	err = wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 		return e2edaemonset.CheckRunningOnAllNodes(ctx, f, t.daemonSet)
 	})
 	framework.ExpectNoError(err)

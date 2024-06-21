@@ -1191,7 +1191,7 @@ func UnblockNetwork(ctx context.Context, from string, to string) {
 	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
 	// may fail). Manual intervention is required in such case (recreating the
 	// cluster solves the problem too).
-	err := wait.PollWithContext(ctx, time.Millisecond*100, time.Second*30, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*30, false, func(ctx context.Context) (bool, error) {
 		result, err := e2essh.SSH(ctx, undropCmd, from, framework.TestContext.Provider)
 		if result.Code == 0 && err == nil {
 			return true, nil

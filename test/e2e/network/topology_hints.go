@@ -81,7 +81,7 @@ var _ = common.SIGDescribe(feature.TopologyHints, func() {
 			},
 		})
 
-		err = wait.PollWithContext(ctx, 5*time.Second, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 			return e2edaemonset.CheckRunningOnAllNodes(ctx, f, ds)
 		})
 		framework.ExpectNoError(err, "timed out waiting for DaemonSets to be ready")
@@ -119,7 +119,7 @@ var _ = common.SIGDescribe(feature.TopologyHints, func() {
 		framework.Logf("Waiting for %d endpoints to be tracked in EndpointSlices", len(schedulableNodes))
 
 		var finalSlices []discoveryv1.EndpointSlice
-		err = wait.PollWithContext(ctx, 5*time.Second, 3*time.Minute, func(ctx context.Context) (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, 5*time.Second, 3*time.Minute, false, func(ctx context.Context) (bool, error) {
 			slices, listErr := c.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svc.Name)})
 			if listErr != nil {
 				return false, listErr
@@ -190,7 +190,7 @@ var _ = common.SIGDescribe(feature.TopologyHints, func() {
 			framework.Logf("Ensuring that requests from %s pod on %s node stay in %s zone", clientPod.Name, nodeName, fromZone)
 
 			var logs string
-			if pollErr := wait.PollWithContext(ctx, 5*time.Second, e2eservice.KubeProxyLagTimeout, func(ctx context.Context) (bool, error) {
+			if pollErr := wait.PollUntilContextTimeout(ctx, 5*time.Second, e2eservice.KubeProxyLagTimeout, false, func(ctx context.Context) (bool, error) {
 				var err error
 				logs, err = e2epod.GetPodLogs(ctx, c, f.Namespace.Name, clientPod.Name, clientPod.Name)
 				framework.ExpectNoError(err)
