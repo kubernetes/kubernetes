@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	gomock "go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -130,18 +129,15 @@ func TestUpdateThreshold(t *testing.T) {
 		},
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			notifierFactory := NewMockNotifierFactory(mockCtrl)
-			notifier := NewMockCgroupNotifier(mockCtrl)
+			notifierFactory := NewMockNotifierFactory(t)
+			notifier := NewMockCgroupNotifier(t)
 
 			m := newTestMemoryThresholdNotifier(tc.evictionThreshold, notifierFactory, nil)
 			notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, tc.expectedThreshold.Value()).Return(notifier, tc.updateThresholdErr).Times(1)
 			var events chan<- struct{} = m.events
-			notifier.EXPECT().Start(events).Return().AnyTimes()
+			notifier.EXPECT().Start(events).Return().Maybe()
 			err := m.UpdateThreshold(nodeSummary(tc.available, tc.workingSet, tc.usage, isAllocatableEvictionThreshold(tc.evictionThreshold)))
 			if err != nil && !tc.expectErr {
 				t.Errorf("Unexpected error updating threshold: %v", err)
@@ -161,10 +157,8 @@ func TestStart(t *testing.T) {
 			Quantity: &noResources,
 		},
 	}
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	notifierFactory := NewMockNotifierFactory(mockCtrl)
-	notifier := NewMockCgroupNotifier(mockCtrl)
+	notifierFactory := NewMockNotifierFactory(t)
+	notifier := NewMockCgroupNotifier(t)
 
 	var wg sync.WaitGroup
 	wg.Add(4)
@@ -174,7 +168,7 @@ func TestStart(t *testing.T) {
 	notifierFactory.EXPECT().NewCgroupNotifier(testCgroupPath, memoryUsageAttribute, int64(0)).Return(notifier, nil).Times(1)
 
 	var events chan<- struct{} = m.events
-	notifier.EXPECT().Start(events).DoAndReturn(func(events chan<- struct{}) {
+	notifier.EXPECT().Start(events).Run(func(events chan<- struct{}) {
 		for i := 0; i < 4; i++ {
 			events <- struct{}{}
 		}

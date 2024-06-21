@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -source=runtime.go -destination=testing/runtime_mock.go -package=testing Runtime
+//go:generate mockery
 package container
 
 import (

@@ -23,7 +23,6 @@ import (
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -245,15 +244,12 @@ func TestCadvisorListPodStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
-	mockRuntime := containertest.NewMockRuntime(mockCtrl)
+	mockRuntime := containertest.NewMockRuntime(t)
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
 		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
@@ -267,7 +263,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	p1Time := metav1.Now()
 	p2Time := metav1.Now()
 	p3Time := metav1.Now()
-	mockStatus := statustest.NewMockPodStatusProvider(mockCtrl)
+	mockStatus := statustest.NewMockPodStatusProvider(t)
 	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName0)).Return(v1.PodStatus{StartTime: &p0Time}, true)
 	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName1)).Return(v1.PodStatus{StartTime: &p1Time}, true)
 	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName2)).Return(v1.PodStatus{StartTime: &p2Time}, true)
@@ -434,10 +430,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
@@ -525,12 +518,10 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 
 func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 	ctx := context.Background()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	var (
 		assert       = assert.New(t)
-		mockCadvisor = cadvisortest.NewMockInterface(mockCtrl)
-		mockRuntime  = containertest.NewMockRuntime(mockCtrl)
+		mockCadvisor = cadvisortest.NewMockInterface(t)
+		mockRuntime  = containertest.NewMockRuntime(t)
 
 		seed        = 1000
 		imageFsInfo = getTestFsInfo(seed)
@@ -557,12 +548,10 @@ func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {
 
 func TestCadvisorImagesFsStats(t *testing.T) {
 	ctx := context.Background()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	var (
 		assert       = assert.New(t)
-		mockCadvisor = cadvisortest.NewMockInterface(mockCtrl)
-		mockRuntime  = containertest.NewMockRuntime(mockCtrl)
+		mockCadvisor = cadvisortest.NewMockInterface(t)
+		mockRuntime  = containertest.NewMockRuntime(t)
 
 		seed        = 1000
 		imageFsInfo = getTestFsInfo(seed)
@@ -605,12 +594,10 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 
 func TestCadvisorSplitImagesFsStats(t *testing.T) {
 	ctx := context.Background()
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	var (
 		assert       = assert.New(t)
-		mockCadvisor = cadvisortest.NewMockInterface(mockCtrl)
-		mockRuntime  = containertest.NewMockRuntime(mockCtrl)
+		mockCadvisor = cadvisortest.NewMockInterface(t)
+		mockRuntime  = containertest.NewMockRuntime(t)
 
 		seed            = 1000
 		imageFsInfo     = getTestFsInfo(seed)
@@ -736,20 +723,17 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor := cadvisortest.NewMockInterface(t)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
 
-	mockRuntime := containertest.NewMockRuntime(mockCtrl)
-	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
+	mockRuntime := containertest.NewMockRuntime(t)
+	mockRuntime.EXPECT().ImageStats(ctx).Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).Maybe()
 
 	volumeStats := serverstats.PodVolumeStats{}
 	p0Time := metav1.Now()
-	mockStatus := statustest.NewMockPodStatusProvider(mockCtrl)
+	mockStatus := statustest.NewMockPodStatusProvider(t)
 	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName0)).Return(v1.PodStatus{StartTime: &p0Time}, true)
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}

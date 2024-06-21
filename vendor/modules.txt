@@ -593,9 +593,13 @@ github.com/spf13/pflag
 # github.com/stoewer/go-strcase v1.2.0
 ## explicit; go 1.11
 github.com/stoewer/go-strcase
+# github.com/stretchr/objx v0.5.0
+## explicit; go 1.12
+github.com/stretchr/objx
 # github.com/stretchr/testify v1.8.4
 ## explicit; go 1.20
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 # github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635
 ## explicit
@@ -800,9 +804,6 @@ go.starlark.net/syntax
 ## explicit; go 1.20
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# go.uber.org/mock v0.4.0
-## explicit; go 1.20
-go.uber.org/mock/gomock
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr

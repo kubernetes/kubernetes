@@ -69,7 +69,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.20.0
 	go.opentelemetry.io/proto/otlp v1.0.0
 	go.uber.org/goleak v1.3.0
-	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.23.0
 	golang.org/x/net v0.25.0
@@ -192,6 +191,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

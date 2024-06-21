@@ -24,7 +24,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -2976,10 +2975,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", map[*v1.Pod]statsapi.PodStats{})}
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	thresholdNotifier := NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier := NewMockThresholdNotifier(t)
 	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(nil).Times(2)
 
 	manager := &managerImpl{
@@ -3019,7 +3015,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 
 	// new memory threshold notifier that returns an error
-	thresholdNotifier = NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier = NewMockThresholdNotifier(t)
 	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(fmt.Errorf("error updating threshold")).Times(1)
 	thresholdNotifier.EXPECT().Description().Return("mock thresholdNotifier").Times(1)
 	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -source=handlers.go -destination=handlers.mock.go -package=oidc TokenHandler JWKsHandler
+//go:generate mockery
 
-package oidc
+package handlers
 
 import (
 	"gopkg.in/square/go-jose.v2"
