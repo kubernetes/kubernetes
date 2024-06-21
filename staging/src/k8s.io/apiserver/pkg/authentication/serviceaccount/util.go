@@ -36,9 +36,6 @@ const (
 	ServiceAccountUsernameSeparator = ":"
 	ServiceAccountGroupPrefix       = "system:serviceaccounts:"
 	AllServiceAccountsGroup         = "system:serviceaccounts"
-	// CredentialIDKey is the key used in a user's "extra" to specify the unique
-	// identifier for this identity document).
-	CredentialIDKey = "authentication.kubernetes.io/credential-id"
 	// IssuedCredentialIDAuditAnnotationKey is the annotation key used in the audit event that is persisted to the
 	// '/token' endpoint for service accounts.
 	// This annotation indicates the generated credential identifier for the service account token being issued.
@@ -156,7 +153,7 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 		if info.Extra == nil {
 			info.Extra = make(map[string][]string)
 		}
-		info.Extra[CredentialIDKey] = []string{sa.CredentialID}
+		info.Extra[user.CredentialIDKey] = []string{sa.CredentialID}
 	}
 	if sa.NodeName != "" {
 		if info.Extra == nil {

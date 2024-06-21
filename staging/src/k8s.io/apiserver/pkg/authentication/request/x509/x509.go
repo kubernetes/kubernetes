@@ -17,6 +17,7 @@ limitations under the License.
 package x509
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
@@ -276,10 +277,17 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 	if len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}
+
+	fp := sha256.Sum256(chain[0].Raw)
+	id := "X509SHA256=" + hex.EncodeToString(fp[:])
+
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name:   chain[0].Subject.CommonName,
 			Groups: chain[0].Subject.Organization,
+			Extra: map[string][]string{
+				user.CredentialIDKey: {id},
+			},
 		},
 	}, true, nil
 })
