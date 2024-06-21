@@ -48,6 +48,7 @@
     "leaseDurationSeconds": 2,
     "acquireTime": "2003-01-01T01:01:01.000003Z",
     "renewTime": "2004-01-01T01:01:01.000004Z",
-    "leaseTransitions": 5
+    "leaseTransitions": 5,
+    "strategy": "strategyValue"
   }
 }

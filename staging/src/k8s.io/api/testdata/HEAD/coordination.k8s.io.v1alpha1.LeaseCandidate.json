@@ -1,5 +1,5 @@
 {
-  "kind": "IdentityLease",
+  "kind": "LeaseCandidate",
   "apiVersion": "coordination.k8s.io/v1alpha1",
   "metadata": {
     "name": "nameValue",
@@ -46,10 +46,8 @@
   "spec": {
     "binaryVersion": "binaryVersionValue",
     "compatibilityVersion": "compatibilityVersionValue",
-    "canLeadLease": "canLeadLeaseValue",
-    "holderIdentity": "holderIdentityValue",
+    "targetLease": "targetLeaseValue",
     "leaseDurationSeconds": 2,
-    "acquireTime": "2003-01-01T01:01:01.000003Z",
     "renewTime": "2004-01-01T01:01:01.000004Z"
   }
 }

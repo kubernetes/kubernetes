@@ -24,29 +24,29 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/coordination/identitylease"
+	"k8s.io/kubernetes/pkg/registry/coordination/leasecandidate"
 )
 
-// REST implements a RESTStorage for identityleases against etcd
+// REST implements a RESTStorage for leasecandidates against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against identityleases.
+// NewREST returns a RESTStorage object that will work against leasecandidates.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &coordinationapi.IdentityLease{} },
-		NewListFunc:               func() runtime.Object { return &coordinationapi.IdentityLeaseList{} },
-		DefaultQualifiedResource:  coordinationapi.Resource("identityleases"),
-		SingularQualifiedResource: coordinationapi.Resource("identitylease"),
+		NewFunc:                   func() runtime.Object { return &coordinationapi.LeaseCandidate{} },
+		NewListFunc:               func() runtime.Object { return &coordinationapi.LeaseCandidateList{} },
+		DefaultQualifiedResource:  coordinationapi.Resource("leasecandidates"),
+		SingularQualifiedResource: coordinationapi.Resource("leasecandidate"),
 
-		CreateStrategy: identitylease.Strategy,
-		UpdateStrategy: identitylease.Strategy,
-		DeleteStrategy: identitylease.Strategy,
+		CreateStrategy: leasecandidate.Strategy,
+		UpdateStrategy: leasecandidate.Strategy,
+		DeleteStrategy: leasecandidate.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: identitylease.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: leasecandidate.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
 		return nil, err
 	}

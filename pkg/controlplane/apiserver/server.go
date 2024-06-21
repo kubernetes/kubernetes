@@ -150,7 +150,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
 		le, err := leaderelection.NewController(
 			c.Extra.VersionedInformers.Coordination().V1().Leases(),
-			c.Extra.VersionedInformers.Coordination().V1alpha1().IdentityLeases(),
+			c.Extra.VersionedInformers.Coordination().V1alpha1().LeaseCandidates(),
 			client.CoordinationV1(),
 		)
 		if err != nil {

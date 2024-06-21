@@ -374,9 +374,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/coordination/v1.Lease":                                                                      schema_k8sio_api_coordination_v1_Lease(ref),
 		"k8s.io/api/coordination/v1.LeaseList":                                                                  schema_k8sio_api_coordination_v1_LeaseList(ref),
 		"k8s.io/api/coordination/v1.LeaseSpec":                                                                  schema_k8sio_api_coordination_v1_LeaseSpec(ref),
-		"k8s.io/api/coordination/v1alpha1.IdentityLease":                                                        schema_k8sio_api_coordination_v1alpha1_IdentityLease(ref),
-		"k8s.io/api/coordination/v1alpha1.IdentityLeaseList":                                                    schema_k8sio_api_coordination_v1alpha1_IdentityLeaseList(ref),
-		"k8s.io/api/coordination/v1alpha1.IdentityLeaseSpec":                                                    schema_k8sio_api_coordination_v1alpha1_IdentityLeaseSpec(ref),
+		"k8s.io/api/coordination/v1alpha1.LeaseCandidate":                                                       schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref),
+		"k8s.io/api/coordination/v1alpha1.LeaseCandidateList":                                                   schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref),
+		"k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec":                                                   schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref),
 		"k8s.io/api/coordination/v1beta1.Lease":                                                                 schema_k8sio_api_coordination_v1beta1_Lease(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseList":                                                             schema_k8sio_api_coordination_v1beta1_LeaseList(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseSpec":                                                             schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref),
@@ -18762,6 +18762,14 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 							Format:      "int32",
 						},
 					},
+					"strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Strategy indicates the strategy for picking the leader for coordinated leader election",
+							Default:     "NoCoordination",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -18770,11 +18778,11 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_IdentityLease(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "IdentityLease defines a lease concept.",
+				Description: "LeaseCandidate defines a candidate for a lease object.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -18802,22 +18810,22 @@ func schema_k8sio_api_coordination_v1alpha1_IdentityLease(ref common.ReferenceCa
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/api/coordination/v1alpha1.IdentityLeaseSpec"),
+							Ref:         ref("k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/coordination/v1alpha1.IdentityLeaseSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"k8s.io/api/coordination/v1alpha1.LeaseCandidateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "IdentityLeaseList is a list of Lease objects.",
+				Description: "LeaseCandidateList is a list of Lease objects.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -18849,7 +18857,7 @@ func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseList(ref common.Referen
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/api/coordination/v1alpha1.IdentityLease"),
+										Ref:     ref("k8s.io/api/coordination/v1alpha1.LeaseCandidate"),
 									},
 								},
 							},
@@ -18860,11 +18868,11 @@ func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseList(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/coordination/v1alpha1.IdentityLease", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"k8s.io/api/coordination/v1alpha1.LeaseCandidate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18885,16 +18893,9 @@ func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseSpec(ref common.Referen
 							Format:      "",
 						},
 					},
-					"canLeadLease": {
+					"targetLease": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CanLeadLease is a name/namespace pair of the lease that the identity lease can lead",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"holderIdentity": {
-						SchemaProps: spec.SchemaProps{
-							Description: "holderIdentity contains the identity of the holder of a current lease.",
+							Description: "TargetLease is a name/namespace pair of the lease that the candidate can lead",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18904,12 +18905,6 @@ func schema_k8sio_api_coordination_v1alpha1_IdentityLeaseSpec(ref common.Referen
 							Description: "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed renewTime.",
 							Type:        []string{"integer"},
 							Format:      "int32",
-						},
-					},
-					"acquireTime": {
-						SchemaProps: spec.SchemaProps{
-							Description: "acquireTime is a time when the current lease was acquired.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"),
 						},
 					},
 					"renewTime": {
@@ -19058,6 +19053,14 @@ func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallbac
 							Description: "leaseTransitions is the number of transitions of a lease between holders.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Strategy indicates the strategy for picking the leader for coordinated leader election",
+							Default:     "NoCoordination",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},

@@ -117,6 +117,11 @@
               }
             ],
             "description": "renewTime is a time when the current holder of a lease has last updated the lease."
+          },
+          "strategy": {
+            "default": "NoCoordination",
+            "description": "Strategy indicates the strategy for picking the leader for coordinated leader election",
+            "type": "string"
           }
         },
         "type": "object"

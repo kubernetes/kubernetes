@@ -4,11 +4,11 @@
   "kind": "APIResourceList",
   "resources": [
     {
-      "kind": "IdentityLease",
-      "name": "identityleases",
+      "kind": "LeaseCandidate",
+      "name": "leasecandidates",
       "namespaced": true,
-      "singularName": "identitylease",
-      "storageVersionHash": "71n8GyGNsoc=",
+      "singularName": "leasecandidate",
+      "storageVersionHash": "VM2ILh8OBCI=",
       "verbs": [
         "create",
         "delete",

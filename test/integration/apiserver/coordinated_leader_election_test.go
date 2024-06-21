@@ -19,7 +19,6 @@ package apiserver
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +39,7 @@ import (
 	"k8s.io/utils/clock"
 )
 
-func TestSingleIdentityLease(t *testing.T) {
+func TestSingleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
@@ -53,11 +52,11 @@ func TestSingleIdentityLease(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cletest := setupCLE(config, ctx, cancel, t)
 	defer cletest.cleanup()
-	go cletest.createAndRunFakeController("foo1", "default", "default/foo", "1.20", "1.20")
+	go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20", "1.20")
 	cletest.pollForLease("foo", "default", "foo1")
 }
 
-func TestMultipleIdentityLease(t *testing.T) {
+func TestMultipleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
@@ -70,11 +69,11 @@ func TestMultipleIdentityLease(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cletest := setupCLE(config, ctx, cancel, t)
 	defer cletest.cleanup()
-	go cletest.createAndRunFakeController("foo1", "default", "default/foo", "1.20", "1.20")
-	go cletest.createAndRunFakeController("foo2", "default", "default/foo", "1.20", "1.19")
-	go cletest.createAndRunFakeController("foo3", "default", "default/foo", "1.19", "1.19")
-	go cletest.createAndRunFakeController("foo4", "default", "default/foo", "1.20", "1.19")
-	go cletest.createAndRunFakeController("foo5", "default", "default/foo", "1.20", "1.19")
+	go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20", "1.20")
+	go cletest.createAndRunFakeController("foo2", "default", "foo", "1.20", "1.19")
+	go cletest.createAndRunFakeController("foo3", "default", "foo", "1.19", "1.19")
+	go cletest.createAndRunFakeController("foo4", "default", "foo", "1.20", "1.19")
+	go cletest.createAndRunFakeController("foo5", "default", "foo", "1.20", "1.19")
 	cletest.pollForLease("foo", "default", "foo3")
 }
 
@@ -91,8 +90,8 @@ func TestControllerDisappear(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cletest := setupCLE(config, ctx, cancel, t)
 	defer cletest.cleanup()
-	go cletest.createAndRunFakeController("foo1", "default", "default/foo", "1.20", "1.20")
-	go cletest.createAndRunFakeController("foo2", "default", "default/foo", "1.20", "1.19")
+	go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20", "1.20")
+	go cletest.createAndRunFakeController("foo2", "default", "foo", "1.20", "1.19")
 	cletest.pollForLease("foo", "default", "foo2")
 	cletest.cancelController("foo2", "default")
 	cletest.pollForLease("foo", "default", "foo1")
@@ -105,35 +104,33 @@ type ctxCancelPair struct {
 type cleTest struct {
 	config    *rest.Config
 	clientset *kubernetes.Clientset
-	informer  identityleaseinformers.IdentityLeaseInformer
+	informer  identityleaseinformers.LeaseCandidateInformer
 	t         *testing.T
 	ctxList   map[string]ctxCancelPair
 }
 
-func (t cleTest) createAndRunFakeController(name string, namespace string, canLeadLease string, binaryVersion string, compatibilityVersion string) {
-	identityLease := &leaderelection.IdentityLease{
-		HolderIdentity:        name,
-		LeaseClient:           t.clientset.CoordinationV1alpha1().IdentityLeases(namespace),
-		IdentityLeaseInformer: t.informer,
-		LeaseName:             name,
-		LeaseNamespace:        namespace,
-		LeaseDurationSeconds:  10,
-		Clock:                 clock.RealClock{},
-		CanLeadLeases:         canLeadLease,
-		RenewInterval:         5,
-		BinaryVersion:         binaryVersion,
-		CompatibilityVersion:  compatibilityVersion,
+func (t cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string) {
+	identityLease := &leaderelection.LeaseCandidate{
+		LeaseClient:            t.clientset.CoordinationV1alpha1().LeaseCandidates(namespace),
+		LeaseCandidateInformer: t.informer,
+		LeaseName:              name,
+		LeaseNamespace:         namespace,
+		LeaseDurationSeconds:   10,
+		Clock:                  clock.RealClock{},
+		TargetLease:            targetLease,
+		RenewInterval:          5,
+		BinaryVersion:          binaryVersion,
+		CompatibilityVersion:   compatibilityVersion,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.ctxList[name+"/"+namespace] = ctxCancelPair{ctx, cancel}
 	identityLease.Run(ctx)
 
-	canLead := strings.Split(canLeadLease, "/")
 	electionChecker := leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
 	go leaderElectAndRun(ctx, t.config, name, electionChecker,
-		canLead[0],
+		namespace,
 		"coordinatedLeases",
-		canLead[1],
+		targetLease,
 		leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				klog.Info("Elected leader, starting..")
@@ -208,7 +205,7 @@ func setupCLE(config *rest.Config, ctx context.Context, cancel func(), t *testin
 	return cleTest{
 		config:    config,
 		clientset: clientset,
-		informer:  k8sI.Coordination().V1alpha1().IdentityLeases(),
+		informer:  k8sI.Coordination().V1alpha1().LeaseCandidates(),
 		ctxList:   map[string]ctxCancelPair{"main": a},
 		t:         t,
 	}

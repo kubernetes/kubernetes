@@ -1,5 +1,5 @@
 apiVersion: coordination.k8s.io/v1alpha1
-kind: IdentityLease
+kind: LeaseCandidate
 metadata:
   annotations:
     annotationsKey: annotationsValue
@@ -33,10 +33,8 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  acquireTime: "2003-01-01T01:01:01.000003Z"
   binaryVersion: binaryVersionValue
-  canLeadLease: canLeadLeaseValue
   compatibilityVersion: compatibilityVersionValue
-  holderIdentity: holderIdentityValue
   leaseDurationSeconds: 2
   renewTime: "2004-01-01T01:01:01.000004Z"
+  targetLease: targetLeaseValue

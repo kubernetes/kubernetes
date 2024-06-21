@@ -54,6 +54,7 @@ var map_LeaseSpec = map[string]string{
 	"acquireTime":          "acquireTime is a time when the current lease was acquired.",
 	"renewTime":            "renewTime is a time when the current holder of a lease has last updated the lease.",
 	"leaseTransitions":     "leaseTransitions is the number of transitions of a lease between holders.",
+	"strategy":             "Strategy indicates the strategy for picking the leader for coordinated leader election",
 }
 
 func (LeaseSpec) SwaggerDoc() map[string]string {

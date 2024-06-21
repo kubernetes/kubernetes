@@ -44,15 +44,15 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-func (m *IdentityLease) Reset()      { *m = IdentityLease{} }
-func (*IdentityLease) ProtoMessage() {}
-func (*IdentityLease) Descriptor() ([]byte, []int) {
+func (m *LeaseCandidate) Reset()      { *m = LeaseCandidate{} }
+func (*LeaseCandidate) ProtoMessage() {}
+func (*LeaseCandidate) Descriptor() ([]byte, []int) {
 	return fileDescriptor_cb9e87df9da593c2, []int{0}
 }
-func (m *IdentityLease) XXX_Unmarshal(b []byte) error {
+func (m *LeaseCandidate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *IdentityLease) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *LeaseCandidate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -60,27 +60,27 @@ func (m *IdentityLease) XXX_Marshal(b []byte, deterministic bool) ([]byte, error
 	}
 	return b[:n], nil
 }
-func (m *IdentityLease) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IdentityLease.Merge(m, src)
+func (m *LeaseCandidate) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCandidate.Merge(m, src)
 }
-func (m *IdentityLease) XXX_Size() int {
+func (m *LeaseCandidate) XXX_Size() int {
 	return m.Size()
 }
-func (m *IdentityLease) XXX_DiscardUnknown() {
-	xxx_messageInfo_IdentityLease.DiscardUnknown(m)
+func (m *LeaseCandidate) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCandidate.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_IdentityLease proto.InternalMessageInfo
+var xxx_messageInfo_LeaseCandidate proto.InternalMessageInfo
 
-func (m *IdentityLeaseList) Reset()      { *m = IdentityLeaseList{} }
-func (*IdentityLeaseList) ProtoMessage() {}
-func (*IdentityLeaseList) Descriptor() ([]byte, []int) {
+func (m *LeaseCandidateList) Reset()      { *m = LeaseCandidateList{} }
+func (*LeaseCandidateList) ProtoMessage() {}
+func (*LeaseCandidateList) Descriptor() ([]byte, []int) {
 	return fileDescriptor_cb9e87df9da593c2, []int{1}
 }
-func (m *IdentityLeaseList) XXX_Unmarshal(b []byte) error {
+func (m *LeaseCandidateList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *IdentityLeaseList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *LeaseCandidateList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -88,27 +88,27 @@ func (m *IdentityLeaseList) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
-func (m *IdentityLeaseList) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IdentityLeaseList.Merge(m, src)
+func (m *LeaseCandidateList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCandidateList.Merge(m, src)
 }
-func (m *IdentityLeaseList) XXX_Size() int {
+func (m *LeaseCandidateList) XXX_Size() int {
 	return m.Size()
 }
-func (m *IdentityLeaseList) XXX_DiscardUnknown() {
-	xxx_messageInfo_IdentityLeaseList.DiscardUnknown(m)
+func (m *LeaseCandidateList) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCandidateList.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_IdentityLeaseList proto.InternalMessageInfo
+var xxx_messageInfo_LeaseCandidateList proto.InternalMessageInfo
 
-func (m *IdentityLeaseSpec) Reset()      { *m = IdentityLeaseSpec{} }
-func (*IdentityLeaseSpec) ProtoMessage() {}
-func (*IdentityLeaseSpec) Descriptor() ([]byte, []int) {
+func (m *LeaseCandidateSpec) Reset()      { *m = LeaseCandidateSpec{} }
+func (*LeaseCandidateSpec) ProtoMessage() {}
+func (*LeaseCandidateSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_cb9e87df9da593c2, []int{2}
 }
-func (m *IdentityLeaseSpec) XXX_Unmarshal(b []byte) error {
+func (m *LeaseCandidateSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *IdentityLeaseSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *LeaseCandidateSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	b = b[:cap(b)]
 	n, err := m.MarshalToSizedBuffer(b)
 	if err != nil {
@@ -116,22 +116,22 @@ func (m *IdentityLeaseSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, e
 	}
 	return b[:n], nil
 }
-func (m *IdentityLeaseSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IdentityLeaseSpec.Merge(m, src)
+func (m *LeaseCandidateSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCandidateSpec.Merge(m, src)
 }
-func (m *IdentityLeaseSpec) XXX_Size() int {
+func (m *LeaseCandidateSpec) XXX_Size() int {
 	return m.Size()
 }
-func (m *IdentityLeaseSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_IdentityLeaseSpec.DiscardUnknown(m)
+func (m *LeaseCandidateSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCandidateSpec.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_IdentityLeaseSpec proto.InternalMessageInfo
+var xxx_messageInfo_LeaseCandidateSpec proto.InternalMessageInfo
 
 func init() {
-	proto.RegisterType((*IdentityLease)(nil), "k8s.io.api.coordination.v1alpha1.IdentityLease")
-	proto.RegisterType((*IdentityLeaseList)(nil), "k8s.io.api.coordination.v1alpha1.IdentityLeaseList")
-	proto.RegisterType((*IdentityLeaseSpec)(nil), "k8s.io.api.coordination.v1alpha1.IdentityLeaseSpec")
+	proto.RegisterType((*LeaseCandidate)(nil), "k8s.io.api.coordination.v1alpha1.LeaseCandidate")
+	proto.RegisterType((*LeaseCandidateList)(nil), "k8s.io.api.coordination.v1alpha1.LeaseCandidateList")
+	proto.RegisterType((*LeaseCandidateSpec)(nil), "k8s.io.api.coordination.v1alpha1.LeaseCandidateSpec")
 }
 
 func init() {
@@ -139,47 +139,44 @@ func init() {
 }
 
 var fileDescriptor_cb9e87df9da593c2 = []byte{
-	// 586 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0x4f, 0x6f, 0xd3, 0x30,
-	0x18, 0xc6, 0x9b, 0xad, 0x85, 0xd5, 0x5d, 0x07, 0x98, 0x21, 0x45, 0x13, 0x4a, 0xab, 0x9d, 0x76,
-	0xc1, 0x5e, 0x07, 0x42, 0x13, 0x9c, 0xc8, 0x10, 0x62, 0x52, 0x07, 0x52, 0x36, 0x38, 0xa0, 0x1d,
-	0x70, 0x1c, 0x93, 0x9a, 0x36, 0x71, 0x70, 0xdc, 0xa2, 0xde, 0xf8, 0x08, 0x7c, 0x0a, 0xbe, 0x0a,
-	0x3d, 0xee, 0xb8, 0x53, 0x45, 0xc3, 0x17, 0x41, 0x71, 0xd3, 0x36, 0xfd, 0x83, 0x3a, 0xb8, 0xd5,
-	0xef, 0xfb, 0x3c, 0xbf, 0xf7, 0x7d, 0x5c, 0x2b, 0xe0, 0xb0, 0x7d, 0x1c, 0x23, 0x2e, 0x30, 0x89,
-	0x38, 0xa6, 0x42, 0x48, 0x8f, 0x87, 0x44, 0x71, 0x11, 0xe2, 0x5e, 0x83, 0x74, 0xa2, 0x16, 0x69,
-	0x60, 0x9f, 0x85, 0x4c, 0x12, 0xc5, 0x3c, 0x14, 0x49, 0xa1, 0x04, 0xac, 0x8f, 0x1d, 0x88, 0x44,
-	0x1c, 0xe5, 0x1d, 0x68, 0xe2, 0xd8, 0x7b, 0xe4, 0x73, 0xd5, 0xea, 0xba, 0x88, 0x8a, 0x00, 0xfb,
-	0xc2, 0x17, 0x58, 0x1b, 0xdd, 0xee, 0x27, 0x7d, 0xd2, 0x07, 0xfd, 0x6b, 0x0c, 0xdc, 0x7b, 0x32,
-	0x5b, 0x21, 0x20, 0xb4, 0xc5, 0x43, 0x26, 0xfb, 0x38, 0x6a, 0xfb, 0x69, 0x21, 0xc6, 0x01, 0x53,
-	0x04, 0xf7, 0x96, 0xd6, 0xd8, 0xc3, 0x7f, 0x73, 0xc9, 0x6e, 0xa8, 0x78, 0xc0, 0x96, 0x0c, 0x4f,
-	0xd7, 0x19, 0x62, 0xda, 0x62, 0x01, 0x59, 0xf4, 0xed, 0x0f, 0x0c, 0x50, 0x3d, 0xf5, 0x58, 0xa8,
-	0xb8, 0xea, 0x37, 0x19, 0x89, 0x19, 0xfc, 0x08, 0xb6, 0xd2, 0xad, 0x3c, 0xa2, 0x88, 0x69, 0xd4,
-	0x8d, 0x83, 0xca, 0xd1, 0x21, 0x9a, 0x5d, 0xca, 0x14, 0x8e, 0xa2, 0xb6, 0x9f, 0x16, 0x62, 0x94,
-	0xaa, 0x51, 0xaf, 0x81, 0xde, 0xba, 0x9f, 0x19, 0x55, 0x67, 0x4c, 0x11, 0x1b, 0x0e, 0x86, 0xb5,
-	0x42, 0x32, 0xac, 0x81, 0x59, 0xcd, 0x99, 0x52, 0xe1, 0x3b, 0x50, 0x8c, 0x23, 0x46, 0xcd, 0x0d,
-	0x4d, 0x7f, 0x8c, 0xd6, 0x5d, 0x39, 0x9a, 0x5b, 0xf0, 0x3c, 0x62, 0xd4, 0xde, 0xce, 0x06, 0x14,
-	0xd3, 0x93, 0xa3, 0x71, 0xfb, 0x3f, 0x0d, 0x70, 0x6f, 0x4e, 0xd9, 0xe4, 0xb1, 0x82, 0x97, 0x4b,
-	0x71, 0xd0, 0xcd, 0xe2, 0xa4, 0x6e, 0x1d, 0xe6, 0x6e, 0x36, 0x6b, 0x6b, 0x52, 0xc9, 0x45, 0xb9,
-	0x00, 0x25, 0xae, 0x58, 0x10, 0x9b, 0x1b, 0xf5, 0xcd, 0x83, 0xca, 0x11, 0xfe, 0xc7, 0x2c, 0x76,
-	0x35, 0x63, 0x97, 0x4e, 0x53, 0x8a, 0x33, 0x86, 0xed, 0xff, 0x28, 0x2e, 0x24, 0x49, 0x53, 0xc2,
-	0xe7, 0xa0, 0xea, 0xf2, 0x90, 0xc8, 0xfe, 0x7b, 0x26, 0x63, 0x2e, 0x42, 0xb3, 0x54, 0x37, 0x0e,
-	0xca, 0xf6, 0x83, 0x0c, 0x51, 0xb5, 0xf3, 0x4d, 0x67, 0x5e, 0x0b, 0xdf, 0x80, 0xfb, 0x54, 0x04,
-	0x11, 0x51, 0xdc, 0xed, 0x70, 0x35, 0x45, 0xdc, 0xd2, 0x88, 0x87, 0x19, 0x62, 0xf7, 0x24, 0x93,
-	0xf0, 0x9c, 0xc6, 0x59, 0x65, 0x84, 0xc7, 0x60, 0x9b, 0x92, 0xb0, 0xc9, 0x88, 0xa7, 0x17, 0x34,
-	0x6f, 0x6b, 0xd0, 0x6e, 0x06, 0xda, 0x3e, 0xc9, 0xf5, 0x9c, 0x39, 0x25, 0x7c, 0x06, 0x76, 0x5a,
-	0xa2, 0xe3, 0x31, 0x39, 0x49, 0xa8, 0xff, 0x96, 0xb2, 0x0d, 0x93, 0x61, 0x6d, 0xe7, 0xf5, 0x5c,
-	0xc7, 0x59, 0x50, 0xc2, 0x26, 0xd8, 0xed, 0xa4, 0x90, 0x97, 0x5d, 0xa9, 0xaf, 0xf5, 0x9c, 0x51,
-	0x11, 0x7a, 0xb1, 0x7e, 0x49, 0x25, 0xdb, 0x4c, 0x23, 0x34, 0x57, 0xf4, 0x9d, 0x95, 0x2e, 0xe8,
-	0x82, 0x0a, 0xa1, 0x5f, 0xba, 0x5c, 0xb2, 0x0b, 0x1e, 0x30, 0x73, 0x53, 0xbf, 0x0e, 0x7c, 0xb3,
-	0xd7, 0x71, 0xc6, 0xa9, 0x14, 0xa9, 0xcd, 0xbe, 0x93, 0x0c, 0x6b, 0x95, 0x17, 0x33, 0x8e, 0x93,
-	0x87, 0xc2, 0x4b, 0x50, 0x96, 0x2c, 0x64, 0x5f, 0xf5, 0x84, 0xe2, 0xff, 0x4d, 0xa8, 0x26, 0xc3,
-	0x5a, 0xd9, 0x99, 0x50, 0x9c, 0x19, 0xd0, 0x7e, 0x35, 0x18, 0x59, 0x85, 0xab, 0x91, 0x55, 0xb8,
-	0x1e, 0x59, 0x85, 0x6f, 0x89, 0x65, 0x0c, 0x12, 0xcb, 0xb8, 0x4a, 0x2c, 0xe3, 0x3a, 0xb1, 0x8c,
-	0x5f, 0x89, 0x65, 0x7c, 0xff, 0x6d, 0x15, 0x3e, 0xd4, 0xd7, 0x7d, 0x05, 0xff, 0x04, 0x00, 0x00,
-	0xff, 0xff, 0xf1, 0x99, 0x6c, 0x0c, 0x28, 0x05, 0x00, 0x00,
+	// 535 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x94, 0x4f, 0x6f, 0xd3, 0x3e,
+	0x18, 0xc7, 0x9b, 0x6d, 0xfd, 0xfd, 0x56, 0x97, 0x22, 0xe4, 0x0d, 0x29, 0xaa, 0x50, 0x5a, 0xf5,
+	0xb4, 0x0b, 0xf6, 0x8a, 0x06, 0x42, 0xe2, 0x96, 0x21, 0x24, 0xa4, 0x0e, 0xa4, 0x6c, 0xec, 0x80,
+	0x76, 0xc0, 0x4d, 0x1e, 0x52, 0xd3, 0x26, 0x8e, 0x1c, 0xb7, 0x68, 0x37, 0x0e, 0xbc, 0x00, 0x5e,
+	0x56, 0xe1, 0xb4, 0xe3, 0x4e, 0x15, 0x0d, 0x6f, 0x04, 0xd9, 0x4d, 0xff, 0x17, 0xb5, 0x37, 0xfb,
+	0xf1, 0xf3, 0xfd, 0xf8, 0xfb, 0x7d, 0x1c, 0x05, 0x9d, 0x76, 0x5f, 0xa6, 0x84, 0x0b, 0xca, 0x12,
+	0x4e, 0x7d, 0x21, 0x64, 0xc0, 0x63, 0xa6, 0xb8, 0x88, 0xe9, 0xa0, 0xc9, 0x7a, 0x49, 0x87, 0x35,
+	0x69, 0x08, 0x31, 0x48, 0xa6, 0x20, 0x20, 0x89, 0x14, 0x4a, 0xe0, 0xfa, 0x44, 0x41, 0x58, 0xc2,
+	0xc9, 0xa2, 0x82, 0x4c, 0x15, 0xd5, 0xa7, 0x21, 0x57, 0x9d, 0x7e, 0x9b, 0xf8, 0x22, 0xa2, 0xa1,
+	0x08, 0x05, 0x35, 0xc2, 0x76, 0xff, 0xb3, 0xd9, 0x99, 0x8d, 0x59, 0x4d, 0x80, 0xd5, 0xb3, 0xb9,
+	0x85, 0x88, 0xf9, 0x1d, 0x1e, 0x83, 0xbc, 0xa5, 0x49, 0x37, 0xd4, 0x85, 0x94, 0x46, 0xa0, 0x18,
+	0x1d, 0xac, 0xd9, 0xa8, 0xd2, 0x7f, 0xa9, 0x64, 0x3f, 0x56, 0x3c, 0x82, 0x35, 0xc1, 0x8b, 0x6d,
+	0x82, 0xd4, 0xef, 0x40, 0xc4, 0x56, 0x75, 0x8d, 0x5f, 0x16, 0x7a, 0xd8, 0x02, 0x96, 0xc2, 0x39,
+	0x8b, 0x03, 0x1e, 0x30, 0x05, 0xf8, 0x13, 0x3a, 0xd4, 0xb6, 0x02, 0xa6, 0x98, 0x6d, 0xd5, 0xad,
+	0x93, 0xf2, 0xb3, 0x53, 0x32, 0x9f, 0xca, 0x8c, 0x4e, 0x92, 0x6e, 0xa8, 0x0b, 0x29, 0xd1, 0xdd,
+	0x64, 0xd0, 0x24, 0xef, 0xdb, 0x5f, 0xc0, 0x57, 0x17, 0xa0, 0x98, 0x8b, 0x87, 0xa3, 0x5a, 0x21,
+	0x1b, 0xd5, 0xd0, 0xbc, 0xe6, 0xcd, 0xa8, 0xf8, 0x1a, 0x1d, 0xa4, 0x09, 0xf8, 0xf6, 0x9e, 0xa1,
+	0x9f, 0x91, 0x6d, 0x33, 0x27, 0xcb, 0x0e, 0x2f, 0x13, 0xf0, 0xdd, 0x07, 0xf9, 0x0d, 0x07, 0x7a,
+	0xe7, 0x19, 0x5e, 0xe3, 0xa7, 0x85, 0xf0, 0x72, 0x6b, 0x8b, 0xa7, 0x0a, 0xdf, 0xac, 0x05, 0x22,
+	0xbb, 0x05, 0xd2, 0x6a, 0x13, 0xe7, 0x51, 0x7e, 0xd9, 0xe1, 0xb4, 0xb2, 0x10, 0xe6, 0x03, 0x2a,
+	0x72, 0x05, 0x51, 0x6a, 0xef, 0xd5, 0xf7, 0x57, 0x66, 0xb5, 0x53, 0x1a, 0xb7, 0x92, 0xc3, 0x8b,
+	0x6f, 0x35, 0xc6, 0x9b, 0xd0, 0x1a, 0xdf, 0xf7, 0x57, 0xb3, 0xe8, 0xa0, 0xf8, 0x15, 0xaa, 0xb4,
+	0x79, 0xcc, 0xe4, 0xed, 0x35, 0xc8, 0x94, 0x8b, 0xd8, 0x2e, 0xd6, 0xad, 0x93, 0x92, 0xfb, 0x38,
+	0x67, 0x54, 0xdc, 0xc5, 0x43, 0x6f, 0xb9, 0x17, 0xbf, 0x43, 0x47, 0xbe, 0x88, 0x12, 0xa6, 0x78,
+	0xbb, 0xc7, 0xd5, 0x0c, 0xf1, 0x9f, 0x41, 0x3c, 0xc9, 0x11, 0xc7, 0xe7, 0x79, 0x0b, 0x5f, 0xe8,
+	0xf1, 0x36, 0x09, 0xf1, 0x73, 0x54, 0x56, 0x4c, 0x86, 0xa0, 0x8c, 0x51, 0xfb, 0x7f, 0xc3, 0x39,
+	0xca, 0x39, 0xe5, 0xab, 0xf9, 0x91, 0xb7, 0xd8, 0x87, 0x5b, 0xe8, 0xb8, 0xa7, 0x17, 0xaf, 0xfb,
+	0xd2, 0x4c, 0xe6, 0x12, 0x7c, 0x11, 0x07, 0xa9, 0xf9, 0x1c, 0x8a, 0xae, 0xad, 0x3d, 0xb4, 0x36,
+	0x9c, 0x7b, 0x1b, 0x55, 0xf8, 0x06, 0x95, 0x24, 0xc4, 0xf0, 0xf5, 0x8a, 0x47, 0x60, 0x1f, 0x98,
+	0xe7, 0xa5, 0xbb, 0x3d, 0xef, 0x05, 0xf7, 0xa5, 0xd0, 0x32, 0xb7, 0x92, 0x8d, 0x6a, 0x25, 0x6f,
+	0x4a, 0xf1, 0xe6, 0x40, 0xf7, 0xcd, 0x70, 0xec, 0x14, 0xee, 0xc6, 0x4e, 0xe1, 0x7e, 0xec, 0x14,
+	0xbe, 0x65, 0x8e, 0x35, 0xcc, 0x1c, 0xeb, 0x2e, 0x73, 0xac, 0xfb, 0xcc, 0xb1, 0x7e, 0x67, 0x8e,
+	0xf5, 0xe3, 0x8f, 0x53, 0xf8, 0x58, 0xdf, 0xf6, 0x9f, 0xf9, 0x1b, 0x00, 0x00, 0xff, 0xff, 0x4b,
+	0x7f, 0xbb, 0x61, 0x8a, 0x04, 0x00, 0x00,
 }
 
-func (m *IdentityLease) Marshal() (dAtA []byte, err error) {
+func (m *LeaseCandidate) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -189,12 +186,12 @@ func (m *IdentityLease) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *IdentityLease) MarshalTo(dAtA []byte) (int, error) {
+func (m *LeaseCandidate) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *IdentityLease) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *LeaseCandidate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -222,7 +219,7 @@ func (m *IdentityLease) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *IdentityLeaseList) Marshal() (dAtA []byte, err error) {
+func (m *LeaseCandidateList) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -232,12 +229,12 @@ func (m *IdentityLeaseList) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *IdentityLeaseList) MarshalTo(dAtA []byte) (int, error) {
+func (m *LeaseCandidateList) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *IdentityLeaseList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *LeaseCandidateList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -269,7 +266,7 @@ func (m *IdentityLeaseList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *IdentityLeaseSpec) Marshal() (dAtA []byte, err error) {
+func (m *LeaseCandidateSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -279,19 +276,19 @@ func (m *IdentityLeaseSpec) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *IdentityLeaseSpec) MarshalTo(dAtA []byte) (int, error) {
+func (m *LeaseCandidateSpec) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *IdentityLeaseSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *LeaseCandidateSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	i -= len(m.CanLeadLease)
-	copy(dAtA[i:], m.CanLeadLease)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.CanLeadLease)))
+	i -= len(m.TargetLease)
+	copy(dAtA[i:], m.TargetLease)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.TargetLease)))
 	i--
 	dAtA[i] = 0x3a
 	i -= len(m.CompatibilityVersion)
@@ -316,29 +313,10 @@ func (m *IdentityLeaseSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x22
 	}
-	if m.AcquireTime != nil {
-		{
-			size, err := m.AcquireTime.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintGenerated(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x1a
-	}
 	if m.LeaseDurationSeconds != nil {
 		i = encodeVarintGenerated(dAtA, i, uint64(*m.LeaseDurationSeconds))
 		i--
 		dAtA[i] = 0x10
-	}
-	if m.HolderIdentity != nil {
-		i -= len(*m.HolderIdentity)
-		copy(dAtA[i:], *m.HolderIdentity)
-		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.HolderIdentity)))
-		i--
-		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -354,7 +332,7 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *IdentityLease) Size() (n int) {
+func (m *LeaseCandidate) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -367,7 +345,7 @@ func (m *IdentityLease) Size() (n int) {
 	return n
 }
 
-func (m *IdentityLeaseList) Size() (n int) {
+func (m *LeaseCandidateList) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -384,22 +362,14 @@ func (m *IdentityLeaseList) Size() (n int) {
 	return n
 }
 
-func (m *IdentityLeaseSpec) Size() (n int) {
+func (m *LeaseCandidateSpec) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if m.HolderIdentity != nil {
-		l = len(*m.HolderIdentity)
-		n += 1 + l + sovGenerated(uint64(l))
-	}
 	if m.LeaseDurationSeconds != nil {
 		n += 1 + sovGenerated(uint64(*m.LeaseDurationSeconds))
-	}
-	if m.AcquireTime != nil {
-		l = m.AcquireTime.Size()
-		n += 1 + l + sovGenerated(uint64(l))
 	}
 	if m.RenewTime != nil {
 		l = m.RenewTime.Size()
@@ -409,7 +379,7 @@ func (m *IdentityLeaseSpec) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.CompatibilityVersion)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.CanLeadLease)
+	l = len(m.TargetLease)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -420,45 +390,43 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (this *IdentityLease) String() string {
+func (this *LeaseCandidate) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IdentityLease{`,
+	s := strings.Join([]string{`&LeaseCandidate{`,
 		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
-		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "IdentityLeaseSpec", "IdentityLeaseSpec", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "LeaseCandidateSpec", "LeaseCandidateSpec", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *IdentityLeaseList) String() string {
+func (this *LeaseCandidateList) String() string {
 	if this == nil {
 		return "nil"
 	}
-	repeatedStringForItems := "[]IdentityLease{"
+	repeatedStringForItems := "[]LeaseCandidate{"
 	for _, f := range this.Items {
-		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "IdentityLease", "IdentityLease", 1), `&`, ``, 1) + ","
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "LeaseCandidate", "LeaseCandidate", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForItems += "}"
-	s := strings.Join([]string{`&IdentityLeaseList{`,
+	s := strings.Join([]string{`&LeaseCandidateList{`,
 		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + repeatedStringForItems + `,`,
 		`}`,
 	}, "")
 	return s
 }
-func (this *IdentityLeaseSpec) String() string {
+func (this *LeaseCandidateSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
-	s := strings.Join([]string{`&IdentityLeaseSpec{`,
-		`HolderIdentity:` + valueToStringGenerated(this.HolderIdentity) + `,`,
+	s := strings.Join([]string{`&LeaseCandidateSpec{`,
 		`LeaseDurationSeconds:` + valueToStringGenerated(this.LeaseDurationSeconds) + `,`,
-		`AcquireTime:` + strings.Replace(fmt.Sprintf("%v", this.AcquireTime), "MicroTime", "v1.MicroTime", 1) + `,`,
 		`RenewTime:` + strings.Replace(fmt.Sprintf("%v", this.RenewTime), "MicroTime", "v1.MicroTime", 1) + `,`,
 		`BinaryVersion:` + fmt.Sprintf("%v", this.BinaryVersion) + `,`,
 		`CompatibilityVersion:` + fmt.Sprintf("%v", this.CompatibilityVersion) + `,`,
-		`CanLeadLease:` + fmt.Sprintf("%v", this.CanLeadLease) + `,`,
+		`TargetLease:` + fmt.Sprintf("%v", this.TargetLease) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -471,7 +439,7 @@ func valueToStringGenerated(v interface{}) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
 }
-func (m *IdentityLease) Unmarshal(dAtA []byte) error {
+func (m *LeaseCandidate) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -494,10 +462,10 @@ func (m *IdentityLease) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: IdentityLease: wiretype end group for non-group")
+			return fmt.Errorf("proto: LeaseCandidate: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: IdentityLease: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LeaseCandidate: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -587,7 +555,7 @@ func (m *IdentityLease) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *IdentityLeaseList) Unmarshal(dAtA []byte) error {
+func (m *LeaseCandidateList) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -610,10 +578,10 @@ func (m *IdentityLeaseList) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: IdentityLeaseList: wiretype end group for non-group")
+			return fmt.Errorf("proto: LeaseCandidateList: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: IdentityLeaseList: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LeaseCandidateList: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -678,7 +646,7 @@ func (m *IdentityLeaseList) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Items = append(m.Items, IdentityLease{})
+			m.Items = append(m.Items, LeaseCandidate{})
 			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -704,7 +672,7 @@ func (m *IdentityLeaseList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *IdentityLeaseSpec) Unmarshal(dAtA []byte) error {
+func (m *LeaseCandidateSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -727,45 +695,12 @@ func (m *IdentityLeaseSpec) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: IdentityLeaseSpec: wiretype end group for non-group")
+			return fmt.Errorf("proto: LeaseCandidateSpec: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: IdentityLeaseSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: LeaseCandidateSpec: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field HolderIdentity", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			s := string(dAtA[iNdEx:postIndex])
-			m.HolderIdentity = &s
-			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LeaseDurationSeconds", wireType)
@@ -786,42 +721,6 @@ func (m *IdentityLeaseSpec) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.LeaseDurationSeconds = &v
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AcquireTime", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.AcquireTime == nil {
-				m.AcquireTime = &v1.MicroTime{}
-			}
-			if err := m.AcquireTime.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field RenewTime", wireType)
@@ -924,7 +823,7 @@ func (m *IdentityLeaseSpec) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 7:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CanLeadLease", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetLease", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -952,7 +851,7 @@ func (m *IdentityLeaseSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.CanLeadLease = string(dAtA[iNdEx:postIndex])
+			m.TargetLease = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

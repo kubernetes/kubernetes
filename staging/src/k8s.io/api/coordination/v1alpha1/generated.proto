@@ -28,8 +28,8 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/coordination/v1alpha1";
 
-// IdentityLease defines a lease concept.
-message IdentityLease {
+// LeaseCandidate defines a candidate for a lease object.
+message LeaseCandidate {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
@@ -37,44 +37,36 @@ message IdentityLease {
   // spec contains the specification of the Lease.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
-  optional IdentityLeaseSpec spec = 2;
+  optional LeaseCandidateSpec spec = 2;
 }
 
-// IdentityLeaseList is a list of Lease objects.
-message IdentityLeaseList {
+// LeaseCandidateList is a list of Lease objects.
+message LeaseCandidateList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items is a list of schema objects.
-  repeated IdentityLease items = 2;
+  repeated LeaseCandidate items = 2;
 }
 
 // LeaseSpec is a specification of a Lease.
-message IdentityLeaseSpec {
+message LeaseCandidateSpec {
   // BinaryVersion is the binary version
   optional string binaryVersion = 5;
 
   // CompatibilityVersion is the compatibility version
   optional string compatiblityVersion = 6;
 
-  // CanLeadLease is a name/namespace pair of the lease that the identity lease can lead
-  optional string canLeadLease = 7;
-
-  // holderIdentity contains the identity of the holder of a current lease.
-  // +optional
-  optional string holderIdentity = 1;
+  // TargetLease is a name/namespace pair of the lease that the candidate can lead
+  optional string targetLease = 7;
 
   // leaseDurationSeconds is a duration that candidates for a lease need
   // to wait to force acquire it. This is measure against time of last
   // observed renewTime.
   // +optional
   optional int32 leaseDurationSeconds = 2;
-
-  // acquireTime is a time when the current lease was acquired.
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime acquireTime = 3;
 
   // renewTime is a time when the current holder of a lease has last
   // updated the lease.

@@ -20,6 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type CoordinatedStrategy string
+
+// CoordinatedLeaseStrategy defines the strategy for picking the leader for coordinated leader election.
+const (
+	OldestCompatibilityVersion CoordinatedStrategy = "OldestCompatibilityVersion"
+	NoCoordination             CoordinatedStrategy = "NoCoordination"
+)
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.14
@@ -58,6 +66,10 @@ type LeaseSpec struct {
 	// holders.
 	// +optional
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
+	// Strategy indicates the strategy for picking the leader for coordinated leader election
+	// +optional
+	// +default="NoCoordination"
+	Strategy *CoordinatedStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

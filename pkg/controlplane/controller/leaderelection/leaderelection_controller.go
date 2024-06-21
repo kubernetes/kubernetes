@@ -19,7 +19,6 @@ package leaderelection
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -43,10 +42,6 @@ import (
 
 const controllerName = "leader-election-controller" // TODO: make exported?
 
-// TODO: multi-valued labels are problematic.. label matching gets broken.. should we use a label
-// per leader lease? Do we need to add a spec field?
-const CanLeadLeasesAnnotationName = "coordination.k8s.io/can-lead-leases"
-
 const CompatibilityVersionAnnotationName = "coordination.k8s.io/compatibility-version"
 const BinaryVersionAnnotationName = "coordination.k8s.io/binary-version"
 
@@ -63,11 +58,11 @@ type Controller struct {
 	leaseSynced   cache.InformerSynced
 	leaseClient   coordinationv1client.CoordinationV1Interface
 
-	identityLeaseInformer coordinationv1alpha1.IdentityLeaseInformer
+	leaseCandidateInformer coordinationv1alpha1.LeaseCandidateInformer
 	// Maybe be useful if identity leases are written to in the future
-	// identityLeaseQueue    workqueue.RateLimitingInterface
-	// identityLeaseClient   coordinationv1alpha1client.CoordinationV1alpha1Interface
-	// identityLeaseSynced   cache.InformerSynced
+	// leaseCandidateQueue    workqueue.RateLimitingInterface
+	// leaseCandidateClient   coordinationv1alpha1client.CoordinationV1alpha1Interface
+	// leaseCandidateSynced   cache.InformerSynced
 
 	electionCh chan election
 }
@@ -81,12 +76,8 @@ type leaderLeaseID struct {
 	namespace, name string
 }
 
-func parseLeaderLeaseID(id string) (leaderLeaseID, error) {
-	parts := strings.Split(id, "/")
-	if len(parts) != 2 {
-		return leaderLeaseID{}, fmt.Errorf("expected single '/' in leader lease identifier but got '%s'", id)
-	}
-	return leaderLeaseID{parts[0], parts[1]}, nil
+func parseLeaderLeaseID(namespace, id string) (leaderLeaseID, error) {
+	return leaderLeaseID{namespace, id}, nil
 }
 
 func (l leaderLeaseID) String() string {
@@ -112,13 +103,13 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(leaseInformer coordinationv1.LeaseInformer, identityLeaseInformer coordinationv1alpha1.IdentityLeaseInformer, leaseClient coordinationv1client.CoordinationV1Interface) (*Controller, error) {
+func NewController(leaseInformer coordinationv1.LeaseInformer, leaseCandidateInformer coordinationv1alpha1.LeaseCandidateInformer, leaseClient coordinationv1client.CoordinationV1Interface) (*Controller, error) {
 	klog.Infof("NewController")
 	c := &Controller{
-		leaseInformer:         leaseInformer,
-		identityLeaseInformer: identityLeaseInformer,
-		leaseQueue:            workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[string](), workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName}),
-		leaseClient:           leaseClient,
+		leaseInformer:          leaseInformer,
+		leaseCandidateInformer: leaseCandidateInformer,
+		leaseQueue:             workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.DefaultTypedControllerRateLimiter[string](), workqueue.TypedRateLimitingQueueConfig[string]{Name: controllerName}),
+		leaseClient:            leaseClient,
 
 		// TODO: What to do if the size limit is reached?
 		// realistically we'd have a lot less than 1000 leases that all need to be updated at the same time.
@@ -142,12 +133,12 @@ func NewController(leaseInformer coordinationv1.LeaseInformer, identityLeaseInfo
 	if err != nil {
 		return nil, err
 	}
-	_, err = identityLeaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = leaseCandidateInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			c.enqueueIdentity(obj)
+			c.enqueueCandidate(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			c.enqueueIdentity(newObj)
+			c.enqueueCandidate(newObj)
 		},
 	})
 
@@ -169,14 +160,14 @@ func (c *Controller) enqueueLease(obj any) {
 	}
 }
 
-func (c *Controller) enqueueIdentity(obj any) {
-	if lease, ok := obj.(*v1alpha1.IdentityLease); ok {
+func (c *Controller) enqueueCandidate(obj any) {
+	if lease, ok := obj.(*v1alpha1.LeaseCandidate); ok {
 		// TODO: handle namespaces
 		// key, err := controller.KeyFunc(lease)
 		// if err != nil {
 		// 	utilruntime.HandleError(fmt.Errorf("cannot get name of object %v: %w", lease, err))
 		// }
-		_ = c.reconcileIdentityLease(lease)
+		_ = c.reconcileLeaseCandidate(lease)
 		// How to handle invalid lease?
 	}
 }
@@ -244,13 +235,13 @@ func (c *Controller) runElectionLoop(stopCh <-chan struct{}) {
 	}
 }
 
-func (c *Controller) reconcileIdentityLease(lease *v1alpha1.IdentityLease) error {
-	canLead := lease.Spec.CanLeadLease
+func (c *Controller) reconcileLeaseCandidate(lease *v1alpha1.LeaseCandidate) error {
+	canLead := lease.Spec.TargetLease
 	if canLead == "" {
 		return nil
 	}
 	klog.Infof("reconcile found canLead label namespace=%q, name=%q: %q", lease.Namespace, lease.Name, canLead)
-	leaderLeaseID, err := parseLeaderLeaseID(canLead)
+	leaderLeaseID, err := parseLeaderLeaseID(lease.Namespace, canLead)
 	if err != nil {
 		return err
 	}
@@ -300,34 +291,6 @@ func (c *Controller) reconcile(ctx context.Context, key string) error {
 	return nil
 }
 
-// func (c *Controller) activeLeader(ctx context.Context, leaderLeaseID leaderLeaseID) (*v1alpha1.IdentityLease, bool, error) {
-// 	leaderLease, err := c.leaseInformer.Lister().Leases(leaderLeaseID.namespace).Get(leaderLeaseID.name)
-// 	if err != nil {
-// 		if apierrors.IsNotFound(err) {
-// 			klog.Infof("activeLeader not found for lease namespace=%q, name=%q", leaderLeaseID.namespace, leaderLeaseID.name)
-// 			return nil, false, nil
-// 		} else {
-// 			return nil, false, err
-// 		}
-// 	}
-// 	holder := leaderLease.Spec.HolderIdentity
-// 	if holder == nil {
-// 		return nil, false, nil
-// 	}
-// 	// TODO: What namespace to use?
-// 	holderIdentityLease, err := c.identityLeaseInformer.Lister().IdentityLeases(leaderLeaseID.namespace).Get(*holder)
-// 	if err != nil {
-// 		if apierrors.IsNotFound(err) {
-// 			klog.Infof("activeLeader holder identity not found for lease namespace=%q, name=%q", leaderLeaseID.namespace, leaderLeaseID.name)
-// 			return nil, false, nil
-// 		} else {
-// 			return nil, false, err
-// 		}
-// 	}
-
-// 	return holderIdentityLease, !isLeaseExpired(leaderLease), nil
-// }
-
 func (c *Controller) scheduleElection(leaderLeaseID leaderLeaseID) error {
 	klog.Infof("scheduleElection")
 	// TODO: add a set to track ongoing elections and avoid requesting an election if one has already been kicked off?
@@ -354,7 +317,7 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseID leaderLeaseI
 	klog.Infof("pickBestLeader found %q %q", electee.Namespace, electee.Name)
 
 	// TODO: Is taking the pointer safe
-	klog.Infof("Creating lease %q %q for %q", leaderLeaseID.namespace, leaderLeaseID.name, *electee.Spec.HolderIdentity)
+	klog.Infof("Creating lease %q %q for %q", leaderLeaseID.namespace, leaderLeaseID.name, electee.Name)
 	// create the leader election lease
 	leaderLease := &v1.Lease{
 		// TODO: fill out all lease fields
@@ -366,7 +329,7 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseID leaderLeaseI
 			},
 		},
 		Spec: v1.LeaseSpec{
-			HolderIdentity: electee.Spec.HolderIdentity,
+			HolderIdentity: &electee.Name,
 		},
 	}
 	_, err = c.leaseClient.Leases(leaderLeaseID.namespace).Create(ctx, leaderLease, metav1.CreateOptions{})
@@ -379,11 +342,11 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseID leaderLeaseI
 
 			// If the lease has expired and the holder identity is inaccurate, reset it
 			isExpired := isLeaseExpired(lease)
-			if isExpired && electee.Spec.HolderIdentity != nil && (lease.Spec.HolderIdentity == nil || *lease.Spec.HolderIdentity != *electee.Spec.HolderIdentity) {
+			if isExpired && (lease.Spec.HolderIdentity == nil || *lease.Spec.HolderIdentity != electee.Name) {
 				klog.Infof("lease %q %q is expired, resetting it", leaderLeaseID.namespace, leaderLeaseID.name)
 				delete(lease.Annotations, EndOfTermAnnotationName)
 				lease.ObjectMeta.Annotations[ElectedByAnnotationName] = controllerName
-				lease.Spec.HolderIdentity = electee.Spec.HolderIdentity
+				lease.Spec.HolderIdentity = &electee.Name
 
 				// TODO: we don't really need to clear these, right?
 				lease.Spec.RenewTime = nil
@@ -393,8 +356,8 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseID leaderLeaseI
 				if err != nil {
 					return err
 				}
-			} else if lease.Spec.HolderIdentity != nil && electee.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != *electee.Spec.HolderIdentity {
-				klog.Infof("lease %q %q already exists for holder %q but should be held by %q, marking end of term", leaderLeaseID.namespace, leaderLeaseID.name, *lease.Spec.HolderIdentity, *electee.Spec.HolderIdentity)
+			} else if lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != electee.Name {
+				klog.Infof("lease %q %q already exists for holder %q but should be held by %q, marking end of term", leaderLeaseID.namespace, leaderLeaseID.name, *lease.Spec.HolderIdentity, electee.Name)
 				if lease.Annotations == nil {
 					lease.Annotations = make(map[string]string)
 				}
@@ -419,8 +382,8 @@ func (c *Controller) runElection(ctx context.Context, leaderLeaseID leaderLeaseI
 	return nil
 }
 
-func pickBestLeader(candidates []*v1alpha1.IdentityLease) *v1alpha1.IdentityLease {
-	var electee *v1alpha1.IdentityLease
+func pickBestLeader(candidates []*v1alpha1.LeaseCandidate) *v1alpha1.LeaseCandidate {
+	var electee *v1alpha1.LeaseCandidate
 	for _, c := range candidates {
 		if electee == nil || compare(electee, c) > 0 {
 			electee = c
@@ -434,7 +397,7 @@ func pickBestLeader(candidates []*v1alpha1.IdentityLease) *v1alpha1.IdentityLeas
 	return electee
 }
 
-func shouldReelect(candidates []*v1alpha1.IdentityLease, currentLeader *v1alpha1.IdentityLease) bool {
+func shouldReelect(candidates []*v1alpha1.LeaseCandidate, currentLeader *v1alpha1.LeaseCandidate) bool {
 	klog.Infof("shouldReelect for candidates: %+v", candidates)
 	pickedLeader := pickBestLeader(candidates)
 	if pickedLeader == nil {
@@ -443,7 +406,7 @@ func shouldReelect(candidates []*v1alpha1.IdentityLease, currentLeader *v1alpha1
 	return compare(currentLeader, pickedLeader) > 0
 }
 
-func getCompatibilityVersion(l *v1alpha1.IdentityLease) semver.Version {
+func getCompatibilityVersion(l *v1alpha1.LeaseCandidate) semver.Version {
 	value := l.Spec.CompatibilityVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -452,7 +415,7 @@ func getCompatibilityVersion(l *v1alpha1.IdentityLease) semver.Version {
 	return v
 }
 
-func getBinaryVersion(l *v1alpha1.IdentityLease) semver.Version {
+func getBinaryVersion(l *v1alpha1.LeaseCandidate) semver.Version {
 	value := l.Spec.BinaryVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -461,7 +424,7 @@ func getBinaryVersion(l *v1alpha1.IdentityLease) semver.Version {
 	return v
 }
 
-func compare(lhs, rhs *v1alpha1.IdentityLease) int {
+func compare(lhs, rhs *v1alpha1.LeaseCandidate) int {
 	lhsVersion := getCompatibilityVersion(lhs)
 	rhsVersion := getCompatibilityVersion(rhs)
 	result := lhsVersion.Compare(rhsVersion)
@@ -473,20 +436,20 @@ func compare(lhs, rhs *v1alpha1.IdentityLease) int {
 	return result
 }
 
-func (c *Controller) listCandidates(leaderLeaseID leaderLeaseID) ([]*v1alpha1.IdentityLease, error) {
-	leases, err := c.identityLeaseInformer.Lister().IdentityLeases(leaderLeaseID.namespace).List(labels.Everything()) // TODO: somwhow filter
+func (c *Controller) listCandidates(leaderLeaseID leaderLeaseID) ([]*v1alpha1.LeaseCandidate, error) {
+	leases, err := c.leaseCandidateInformer.Lister().LeaseCandidates(leaderLeaseID.namespace).List(labels.Everything()) // TODO: somwhow filter
 	klog.Infof("total candidates %d", len(leases))
 	if err != nil {
 		return nil, err
 	}
-	var results []*v1alpha1.IdentityLease
+	var results []*v1alpha1.LeaseCandidate
 
 	for _, l := range leases {
-		if canLead(l, leaderLeaseID.String()) {
-			if !isIdentityLeaseExpired(l) {
+		if canLead(l, leaderLeaseID.name) {
+			if !isLeaseCandidateExpired(l) {
 				results = append(results, l)
 			} else {
-				klog.Infof("IdentityLease %s is expired", l.Name)
+				klog.Infof("LeaseCandidate %s is expired", l.Name)
 			}
 		}
 	}
@@ -494,8 +457,8 @@ func (c *Controller) listCandidates(leaderLeaseID leaderLeaseID) ([]*v1alpha1.Id
 	return results, nil
 }
 
-func canLead(lease *v1alpha1.IdentityLease, leaderLeaseName string) bool {
-	return lease.Spec.CanLeadLease == leaderLeaseName
+func canLead(lease *v1alpha1.LeaseCandidate, leaderLeaseName string) bool {
+	return lease.Spec.TargetLease == leaderLeaseName
 }
 
 func isLeaseExpired(lease *v1.Lease) bool {
@@ -508,9 +471,9 @@ func isLeaseExpired(lease *v1.Lease) bool {
 		lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second).Before(currentTime)
 }
 
-func isIdentityLeaseExpired(lease *v1alpha1.IdentityLease) bool {
+func isLeaseCandidateExpired(lease *v1alpha1.LeaseCandidate) bool {
 	currentTime := time.Now()
-	// IdentityLeases created should have non-nil renew time
+	// LeaseCandidates created should have non-nil renew time
 	// and lease duration set. Leases without these fields set are invalid and should
 	// be GC'ed.
 	return lease.Spec.RenewTime == nil ||

@@ -38,115 +38,111 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.IdentityLease)(nil), (*coordination.IdentityLease)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_IdentityLease_To_coordination_IdentityLease(a.(*v1alpha1.IdentityLease), b.(*coordination.IdentityLease), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.LeaseCandidate)(nil), (*coordination.LeaseCandidate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_LeaseCandidate_To_coordination_LeaseCandidate(a.(*v1alpha1.LeaseCandidate), b.(*coordination.LeaseCandidate), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*coordination.IdentityLease)(nil), (*v1alpha1.IdentityLease)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_coordination_IdentityLease_To_v1alpha1_IdentityLease(a.(*coordination.IdentityLease), b.(*v1alpha1.IdentityLease), scope)
+	if err := s.AddGeneratedConversionFunc((*coordination.LeaseCandidate)(nil), (*v1alpha1.LeaseCandidate)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_LeaseCandidate_To_v1alpha1_LeaseCandidate(a.(*coordination.LeaseCandidate), b.(*v1alpha1.LeaseCandidate), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.IdentityLeaseList)(nil), (*coordination.IdentityLeaseList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_IdentityLeaseList_To_coordination_IdentityLeaseList(a.(*v1alpha1.IdentityLeaseList), b.(*coordination.IdentityLeaseList), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.LeaseCandidateList)(nil), (*coordination.LeaseCandidateList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_LeaseCandidateList_To_coordination_LeaseCandidateList(a.(*v1alpha1.LeaseCandidateList), b.(*coordination.LeaseCandidateList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*coordination.IdentityLeaseList)(nil), (*v1alpha1.IdentityLeaseList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_coordination_IdentityLeaseList_To_v1alpha1_IdentityLeaseList(a.(*coordination.IdentityLeaseList), b.(*v1alpha1.IdentityLeaseList), scope)
+	if err := s.AddGeneratedConversionFunc((*coordination.LeaseCandidateList)(nil), (*v1alpha1.LeaseCandidateList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_LeaseCandidateList_To_v1alpha1_LeaseCandidateList(a.(*coordination.LeaseCandidateList), b.(*v1alpha1.LeaseCandidateList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.IdentityLeaseSpec)(nil), (*coordination.IdentityLeaseSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec(a.(*v1alpha1.IdentityLeaseSpec), b.(*coordination.IdentityLeaseSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.LeaseCandidateSpec)(nil), (*coordination.LeaseCandidateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(a.(*v1alpha1.LeaseCandidateSpec), b.(*coordination.LeaseCandidateSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*coordination.IdentityLeaseSpec)(nil), (*v1alpha1.IdentityLeaseSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec(a.(*coordination.IdentityLeaseSpec), b.(*v1alpha1.IdentityLeaseSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*coordination.LeaseCandidateSpec)(nil), (*v1alpha1.LeaseCandidateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec(a.(*coordination.LeaseCandidateSpec), b.(*v1alpha1.LeaseCandidateSpec), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1alpha1_IdentityLease_To_coordination_IdentityLease(in *v1alpha1.IdentityLease, out *coordination.IdentityLease, s conversion.Scope) error {
+func autoConvert_v1alpha1_LeaseCandidate_To_coordination_LeaseCandidate(in *v1alpha1.LeaseCandidate, out *coordination.LeaseCandidate, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_v1alpha1_IdentityLease_To_coordination_IdentityLease is an autogenerated conversion function.
-func Convert_v1alpha1_IdentityLease_To_coordination_IdentityLease(in *v1alpha1.IdentityLease, out *coordination.IdentityLease, s conversion.Scope) error {
-	return autoConvert_v1alpha1_IdentityLease_To_coordination_IdentityLease(in, out, s)
+// Convert_v1alpha1_LeaseCandidate_To_coordination_LeaseCandidate is an autogenerated conversion function.
+func Convert_v1alpha1_LeaseCandidate_To_coordination_LeaseCandidate(in *v1alpha1.LeaseCandidate, out *coordination.LeaseCandidate, s conversion.Scope) error {
+	return autoConvert_v1alpha1_LeaseCandidate_To_coordination_LeaseCandidate(in, out, s)
 }
 
-func autoConvert_coordination_IdentityLease_To_v1alpha1_IdentityLease(in *coordination.IdentityLease, out *v1alpha1.IdentityLease, s conversion.Scope) error {
+func autoConvert_coordination_LeaseCandidate_To_v1alpha1_LeaseCandidate(in *coordination.LeaseCandidate, out *v1alpha1.LeaseCandidate, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	if err := Convert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec(&in.Spec, &out.Spec, s); err != nil {
+	if err := Convert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Convert_coordination_IdentityLease_To_v1alpha1_IdentityLease is an autogenerated conversion function.
-func Convert_coordination_IdentityLease_To_v1alpha1_IdentityLease(in *coordination.IdentityLease, out *v1alpha1.IdentityLease, s conversion.Scope) error {
-	return autoConvert_coordination_IdentityLease_To_v1alpha1_IdentityLease(in, out, s)
+// Convert_coordination_LeaseCandidate_To_v1alpha1_LeaseCandidate is an autogenerated conversion function.
+func Convert_coordination_LeaseCandidate_To_v1alpha1_LeaseCandidate(in *coordination.LeaseCandidate, out *v1alpha1.LeaseCandidate, s conversion.Scope) error {
+	return autoConvert_coordination_LeaseCandidate_To_v1alpha1_LeaseCandidate(in, out, s)
 }
 
-func autoConvert_v1alpha1_IdentityLeaseList_To_coordination_IdentityLeaseList(in *v1alpha1.IdentityLeaseList, out *coordination.IdentityLeaseList, s conversion.Scope) error {
+func autoConvert_v1alpha1_LeaseCandidateList_To_coordination_LeaseCandidateList(in *v1alpha1.LeaseCandidateList, out *coordination.LeaseCandidateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]coordination.IdentityLease)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]coordination.LeaseCandidate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
-// Convert_v1alpha1_IdentityLeaseList_To_coordination_IdentityLeaseList is an autogenerated conversion function.
-func Convert_v1alpha1_IdentityLeaseList_To_coordination_IdentityLeaseList(in *v1alpha1.IdentityLeaseList, out *coordination.IdentityLeaseList, s conversion.Scope) error {
-	return autoConvert_v1alpha1_IdentityLeaseList_To_coordination_IdentityLeaseList(in, out, s)
+// Convert_v1alpha1_LeaseCandidateList_To_coordination_LeaseCandidateList is an autogenerated conversion function.
+func Convert_v1alpha1_LeaseCandidateList_To_coordination_LeaseCandidateList(in *v1alpha1.LeaseCandidateList, out *coordination.LeaseCandidateList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_LeaseCandidateList_To_coordination_LeaseCandidateList(in, out, s)
 }
 
-func autoConvert_coordination_IdentityLeaseList_To_v1alpha1_IdentityLeaseList(in *coordination.IdentityLeaseList, out *v1alpha1.IdentityLeaseList, s conversion.Scope) error {
+func autoConvert_coordination_LeaseCandidateList_To_v1alpha1_LeaseCandidateList(in *coordination.LeaseCandidateList, out *v1alpha1.LeaseCandidateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.IdentityLease)(unsafe.Pointer(&in.Items))
+	out.Items = *(*[]v1alpha1.LeaseCandidate)(unsafe.Pointer(&in.Items))
 	return nil
 }
 
-// Convert_coordination_IdentityLeaseList_To_v1alpha1_IdentityLeaseList is an autogenerated conversion function.
-func Convert_coordination_IdentityLeaseList_To_v1alpha1_IdentityLeaseList(in *coordination.IdentityLeaseList, out *v1alpha1.IdentityLeaseList, s conversion.Scope) error {
-	return autoConvert_coordination_IdentityLeaseList_To_v1alpha1_IdentityLeaseList(in, out, s)
+// Convert_coordination_LeaseCandidateList_To_v1alpha1_LeaseCandidateList is an autogenerated conversion function.
+func Convert_coordination_LeaseCandidateList_To_v1alpha1_LeaseCandidateList(in *coordination.LeaseCandidateList, out *v1alpha1.LeaseCandidateList, s conversion.Scope) error {
+	return autoConvert_coordination_LeaseCandidateList_To_v1alpha1_LeaseCandidateList(in, out, s)
 }
 
-func autoConvert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec(in *v1alpha1.IdentityLeaseSpec, out *coordination.IdentityLeaseSpec, s conversion.Scope) error {
+func autoConvert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(in *v1alpha1.LeaseCandidateSpec, out *coordination.LeaseCandidateSpec, s conversion.Scope) error {
 	out.BinaryVersion = in.BinaryVersion
 	out.CompatibilityVersion = in.CompatibilityVersion
-	out.CanLeadLease = in.CanLeadLease
-	out.HolderIdentity = (*string)(unsafe.Pointer(in.HolderIdentity))
+	out.TargetLease = in.TargetLease
 	out.LeaseDurationSeconds = (*int32)(unsafe.Pointer(in.LeaseDurationSeconds))
-	out.AcquireTime = (*v1.MicroTime)(unsafe.Pointer(in.AcquireTime))
 	out.RenewTime = (*v1.MicroTime)(unsafe.Pointer(in.RenewTime))
 	return nil
 }
 
-// Convert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec is an autogenerated conversion function.
-func Convert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec(in *v1alpha1.IdentityLeaseSpec, out *coordination.IdentityLeaseSpec, s conversion.Scope) error {
-	return autoConvert_v1alpha1_IdentityLeaseSpec_To_coordination_IdentityLeaseSpec(in, out, s)
+// Convert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec is an autogenerated conversion function.
+func Convert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(in *v1alpha1.LeaseCandidateSpec, out *coordination.LeaseCandidateSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_LeaseCandidateSpec_To_coordination_LeaseCandidateSpec(in, out, s)
 }
 
-func autoConvert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec(in *coordination.IdentityLeaseSpec, out *v1alpha1.IdentityLeaseSpec, s conversion.Scope) error {
+func autoConvert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec(in *coordination.LeaseCandidateSpec, out *v1alpha1.LeaseCandidateSpec, s conversion.Scope) error {
 	out.BinaryVersion = in.BinaryVersion
 	out.CompatibilityVersion = in.CompatibilityVersion
-	out.CanLeadLease = in.CanLeadLease
-	out.HolderIdentity = (*string)(unsafe.Pointer(in.HolderIdentity))
+	out.TargetLease = in.TargetLease
 	out.LeaseDurationSeconds = (*int32)(unsafe.Pointer(in.LeaseDurationSeconds))
-	out.AcquireTime = (*v1.MicroTime)(unsafe.Pointer(in.AcquireTime))
 	out.RenewTime = (*v1.MicroTime)(unsafe.Pointer(in.RenewTime))
 	return nil
 }
 
-// Convert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec is an autogenerated conversion function.
-func Convert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec(in *coordination.IdentityLeaseSpec, out *v1alpha1.IdentityLeaseSpec, s conversion.Scope) error {
-	return autoConvert_coordination_IdentityLeaseSpec_To_v1alpha1_IdentityLeaseSpec(in, out, s)
+// Convert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec is an autogenerated conversion function.
+func Convert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec(in *coordination.LeaseCandidateSpec, out *v1alpha1.LeaseCandidateSpec, s conversion.Scope) error {
+	return autoConvert_coordination_LeaseCandidateSpec_To_v1alpha1_LeaseCandidateSpec(in, out, s)
 }

@@ -28,8 +28,8 @@ type FakeCoordinationV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeCoordinationV1alpha1) IdentityLeases(namespace string) v1alpha1.IdentityLeaseInterface {
-	return &FakeIdentityLeases{c, namespace}
+func (c *FakeCoordinationV1alpha1) LeaseCandidates(namespace string) v1alpha1.LeaseCandidateInterface {
+	return &FakeLeaseCandidates{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -431,13 +431,13 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(leaseColumnDefinitions, printLease)
 	_ = h.TableHandler(leaseColumnDefinitions, printLeaseList)
 
-	identityLeaseColumnDefinitions := []metav1.TableColumnDefinition{
+	leaseCandidateColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "CanLeadLease", Type: "string", Description: coordinationv1alpha1.IdentityLeaseSpec{}.SwaggerDoc()["canLeadLease"]},
+		{Name: "TargetLease", Type: "string", Description: coordinationv1alpha1.LeaseCandidateSpec{}.SwaggerDoc()["TargetLease"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
-	_ = h.TableHandler(identityLeaseColumnDefinitions, printIdentityLease)
-	_ = h.TableHandler(identityLeaseColumnDefinitions, printIdentityLeaseList)
+	_ = h.TableHandler(leaseCandidateColumnDefinitions, printLeaseCandidate)
+	_ = h.TableHandler(leaseCandidateColumnDefinitions, printLeaseCandidateList)
 
 	storageClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -2592,19 +2592,19 @@ func printLeaseList(list *coordination.LeaseList, options printers.GenerateOptio
 	return rows, nil
 }
 
-func printIdentityLease(obj *coordination.IdentityLease, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printLeaseCandidate(obj *coordination.LeaseCandidate, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.CanLeadLease, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.TargetLease, translateTimestampSince(obj.CreationTimestamp))
 	return []metav1.TableRow{row}, nil
 }
 
-func printIdentityLeaseList(list *coordination.IdentityLeaseList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printLeaseCandidateList(list *coordination.LeaseCandidateList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printIdentityLease(&list.Items[i], options)
+		r, err := printLeaseCandidate(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
