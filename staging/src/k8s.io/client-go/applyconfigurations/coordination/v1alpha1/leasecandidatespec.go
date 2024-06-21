@@ -22,28 +22,26 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// IdentityLeaseSpecApplyConfiguration represents an declarative configuration of the IdentityLeaseSpec type for use
+// LeaseCandidateSpecApplyConfiguration represents a declarative configuration of the LeaseCandidateSpec type for use
 // with apply.
-type IdentityLeaseSpecApplyConfiguration struct {
+type LeaseCandidateSpecApplyConfiguration struct {
 	BinaryVersion        *string       `json:"binaryVersion,omitempty"`
 	CompatibilityVersion *string       `json:"compatibilityVersion,omitempty"`
-	CanLeadLease         *string       `json:"canLeadLease,omitempty"`
-	HolderIdentity       *string       `json:"holderIdentity,omitempty"`
+	TargetLease          *string       `json:"targetLease,omitempty"`
 	LeaseDurationSeconds *int32        `json:"leaseDurationSeconds,omitempty"`
-	AcquireTime          *v1.MicroTime `json:"acquireTime,omitempty"`
 	RenewTime            *v1.MicroTime `json:"renewTime,omitempty"`
 }
 
-// IdentityLeaseSpecApplyConfiguration constructs an declarative configuration of the IdentityLeaseSpec type for use with
+// LeaseCandidateSpecApplyConfiguration constructs a declarative configuration of the LeaseCandidateSpec type for use with
 // apply.
-func IdentityLeaseSpec() *IdentityLeaseSpecApplyConfiguration {
-	return &IdentityLeaseSpecApplyConfiguration{}
+func LeaseCandidateSpec() *LeaseCandidateSpecApplyConfiguration {
+	return &LeaseCandidateSpecApplyConfiguration{}
 }
 
 // WithBinaryVersion sets the BinaryVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the BinaryVersion field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithBinaryVersion(value string) *IdentityLeaseSpecApplyConfiguration {
+func (b *LeaseCandidateSpecApplyConfiguration) WithBinaryVersion(value string) *LeaseCandidateSpecApplyConfiguration {
 	b.BinaryVersion = &value
 	return b
 }
@@ -51,47 +49,31 @@ func (b *IdentityLeaseSpecApplyConfiguration) WithBinaryVersion(value string) *I
 // WithCompatibilityVersion sets the CompatibilityVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CompatibilityVersion field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithCompatibilityVersion(value string) *IdentityLeaseSpecApplyConfiguration {
+func (b *LeaseCandidateSpecApplyConfiguration) WithCompatibilityVersion(value string) *LeaseCandidateSpecApplyConfiguration {
 	b.CompatibilityVersion = &value
 	return b
 }
 
-// WithCanLeadLease sets the CanLeadLease field in the declarative configuration to the given value
+// WithTargetLease sets the TargetLease field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the CanLeadLease field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithCanLeadLease(value string) *IdentityLeaseSpecApplyConfiguration {
-	b.CanLeadLease = &value
-	return b
-}
-
-// WithHolderIdentity sets the HolderIdentity field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the HolderIdentity field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithHolderIdentity(value string) *IdentityLeaseSpecApplyConfiguration {
-	b.HolderIdentity = &value
+// If called multiple times, the TargetLease field is set to the value of the last call.
+func (b *LeaseCandidateSpecApplyConfiguration) WithTargetLease(value string) *LeaseCandidateSpecApplyConfiguration {
+	b.TargetLease = &value
 	return b
 }
 
 // WithLeaseDurationSeconds sets the LeaseDurationSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LeaseDurationSeconds field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithLeaseDurationSeconds(value int32) *IdentityLeaseSpecApplyConfiguration {
+func (b *LeaseCandidateSpecApplyConfiguration) WithLeaseDurationSeconds(value int32) *LeaseCandidateSpecApplyConfiguration {
 	b.LeaseDurationSeconds = &value
-	return b
-}
-
-// WithAcquireTime sets the AcquireTime field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the AcquireTime field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithAcquireTime(value v1.MicroTime) *IdentityLeaseSpecApplyConfiguration {
-	b.AcquireTime = &value
 	return b
 }
 
 // WithRenewTime sets the RenewTime field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RenewTime field is set to the value of the last call.
-func (b *IdentityLeaseSpecApplyConfiguration) WithRenewTime(value v1.MicroTime) *IdentityLeaseSpecApplyConfiguration {
+func (b *LeaseCandidateSpecApplyConfiguration) WithRenewTime(value v1.MicroTime) *LeaseCandidateSpecApplyConfiguration {
 	b.RenewTime = &value
 	return b
 }

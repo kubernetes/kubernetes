@@ -5377,12 +5377,16 @@
         "renewTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
           "description": "renewTime is a time when the current holder of a lease has last updated the lease."
+        },
+        "strategy": {
+          "description": "Strategy indicates the strategy for picking the leader for coordinated leader election",
+          "type": "string"
         }
       },
       "type": "object"
     },
-    "io.k8s.api.coordination.v1alpha1.IdentityLease": {
-      "description": "IdentityLease defines a lease concept.",
+    "io.k8s.api.coordination.v1alpha1.LeaseCandidate": {
+      "description": "LeaseCandidate defines a candidate for a lease object.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -5397,7 +5401,7 @@
           "description": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
         },
         "spec": {
-          "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLeaseSpec",
+          "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec",
           "description": "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
@@ -5405,13 +5409,13 @@
       "x-kubernetes-group-version-kind": [
         {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       ]
     },
-    "io.k8s.api.coordination.v1alpha1.IdentityLeaseList": {
-      "description": "IdentityLeaseList is a list of Lease objects.",
+    "io.k8s.api.coordination.v1alpha1.LeaseCandidateList": {
+      "description": "LeaseCandidateList is a list of Lease objects.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -5420,7 +5424,7 @@
         "items": {
           "description": "items is a list of schema objects.",
           "items": {
-            "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+            "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
           },
           "type": "array"
         },
@@ -5440,32 +5444,20 @@
       "x-kubernetes-group-version-kind": [
         {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLeaseList",
+          "kind": "LeaseCandidateList",
           "version": "v1alpha1"
         }
       ]
     },
-    "io.k8s.api.coordination.v1alpha1.IdentityLeaseSpec": {
+    "io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec": {
       "description": "LeaseSpec is a specification of a Lease.",
       "properties": {
-        "acquireTime": {
-          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
-          "description": "acquireTime is a time when the current lease was acquired."
-        },
         "binaryVersion": {
           "description": "BinaryVersion is the binary version",
           "type": "string"
         },
-        "canLeadLease": {
-          "description": "CanLeadLease is a name/namespace pair of the lease that the identity lease can lead",
-          "type": "string"
-        },
         "compatibilityVersion": {
           "description": "CompatibilityVersion is the compatibility version",
-          "type": "string"
-        },
-        "holderIdentity": {
-          "description": "holderIdentity contains the identity of the holder of a current lease.",
           "type": "string"
         },
         "leaseDurationSeconds": {
@@ -5476,6 +5468,10 @@
         "renewTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
           "description": "renewTime is a time when the current holder of a lease has last updated the lease."
+        },
+        "targetLease": {
+          "description": "TargetLease is a name/namespace pair of the lease that the candidate can lead",
+          "type": "string"
         }
       },
       "type": "object"
@@ -55897,13 +55893,13 @@
         ]
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/identityleases": {
+    "/apis/coordination.k8s.io/v1alpha1/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
-        "description": "list or watch objects of kind IdentityLease",
-        "operationId": "listCoordinationV1alpha1IdentityLeaseForAllNamespaces",
+        "description": "list or watch objects of kind LeaseCandidate",
+        "operationId": "listCoordinationV1alpha1LeaseCandidateForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -55915,7 +55911,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLeaseList"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateList"
             }
           },
           "401": {
@@ -55931,7 +55927,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -55971,13 +55967,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/identityleases": {
+    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/leasecandidates": {
       "delete": {
         "consumes": [
           "*/*"
         ],
-        "description": "delete collection of IdentityLease",
-        "operationId": "deleteCoordinationV1alpha1CollectionNamespacedIdentityLease",
+        "description": "delete collection of LeaseCandidate",
+        "operationId": "deleteCoordinationV1alpha1CollectionNamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -56048,7 +56044,7 @@
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56056,8 +56052,8 @@
         "consumes": [
           "*/*"
         ],
-        "description": "list or watch objects of kind IdentityLease",
-        "operationId": "listCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "list or watch objects of kind LeaseCandidate",
+        "operationId": "listCoordinationV1alpha1NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
@@ -56101,7 +56097,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLeaseList"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidateList"
             }
           },
           "401": {
@@ -56117,7 +56113,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56133,15 +56129,15 @@
         "consumes": [
           "*/*"
         ],
-        "description": "create an IdentityLease",
-        "operationId": "createCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "create a LeaseCandidate",
+        "operationId": "createCoordinationV1alpha1NamespacedLeaseCandidate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           {
@@ -56171,19 +56167,19 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "202": {
             "description": "Accepted",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "401": {
@@ -56199,18 +56195,18 @@
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/identityleases/{name}": {
+    "/apis/coordination.k8s.io/v1alpha1/namespaces/{namespace}/leasecandidates/{name}": {
       "delete": {
         "consumes": [
           "*/*"
         ],
-        "description": "delete an IdentityLease",
-        "operationId": "deleteCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "delete a LeaseCandidate",
+        "operationId": "deleteCoordinationV1alpha1NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-2Y1dVQaQ"
@@ -56263,7 +56259,7 @@
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56271,8 +56267,8 @@
         "consumes": [
           "*/*"
         ],
-        "description": "read the specified IdentityLease",
-        "operationId": "readCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "read the specified LeaseCandidate",
+        "operationId": "readCoordinationV1alpha1NamespacedLeaseCandidate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56282,7 +56278,7 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "401": {
@@ -56298,13 +56294,13 @@
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
       "parameters": [
         {
-          "description": "name of the IdentityLease",
+          "description": "name of the LeaseCandidate",
           "in": "path",
           "name": "name",
           "required": true,
@@ -56325,8 +56321,8 @@
           "application/strategic-merge-patch+json",
           "application/apply-patch+yaml"
         ],
-        "description": "partially update the specified IdentityLease",
-        "operationId": "patchCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "partially update the specified LeaseCandidate",
+        "operationId": "patchCoordinationV1alpha1NamespacedLeaseCandidate",
         "parameters": [
           {
             "$ref": "#/parameters/body-78PwaGsr"
@@ -56361,13 +56357,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "401": {
@@ -56383,7 +56379,7 @@
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56391,15 +56387,15 @@
         "consumes": [
           "*/*"
         ],
-        "description": "replace the specified IdentityLease",
-        "operationId": "replaceCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "replace the specified LeaseCandidate",
+        "operationId": "replaceCoordinationV1alpha1NamespacedLeaseCandidate",
         "parameters": [
           {
             "in": "body",
             "name": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           {
@@ -56429,13 +56425,13 @@
           "200": {
             "description": "OK",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "201": {
             "description": "Created",
             "schema": {
-              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.IdentityLease"
+              "$ref": "#/definitions/io.k8s.api.coordination.v1alpha1.LeaseCandidate"
             }
           },
           "401": {
@@ -56451,18 +56447,18 @@
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/identityleases": {
+    "/apis/coordination.k8s.io/v1alpha1/watch/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
-        "description": "watch individual changes to a list of IdentityLease. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchCoordinationV1alpha1IdentityLeaseListForAllNamespaces",
+        "description": "watch individual changes to a list of LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchCoordinationV1alpha1LeaseCandidateListForAllNamespaces",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56490,7 +56486,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56530,13 +56526,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/identityleases": {
+    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/leasecandidates": {
       "get": {
         "consumes": [
           "*/*"
         ],
-        "description": "watch individual changes to a list of IdentityLease. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchCoordinationV1alpha1NamespacedIdentityLeaseList",
+        "description": "watch individual changes to a list of LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchCoordinationV1alpha1NamespacedLeaseCandidateList",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56564,7 +56560,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56607,13 +56603,13 @@
         }
       ]
     },
-    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/identityleases/{name}": {
+    "/apis/coordination.k8s.io/v1alpha1/watch/namespaces/{namespace}/leasecandidates/{name}": {
       "get": {
         "consumes": [
           "*/*"
         ],
-        "description": "watch changes to an object of kind IdentityLease. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchCoordinationV1alpha1NamespacedIdentityLease",
+        "description": "watch changes to an object of kind LeaseCandidate. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchCoordinationV1alpha1NamespacedLeaseCandidate",
         "produces": [
           "application/json",
           "application/yaml",
@@ -56641,7 +56637,7 @@
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "coordination.k8s.io",
-          "kind": "IdentityLease",
+          "kind": "LeaseCandidate",
           "version": "v1alpha1"
         }
       },
@@ -56662,7 +56658,7 @@
           "$ref": "#/parameters/limit-1NfNmdNH"
         },
         {
-          "description": "name of the IdentityLease",
+          "description": "name of the LeaseCandidate",
           "in": "path",
           "name": "name",
           "required": true,

@@ -35,20 +35,20 @@ import (
 func TestCompare(t *testing.T) {
 	cases := []struct {
 		name           string
-		lhs            *v1alpha1.IdentityLease
-		rhs            *v1alpha1.IdentityLease
+		lhs            *v1alpha1.LeaseCandidate
+		rhs            *v1alpha1.LeaseCandidate
 		expectedResult int
 	}{
 		{
 			name: "identical versions",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
 			},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
@@ -57,9 +57,9 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "no lhs version",
-			lhs:  &v1alpha1.IdentityLease{},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs:  &v1alpha1.LeaseCandidate{},
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
@@ -68,25 +68,25 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "no rhs version",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
 			},
-			rhs:            &v1alpha1.IdentityLease{},
+			rhs:            &v1alpha1.LeaseCandidate{},
 			expectedResult: 1,
 		},
 		{
 			name: "invalid lhs version",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "xyz",
 					BinaryVersion:        "xyz",
 				},
 			},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
@@ -95,14 +95,14 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "invalid rhs version",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.21",
 				},
 			},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "xyz",
 					BinaryVersion:        "xyz",
 				},
@@ -111,14 +111,14 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "lhs less than rhs",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.19",
 					BinaryVersion:        "1.20",
 				},
 			},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.20",
 				},
@@ -127,14 +127,14 @@ func TestCompare(t *testing.T) {
 		},
 		{
 			name: "rhs less than lhs",
-			lhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			lhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.20",
 					BinaryVersion:        "1.20",
 				},
 			},
-			rhs: &v1alpha1.IdentityLease{
-				Spec: v1alpha1.IdentityLeaseSpec{
+			rhs: &v1alpha1.LeaseCandidate{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.19",
 					BinaryVersion:        "1.20",
 				},
@@ -155,18 +155,18 @@ func TestCompare(t *testing.T) {
 func TestPickLeader(t *testing.T) {
 	cases := []struct {
 		name               string
-		candidates         []*v1alpha1.IdentityLease
+		candidates         []*v1alpha1.LeaseCandidate
 		expectedLeaderName string
 		expectNoLeader     bool
 	}{
 		{
 			name: "same compatibility version, newer binary version",
-			candidates: []*v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.20",
 					},
@@ -175,7 +175,7 @@ func TestPickLeader(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
 					},
@@ -185,12 +185,12 @@ func TestPickLeader(t *testing.T) {
 		},
 		{
 			name: "same binary version, newer compatibility version",
-			candidates: []*v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.20",
 					},
@@ -199,7 +199,7 @@ func TestPickLeader(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.20",
 						BinaryVersion:        "1.20",
 					},
@@ -209,12 +209,12 @@ func TestPickLeader(t *testing.T) {
 		},
 		{
 			name: "one candidate",
-			candidates: []*v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.20",
 					},
@@ -224,7 +224,7 @@ func TestPickLeader(t *testing.T) {
 		},
 		{
 			name:           "no candidates",
-			candidates:     []*v1alpha1.IdentityLease{},
+			candidates:     []*v1alpha1.LeaseCandidate{},
 			expectNoLeader: true,
 		},
 		// TODO: Add test cases where candidates have invalid version numbers
@@ -250,18 +250,18 @@ func TestPickLeader(t *testing.T) {
 func TestShouldReelect(t *testing.T) {
 	cases := []struct {
 		name          string
-		candidates    []*v1alpha1.IdentityLease
-		currentLeader *v1alpha1.IdentityLease
+		candidates    []*v1alpha1.LeaseCandidate
+		currentLeader *v1alpha1.LeaseCandidate
 		expectResult  bool
 	}{
 		{
 			name: "candidate with newer binary version",
-			candidates: []*v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
 					},
@@ -270,17 +270,17 @@ func TestShouldReelect(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.20",
 					},
 				},
 			},
-			currentLeader: &v1alpha1.IdentityLease{
+			currentLeader: &v1alpha1.LeaseCandidate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "component-identity-1",
 				},
-				Spec: v1alpha1.IdentityLeaseSpec{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.19",
 					BinaryVersion:        "1.19",
 				},
@@ -289,12 +289,12 @@ func TestShouldReelect(t *testing.T) {
 		},
 		{
 			name: "no newer candidates",
-			candidates: []*v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
 					},
@@ -303,17 +303,17 @@ func TestShouldReelect(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
+					Spec: v1alpha1.LeaseCandidateSpec{
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
 					},
 				},
 			},
-			currentLeader: &v1alpha1.IdentityLease{
+			currentLeader: &v1alpha1.LeaseCandidate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "component-identity-1",
 				},
-				Spec: v1alpha1.IdentityLeaseSpec{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.19",
 					BinaryVersion:        "1.19",
 				},
@@ -322,12 +322,12 @@ func TestShouldReelect(t *testing.T) {
 		},
 		{
 			name:       "no candidates",
-			candidates: []*v1alpha1.IdentityLease{},
-			currentLeader: &v1alpha1.IdentityLease{
+			candidates: []*v1alpha1.LeaseCandidate{},
+			currentLeader: &v1alpha1.LeaseCandidate{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "component-identity-1",
 				},
-				Spec: v1alpha1.IdentityLeaseSpec{
+				Spec: v1alpha1.LeaseCandidateSpec{
 					CompatibilityVersion: "1.19",
 					BinaryVersion:        "1.19",
 				},
@@ -350,24 +350,23 @@ func TestController(t *testing.T) {
 	cases := []struct {
 		name                       string
 		leaderLeaseID              leaderLeaseID
-		createAfterControllerStart []*v1alpha1.IdentityLease
+		createAfterControllerStart []*v1alpha1.LeaseCandidate
 		deleteAfterControllerStart []leaderLeaseID
 		expectedLeaderLeases       []*v1.Lease
 	}{
 		{
 			name:          "single candidate leader election",
 			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.IdentityLease{
+			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
-						HolderIdentity:       ptr.To("component-identity-1"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -391,17 +390,16 @@ func TestController(t *testing.T) {
 		{
 			name:          "multiple candidate leader election",
 			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.IdentityLease{
+			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
-						HolderIdentity:       ptr.To("component-identity-1"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -411,11 +409,10 @@ func TestController(t *testing.T) {
 						Namespace: "kube-system",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.20",
-						HolderIdentity:       ptr.To("component-identity-2"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -425,11 +422,10 @@ func TestController(t *testing.T) {
 						Namespace: "kube-system",
 						Name:      "component-identity-3",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.20",
 						BinaryVersion:        "1.20",
-						HolderIdentity:       ptr.To("component-identity-3"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -453,7 +449,7 @@ func TestController(t *testing.T) {
 		{
 			name:          "deletion of lease triggers reelection",
 			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.IdentityLease{
+			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
 				{
 					// Leader lease
 					ObjectMeta: metav1.ObjectMeta{
@@ -463,20 +459,17 @@ func TestController(t *testing.T) {
 							ElectedByAnnotationName: controllerName,
 						},
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						HolderIdentity: ptr.To("component-identity-9"),
-					},
+					Spec: v1alpha1.LeaseCandidateSpec{},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
-						HolderIdentity:       ptr.To("component-identity-1"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -503,7 +496,7 @@ func TestController(t *testing.T) {
 		{
 			name:          "better candidate triggers reelection",
 			leaderLeaseID: leaderLeaseID{namespace: "kube-system", name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.IdentityLease{
+			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
 				{
 					// Leader lease
 					ObjectMeta: metav1.ObjectMeta{
@@ -513,20 +506,17 @@ func TestController(t *testing.T) {
 							ElectedByAnnotationName: controllerName,
 						},
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						HolderIdentity: ptr.To("component-identity-1"),
-					},
+					Spec: v1alpha1.LeaseCandidateSpec{},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.20",
 						BinaryVersion:        "1.20",
-						HolderIdentity:       ptr.To("component-identity-1"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -536,11 +526,10 @@ func TestController(t *testing.T) {
 						Namespace: "kube-system",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha1.IdentityLeaseSpec{
-						CanLeadLease:         "kube-system/component-A",
+					Spec: v1alpha1.LeaseCandidateSpec{
+						TargetLease:          "component-A",
 						CompatibilityVersion: "1.19",
 						BinaryVersion:        "1.19",
-						HolderIdentity:       ptr.To("component-identity-2"),
 						LeaseDurationSeconds: ptr.To(int32(30)),
 						RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 					},
@@ -573,7 +562,7 @@ func TestController(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			controller, err := NewController(
 				informerFactory.Coordination().V1().Leases(),
-				informerFactory.Coordination().V1alpha1().IdentityLeases(),
+				informerFactory.Coordination().V1alpha1().LeaseCandidates(),
 				client.CoordinationV1(),
 			)
 			if err != nil {
@@ -610,14 +599,14 @@ func TestController(t *testing.T) {
 			}()
 
 			for _, obj := range tc.createAfterControllerStart {
-				_, err := client.CoordinationV1alpha1().IdentityLeases(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				_, err := client.CoordinationV1alpha1().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			for _, obj := range tc.deleteAfterControllerStart {
-				err := client.CoordinationV1alpha1().IdentityLeases(obj.namespace).Delete(ctx, obj.name, metav1.DeleteOptions{})
+				err := client.CoordinationV1alpha1().LeaseCandidates(obj.namespace).Delete(ctx, obj.name, metav1.DeleteOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}

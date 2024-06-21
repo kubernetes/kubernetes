@@ -32,59 +32,59 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// IdentityLeaseInformer provides access to a shared informer and lister for
-// IdentityLeases.
-type IdentityLeaseInformer interface {
+// LeaseCandidateInformer provides access to a shared informer and lister for
+// LeaseCandidates.
+type LeaseCandidateInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.IdentityLeaseLister
+	Lister() v1alpha1.LeaseCandidateLister
 }
 
-type identityLeaseInformer struct {
+type leaseCandidateInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewIdentityLeaseInformer constructs a new informer for IdentityLease type.
+// NewLeaseCandidateInformer constructs a new informer for LeaseCandidate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewIdentityLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredIdentityLeaseInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewLeaseCandidateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredLeaseCandidateInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredIdentityLeaseInformer constructs a new informer for IdentityLease type.
+// NewFilteredLeaseCandidateInformer constructs a new informer for LeaseCandidate type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredIdentityLeaseInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredLeaseCandidateInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoordinationV1alpha1().IdentityLeases(namespace).List(context.TODO(), options)
+				return client.CoordinationV1alpha1().LeaseCandidates(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CoordinationV1alpha1().IdentityLeases(namespace).Watch(context.TODO(), options)
+				return client.CoordinationV1alpha1().LeaseCandidates(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&coordinationv1alpha1.IdentityLease{},
+		&coordinationv1alpha1.LeaseCandidate{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *identityLeaseInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredIdentityLeaseInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *leaseCandidateInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredLeaseCandidateInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *identityLeaseInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&coordinationv1alpha1.IdentityLease{}, f.defaultInformer)
+func (f *leaseCandidateInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&coordinationv1alpha1.LeaseCandidate{}, f.defaultInformer)
 }
 
-func (f *identityLeaseInformer) Lister() v1alpha1.IdentityLeaseLister {
-	return v1alpha1.NewIdentityLeaseLister(f.Informer().GetIndexer())
+func (f *leaseCandidateInformer) Lister() v1alpha1.LeaseCandidateLister {
+	return v1alpha1.NewLeaseCandidateLister(f.Informer().GetIndexer())
 }

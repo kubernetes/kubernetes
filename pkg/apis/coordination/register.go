@@ -50,8 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Lease{},
 		&LeaseList{},
-		&IdentityLease{},
-		&IdentityLeaseList{},
+		&LeaseCandidate{},
+		&LeaseCandidateList{},
 	)
 	return nil
 }

@@ -25,8 +25,8 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/coordination"
-	identityleasestorage "k8s.io/kubernetes/pkg/registry/coordination/identitylease/storage"
 	leasestorage "k8s.io/kubernetes/pkg/registry/coordination/lease/storage"
+	leasecandidatestorage "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate/storage"
 )
 
 type RESTStorageProvider struct{}
@@ -69,12 +69,12 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	storage := map[string]rest.Storage{}
 
 	// identity
-	if resource := "identityleases"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
-		identityLeaseStorage, err := identityleasestorage.NewREST(restOptionsGetter)
+	if resource := "leasecandidates"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		leaseCandidateStorage, err := leasecandidatestorage.NewREST(restOptionsGetter)
 		if err != nil {
 			return storage, err
 		}
-		storage[resource] = identityLeaseStorage
+		storage[resource] = leaseCandidateStorage
 	}
 	return storage, nil
 }

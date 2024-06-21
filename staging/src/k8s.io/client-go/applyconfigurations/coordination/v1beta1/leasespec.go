@@ -19,17 +19,19 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // LeaseSpecApplyConfiguration represents a declarative configuration of the LeaseSpec type for use
 // with apply.
 type LeaseSpecApplyConfiguration struct {
-	HolderIdentity       *string       `json:"holderIdentity,omitempty"`
-	LeaseDurationSeconds *int32        `json:"leaseDurationSeconds,omitempty"`
-	AcquireTime          *v1.MicroTime `json:"acquireTime,omitempty"`
-	RenewTime            *v1.MicroTime `json:"renewTime,omitempty"`
-	LeaseTransitions     *int32        `json:"leaseTransitions,omitempty"`
+	HolderIdentity       *string                      `json:"holderIdentity,omitempty"`
+	LeaseDurationSeconds *int32                       `json:"leaseDurationSeconds,omitempty"`
+	AcquireTime          *v1.MicroTime                `json:"acquireTime,omitempty"`
+	RenewTime            *v1.MicroTime                `json:"renewTime,omitempty"`
+	LeaseTransitions     *int32                       `json:"leaseTransitions,omitempty"`
+	Strategy             *v1beta1.CoordinatedStrategy `json:"strategy,omitempty"`
 }
 
 // LeaseSpecApplyConfiguration constructs a declarative configuration of the LeaseSpec type for use with
@@ -75,5 +77,13 @@ func (b *LeaseSpecApplyConfiguration) WithRenewTime(value v1.MicroTime) *LeaseSp
 // If called multiple times, the LeaseTransitions field is set to the value of the last call.
 func (b *LeaseSpecApplyConfiguration) WithLeaseTransitions(value int32) *LeaseSpecApplyConfiguration {
 	b.LeaseTransitions = &value
+	return b
+}
+
+// WithStrategy sets the Strategy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Strategy field is set to the value of the last call.
+func (b *LeaseSpecApplyConfiguration) WithStrategy(value v1beta1.CoordinatedStrategy) *LeaseSpecApplyConfiguration {
+	b.Strategy = &value
 	return b
 }

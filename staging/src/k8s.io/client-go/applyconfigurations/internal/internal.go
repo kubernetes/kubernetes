@@ -4359,7 +4359,11 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: renewTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
-- name: io.k8s.api.coordination.v1alpha1.IdentityLease
+    - name: strategy
+      type:
+        scalar: string
+      default: NoCoordination
+- name: io.k8s.api.coordination.v1alpha1.LeaseCandidate
   map:
     fields:
     - name: apiVersion
@@ -4374,24 +4378,15 @@ var schemaYAML = typed.YAMLObject(`types:
       default: {}
     - name: spec
       type:
-        namedType: io.k8s.api.coordination.v1alpha1.IdentityLeaseSpec
+        namedType: io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec
       default: {}
-- name: io.k8s.api.coordination.v1alpha1.IdentityLeaseSpec
+- name: io.k8s.api.coordination.v1alpha1.LeaseCandidateSpec
   map:
     fields:
-    - name: acquireTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
     - name: binaryVersion
       type:
         scalar: string
-    - name: canLeadLease
-      type:
-        scalar: string
     - name: compatibilityVersion
-      type:
-        scalar: string
-    - name: holderIdentity
       type:
         scalar: string
     - name: leaseDurationSeconds
@@ -4400,6 +4395,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: renewTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
+    - name: targetLease
+      type:
+        scalar: string
 - name: io.k8s.api.coordination.v1beta1.Lease
   map:
     fields:
@@ -4435,6 +4433,10 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: renewTime
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
+    - name: strategy
+      type:
+        scalar: string
+      default: NoCoordination
 - name: io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource
   map:
     fields:

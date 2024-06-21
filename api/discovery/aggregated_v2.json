@@ -1607,14 +1607,14 @@
           "freshness": "Current",
           "resources": [
             {
-              "resource": "identityleases",
+              "resource": "leasecandidates",
               "responseKind": {
                 "group": "",
-                "kind": "IdentityLease",
+                "kind": "LeaseCandidate",
                 "version": ""
               },
               "scope": "Namespaced",
-              "singularResource": "identitylease",
+              "singularResource": "leasecandidate",
               "verbs": [
                 "create",
                 "delete",

@@ -20,6 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type CoordinatedStrategy string
+
+// CoordinatedLeaseStrategy defines the strategy for picking the leader for coordinated leader election.
+const (
+	OldestCompatibilityVersion CoordinatedStrategy = "OldestCompatibilityVersion"
+	NoCoordination             CoordinatedStrategy = "NoCoordination"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Lease defines a lease concept.
@@ -54,6 +62,9 @@ type LeaseSpec struct {
 	// holders.
 	// +optional
 	LeaseTransitions *int32
+	// Strategy indicates the strategy for picking the leader for coordinated leader election
+	// +optional
+	Strategy *CoordinatedStrategy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -70,34 +81,28 @@ type LeaseList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// IdentityLease defines an identity lease concept.
-type IdentityLease struct {
+// LeaseCandidate defines an identity lease concept.
+type LeaseCandidate struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
-	Spec IdentityLeaseSpec
+	Spec LeaseCandidateSpec
 }
 
-// IdentityLeaseSpec is a specification of a Lease.
-type IdentityLeaseSpec struct {
+// LeaseCandidateSpec is a specification of a Lease.
+type LeaseCandidateSpec struct {
 	// BinaryVersion is the binary version
 	BinaryVersion string
 	// CompatibilityVersion is the compatibility version
 	CompatibilityVersion string
-	// CanLeadLease is a name/namespace pair of the lease that the identity lease can lead
-	CanLeadLease string
+	// TargetLease is a name/namespace pair of the lease that the candidate can lead
+	TargetLease string
 
-	// holderIdentity contains the identity of the holder of a current lease.
-	// +optional
-	HolderIdentity *string
 	// leaseDurationSeconds is a duration that candidates for a lease need
 	// to wait to force acquire it. This is measure against time of last
 	// observed renewTime.
 	// +optional
 	LeaseDurationSeconds *int32
-	// acquireTime is a time when the current lease was acquired.
-	// +optional
-	AcquireTime *metav1.MicroTime
 	// renewTime is a time when the current holder of a lease has last
 	// updated the lease.
 	// +optional
@@ -106,12 +111,12 @@ type IdentityLeaseSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// IdentityLeaseList is a list of Lease objects.
-type IdentityLeaseList struct {
+// LeaseCandidateList is a list of LeaseCandidate objects.
+type LeaseCandidateList struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ListMeta
 
 	// items is a list of schema objects.
-	Items []IdentityLease
+	Items []LeaseCandidate
 }

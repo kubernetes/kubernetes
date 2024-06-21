@@ -25,7 +25,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"regexp"
 	"sort"
 	"time"
 
@@ -37,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -265,10 +263,10 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		return err
 	}
 	// Special characters may not be used for names of resources
-	id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
+	// id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "-" + string(uuid.NewUUID())
+	// id = id + "-" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
@@ -296,20 +294,19 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		// TODO: This should be a shared informer factory
 		kubeInformerFactory := informers.NewSharedInformerFactory(c.Client, time.Second*30)
 		// Start component identity lease management
-		identityLease := &leaderelection.IdentityLease{
-			LeaseClient:           c.Client.CoordinationV1alpha1().IdentityLeases("kube-system"),
-			IdentityLeaseInformer: kubeInformerFactory.Coordination().V1alpha1().IdentityLeases(),
-			HolderIdentity:        id,
-			LeaseName:             "kube-controller-manager-" + id, // TODO: safely append uids
-			LeaseNamespace:        "kube-system",                   // TODO: put this in kube-system once RBAC is set up for that
-			LeaseDurationSeconds:  10,
-			Clock:                 clock.RealClock{},
-			CanLeadLeases:         "kube-system/kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
-			RenewInterval:         5,
-			BinaryVersion:         version.Get().Major + "." + version.Get().Minor,
-			CompatibilityVersion:  version.Get().Major + "." + version.Get().Minor,
+		leaseCandidate := &leaderelection.LeaseCandidate{
+			LeaseClient:            c.Client.CoordinationV1alpha1().LeaseCandidates("kube-system"),
+			LeaseCandidateInformer: kubeInformerFactory.Coordination().V1alpha1().LeaseCandidates(),
+			LeaseName:              "kube-controller-manager-" + id, // TODO: safely append uids
+			LeaseNamespace:         "kube-system",                   // TODO: put this in kube-system once RBAC is set up for that
+			LeaseDurationSeconds:   10,
+			Clock:                  clock.RealClock{},
+			TargetLease:            "kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
+			RenewInterval:          5,
+			BinaryVersion:          version.Get().Major + "." + version.Get().Minor,
+			CompatibilityVersion:   version.Get().Major + "." + version.Get().Minor,
 		}
-		go identityLease.Run(ctx)
+		go leaseCandidate.Run(ctx)
 	}
 
 	// Start the main lock

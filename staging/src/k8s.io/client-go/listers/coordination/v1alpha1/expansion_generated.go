@@ -18,10 +18,10 @@ limitations under the License.
 
 package v1alpha1
 
-// IdentityLeaseListerExpansion allows custom methods to be added to
-// IdentityLeaseLister.
-type IdentityLeaseListerExpansion interface{}
+// LeaseCandidateListerExpansion allows custom methods to be added to
+// LeaseCandidateLister.
+type LeaseCandidateListerExpansion interface{}
 
-// IdentityLeaseNamespaceListerExpansion allows custom methods to be added to
-// IdentityLeaseNamespaceLister.
-type IdentityLeaseNamespaceListerExpansion interface{}
+// LeaseCandidateNamespaceListerExpansion allows custom methods to be added to
+// LeaseCandidateNamespaceLister.
+type LeaseCandidateNamespaceListerExpansion interface{}

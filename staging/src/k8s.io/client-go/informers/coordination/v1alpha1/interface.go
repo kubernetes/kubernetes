@@ -24,8 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// IdentityLeases returns a IdentityLeaseInformer.
-	IdentityLeases() IdentityLeaseInformer
+	// LeaseCandidates returns a LeaseCandidateInformer.
+	LeaseCandidates() LeaseCandidateInformer
 }
 
 type version struct {
@@ -39,7 +39,7 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
-// IdentityLeases returns a IdentityLeaseInformer.
-func (v *version) IdentityLeases() IdentityLeaseInformer {
-	return &identityLeaseInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+// LeaseCandidates returns a LeaseCandidateInformer.
+func (v *version) LeaseCandidates() LeaseCandidateInformer {
+	return &leaseCandidateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
