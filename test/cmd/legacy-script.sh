@@ -1036,6 +1036,7 @@ runTests() {
   ####################
 
   record_command run_wait_tests
+  record_command run_wait_with_non_existence_check_tests
 
   ####################
   # kubectl debug    #
