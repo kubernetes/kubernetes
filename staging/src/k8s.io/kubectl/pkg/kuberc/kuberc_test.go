@@ -38,8 +38,9 @@ type fakeCmds struct {
 }
 
 type fakeFlag struct {
-	name  string
-	value string
+	name      string
+	value     string
+	shorthand string
 }
 
 func TestApplyOverride(t *testing.T) {
@@ -451,6 +452,105 @@ func TestApplyOverride(t *testing.T) {
 			},
 		},
 		{
+			name: "subcommand explicit takes precedence with space and with shorthand",
+			nestedCmds: []fakeCmds{
+				{
+					name:  "command1",
+					flags: nil,
+				},
+				{
+					name: "command2",
+					flags: []fakeFlag{
+						{
+							name:      "firstflag",
+							value:     "test",
+							shorthand: "r",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"command1",
+				"command2",
+				"-r",
+				"explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Overrides: []v1alpha1.PreferencesCommandOverride{
+							{
+								Command: "command1 command2",
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+		},
+		{
+			name: "subcommand explicit takes precedence with space and with shorthand and equal sign",
+			nestedCmds: []fakeCmds{
+				{
+					name:  "command1",
+					flags: nil,
+				},
+				{
+					name: "command2",
+					flags: []fakeFlag{
+						{
+							name:      "firstflag",
+							value:     "test",
+							shorthand: "r",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"command1",
+				"command2",
+				"-r=explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Overrides: []v1alpha1.PreferencesCommandOverride{
+							{
+								Command: "command1 command2",
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+		},
+		{
 			name: "subcommand check the not overridden flag",
 			nestedCmds: []fakeCmds{
 				{
@@ -691,6 +791,115 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 				"--firstflag=explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Aliases: []v1alpha1.PreferencesAliasOverride{
+							{
+								Name:    "getcmd",
+								Command: "command1",
+								Args: []string{
+									"resources",
+									"nodes",
+								},
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+			expectedCmd: "getcmd",
+			expectedArgs: []string{
+				"resources",
+				"nodes",
+			},
+		},
+		{
+			name: "command override with shorthand",
+			nestedCmds: []fakeCmds{
+				{
+					name: "command1",
+					flags: []fakeFlag{
+						{
+							name:      "firstflag",
+							value:     "test",
+							shorthand: "r",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"getcmd",
+				"-r=explicit",
+			},
+			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
+				return &v1alpha1.Preferences{
+					TypeMeta: metav1.TypeMeta{},
+					Spec: v1alpha1.PreferencesSpec{
+						Aliases: []v1alpha1.PreferencesAliasOverride{
+							{
+								Name:    "getcmd",
+								Command: "command1",
+								Args: []string{
+									"resources",
+									"nodes",
+								},
+								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
+									{
+										Name:    "firstflag",
+										Default: "changed",
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+			expectedFLags: []fakeFlag{
+				{
+					name:  "firstflag",
+					value: "explicit",
+				},
+			},
+			expectedCmd: "getcmd",
+			expectedArgs: []string{
+				"resources",
+				"nodes",
+			},
+		},
+		{
+			name: "command override with shorthand and space",
+			nestedCmds: []fakeCmds{
+				{
+					name: "command1",
+					flags: []fakeFlag{
+						{
+							name:      "firstflag",
+							value:     "test",
+							shorthand: "r",
+						},
+					},
+				},
+			},
+			args: []string{
+				"root",
+				"getcmd",
+				"-r",
+				"explicit",
 			},
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
@@ -984,7 +1193,7 @@ func addCommands(rootCmd *cobra.Command, commands []fakeCmds) {
 	for _, flg := range commands[0].flags {
 		val := flag.StringFlag{}
 		val.Set(flg.value) // nolint: errcheck
-		subCmd.Flags().AddFlag(&pflag.Flag{Name: flg.name, Value: &val})
+		subCmd.Flags().AddFlag(&pflag.Flag{Name: flg.name, Value: &val, Shorthand: flg.shorthand})
 	}
 	rootCmd.AddCommand(subCmd)
 
