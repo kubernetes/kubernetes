@@ -32,6 +32,8 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
+kube::util::ensure-temp-dir
+
 kube::test::find_dirs() {
   (
     cd "${KUBE_ROOT}"
@@ -136,9 +138,6 @@ shift $((OPTIND - 1))
 testargs=()
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
-# Used to filter verbose test output.
-go_test_grep_pattern=".*"
-
 goflags=()
 # The junit report tool needs full test case information to produce a
 # meaningful report.
@@ -146,11 +145,6 @@ if [[ -n "${KUBE_JUNIT_REPORT_DIR}" ]] ; then
   goflags+=(-v)
   goflags+=(-json)
   # Show only summary lines by matching lines like "status package/test"
-  go_test_grep_pattern="^[^[:space:]]\+[[:space:]]\+[^[:space:]]\+/[^[[:space:]]\+"
-fi
-
-if [[ -n "${FULL_LOG:-}" ]] ; then
-  go_test_grep_pattern=".*"
 fi
 
 # Filter out arguments that start with "-" and move them to goflags.
@@ -180,9 +174,18 @@ junitFilenamePrefix() {
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
 }
 
+# produceJUnitXMLReport accepts "go test" output on stdin and stderr
+# through a named pipe (second parameter). The first parameter
+# determines where to write a JUnit file. If empty, output is just
+# passed through.
 produceJUnitXMLReport() {
   local -r junit_filename_prefix=$1
+  local -r pipename=$2
   if [[ -z "${junit_filename_prefix}" ]]; then
+    # Dump stdin...
+    cat &
+    # ... and stderr.
+    cat "${pipename}"
     return
   fi
 
@@ -193,9 +196,9 @@ produceJUnitXMLReport() {
     kube::log::status "gotestsum not found; installing from ./hack/tools"
     go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
   fi
-  gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
+  gotestsum --junitfile "${junit_xml_filename}" ${FULL_LOG:+--format=standard-verbose} --stdin --stderr 3 3<"${pipename}"
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-    rm "${junit_filename_prefix}"*.stdout
+    rm -f "${junit_filename_prefix}"*.stdout "${junit_filename_prefix}"*.stderr
   fi
 
   if ! command -v prune-junit-xml >/dev/null 2>&1; then
@@ -215,6 +218,8 @@ runTests() {
   local -a targets
   kube::util::read-array targets < <(kube::golang::normalize_go_targets "$@")
 
+  mkfifo "${KUBE_TEMP}/stderr-pipe"
+
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
@@ -223,9 +228,9 @@ runTests() {
     go test "${goflags[@]:+${goflags[@]}}" \
      "${KUBE_TIMEOUT}" "${targets[@]}" \
      "${testargs[@]:+${testargs[@]}}" \
+     2> >( tee ${junit_filename_prefix:+"${junit_filename_prefix}.stderr"} >"${KUBE_TEMP}/stderr-pipe" ) \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
-    produceJUnitXMLReport "${junit_filename_prefix}"
+     | produceJUnitXMLReport "${junit_filename_prefix}" "${KUBE_TEMP}/stderr-pipe" && rc=$? || rc=$?
     return "${rc}"
   fi
 
@@ -261,11 +266,11 @@ runTests() {
         \"\${_pkg}\" \
         ${testargs[*]:+${testargs[*]}} \
       | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-      | grep \"${go_test_grep_pattern}\"" \
+      " \
     {} \
+    2> "${KUBE_TEMP}/stderr-pipe" \
+    | produceJUnitXMLReport "${junit_filename_prefix}" "${KUBE_TEMP}/stderr-pipe" \
     && test_result=$? || test_result=$?
-
-  produceJUnitXMLReport "${junit_filename_prefix}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {
