@@ -721,7 +721,10 @@ done`}
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 		ginkgo.By("Ensuring job past active deadline")
-		err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+15)*time.Second, "DeadlineExceeded")
+		// We wait up to 60s because experiments show that pod termination by the Kubelet
+		// may take a significant amount of time. Take a look at the recorded statistics
+		// in the PR description (up to 40s, but we also leave 20s of margin).
+		err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(60)*time.Second, "DeadlineExceeded")
 		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 

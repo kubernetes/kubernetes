@@ -2841,7 +2841,7 @@ func TestElasticIndexedJob(t *testing.T) {
 			jobUpdates: []jobUpdate{
 				{
 					completions:     ptr.To[int32](0),
-					wantTerminating: ptr.To[int32](3),
+					wantTerminating: ptr.To[int32](0),
 				},
 			},
 		},

@@ -568,7 +568,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			}
 		}
 	}
-	if ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
 	}
 	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
@@ -577,7 +577,7 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
 	}
-	if job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
 	}
 	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
@@ -1023,4 +1023,5 @@ type JobStatusValidationOptions struct {
 	RejectNotCompleteJobWithCompletionTime       bool
 	RejectCompleteJobWithFailedCondition         bool
 	RejectCompleteJobWithFailureTargetCondition  bool
+	AllowForSuccessCriteriaMetInExtendedScope    bool
 }
