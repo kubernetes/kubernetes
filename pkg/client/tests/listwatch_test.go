@@ -55,7 +55,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam("v1")
+	fieldSelectorQueryParamName := "fieldSelector"
 	table := []struct {
 		desc          string
 		location      string
@@ -109,7 +109,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
-	fieldSelectorQueryParamName := metav1.FieldSelectorQueryParam("v1")
+	fieldSelectorQueryParamName := "fieldSelector"
 	table := []struct {
 		desc          string
 		rv            string

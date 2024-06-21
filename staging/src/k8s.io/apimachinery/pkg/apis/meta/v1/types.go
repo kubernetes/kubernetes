@@ -1207,16 +1207,6 @@ type RootPaths struct {
 	Paths []string `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 }
 
-// TODO: remove me when watch is refactored
-func LabelSelectorQueryParam(version string) string {
-	return "labelSelector"
-}
-
-// TODO: remove me when watch is refactored
-func FieldSelectorQueryParam(version string) string {
-	return "fieldSelector"
-}
-
 // String returns available api versions as a human-friendly version string.
 func (apiVersions APIVersions) String() string {
 	return strings.Join(apiVersions.Versions, ",")

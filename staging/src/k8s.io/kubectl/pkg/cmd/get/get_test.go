@@ -1511,7 +1511,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("labelSelector") != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1556,7 +1556,7 @@ func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("labelSelector") != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1601,7 +1601,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("fieldSelector") != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1646,7 +1646,7 @@ func TestGetMultipleTypeTableObjectsWithFieldSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("fieldSelector") != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1893,7 +1893,7 @@ func TestWatchLabelSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("labelSelector") != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1945,7 +1945,7 @@ func TestWatchTableLabelSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("labelSelector") != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -1997,7 +1997,7 @@ func TestWatchFieldSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("fieldSelector") != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -2049,7 +2049,7 @@ func TestWatchTableFieldSelector(t *testing.T) {
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+			if req.URL.Query().Get("fieldSelector") != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
