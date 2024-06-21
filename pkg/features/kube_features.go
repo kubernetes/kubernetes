@@ -142,13 +142,6 @@ const (
 	// Enables coordinated leader election in the API server
 	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
-	// owner: @mfordjody
-	// alpha: v1.26
-	//
-	// Bypasses obsolete validation that GCP volumes are read-only when used in
-	// Deployments.
-	SkipReadOnlyValidationGCE featuregate.Feature = "SkipReadOnlyValidationGCE"
-
 	// owner: @trierra
 	// kep:  http://kep.k8s.io/2589
 	// alpha: v1.23
