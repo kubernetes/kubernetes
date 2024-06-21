@@ -20,6 +20,7 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
@@ -44,6 +45,36 @@ func NewUnstructuredNegotiatedSerializer(
 		structuralSchemas:     structuralSchemas,
 		structuralSchemaGK:    structuralSchemaGK,
 		preserveUnknownFields: preserveUnknownFields,
+
+		supportedMediaTypes: []runtime.SerializerInfo{
+			{
+				MediaType:        "application/json",
+				MediaTypeType:    "application",
+				MediaTypeSubType: "json",
+				EncodesAsText:    true,
+				Serializer:       json.NewSerializer(json.DefaultMetaFactory, creator, typer, false),
+				PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, creator, typer, true),
+				StrictSerializer: json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{
+					Strict: true,
+				}),
+				StreamSerializer: &runtime.StreamSerializerInfo{
+					EncodesAsText: true,
+					Serializer:    json.NewSerializer(json.DefaultMetaFactory, creator, typer, false),
+					Framer:        json.Framer,
+				},
+			},
+			{
+				MediaType:        "application/yaml",
+				MediaTypeType:    "application",
+				MediaTypeSubType: "yaml",
+				EncodesAsText:    true,
+				Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, creator, typer),
+				StrictSerializer: json.NewSerializerWithOptions(json.DefaultMetaFactory, creator, typer, json.SerializerOptions{
+					Yaml:   true,
+					Strict: true,
+				}),
+			},
+		},
 	}
 }
 
