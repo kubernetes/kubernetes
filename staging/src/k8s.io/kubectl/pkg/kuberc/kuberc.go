@@ -45,8 +45,7 @@ var (
 // arguments based on user's kuberc configuration.
 type PreferencesHandler interface {
 	AddFlags(flags *pflag.FlagSet)
-	ApplyOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) error
-	ApplyAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
+	Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error)
 }
 
 // Preferences stores the kuberc file coming either from environment variable
@@ -72,26 +71,40 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 	}
 }
 
-// ApplyOverrides finds the command and sets the defaulted flag values in kuberc.
-func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errOut io.Writer) error {
+// Apply firstly applies the aliases in the preferences file and secondly overrides
+// the default values of flags.
+func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
 	if len(args) <= 1 {
-		return nil
+		return args, nil
 	}
 
 	if !util.KubeRC.IsEnabled() {
-		return nil
+		return args, nil
 	}
 
 	kubercPath := getExplicitKuberc(args)
 	kuberc, err := p.GetPreferencesFunc(kubercPath)
 	if err != nil {
-		return fmt.Errorf("kuberc error %w", err)
+		return args, fmt.Errorf("kuberc error %w", err)
 	}
 
 	if kuberc == nil {
-		return nil
+		return args, nil
 	}
 
+	args, err = p.applyAliases(rootCmd, kuberc, args, errOut)
+	if err != nil {
+		return args, err
+	}
+	err = p.applyOverrides(rootCmd, kuberc, args, errOut)
+	if err != nil {
+		return args, err
+	}
+	return args, nil
+}
+
+// applyOverrides finds the command and sets the defaulted flag values in kuberc.
+func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *v1alpha1.Preferences, args []string, errOut io.Writer) error {
 	args = args[1:]
 	cmd, _, err := rootCmd.Find(args)
 	if err != nil {
@@ -133,33 +146,15 @@ func (p *Preferences) ApplyOverrides(rootCmd *cobra.Command, args []string, errO
 	return nil
 }
 
-// ApplyAliases firstly appends all defined aliases in kuberc file to the root command.
+// applyAliases firstly appends all defined aliases in kuberc file to the root command.
 // Since there may be several alias definitions belonging to the same command, it extracts the
 // alias that is currently executed from args. After that it sets the flag definitions in alias as default values
 // of the command. Lastly, others parameters (e.g. resources, etc.) that are passed as arguments in kuberc
 // is appended into the os.Args.
-func (p *Preferences) ApplyAliases(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
-	if len(args) <= 1 {
-		return args, nil
-	}
-
-	if !util.KubeRC.IsEnabled() {
-		return args, nil
-	}
-
+func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Preferences, args []string, errOut io.Writer) ([]string, error) {
 	_, _, err := rootCmd.Find(args[1:])
 	if err == nil {
 		// Command is found, no need to continue for aliasing
-		return args, nil
-	}
-
-	kubercPath := getExplicitKuberc(args)
-	kuberc, err := p.GetPreferencesFunc(kubercPath)
-	if err != nil {
-		return args, fmt.Errorf("kuberc error %w", err)
-	}
-
-	if kuberc == nil {
 		return args, nil
 	}
 

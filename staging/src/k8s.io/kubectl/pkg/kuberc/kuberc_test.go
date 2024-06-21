@@ -583,7 +583,7 @@ func TestApplyOverride(t *testing.T) {
 				addCommands(rootCmd, test.nestedCmds)
 				pref.GetPreferencesFunc = test.getPreferencesFunc
 				errWriter := &bytes.Buffer{}
-				err := pref.ApplyOverrides(rootCmd, test.args, errWriter)
+				_, err := pref.Apply(rootCmd, test.args, errWriter)
 				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}
@@ -923,7 +923,7 @@ func TestApplyAlias(t *testing.T) {
 				addCommands(rootCmd, test.nestedCmds)
 				pref.GetPreferencesFunc = test.getPreferencesFunc
 				errWriter := &bytes.Buffer{}
-				lastArgs, err := pref.ApplyAliases(rootCmd, test.args, errWriter)
+				lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
 				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}

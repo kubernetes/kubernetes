@@ -496,18 +496,12 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	var err error
-	o.Arguments, err = pref.ApplyAliases(cmds, o.Arguments, o.IOStreams.ErrOut)
+	o.Arguments, err = pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
 		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying aliases %v\n", err)
 		os.Exit(1)
 	}
 	os.Args = o.Arguments
-	err = pref.ApplyOverrides(cmds, o.Arguments, o.IOStreams.ErrOut)
-	if err != nil {
-		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying command flag overrides %v\n", err)
-		os.Exit(1)
-	}
-
 	return cmds
 }
 
