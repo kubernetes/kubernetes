@@ -132,7 +132,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
-	err = wait.PollWithContext(ctx, 100*time.Millisecond, 30*time.Second, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return false, ctx.Err()

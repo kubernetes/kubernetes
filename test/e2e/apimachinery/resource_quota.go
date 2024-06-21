@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
@@ -165,7 +165,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		err := wait.PollWithContext(ctx, 1*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 			secrets, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(secrets.Items) == found {
@@ -331,7 +331,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		found, unchanged := 0, 0
 		// On contended servers the service account controller can slow down, leading to the count changing during a run.
 		// Wait up to 15s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
-		err := wait.PollWithContext(ctx, 1*time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+		err := wait.PollUntilContextTimeout(ctx, 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
 			if len(configmaps.Items) == found {
@@ -2121,7 +2121,7 @@ func deleteResourceQuota(ctx context.Context, c clientset.Interface, namespace, 
 // Wait up to 5s for the count to stabilize, assuming that updates come at a consistent rate, and are not held indefinitely.
 func countResourceQuota(ctx context.Context, c clientset.Interface, namespace string) (int, error) {
 	found, unchanged := 0, 0
-	return found, wait.PollWithContext(ctx, 1*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+	return found, wait.PollUntilContextTimeout(ctx, 1*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		resourceQuotas, err := c.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(resourceQuotas.Items) == found {
@@ -2137,7 +2137,7 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 
 // wait for resource quota status to show the expected used resources value
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollWithContext(ctx, framework.Poll, resourceQuotaTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -2160,7 +2160,7 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
 // for the specific resource name.
 func updateResourceQuotaUntilUsageAppears(ctx context.Context, c clientset.Interface, ns, quotaName string, resourceName v1.ResourceName) error {
-	return wait.PollWithContext(ctx, framework.Poll, resourceQuotaTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
 		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
