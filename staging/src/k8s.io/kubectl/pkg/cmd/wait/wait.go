@@ -328,15 +328,15 @@ func (o *WaitOptions) RunWait() error {
 	defer cancel()
 
 	isForDelete := strings.ToLower(o.ForCondition) == "delete"
-	if o.WaitForCreation && o.Timeout == 0 {
-		return fmt.Errorf("--wait-for-creation requires a timeout value greater than 0")
-	}
-
-	if o.WaitForCreation && isForDelete {
-		return fmt.Errorf("--wait-for-creation is mutually exclusive with --for=delete")
-	}
-
 	if o.WaitForCreation {
+		if o.Timeout == 0 {
+			return fmt.Errorf("--wait-for-creation requires a timeout value greater than 0")
+		}
+
+		if isForDelete {
+			return fmt.Errorf("--wait-for-creation is mutually exclusive with --for=delete")
+		}
+
 		err := func() error {
 			for {
 				select {
