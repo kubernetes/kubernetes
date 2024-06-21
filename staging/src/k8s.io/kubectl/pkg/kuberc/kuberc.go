@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/kubectl/pkg/cmd/util"
@@ -218,8 +218,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 	for _, fl := range aliasArgs.flags {
 		err = foundAliasCmd.Flags().Set(fl.Name, fl.Default)
 		if err != nil {
-			fmt.Fprintf(errOut, "Warning: could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
-			return args, nil
+			return args, fmt.Errorf("could not apply value %s to flag %s in alias %s err: %v\n", fl.Default, fl.Name, args[0], err)
 		}
 	}
 
