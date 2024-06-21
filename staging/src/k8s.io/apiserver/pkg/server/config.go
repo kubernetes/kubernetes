@@ -21,7 +21,6 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -37,7 +36,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/cryptobyte"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -764,8 +762,8 @@ func (c *RecommendedConfig) Complete() CompletedConfig {
 			if len(ns) == 0 {
 				ns = "default"
 			}
-			c.EventSink = &v1.EventSinkImpl{
-				Interface: kubernetes.NewForConfigOrDie(c.ClientConfig).CoreV1().Events(ns),
+			c.EventSink = clientEventSink{
+				&v1.EventSinkImpl{Interface: kubernetes.NewForConfigOrDie(c.ClientConfig).CoreV1().Events(ns)},
 			}
 		}
 	}
@@ -777,39 +775,6 @@ var allowedMediaTypes = []string{
 	runtime.ContentTypeJSON,
 	runtime.ContentTypeYAML,
 	runtime.ContentTypeProtobuf,
-}
-
-func eventReference() (*corev1.ObjectReference, error) {
-	ns := os.Getenv("POD_NAMESPACE")
-	pod := os.Getenv("POD_NAME")
-	if len(ns) == 0 && len(pod) > 0 {
-		serviceAccountNamespaceFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-		if _, err := os.Stat(serviceAccountNamespaceFile); err == nil {
-			bs, err := ioutil.ReadFile(serviceAccountNamespaceFile)
-			if err != nil {
-				return nil, err
-			}
-			ns = string(bs)
-		}
-	}
-	if len(ns) == 0 {
-		pod = ""
-		ns = "openshift-kube-apiserver"
-	}
-	if len(pod) == 0 {
-		return &corev1.ObjectReference{
-			Kind:       "Namespace",
-			Name:       ns,
-			APIVersion: "v1",
-		}, nil
-	}
-
-	return &corev1.ObjectReference{
-		Kind:       "Pod",
-		Namespace:  ns,
-		Name:       pod,
-		APIVersion: "v1",
-	}, nil
 }
 
 // New creates a new server which logically combines the handling chain with the passed server.
@@ -908,8 +873,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	ref, err := eventReference()
 	if err != nil {
 		klog.Warningf("Failed to derive event reference, won't create events: %v", err)
-		c.EventSink = nullEventSink{}
+		s.OpenShiftGenericAPIServerPatch.eventSink = nullEventSink{}
 	}
+	s.RegisterDestroyFunc(c.EventSink.Destroy)
 	s.eventRef = ref
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
@@ -1267,10 +1233,4 @@ func SetHostnameFuncForTests(name string) {
 		err = nil
 		return
 	}
-}
-
-type nullEventSink struct{}
-
-func (nullEventSink) Create(event *corev1.Event) (*corev1.Event, error) {
-	return nil, nil
 }

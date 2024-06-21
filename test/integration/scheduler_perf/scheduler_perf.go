@@ -705,7 +705,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkr
 					// because then during cleanup, the
 					// test will wait for goroutines to
 					// quit *before* restoring klog settings.
-					// framework.GoleakCheck(b)
+					framework.GoleakCheck(b)
 
 					// Now that we are ready to run, start
 					// etcd.
