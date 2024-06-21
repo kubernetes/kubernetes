@@ -222,40 +222,48 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor, op
 func mustBuildEnvs(baseEnv *environment.EnvSet) variableDeclEnvs {
 	requestType := BuildRequestType()
 	namespaceType := BuildNamespaceType()
-	envs := make(variableDeclEnvs, 4) // since the number of variable combinations is small, pre-build a environment for each
+	envs := make(variableDeclEnvs, 8) // since the number of variable combinations is small, pre-build a environment for each
 	for _, hasParams := range []bool{false, true} {
 		for _, hasAuthorizer := range []bool{false, true} {
-			var envOpts []cel.EnvOption
-			if hasParams {
-				envOpts = append(envOpts, cel.Variable(ParamsVarName, cel.DynType))
-			}
-			if hasAuthorizer {
+			for _, strictCost := range []bool{false, true} {
+				var envOpts []cel.EnvOption
+				if hasParams {
+					envOpts = append(envOpts, cel.Variable(ParamsVarName, cel.DynType))
+				}
+				if hasAuthorizer {
+					envOpts = append(envOpts,
+						cel.Variable(AuthorizerVarName, library.AuthorizerType),
+						cel.Variable(RequestResourceAuthorizerVarName, library.ResourceCheckType))
+				}
 				envOpts = append(envOpts,
-					cel.Variable(AuthorizerVarName, library.AuthorizerType),
-					cel.Variable(RequestResourceAuthorizerVarName, library.ResourceCheckType))
-			}
-			envOpts = append(envOpts,
-				cel.Variable(ObjectVarName, cel.DynType),
-				cel.Variable(OldObjectVarName, cel.DynType),
-				cel.Variable(NamespaceVarName, namespaceType.CelType()),
-				cel.Variable(RequestVarName, requestType.CelType()))
+					cel.Variable(ObjectVarName, cel.DynType),
+					cel.Variable(OldObjectVarName, cel.DynType),
+					cel.Variable(NamespaceVarName, namespaceType.CelType()),
+					cel.Variable(RequestVarName, requestType.CelType()))
 
-			extended, err := baseEnv.Extend(
-				environment.VersionedOptions{
-					// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
-					// options should always be present.
-					IntroducedVersion: version.MajorMinor(1, 0),
-					EnvOptions:        envOpts,
-					DeclTypes: []*apiservercel.DeclType{
-						namespaceType,
-						requestType,
+				extended, err := baseEnv.Extend(
+					environment.VersionedOptions{
+						// Feature epoch was actually 1.26, but we artificially set it to 1.0 because these
+						// options should always be present.
+						IntroducedVersion: version.MajorMinor(1, 0),
+						EnvOptions:        envOpts,
+						DeclTypes: []*apiservercel.DeclType{
+							namespaceType,
+							requestType,
+						},
 					},
-				},
-			)
-			if err != nil {
-				panic(fmt.Sprintf("environment misconfigured: %v", err))
+				)
+				if err != nil {
+					panic(fmt.Sprintf("environment misconfigured: %v", err))
+				}
+				if strictCost {
+					extended, err = extended.Extend(environment.StrictCostOpt)
+					if err != nil {
+						panic(fmt.Sprintf("environment misconfigured: %v", err))
+					}
+				}
+				envs[OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer, StrictCost: strictCost}] = extended
 			}
-			envs[OptionalVariableDeclarations{HasParams: hasParams, HasAuthorizer: hasAuthorizer}] = extended
 		}
 	}
 	return envs
