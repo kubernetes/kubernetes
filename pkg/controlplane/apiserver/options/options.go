@@ -229,7 +229,9 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 	}
 
 	// put authorization options in final state
-	completed.Authorization.Complete()
+	if completed.Authorization != nil {
+		completed.Authorization.Complete()
+	}
 	// adjust authentication for completed authorization
 	completed.Authentication.ApplyAuthorization(completed.Authorization)
 
