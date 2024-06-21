@@ -156,7 +156,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
 	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
-	cmd.Flags().BoolVar(&flags.WaitForCreation, "wait-for-creation", flags.WaitForCreation, "If set to true, also wait for creation of objects if they do not already exist. This flag is ignored in --for=delete")
+	cmd.Flags().BoolVar(&flags.WaitForCreation, "wait-for-creation", flags.WaitForCreation, "If set to true, also wait for creation of objects if they do not already exist. This flag can not be used with --for=delete or --timeout=0")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -332,7 +332,11 @@ func (o *WaitOptions) RunWait() error {
 		return fmt.Errorf("--wait-for-creation requires a timeout value greater than 0")
 	}
 
-	if o.WaitForCreation && !isForDelete {
+	if o.WaitForCreation && isForDelete {
+		return fmt.Errorf("--wait-for-creation is mutually exclusive with --for=delete")
+	}
+
+	if o.WaitForCreation {
 		err := func() error {
 			for {
 				select {
