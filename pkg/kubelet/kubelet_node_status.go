@@ -737,6 +737,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 		nodestatus.Images(kl.nodeStatusMaxImages, kl.imageManager.GetImageList),
 		nodestatus.GoRuntime(),
 		nodestatus.RuntimeHandlers(kl.runtimeState.runtimeHandlers),
+		nodestatus.NodeFeatures(kl.runtimeState.runtimeFeatures),
 	)
 
 	setters = append(setters,
