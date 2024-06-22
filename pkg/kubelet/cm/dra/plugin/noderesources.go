@@ -37,6 +37,7 @@ import (
 	resourceinformers "k8s.io/client-go/informers/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
@@ -46,7 +47,10 @@ import (
 const (
 	// resyncPeriod for informer
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123688): disable?
-	resyncPeriod = time.Duration(10 * time.Minute)
+	resyncPeriod   = time.Duration(10 * time.Minute)
+	retryPeriod    = 5 * time.Second
+	maxRetryPeriod = 180 * time.Second
+	backoffFactor  = 2.0 // Introduce a backoff multiplier as jitter factor
 )
 
 // nodeResourcesController collects resource information from all registered
@@ -56,7 +60,7 @@ type nodeResourcesController struct {
 	kubeClient kubernetes.Interface
 	getNode    func() (*v1.Node, error)
 	wg         sync.WaitGroup
-	queue      workqueue.RateLimitingInterface
+	queue      workqueue.TypedRateLimitingInterface[string]
 	sliceStore cache.Store
 
 	mutex         sync.RWMutex
@@ -96,10 +100,13 @@ func startNodeResourcesController(ctx context.Context, kubeClient kubernetes.Int
 	ctx = klog.NewContext(ctx, logger)
 
 	c := &nodeResourcesController{
-		ctx:           ctx,
-		kubeClient:    kubeClient,
-		getNode:       getNode,
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "node_resource_slices"),
+		ctx:        ctx,
+		kubeClient: kubeClient,
+		getNode:    getNode,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
+		),
 		activePlugins: make(map[string]*activePlugin),
 	}
 
@@ -182,6 +189,9 @@ func (c *nodeResourcesController) monitorPlugin(ctx context.Context, active *act
 		logger.Info("Stopping to monitor node resources of the plugin", "reason", context.Cause(ctx), "err", ctx.Err(), "recover", r)
 	}()
 
+	backOff := flowcontrol.NewBackOffWithJitter(retryPeriod, maxRetryPeriod, backoffFactor)
+	backOffID := "retry"
+
 	// Keep trying until canceled.
 	for ctx.Err() == nil {
 		logger.V(5).Info("Calling NodeListAndWatchResources")
@@ -194,9 +204,9 @@ func (c *nodeResourcesController) monitorPlugin(ctx context.Context, active *act
 			default:
 				// This is a problem, report it and retry.
 				logger.Error(err, "Creating gRPC stream for node resources failed")
-				// TODO (https://github.com/kubernetes/kubernetes/issues/123689): expontential backoff?
 				select {
-				case <-time.After(5 * time.Second):
+				case <-time.After(backOff.Get(backOffID)):
+					backOff.Next(backOffID, time.Now())
 				case <-ctx.Done():
 				}
 			}
@@ -216,9 +226,9 @@ func (c *nodeResourcesController) monitorPlugin(ctx context.Context, active *act
 				case ctx.Err() == nil:
 					// This is a problem, report it and retry.
 					logger.Error(err, "Reading node resources from gRPC stream failed")
-					// TODO (https://github.com/kubernetes/kubernetes/issues/123689): expontential backoff?
 					select {
-					case <-time.After(5 * time.Second):
+					case <-time.After(backOff.Get(backOffID)):
+						backOff.Next(backOffID, time.Now())
 					case <-ctx.Done():
 					}
 				}
@@ -347,7 +357,7 @@ func (c *nodeResourcesController) processNextWorkItem(ctx context.Context) bool 
 	}
 	defer c.queue.Done(key)
 
-	driverName := key.(string)
+	driverName := key
 
 	// Panics are caught and treated like errors.
 	var err error

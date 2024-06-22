@@ -50,7 +50,7 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 	// reset default registry metrics
 	legacyregistry.Reset()
 
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)

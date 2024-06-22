@@ -19,8 +19,10 @@ package validation
 import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -58,12 +60,31 @@ var supportedAllocationModes = sets.NewString(string(resource.AllocationModeImme
 
 func validateResourceClaimParametersRef(ref *resource.ResourceClaimParametersReference, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if ref != nil {
-		if ref.Kind == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+
+	if ref == nil {
+		return allErrs
+	}
+
+	// group is required but the Core group is the empty value, so it can not be enforced.
+	if ref.APIGroup != "" {
+		for _, msg := range utilvalidation.IsDNS1123Subdomain(ref.APIGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
 		}
-		if ref.Name == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+
+	if ref.Kind == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
+		}
+	}
+
+	if ref.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
 		}
 	}
 	return allErrs
@@ -71,17 +92,38 @@ func validateResourceClaimParametersRef(ref *resource.ResourceClaimParametersRef
 
 func validateClassParameters(ref *resource.ResourceClassParametersReference, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	if ref != nil {
-		if ref.Kind == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+
+	if ref == nil {
+		return allErrs
+	}
+
+	// group is required but the Core group is the empty value, so it can not be enforced.
+	if ref.APIGroup != "" {
+		for _, msg := range utilvalidation.IsDNS1123Subdomain(ref.APIGroup) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), ref.APIGroup, msg))
 		}
-		if ref.Name == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	}
+
+	if ref.Kind == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Kind) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), ref.Kind, msg))
 		}
-		if ref.Namespace != "" {
-			for _, msg := range apimachineryvalidation.ValidateNamespaceName(ref.Namespace, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), ref.Namespace, msg))
-			}
+	}
+
+	if ref.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(ref.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), ref.Name, msg))
+		}
+	}
+
+	// namespace is optional.
+	if ref.Namespace != "" {
+		for _, msg := range apimachineryvalidation.ValidateNamespaceName(ref.Namespace, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), ref.Namespace, msg))
 		}
 	}
 	return allErrs

@@ -300,18 +300,20 @@ func (f *Fit) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldOb
 	return framework.Queue, nil
 }
 
-// isResourceScaleDown checks whether the resource request of the modified pod is less than the original pod
-// for the resources requested by the pod we are trying to schedule.
-func (f *Fit) isResourceScaleDown(targetPod, originalOtherPod, modifiedOtherPod *v1.Pod) bool {
-	if modifiedOtherPod.Spec.NodeName == "" {
-		// no resource is freed up whatever the pod is modified.
+// isResourceScaleDown checks whether an update event may make the pod schedulable. Specifically:
+// - Returns true when an update event shows a scheduled pod's resource request got reduced.
+// - Returns true when an update event is for the unscheduled pod itself, and it shows the pod's resource request got reduced.
+func (f *Fit) isResourceScaleDown(targetPod, originalPod, modifiedPod *v1.Pod) bool {
+	if modifiedPod.UID != targetPod.UID && modifiedPod.Spec.NodeName == "" {
+		// If the update event is not for targetPod and a scheduled Pod,
+		// it wouldn't make targetPod schedulable.
 		return false
 	}
 
 	// the other pod was scheduled, so modification or deletion may free up some resources.
 	originalMaxResourceReq, modifiedMaxResourceReq := &framework.Resource{}, &framework.Resource{}
-	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalOtherPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
-	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedOtherPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
+	originalMaxResourceReq.SetMaxResource(resource.PodRequests(originalPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
+	modifiedMaxResourceReq.SetMaxResource(resource.PodRequests(modifiedPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling}))
 
 	// check whether the resource request of the modified pod is less than the original pod.
 	podRequests := resource.PodRequests(targetPod, resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: f.enableInPlacePodVerticalScaling})

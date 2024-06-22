@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesRequestApplyConfiguration represents an declarative configuration of the NamedResourcesRequest type for use
+// NamedResourcesRequestApplyConfiguration represents a declarative configuration of the NamedResourcesRequest type for use
 // with apply.
 type NamedResourcesRequestApplyConfiguration struct {
 	Selector *string `json:"selector,omitempty"`
 }
 
-// NamedResourcesRequestApplyConfiguration constructs an declarative configuration of the NamedResourcesRequest type for use with
+// NamedResourcesRequestApplyConfiguration constructs a declarative configuration of the NamedResourcesRequest type for use with
 // apply.
 func NamedResourcesRequest() *NamedResourcesRequestApplyConfiguration {
 	return &NamedResourcesRequestApplyConfiguration{}

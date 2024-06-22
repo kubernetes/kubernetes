@@ -140,6 +140,15 @@ var (
 			APIGroup: "example.com",
 		}).
 		Obj()
+	claimParametersOtherNamespace = st.MakeClaimParameters().Name(claimName).Namespace(namespace+"-2").
+					NamedResourcesRequests("some-driver", "true").
+					Shareable(true).
+					GeneratedFrom(&resourcev1alpha2.ResourceClaimParametersReference{
+			Name:     claimName,
+			Kind:     "ResourceClaimParameters",
+			APIGroup: "example.com",
+		}).
+		Obj()
 	classParameters = st.MakeClassParameters().Name(className).Namespace(namespace).
 			NamedResourcesFilters("some-driver", "true").
 			GeneratedFrom(&resourcev1alpha2.ResourceClassParametersReference{
@@ -631,7 +640,7 @@ func TestPlugin(t *testing.T) {
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
 			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
-			objs:    []apiruntime.Object{claimParameters, classParameters, workerNodeSlice},
+			objs:    []apiruntime.Object{claimParameters, claimParametersOtherNamespace /* must be ignored */, classParameters, workerNodeSlice},
 			want: want{
 				reserve: result{
 					inFlightClaim: claimWithCRD(structuredAllocatedClaimWithParams),
@@ -659,7 +668,7 @@ func TestPlugin(t *testing.T) {
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
 			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{claimParameters /* classParameters, */, workerNodeSlice},
+			objs:    []apiruntime.Object{claimParameters, workerNodeSlice},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `class parameters default/my-resource-class not found`),
@@ -674,10 +683,70 @@ func TestPlugin(t *testing.T) {
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaimWithParams},
 			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClassWithParams},
-			objs:    []apiruntime.Object{ /* claimParameters, */ classParameters, workerNodeSlice},
+			objs:    []apiruntime.Object{classParameters, workerNodeSlice},
 			want: want{
 				prefilter: result{
 					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim parameters default/my-pod-my-resource not found`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+
+		"missing-translated-class-parameters": {
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
+			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
+			objs:    []apiruntime.Object{claimParameters, workerNodeSlice},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `generated class parameters for ResourceClassParameters.example.com default/my-resource-class not found`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+
+		"missing-translated-claim-parameters": {
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
+			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
+			objs:    []apiruntime.Object{classParameters, workerNodeSlice},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `generated claim parameters for ResourceClaimParameters.example.com default/my-pod-my-resource not found`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+
+		"too-many-translated-class-parameters": {
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
+			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
+			objs:    []apiruntime.Object{claimParameters, classParameters, st.FromClassParameters(classParameters).Name("other").Obj() /* too many */, workerNodeSlice},
+			want: want{
+				prefilter: result{
+					status: framework.AsStatus(errors.New(`multiple generated class parameters for ResourceClassParameters.example.com my-resource-class found: [default/my-resource-class default/other]`)),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+
+		"too-many-translated-claim-parameters": {
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{claimWithCRD(pendingDelayedClaimWithParams)},
+			classes: []*resourcev1alpha2.ResourceClass{classWithCRD(structuredResourceClassWithCRD)},
+			objs:    []apiruntime.Object{claimParameters, st.FromClaimParameters(claimParameters).Name("other").Obj() /* too many */, classParameters, workerNodeSlice},
+			want: want{
+				prefilter: result{
+					status: framework.AsStatus(errors.New(`multiple generated claim parameters for ResourceClaimParameters.example.com default/my-pod-my-resource found: [default/my-pod-my-resource default/other]`)),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),

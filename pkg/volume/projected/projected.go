@@ -103,10 +103,6 @@ func (plugin *projectedPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
-	return false
-}
-
 func (plugin *projectedPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
 	return false, nil
 }

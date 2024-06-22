@@ -139,7 +139,6 @@ type ScheduleResult struct {
 	SuggestedHost string
 	// The number of nodes the scheduler evaluated the pod against in the filtering
 	// phase and beyond.
-	// Note that it contains the number of nodes that filtered out by PreFilterResult.
 	EvaluatedNodes int
 	// The number of nodes out of the evaluated ones that fit the pod.
 	FeasibleNodes int
@@ -292,6 +291,8 @@ func New(ctx context.Context,
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
+	// waitingPods holds all the pods that are in the scheduler and waiting in the permit stage
+	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(options.componentConfigVersion),
@@ -303,6 +304,7 @@ func New(ctx context.Context,
 		frameworkruntime.WithParallelism(int(options.parallelism)),
 		frameworkruntime.WithExtenders(extenders),
 		frameworkruntime.WithMetricsRecorder(metricsRecorder),
+		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)

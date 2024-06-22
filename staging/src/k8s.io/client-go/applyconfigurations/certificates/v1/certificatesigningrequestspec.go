@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/certificates/v1"
 )
 
-// CertificateSigningRequestSpecApplyConfiguration represents an declarative configuration of the CertificateSigningRequestSpec type for use
+// CertificateSigningRequestSpecApplyConfiguration represents a declarative configuration of the CertificateSigningRequestSpec type for use
 // with apply.
 type CertificateSigningRequestSpecApplyConfiguration struct {
 	Request           []byte                   `json:"request,omitempty"`
@@ -35,7 +35,7 @@ type CertificateSigningRequestSpecApplyConfiguration struct {
 	Extra             map[string]v1.ExtraValue `json:"extra,omitempty"`
 }
 
-// CertificateSigningRequestSpecApplyConfiguration constructs an declarative configuration of the CertificateSigningRequestSpec type for use with
+// CertificateSigningRequestSpecApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestSpec type for use with
 // apply.
 func CertificateSigningRequestSpec() *CertificateSigningRequestSpecApplyConfiguration {
 	return &CertificateSigningRequestSpecApplyConfiguration{}

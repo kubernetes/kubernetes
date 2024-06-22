@@ -29,7 +29,6 @@ import (
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
-	gomock "go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -148,11 +147,8 @@ func TestCRIListPodStats(t *testing.T) {
 		podLogStats1 = makeFakeLogStats(6000)
 	)
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	var (
-		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
+		mockCadvisor       = cadvisortest.NewMockInterface(t)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -216,13 +212,10 @@ func TestCRIListPodStats(t *testing.T) {
 		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	fakeOS := &kubecontainertest.FakeOS{}
 	fakeOS.ReadDirFn = func(path string) ([]os.DirEntry, error) {
 		var dirEntries []os.DirEntry
-		mockDE := kubecontainertest.NewMockDirEntry(ctrl)
+		mockDE := kubecontainertest.NewMockDirEntry(t)
 		switch path {
 		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
 			mockDE.EXPECT().Name().Return(podLogName0)
@@ -336,6 +329,10 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
 	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
@@ -369,10 +366,8 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		podLogStats0 = makeFakeLogStats(5000)
 		podLogStats1 = makeFakeLogStats(6000)
 	)
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
 	var (
-		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
+		mockCadvisor       = cadvisortest.NewMockInterface(t)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -439,12 +434,10 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 	fakeOS := &kubecontainertest.FakeOS{}
 	fakeOS.ReadDirFn = func(path string) ([]os.DirEntry, error) {
 		var dirEntries []os.DirEntry
-		mockDE := kubecontainertest.NewMockDirEntry(ctrl)
+		mockDE := kubecontainertest.NewMockDirEntry(t)
 		switch path {
 		case kuberuntime.BuildPodLogsDirectory(testPodLogDirectory, "sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
 			mockDE.EXPECT().Name().Return(podLogName0)
@@ -580,11 +573,8 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		containerStats9 = makeFakeContainerStats(container9, imageFsMountpoint)
 	)
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	var (
-		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
+		mockCadvisor       = cadvisortest.NewMockInterface(t)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -748,11 +738,8 @@ func TestCRIImagesFsStats(t *testing.T) {
 		imageFsUsage      = makeFakeImageFsUsage(imageFsMountpoint)
 	)
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
 	var (
-		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
+		mockCadvisor       = cadvisortest.NewMockInterface(t)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)

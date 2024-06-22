@@ -40,7 +40,7 @@ import (
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -75,6 +75,9 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, ValidateEncryptionAlgorithm(c.EncryptionAlgorithm, field.NewPath("encryptionAlgorithm"))...)
 	allErrs = append(allErrs, componentconfigs.Validate(c)...)
+	for _, certError := range ValidateCertValidity(c) {
+		klog.Warningf("WARNING: %s", certError.Error())
+	}
 	return allErrs
 }
 
@@ -606,7 +609,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		"print-join-command", "rootfs", "v", "log-file")
+		"print-join-command", "rootfs", "v", "log-file", "yes")
 	if allowedFlags.Has(flagName) {
 		return true
 	}
@@ -763,10 +766,32 @@ func ValidateImagePullPolicy(policy corev1.PullPolicy, fldPath *field.Path) fiel
 func ValidateUpgradeConfiguration(c *kubeadm.UpgradeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.Apply.Patches != nil {
-		allErrs = append(allErrs, ValidateAbsolutePath(c.Apply.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Apply.Patches.Directory,
+			field.NewPath("apply").Child("patches").Child("directory"))...)
 	}
 	if c.Node.Patches != nil {
-		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory, field.NewPath("patches").Child("directory"))...)
+		allErrs = append(allErrs, ValidateAbsolutePath(c.Node.Patches.Directory,
+			field.NewPath("node").Child("patches").Child("directory"))...)
+	}
+	allErrs = append(allErrs, ValidateImagePullPolicy(c.Apply.ImagePullPolicy,
+		field.NewPath("apply").Child("imagePullPolicy"))...)
+	allErrs = append(allErrs, ValidateImagePullPolicy(c.Node.ImagePullPolicy,
+		field.NewPath("node").Child("imagePullPolicy"))...)
+	return allErrs
+}
+
+// ValidateCertValidity validates if the values for cert validity are too big
+func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
+	var allErrs []error
+	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
+				cfg.CertificateValidityPeriod.Duration, constants.CertificateValidityPeriod))
+	}
+	if cfg.CACertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod.Duration > constants.CACertificateValidityPeriod {
+		allErrs = append(allErrs,
+			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
+				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
 	}
 	return allErrs
 }

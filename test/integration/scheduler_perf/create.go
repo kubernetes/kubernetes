@@ -17,8 +17,11 @@ limitations under the License.
 package benchmark
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
+	"os"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,6 +33,8 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/yaml"
 )
 
 // createAny defines an op where some object gets created from a YAML file.
@@ -40,7 +45,13 @@ type createAny struct {
 	// Namespace the object should be created in. Must be empty for cluster-scoped objects.
 	Namespace string
 	// Path to spec file describing the object to create.
+	// This will be processed with text/template.
+	// .Index will be in the range [0, Count-1] when creating
+	// more than one object. .Count is the total number of objects.
 	TemplatePath string
+	// Count determines how many objects get created. Defaults to 1 if unset.
+	Count      *int
+	CountParam string
 }
 
 var _ runnableOp = &createAny{}
@@ -61,8 +72,15 @@ func (c *createAny) collectsMetrics() bool {
 	return false
 }
 
-func (c *createAny) patchParams(w *workload) (realOp, error) {
-	return c, c.isValid(false)
+func (c createAny) patchParams(w *workload) (realOp, error) {
+	if c.CountParam != "" {
+		count, err := w.Params.get(c.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		c.Count = ptr.To(count)
+	}
+	return &c, c.isValid(false)
 }
 
 func (c *createAny) requiredNamespaces() []string {
@@ -73,8 +91,18 @@ func (c *createAny) requiredNamespaces() []string {
 }
 
 func (c *createAny) run(tCtx ktesting.TContext) {
+	count := 1
+	if c.Count != nil {
+		count = *c.Count
+	}
+	for index := 0; index < count; index++ {
+		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+	}
+}
+
+func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 	var obj *unstructured.Unstructured
-	if err := getSpecFromFile(&c.TemplatePath, &obj); err != nil {
+	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
 		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
 	}
 
@@ -142,4 +170,24 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 		case <-time.After(time.Second):
 		}
 	}
+}
+
+func getSpecFromTextTemplateFile(path string, env map[string]any, spec interface{}) error {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	fm := template.FuncMap{"div": func(a, b int) int {
+		return a / b
+	}}
+	tmpl, err := template.New("object").Funcs(fm).Parse(string(content))
+	if err != nil {
+		return err
+	}
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, env); err != nil {
+		return err
+	}
+
+	return yaml.UnmarshalStrict(buffer.Bytes(), spec)
 }

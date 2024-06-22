@@ -651,7 +651,9 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{errors.New("swap is supported for cgroup v2 only; the NodeSwap feature gate of the kubelet is beta but disabled by default")}, nil
+		return []error{errors.New("swap is supported for cgroup v2 only. " +
+			"The kubelet must be properly configured to use swap. Please refer to https://kubernetes.io/docs/concepts/architecture/nodes/#swap-memory, " +
+			"or disable swap on the node")}, nil
 	}
 
 	return nil, nil
@@ -857,8 +859,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	for _, image := range ipc.imageList {
 		switch policy {
 		case v1.PullIfNotPresent:
-			ret, err := ipc.runtime.ImageExists(image)
-			if ret && err == nil {
+			if ipc.runtime.ImageExists(image) {
 				klog.V(1).Infof("image exists: %s", image)
 				continue
 			}
@@ -1074,8 +1075,8 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 // addCommonChecks is a helper function to duplicate checks that are common between both the
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
-	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
-	if err != nil {
+	containerRuntime := utilruntime.NewContainerRuntime(nodeReg.CRISocket)
+	if err := containerRuntime.Connect(); err != nil {
 		klog.Warningf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
 	} else {
 		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
@@ -1104,8 +1105,8 @@ func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
-	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.NodeRegistration.CRISocket)
-	if err != nil {
+	containerRuntime := utilruntime.NewContainerRuntime(cfg.NodeRegistration.CRISocket)
+	if err := containerRuntime.Connect(); err != nil {
 		return &Error{Msg: err.Error()}
 	}
 

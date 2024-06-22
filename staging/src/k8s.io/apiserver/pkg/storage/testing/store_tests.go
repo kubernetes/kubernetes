@@ -1573,6 +1573,114 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 	}
 }
 
+// RunTestGetListRecursivePrefix tests how recursive parameter works for object keys that are prefixes of each other.
+func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store storage.Interface) {
+	fooKey, fooObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+	fooBarKey, fooBarObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foobar", Namespace: "test-ns"}})
+	_, otherNamespaceObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test-ns2"}})
+	lastRev := otherNamespaceObj.ResourceVersion
+
+	tests := []struct {
+		name        string
+		key         string
+		recursive   bool
+		expectedOut []example.Pod
+	}{
+		{
+			name:        "NonRecursive on resource prefix doesn't return any objects",
+			key:         "/pods/",
+			recursive:   false,
+			expectedOut: []example.Pod{},
+		},
+		{
+			name:        "Recursive on resource prefix returns all objects",
+			key:         "/pods/",
+			recursive:   true,
+			expectedOut: []example.Pod{*fooObj, *fooBarObj, *otherNamespaceObj},
+		},
+		{
+			name:        "NonRecursive on namespace prefix doesn't return any objects",
+			key:         "/pods/test-ns/",
+			recursive:   false,
+			expectedOut: []example.Pod{},
+		},
+		{
+			name:        "Recursive on resource prefix returns objects in the namespace",
+			key:         "/pods/test-ns/",
+			recursive:   true,
+			expectedOut: []example.Pod{*fooObj, *fooBarObj},
+		},
+		{
+			name:        "NonRecursive on object key (prefix) returns object and no other objects with the same prefix",
+			key:         fooKey,
+			recursive:   false,
+			expectedOut: []example.Pod{*fooObj},
+		},
+		{
+			name:        "Recursive on object key (prefix) doesn't return anything",
+			key:         fooKey,
+			recursive:   true,
+			expectedOut: []example.Pod{},
+		},
+		{
+			name:        "NonRecursive on object key (no-prefix) return object",
+			key:         fooBarKey,
+			recursive:   false,
+			expectedOut: []example.Pod{*fooBarObj},
+		},
+		{
+			name:        "Recursive on object key (no-prefix) doesn't return anything",
+			key:         fooBarKey,
+			recursive:   true,
+			expectedOut: []example.Pod{},
+		},
+	}
+
+	listTypes := []struct {
+		name            string
+		ResourceVersion string
+		Match           metav1.ResourceVersionMatch
+	}{
+		{
+			name:            "Exact",
+			ResourceVersion: lastRev,
+			Match:           metav1.ResourceVersionMatchExact,
+		},
+		{
+			name:            "Consistent",
+			ResourceVersion: "",
+		},
+		{
+			name:            "NotOlderThan",
+			ResourceVersion: "0",
+			Match:           metav1.ResourceVersionMatchNotOlderThan,
+		},
+	}
+
+	for _, listType := range listTypes {
+		listType := listType
+		t.Run(listType.name, func(t *testing.T) {
+			for _, tt := range tests {
+				tt := tt
+				t.Run(tt.name, func(t *testing.T) {
+					out := &example.PodList{}
+					storageOpts := storage.ListOptions{
+						ResourceVersion:      listType.ResourceVersion,
+						ResourceVersionMatch: listType.Match,
+						Recursive:            tt.recursive,
+						Predicate:            storage.Everything,
+					}
+					err := store.GetList(ctx, tt.key, storageOpts, out)
+					if err != nil {
+						t.Fatalf("GetList failed: %v", err)
+					}
+					expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
+				})
+			}
+		})
+	}
+}
+
 type CallsValidation func(t *testing.T, pageSize, estimatedProcessedObjects uint64)
 
 func RunTestListContinuation(ctx context.Context, t *testing.T, store storage.Interface, validation CallsValidation) {

@@ -102,9 +102,6 @@ func NewIPAllocator(
 	// of having to do conversions with IP addresses.
 	// Don't allocate the network's ".0" address.
 	ipFirst := prefix.Masked().Addr().Next()
-	if err != nil {
-		return nil, err
-	}
 	// Use the broadcast address as last address for IPv6
 	ipLast, err := broadcastAddress(prefix)
 	if err != nil {

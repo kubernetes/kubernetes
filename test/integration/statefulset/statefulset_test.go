@@ -55,7 +55,7 @@ const (
 // TestVolumeTemplateNoopUpdate ensures embedded StatefulSet objects with embedded PersistentVolumes can be updated
 func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	// Start the server with default storage setup
-	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := apiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	c, err := dynamic.NewForConfig(server.ClientConfig)

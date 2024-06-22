@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// MutatingWebhookApplyConfiguration represents an declarative configuration of the MutatingWebhook type for use
+// MutatingWebhookApplyConfiguration represents a declarative configuration of the MutatingWebhook type for use
 // with apply.
 type MutatingWebhookApplyConfiguration struct {
 	Name                    *string                                         `json:"name,omitempty"`
@@ -40,7 +40,7 @@ type MutatingWebhookApplyConfiguration struct {
 	MatchConditions         []MatchConditionApplyConfiguration              `json:"matchConditions,omitempty"`
 }
 
-// MutatingWebhookApplyConfiguration constructs an declarative configuration of the MutatingWebhook type for use with
+// MutatingWebhookApplyConfiguration constructs a declarative configuration of the MutatingWebhook type for use with
 // apply.
 func MutatingWebhook() *MutatingWebhookApplyConfiguration {
 	return &MutatingWebhookApplyConfiguration{}

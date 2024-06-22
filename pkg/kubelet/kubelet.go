@@ -36,6 +36,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/client-go/informers"
@@ -63,6 +64,7 @@ import (
 	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	remote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -80,7 +82,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -328,10 +329,11 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration, 
 		tp = kubeDeps.TracerProvider
 	}
 
-	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(kubeCfg.ContainerRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, tp); err != nil {
+	logger := klog.Background()
+	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(kubeCfg.ContainerRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, tp, &logger); err != nil {
 		return err
 	}
-	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, tp); err != nil {
+	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, tp, &logger); err != nil {
 		return err
 	}
 
@@ -780,17 +782,28 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.imageManager = imageManager
 
-	if kubeCfg.ServerTLSBootstrap && kubeDeps.TLSOptions != nil && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-		klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize certificate manager: %v", err)
-		}
-		kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-			cert := klet.serverCertificateManager.Current()
-			if cert == nil {
-				return nil, fmt.Errorf("no serving certificate available for the kubelet")
+	if kubeDeps.TLSOptions != nil {
+		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
+			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize certificate manager: %w", err)
 			}
-			return cert, nil
+
+		} else if kubeDeps.TLSOptions.CertFile != "" && kubeDeps.TLSOptions.KeyFile != "" && utilfeature.DefaultFeatureGate.Enabled(features.ReloadKubeletServerCertificateFile) {
+			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateDynamicFileManager(kubeDeps.TLSOptions.CertFile, kubeDeps.TLSOptions.KeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to initialize file based certificate manager: %w", err)
+			}
+		}
+
+		if klet.serverCertificateManager != nil {
+			kubeDeps.TLSOptions.Config.GetCertificate = func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+				cert := klet.serverCertificateManager.Current()
+				if cert == nil {
+					return nil, fmt.Errorf("no serving certificate available for the kubelet")
+				}
+				return cert, nil
+			}
 		}
 	}
 
@@ -1733,6 +1746,10 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	))
 	klog.V(4).InfoS("SyncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer func() {
+		if err != nil {
+			otelSpan.RecordError(err)
+			otelSpan.SetStatus(codes.Error, err.Error())
+		}
 		klog.V(4).InfoS("SyncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
 		otelSpan.End()
 	}()
@@ -2229,7 +2246,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 func (kl *Kubelet) getPodsToSync() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
 	podUIDs := kl.workQueue.GetWork()
-	podUIDSet := sets.NewString()
+	podUIDSet := sets.New[string]()
 	for _, podUID := range podUIDs {
 		podUIDSet.Insert(string(podUID))
 	}

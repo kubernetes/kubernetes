@@ -225,12 +225,12 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
 // If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
-func JWTTokenAuthenticator(issuers []string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator) authenticator.Token {
+func JWTTokenAuthenticator[PrivateClaims any](issuers []string, keys []interface{}, implicitAuds authenticator.Audiences, validator Validator[PrivateClaims]) authenticator.Token {
 	issuersMap := make(map[string]bool)
 	for _, issuer := range issuers {
 		issuersMap[issuer] = true
 	}
-	return &jwtTokenAuthenticator{
+	return &jwtTokenAuthenticator[PrivateClaims]{
 		issuers:      issuersMap,
 		keys:         keys,
 		implicitAuds: implicitAuds,
@@ -238,29 +238,25 @@ func JWTTokenAuthenticator(issuers []string, keys []interface{}, implicitAuds au
 	}
 }
 
-type jwtTokenAuthenticator struct {
+type jwtTokenAuthenticator[PrivateClaims any] struct {
 	issuers      map[string]bool
 	keys         []interface{}
-	validator    Validator
+	validator    Validator[PrivateClaims]
 	implicitAuds authenticator.Audiences
 }
 
 // Validator is called by the JWT token authenticator to apply domain specific
 // validation to a token and extract user information.
-type Validator interface {
+// PrivateClaims is the struct that the authenticator should deserialize the JWT payload into, thus
+// it should contain fields for any private claims that the Validator requires to validate the JWT.
+type Validator[PrivateClaims any] interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error)
-	// NewPrivateClaims returns a struct that the authenticator should
-	// deserialize the JWT payload into. The authenticator may then pass this
-	// struct back to the Validator as the 'private' argument to a Validate()
-	// call. This struct should contain fields for any private claims that the
-	// Validator requires to validate the JWT.
-	NewPrivateClaims() interface{}
+	Validate(ctx context.Context, tokenData string, public *jwt.Claims, private *PrivateClaims) (*apiserverserviceaccount.ServiceAccountInfo, error)
 }
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
+func (j *jwtTokenAuthenticator[PrivateClaims]) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
@@ -271,7 +267,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 	}
 
 	public := &jwt.Claims{}
-	private := j.validator.NewPrivateClaims()
+	private := new(PrivateClaims)
 
 	// TODO: Pick the key that has the same key ID as `tok`, if one exists.
 	var (
@@ -334,7 +330,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 //
 // Note: go-jose currently does not allow access to unverified JWS payloads.
 // See https://github.com/square/go-jose/issues/169
-func (j *jwtTokenAuthenticator) hasCorrectIssuer(tokenData string) bool {
+func (j *jwtTokenAuthenticator[PrivateClaims]) hasCorrectIssuer(tokenData string) bool {
 	if strings.HasPrefix(strings.TrimSpace(tokenData), "{") {
 		return false
 	}

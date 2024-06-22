@@ -110,7 +110,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) authorize(ctx context.Context
 		return err
 	}
 	if d != authorizer.DecisionAllow {
-		return fmt.Errorf(`user %v does not have "%v" permission on the object referenced by paramRef`, verb, user)
+		return fmt.Errorf(`user %v does not have "%v" permission on the object referenced by paramRef`, user, verb)
 	}
 
 	return nil

@@ -39,9 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
@@ -138,6 +141,9 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return storage.GetCurrentResourceVersionFromStorage(ctx, s, newListFunc, resourcePrefix, w.objectType)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
+		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	}
 	return s
 }
@@ -805,27 +811,11 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
 	}
 
-	// instruct the client to begin querying from immediately after the last key we returned
-	// we never return a key that the client wouldn't be allowed to see
-	if hasMore {
-		// we want to start immediately after the last key
-		next, err := storage.EncodeContinue(string(lastKey)+"\x00", keyPrefix, withRev)
-		if err != nil {
-			return err
-		}
-		var remainingItemCount *int64
-		// getResp.Count counts in objects that do not match the pred.
-		// Instead of returning inaccurate count for non-empty selectors, we return nil.
-		// Only set remainingItemCount if the predicate is empty.
-		if opts.Predicate.Empty() {
-			c := int64(getResp.Count - opts.Predicate.Limit)
-			remainingItemCount = &c
-		}
-		return s.versioner.UpdateList(listObj, uint64(withRev), next, remainingItemCount)
+	continueValue, remainingItemCount, err := storage.PrepareContinueToken(string(lastKey), keyPrefix, withRev, getResp.Count, hasMore, opts)
+	if err != nil {
+		return err
 	}
-
-	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(withRev), "", nil)
+	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
 }
 
 // growSlice takes a slice value and grows its capacity up

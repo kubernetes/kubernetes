@@ -49,7 +49,7 @@ import (
 
 func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	// There are some tests (in scale_test.go) that rely on the response to be returned in JSON.

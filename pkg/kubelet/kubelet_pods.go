@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -62,6 +63,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -130,6 +132,16 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
+	} else {
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get kernel version, unable to determine if feature %s can be supported : %w",
+				features.UserNamespacesSupport, err)
+		}
+		if kernelVersion != nil && !kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.UserNamespacesSupportKernelVersion)) {
+			klog.InfoS("WARNING: the kernel version is incompatible with the feature gate, which needs as a minimum kernel version",
+				"kernelVersion", kernelVersion, "feature", features.UserNamespacesSupport, "minKernelVersion", utilkernel.UserNamespacesSupportKernelVersion)
+		}
 	}
 
 	_, err := user.Lookup(kubeletUser)
@@ -619,7 +631,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(ctx context.Context, pod *v1.Pod,
 	return opts, cleanupAction, nil
 }
 
-var masterServices = sets.NewString("kubernetes")
+var masterServices = sets.New[string]("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
@@ -2016,7 +2028,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			// twice. "container never ran" is different than "container ran and failed".  This is handled differently in the kubelet
 			// and it is handled differently in higher order logic like crashloop detection and handling
 			status.State.Terminated = &v1.ContainerStateTerminated{
-				Reason:   "ContainerStatusUnknown",
+				Reason:   kubecontainer.ContainerReasonStatusUnknown,
 				Message:  "The container could not be located when the pod was terminated",
 				ExitCode: 137, // this code indicates an error
 			}
@@ -2111,6 +2123,23 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Requests: requests,
 		}
 		return resources
+	}
+
+	convertContainerStatusUser := func(cStatus *kubecontainer.Status) *v1.ContainerUser {
+		if cStatus.User == nil {
+			return nil
+		}
+
+		user := &v1.ContainerUser{}
+		if cStatus.User.Linux != nil {
+			user.Linux = &v1.LinuxContainerUser{
+				UID:                cStatus.User.Linux.UID,
+				GID:                cStatus.User.Linux.GID,
+				SupplementalGroups: cStatus.User.Linux.SupplementalGroups,
+			}
+		}
+
+		return user
 	}
 
 	// Fetch old containers statuses from old pod status.
@@ -2226,7 +2255,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// https://github.com/kubernetes/kubernetes/blob/90c9f7b3e198e82a756a68ffeac978a00d606e55/pkg/kubelet/kubelet_pods.go#L1440-L1445
 		// This prevents the pod from becoming pending
 		status.LastTerminationState.Terminated = &v1.ContainerStateTerminated{
-			Reason:   "ContainerStatusUnknown",
+			Reason:   kubecontainer.ContainerReasonStatusUnknown,
 			Message:  "The container could not be located when the pod was deleted.  The container used to be Running",
 			ExitCode: 137,
 		}
@@ -2265,6 +2294,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if status.State.Running != nil {
 				status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
 			}
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+			status.User = convertContainerStatusUser(cStatus)
 		}
 		if containerSeen[cName] == 0 {
 			statuses[cName] = status

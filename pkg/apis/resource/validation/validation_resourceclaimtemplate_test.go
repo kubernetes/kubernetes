@@ -51,6 +51,8 @@ func TestValidateClaimTemplate(t *testing.T) {
 	}
 	now := metav1.Now()
 	badValue := "spaces not allowed"
+	badAPIGroup := "example.com/v1"
+	goodAPIGroup := "example.com"
 
 	scenarios := map[string]struct {
 		template     *resource.ResourceClaimTemplate
@@ -210,6 +212,29 @@ func TestValidateClaimTemplate(t *testing.T) {
 				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
 					Kind: "foo",
 					Name: "bar",
+				}
+				return template
+			}(),
+		},
+		"good-parameters-apigroup": {
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
+					APIGroup: goodAPIGroup,
+					Kind:     "foo",
+					Name:     "bar",
+				}
+				return template
+			}(),
+		},
+		"bad-parameters-apigroup": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "parametersRef", "apiGroup"), badAPIGroup, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
+				template.Spec.Spec.ParametersRef = &resource.ResourceClaimParametersReference{
+					APIGroup: badAPIGroup,
+					Kind:     "foo",
+					Name:     "bar",
 				}
 				return template
 			}(),

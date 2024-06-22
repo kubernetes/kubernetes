@@ -542,7 +542,7 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	stopCh := make(chan struct{})
 	//readyCh := make(chan bool, 1)
 	//readyCh <- true
-	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
 }

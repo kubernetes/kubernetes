@@ -22,7 +22,7 @@ import (
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 )
 
-// ResourceClaimSpecApplyConfiguration represents an declarative configuration of the ResourceClaimSpec type for use
+// ResourceClaimSpecApplyConfiguration represents a declarative configuration of the ResourceClaimSpec type for use
 // with apply.
 type ResourceClaimSpecApplyConfiguration struct {
 	ResourceClassName *string                                             `json:"resourceClassName,omitempty"`
@@ -30,7 +30,7 @@ type ResourceClaimSpecApplyConfiguration struct {
 	AllocationMode    *resourcev1alpha2.AllocationMode                    `json:"allocationMode,omitempty"`
 }
 
-// ResourceClaimSpecApplyConfiguration constructs an declarative configuration of the ResourceClaimSpec type for use with
+// ResourceClaimSpecApplyConfiguration constructs a declarative configuration of the ResourceClaimSpec type for use with
 // apply.
 func ResourceClaimSpec() *ResourceClaimSpecApplyConfiguration {
 	return &ResourceClaimSpecApplyConfiguration{}

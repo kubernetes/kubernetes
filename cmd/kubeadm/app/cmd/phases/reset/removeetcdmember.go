@@ -27,7 +27,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -108,7 +108,7 @@ func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (str
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
 		// Fall back to use the default cluster config if etcd.yaml doesn't exist, this could happen that
 		// etcd.yaml is removed by other reset phases, e.g. cleanup-node.
-		cfg := &v1beta3.ClusterConfiguration{}
+		cfg := &kubeadmapiv1.ClusterConfiguration{}
 		scheme.Scheme.Default(cfg)
 		return cfg.Etcd.Local.DataDir, nil
 	}

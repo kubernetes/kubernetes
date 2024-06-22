@@ -314,7 +314,10 @@ func NewProxier(ctx context.Context,
 		networkInterfacer:        proxyutil.RealNetwork{},
 		conntrackTCPLiberal:      conntrackTCPLiberal,
 		logger:                   logger,
-		nfAcctCounters:           map[string]bool{metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: false},
+		nfAcctCounters: map[string]bool{
+			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: false,
+			metrics.LocalhostNodePortAcceptedNFAcctCounter:     false,
+		},
 	}
 
 	burstSyncs := 2
@@ -1183,6 +1186,16 @@ func (proxier *Proxier) syncProxyRules() {
 				// Jump to the external destination chain.  For better or for
 				// worse, nodeports are not subect to loadBalancerSourceRanges,
 				// and we can't change that.
+				if proxier.localhostNodePorts && proxier.ipFamily == v1.IPv4Protocol && proxier.nfAcctCounters[metrics.LocalhostNodePortAcceptedNFAcctCounter] {
+					natRules.Write(
+						"-A", string(kubeNodePortsChain),
+						"-m", "comment", "--comment", svcPortNameString,
+						"-m", protocol, "-p", protocol,
+						"-d", "127.0.0.0/8",
+						"--dport", strconv.Itoa(svcInfo.NodePort()),
+						"-m", "nfacct", "--nfacct-name", metrics.LocalhostNodePortAcceptedNFAcctCounter,
+						"-j", string(externalTrafficChain))
+				}
 				natRules.Write(
 					"-A", string(kubeNodePortsChain),
 					"-m", "comment", "--comment", svcPortNameString,

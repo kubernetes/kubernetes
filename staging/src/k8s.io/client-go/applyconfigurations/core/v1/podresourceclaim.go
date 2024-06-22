@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// PodResourceClaimApplyConfiguration represents an declarative configuration of the PodResourceClaim type for use
+// PodResourceClaimApplyConfiguration represents a declarative configuration of the PodResourceClaim type for use
 // with apply.
 type PodResourceClaimApplyConfiguration struct {
 	Name   *string                        `json:"name,omitempty"`
 	Source *ClaimSourceApplyConfiguration `json:"source,omitempty"`
 }
 
-// PodResourceClaimApplyConfiguration constructs an declarative configuration of the PodResourceClaim type for use with
+// PodResourceClaimApplyConfiguration constructs a declarative configuration of the PodResourceClaim type for use with
 // apply.
 func PodResourceClaim() *PodResourceClaimApplyConfiguration {
 	return &PodResourceClaimApplyConfiguration{}

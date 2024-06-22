@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesStringSliceApplyConfiguration represents an declarative configuration of the NamedResourcesStringSlice type for use
+// NamedResourcesStringSliceApplyConfiguration represents a declarative configuration of the NamedResourcesStringSlice type for use
 // with apply.
 type NamedResourcesStringSliceApplyConfiguration struct {
 	Strings []string `json:"strings,omitempty"`
 }
 
-// NamedResourcesStringSliceApplyConfiguration constructs an declarative configuration of the NamedResourcesStringSlice type for use with
+// NamedResourcesStringSliceApplyConfiguration constructs a declarative configuration of the NamedResourcesStringSlice type for use with
 // apply.
 func NamedResourcesStringSlice() *NamedResourcesStringSliceApplyConfiguration {
 	return &NamedResourcesStringSliceApplyConfiguration{}

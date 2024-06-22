@@ -26,9 +26,8 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -102,7 +101,7 @@ func runCleanupNode(c workflow.RunData) error {
 
 	if !r.DryRun() {
 		klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
-		if err := removeContainers(utilsexec.New(), r.CRISocketPath()); err != nil {
+		if err := removeContainers(r.CRISocketPath()); err != nil {
 			klog.Warningf("[reset] Failed to remove containers: %v\n", err)
 		}
 	} else {
@@ -135,9 +134,9 @@ func runCleanupNode(c workflow.RunData) error {
 	return nil
 }
 
-func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
-	containerRuntime, err := utilruntime.NewContainerRuntime(execer, criSocketPath)
-	if err != nil {
+func removeContainers(criSocketPath string) error {
+	containerRuntime := utilruntime.NewContainerRuntime(criSocketPath)
+	if err := containerRuntime.Connect(); err != nil {
 		return err
 	}
 	containers, err := containerRuntime.ListKubeContainers()

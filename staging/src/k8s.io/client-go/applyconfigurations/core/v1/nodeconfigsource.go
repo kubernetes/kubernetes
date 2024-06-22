@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// NodeConfigSourceApplyConfiguration represents an declarative configuration of the NodeConfigSource type for use
+// NodeConfigSourceApplyConfiguration represents a declarative configuration of the NodeConfigSource type for use
 // with apply.
 type NodeConfigSourceApplyConfiguration struct {
 	ConfigMap *ConfigMapNodeConfigSourceApplyConfiguration `json:"configMap,omitempty"`
 }
 
-// NodeConfigSourceApplyConfiguration constructs an declarative configuration of the NodeConfigSource type for use with
+// NodeConfigSourceApplyConfiguration constructs a declarative configuration of the NodeConfigSource type for use with
 // apply.
 func NodeConfigSource() *NodeConfigSourceApplyConfiguration {
 	return &NodeConfigSourceApplyConfiguration{}

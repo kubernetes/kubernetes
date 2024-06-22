@@ -489,8 +489,13 @@ func (suite *Suite) runSpecs(description string, suiteLabels Labels, suitePath s
 			newGroup(suite).run(specs.AtIndices(groupedSpecIndices[groupedSpecIdx]))
 		}
 
-		if specs.HasAnySpecsMarkedPending() && suite.config.FailOnPending {
+		if suite.config.FailOnPending && specs.HasAnySpecsMarkedPending() {
 			suite.report.SpecialSuiteFailureReasons = append(suite.report.SpecialSuiteFailureReasons, "Detected pending specs and --fail-on-pending is set")
+			suite.report.SuiteSucceeded = false
+		}
+
+		if suite.config.FailOnEmpty && specs.CountWithoutSkip() == 0 {
+			suite.report.SpecialSuiteFailureReasons = append(suite.report.SpecialSuiteFailureReasons, "Detected no specs ran and --fail-on-empty is set")
 			suite.report.SuiteSucceeded = false
 		}
 	}
@@ -594,8 +599,8 @@ func (suite *Suite) reportEach(spec Spec, nodeType types.NodeType) {
 		suite.writer.Truncate()
 		suite.outputInterceptor.StartInterceptingOutput()
 		report := suite.currentSpecReport
-		nodes[i].Body = func(SpecContext) {
-			nodes[i].ReportEachBody(report)
+		nodes[i].Body = func(ctx SpecContext) {
+			nodes[i].ReportEachBody(ctx, report)
 		}
 		state, failure := suite.runNode(nodes[i], time.Time{}, spec.Nodes.BestTextFor(nodes[i]))
 
@@ -762,7 +767,7 @@ func (suite *Suite) runReportSuiteNode(node Node, report types.Report) {
 		report = report.Add(aggregatedReport)
 	}
 
-	node.Body = func(SpecContext) { node.ReportSuiteBody(report) }
+	node.Body = func(ctx SpecContext) { node.ReportSuiteBody(ctx, report) }
 	suite.currentSpecReport.State, suite.currentSpecReport.Failure = suite.runNode(node, time.Time{}, "")
 
 	suite.currentSpecReport.EndTime = time.Now()
@@ -840,7 +845,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 		timeoutInPlay = "node"
 	}
 	if (!deadline.IsZero() && deadline.Before(now)) || interruptStatus.Interrupted() {
-		//we're out of time already.  let's wait for a NodeTimeout if we have it, or GracePeriod if we don't
+		// we're out of time already.  let's wait for a NodeTimeout if we have it, or GracePeriod if we don't
 		if node.NodeTimeout > 0 {
 			deadline = now.Add(node.NodeTimeout)
 			timeoutInPlay = "node"
@@ -918,9 +923,9 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 				if outcomeFromRun != types.SpecStatePassed {
 					additionalFailure := types.AdditionalFailure{
 						State:   outcomeFromRun,
-						Failure: failure, //we make a copy - this will include all the configuration set up above...
+						Failure: failure, // we make a copy - this will include all the configuration set up above...
 					}
-					//...and then we update the failure with the details from failureFromRun
+					// ...and then we update the failure with the details from failureFromRun
 					additionalFailure.Failure.Location, additionalFailure.Failure.ForwardedPanic, additionalFailure.Failure.TimelineLocation = failureFromRun.Location, failureFromRun.ForwardedPanic, failureFromRun.TimelineLocation
 					additionalFailure.Failure.ProgressReport = types.ProgressReport{}
 					if outcome == types.SpecStateTimedout {
@@ -959,7 +964,7 @@ func (suite *Suite) runNode(node Node, specDeadline time.Time, text string) (typ
 			// tell the spec to stop.  it's important we generate the progress report first to make sure we capture where
 			// the spec is actually stuck
 			sc.cancel(fmt.Errorf("%s timeout occurred", timeoutInPlay))
-			//and now we wait for the grace period
+			// and now we wait for the grace period
 			gracePeriodChannel = time.After(gracePeriod)
 		case <-interruptStatus.Channel:
 			interruptStatus = suite.interruptHandler.Status()

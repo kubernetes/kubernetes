@@ -57,11 +57,11 @@ import (
 
 func TestSchedulingGates(t *testing.T) {
 	tests := []struct {
-		name                  string
-		pods                  []*v1.Pod
-		want                  []string
-		rmPodsSchedulingGates []int
-		wantPostGatesRemoval  []string
+		name     string
+		pods     []*v1.Pod
+		schedule []string
+		delete   []string
+		rmGates  []string
 	}{
 		{
 			name: "regular pods",
@@ -69,7 +69,7 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p1").Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			want: []string{"p1", "p2"},
+			schedule: []string{"p1", "p2"},
 		},
 		{
 			name: "one pod carrying scheduling gates",
@@ -77,7 +77,7 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
 				st.MakePod().Name("p2").Container("pause").Obj(),
 			},
-			want: []string{"p2"},
+			schedule: []string{"p2"},
 		},
 		{
 			name: "two pod carrying scheduling gates, and remove gates of one pod",
@@ -86,9 +86,18 @@ func TestSchedulingGates(t *testing.T) {
 				st.MakePod().Name("p2").SchedulingGates([]string{"bar"}).Container("pause").Obj(),
 				st.MakePod().Name("p3").Container("pause").Obj(),
 			},
-			want:                  []string{"p3"},
-			rmPodsSchedulingGates: []int{1}, // remove gates of 'p2'
-			wantPostGatesRemoval:  []string{"p2"},
+			schedule: []string{"p3"},
+			rmGates:  []string{"p2"},
+		},
+		{
+			name: "gated pod schedulable after deleting the scheduled pod and removing gate",
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").SchedulingGates([]string{"foo"}).Container("pause").Obj(),
+				st.MakePod().Name("p2").Container("pause").Obj(),
+			},
+			schedule: []string{"p2"},
+			delete:   []string{"p2"},
+			rmGates:  []string{"p1"},
 		},
 	}
 
@@ -107,6 +116,15 @@ func TestSchedulingGates(t *testing.T) {
 			testutils.SyncSchedulerInformerFactory(testCtx)
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+
+			// Create node, so we can schedule pods.
+			node := st.MakeNode().Name("node").Obj()
+			if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Fatal("Failed to create node")
+
+			}
+
+			// Create pods.
 			for _, p := range tt.pods {
 				p.Namespace = ns
 				if _, err := cs.CoreV1().Pods(ns).Create(ctx, p, metav1.CreateOptions{}); err != nil {
@@ -122,30 +140,42 @@ func TestSchedulingGates(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			// Pop the expected pods out. They should be de-queueable.
-			for _, wantPod := range tt.want {
-				podInfo := testutils.NextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
-					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
+			// Schedule pods.
+			for _, podName := range tt.schedule {
+				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
 
-			if len(tt.rmPodsSchedulingGates) == 0 {
-				return
+			// Delete pods, which triggers AssignedPodDelete event in the scheduling queue.
+			for _, podName := range tt.delete {
+				if err := cs.CoreV1().Pods(ns).Delete(ctx, podName, metav1.DeleteOptions{}); err != nil {
+					t.Fatalf("Error calling Delete on %s", podName)
+				}
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodDeleted(ctx, cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to delete %s", podName)
+				}
 			}
+
+			// Ensure gated pods are not in ActiveQ
+			if len(testCtx.Scheduler.SchedulingQueue.PodsInActiveQ()) > 0 {
+				t.Fatal("Expected no schedulable pods")
+			}
+
 			// Remove scheduling gates from the pod spec.
-			for _, idx := range tt.rmPodsSchedulingGates {
+			for _, podName := range tt.rmGates {
 				patch := `{"spec": {"schedulingGates": null}}`
-				podName := tt.pods[idx].Name
 				if _, err := cs.CoreV1().Pods(ns).Patch(ctx, podName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 					t.Fatalf("Failed to patch pod %v: %v", podName, err)
 				}
 			}
-			// Pop the expected pods out. They should be de-queueable.
-			for _, wantPod := range tt.wantPostGatesRemoval {
-				podInfo := testutils.NextPodOrDie(t, testCtx)
-				if got := podInfo.Pod.Name; got != wantPod {
-					t.Errorf("Want %v to be popped out, but got %v", wantPod, got)
+
+			// Schedule pods which no longer have gates.
+			for _, podName := range tt.rmGates {
+				testCtx.Scheduler.ScheduleOne(testCtx.Ctx)
+				if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*200, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, podName)); err != nil {
+					t.Fatalf("Failed to schedule %s", podName)
 				}
 			}
 		})
@@ -168,6 +198,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		triggerFn func(testCtx *testutils.TestContext) error
 		// wantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 		wantRequeuedPods sets.Set[string]
+		// enableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
+		enableSchedulingQueueHint []bool
 	}{
 		{
 			name:        "Pod without a required toleration to a node isn't requeued to activeQ",
@@ -188,7 +220,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{false, true},
 		},
 		{
 			name:        "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -217,14 +250,90 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				}
 				return nil
 			},
-			wantRequeuedPods: sets.New("pod2"),
+			wantRequeuedPods:          sets.New("pod2"),
+			enableSchedulingQueueHint: []bool{false, true},
+		},
+		{
+			name:        "Pod updated with toleration requeued to activeQ",
+			initialNode: st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			pods: []*v1.Pod{
+				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a PodUpdate event by adding a toleration to Pod1.
+				// It makes Pod1 schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{false, true},
+		},
+		{
+			name:        "Pod got resource scaled down requeued to activeQ",
+			initialNode: st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			pods: []*v1.Pod{
+				// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
+				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger a PodUpdate event by reducing cpu requested by pod1.
+				// It makes Pod1 schedulable.
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
+					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods:          sets.New("pod1"),
+			enableSchedulingQueueHint: []bool{false, true},
+		},
+		{
+			name:        "Updating pod condition doesn't retry scheduling if the Pod was rejected by TaintToleration",
+			initialNode: st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj(),
+			pods: []*v1.Pod{
+				// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
+				st.MakePod().Name("pod1").Container("image").Obj(),
+			},
+			// Simulate a Pod update by directly calling `SchedulingQueue.Update` instead of actually updating a Pod
+			// because we don't have a way to confirm the scheduler has handled a Pod update event at the moment.
+			// TODO: actually update a Pod update and confirm the scheduler has handled a Pod update event with a metric.
+			// https://github.com/kubernetes/kubernetes/pull/122234#discussion_r1597456808
+			triggerFn: func(testCtx *testutils.TestContext) (err error) {
+				// Trigger a Pod Condition update event.
+				// It will not make pod1 schedulable
+				var (
+					oldPod *v1.Pod
+					newPod *v1.Pod
+				)
+				if oldPod, err = testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Get(testCtx.Ctx, "pod1", metav1.GetOptions{}); err != nil {
+					return fmt.Errorf("failed to get the pod: %w", err)
+				}
+				newPod = oldPod.DeepCopy()
+				newPod.Status.Conditions[0].Message = "injected message"
+
+				if err := testCtx.Scheduler.SchedulingQueue.Update(
+					klog.FromContext(testCtx.Ctx),
+					oldPod,
+					newPod,
+				); err != nil {
+					return fmt.Errorf("failed to update the pod: %w", err)
+				}
+				return nil
+			},
+			wantRequeuedPods: sets.Set[string]{},
+			// This behaviour is only true when enabling QHint
+			// because QHint of TaintToleration would decide to ignore a Pod update.
+			enableSchedulingQueueHint: []bool{true},
 		},
 	}
 
-	for _, featureEnabled := range []bool{false, true} {
-		for _, tt := range tests {
+	for _, tt := range tests {
+		for _, featureEnabled := range tt.enableSchedulingQueueHint {
 			t.Run(fmt.Sprintf("%s [SchedulerQueueingHints enabled: %v]", tt.name, featureEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, featureEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 				// Use zero backoff seconds to bypass backoffQ.
 				// It's intended to not start the scheduler's queue, and hence to
@@ -241,7 +350,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				defer testCtx.Scheduler.SchedulingQueue.Close()
 
 				cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
-				// Create one Node with a taint.
+				// Create initialNode.
 				if _, err := cs.CoreV1().Nodes().Create(ctx, tt.initialNode, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("Failed to create an initial Node %q: %v", tt.initialNode.Name, err)
 				}

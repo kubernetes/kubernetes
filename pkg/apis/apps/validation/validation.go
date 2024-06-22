@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -251,17 +252,31 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 // trailing dashes are allowed.
 var ValidateControllerRevisionName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateControllerRevision collects errors for the fields of state and returns those errors as an ErrorList. If the
+// validateControllerRevision collects errors for the fields of state and returns those errors as an ErrorList. If the
 // returned list is empty, state is valid. Validation is performed to ensure that state is a valid ObjectMeta, its name
 // is valid, and that it doesn't exceed the MaxControllerRevisionSize.
-func ValidateControllerRevision(revision *apps.ControllerRevision) field.ErrorList {
+func validateControllerRevision(revision *apps.ControllerRevision) field.ErrorList {
 	errs := field.ErrorList{}
-
 	errs = append(errs, apivalidation.ValidateObjectMeta(&revision.ObjectMeta, true, ValidateControllerRevisionName, field.NewPath("metadata"))...)
-	if revision.Data == nil {
-		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
-	}
 	errs = append(errs, apivalidation.ValidateNonnegativeField(revision.Revision, field.NewPath("revision"))...)
+	return errs
+}
+
+func ValidateControllerRevisionCreate(revision *apps.ControllerRevision) field.ErrorList {
+	errs := field.ErrorList{}
+	errs = append(errs, validateControllerRevision(revision)...)
+
+	var v any
+	if revision.Data.Raw == nil {
+		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
+	} else if err := json.Unmarshal(revision.Data.Raw, &v); err != nil {
+		errs = append(errs, field.Invalid(field.NewPath("data"), "<value omitted>", fmt.Sprintf("error parsing data: %v", err.Error())))
+	} else if v == nil {
+		errs = append(errs, field.Required(field.NewPath("data"), "data is mandatory"))
+	} else if _, isObject := v.(map[string]any); !isObject {
+		errs = append(errs, field.Required(field.NewPath("data"), "data must be a valid JSON object"))
+	}
+
 	return errs
 }
 
@@ -272,7 +287,7 @@ func ValidateControllerRevisionUpdate(newHistory, oldHistory *apps.ControllerRev
 	errs := field.ErrorList{}
 
 	errs = append(errs, apivalidation.ValidateObjectMetaUpdate(&newHistory.ObjectMeta, &oldHistory.ObjectMeta, field.NewPath("metadata"))...)
-	errs = append(errs, ValidateControllerRevision(newHistory)...)
+	errs = append(errs, validateControllerRevision(newHistory)...)
 	errs = append(errs, apivalidation.ValidateImmutableField(newHistory.Data, oldHistory.Data, field.NewPath("data"))...)
 	return errs
 }

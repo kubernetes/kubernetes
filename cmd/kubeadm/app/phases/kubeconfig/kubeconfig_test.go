@@ -34,6 +34,7 @@ import (
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
@@ -83,7 +84,8 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 		{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				CertificatesDir: pkidir,
+				CertificatesDir:     pkidir,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
@@ -179,6 +181,11 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 					t.Errorf("getKubeConfigSpecs for %s Organizations is %v, expected %v", assertion.kubeConfigFile, spec.ClientCertAuth.Organizations, assertion.organizations)
 				}
 
+				// Assert EncryptionAlgorithm
+				if spec.EncryptionAlgorithm != cfg.EncryptionAlgorithm {
+					t.Errorf("getKubeConfigSpecs for %s EncryptionAlgorithm is %s, expected %s", assertion.kubeConfigFile, spec.EncryptionAlgorithm, cfg.EncryptionAlgorithm)
+				}
+
 				// Asserts InitConfiguration values injected into spec
 				controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, &cfg.LocalAPIEndpoint)
 				if err != nil {
@@ -218,12 +225,14 @@ func TestBuildKubeConfigFromSpecWithClientAuth(t *testing.T) {
 	// Creates a CA
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
+
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a ClientAuth
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
+	config := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "myClientName", "test-cluster", "myOrg1", "myOrg2")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
-	kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myClientName", "myOrg1", "myOrg2")
+	kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myClientName", "myOrg1", "myOrg2")
 }
 
 func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
@@ -231,7 +240,7 @@ func TestBuildKubeConfigFromSpecWithTokenAuth(t *testing.T) {
 	caCert, _ := certstestutil.SetupCertificateAuthority(t)
 
 	// Executes buildKubeConfigFromSpec passing a KubeConfigSpec with a Token
-	config := setupdKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
+	config := setupKubeConfigWithTokenAuth(t, caCert, "https://1.2.3.4:1234", "myClientName", "123456", "test-cluster")
 
 	// Asserts spec data are propagated to the kubeconfig
 	kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
@@ -244,11 +253,13 @@ func TestCreateKubeConfigFileIfNotExists(t *testing.T) {
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
 
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
+
 	// build kubeconfigs (to be used to test kubeconfigs equality/not equality)
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
-	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
-	configWithAnotherClusterAddress := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
-	invalidConfig := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	config := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterCa := setupKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
+	configWithAnotherClusterAddress := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://3.4.5.6:3456", "myOrg1", "test-cluster", "myOrg2")
+	invalidConfig := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1", "myOrg2")
 	invalidConfig.CurrentContext = "invalid context"
 
 	var tests = []struct {
@@ -384,6 +395,8 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 		},
 	}
 
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
+
 	var tests = []struct {
 		name                    string
 		writeKubeConfigFunction func(out io.Writer) error
@@ -391,13 +404,13 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 		{
 			name: "WriteKubeConfigWithClientCert",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, nil)
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, notAfter)
 			},
 		},
 		{
 			name: "WriteKubeConfigWithToken",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", nil)
+				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", notAfter)
 			},
 		},
 	}
@@ -433,8 +446,13 @@ func TestWriteKubeConfig(t *testing.T) {
 		LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			CertificatesDir: pkidir,
+			CertificateValidityPeriod: &metav1.Duration{
+				Duration: time.Hour * 10,
+			},
 		},
 	}
+
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
 
 	var tests = []struct {
 		name                    string
@@ -445,14 +463,14 @@ func TestWriteKubeConfig(t *testing.T) {
 		{
 			name: "WriteKubeConfigWithClientCert",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, nil)
+				return WriteKubeConfigWithClientCert(out, cfg, "myUser", []string{"myOrg"}, notAfter)
 			},
 			withClientCert: true,
 		},
 		{
 			name: "WriteKubeConfigWithToken",
 			writeKubeConfigFunction: func(out io.Writer) error {
-				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", nil)
+				return WriteKubeConfigWithToken(out, cfg, "myUser", "12345", notAfter)
 			},
 			withToken: true,
 		},
@@ -480,7 +498,7 @@ func TestWriteKubeConfig(t *testing.T) {
 
 			if test.withClientCert {
 				// checks that kubeconfig files have expected client cert
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser", "myOrg")
+				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser", "myOrg")
 			}
 
 			if test.withToken {
@@ -495,9 +513,11 @@ func TestValidateKubeConfig(t *testing.T) {
 	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
 
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
-	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
-	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
+
+	config := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	configWithAnotherClusterCa := setupKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	configWithAnotherServerURL := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
 	configWithSameClusterCaByExternalFile := config.DeepCopy()
 	currentCtx, exists := configWithSameClusterCaByExternalFile.Contexts[configWithSameClusterCaByExternalFile.CurrentContext]
@@ -610,15 +630,17 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		t.Fatalf("failure while deleting ca.key: %v", err)
 	}
 
+	notAfter, _ := time.Parse(time.RFC3339, "2026-01-02T15:04:05Z")
+
 	// create a valid config
-	config := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	config := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 
 	// create a config with another CA
 	anotherCaCert, anotherCaKey := certstestutil.SetupCertificateAuthority(t)
-	configWithAnotherClusterCa := setupdKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
+	configWithAnotherClusterCa := setupKubeConfigWithClientAuth(t, anotherCaCert, anotherCaKey, notAfter, "https://1.2.3.4:1234", "test-cluster", "myOrg1")
 
 	// create a config with another server URL
-	configWithAnotherServerURL := setupdKubeConfigWithClientAuth(t, caCert, caKey, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
+	configWithAnotherServerURL := setupKubeConfigWithClientAuth(t, caCert, caKey, notAfter, "https://4.3.2.1:4321", "test-cluster", "myOrg1")
 
 	tests := map[string]struct {
 		filesToWrite  map[string]*clientcmdapi.Config
@@ -697,19 +719,20 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 	}
 }
 
-// setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
-func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, APIServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
+// setupKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With ClientAuth
+func setupKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, notAfter time.Time, apiServer, clientName, clustername string, organizations ...string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
-		APIServer:  APIServer,
+		APIServer:  apiServer,
 		ClientName: clientName,
 		ClientCertAuth: &clientCertAuth{
 			CAKey:         caKey,
 			Organizations: organizations,
 		},
+		ClientCertNotAfter: notAfter,
 	}
 
-	config, err := buildKubeConfigFromSpec(spec, clustername, nil)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}
@@ -717,18 +740,18 @@ func setupdKubeConfigWithClientAuth(t *testing.T, caCert *x509.Certificate, caKe
 	return config
 }
 
-// setupdKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With Token
-func setupdKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, APIServer, clientName, token, clustername string) *clientcmdapi.Config {
+// setupKubeConfigWithClientAuth is a test utility function that wraps buildKubeConfigFromSpec for building a KubeConfig object With Token
+func setupKubeConfigWithTokenAuth(t *testing.T, caCert *x509.Certificate, apiServer, clientName, token, clustername string) *clientcmdapi.Config {
 	spec := &kubeConfigSpec{
 		CACert:     caCert,
-		APIServer:  APIServer,
+		APIServer:  apiServer,
 		ClientName: clientName,
 		TokenAuth: &tokenAuth{
 			Token: token,
 		},
 	}
 
-	config, err := buildKubeConfigFromSpec(spec, clustername, nil)
+	config, err := buildKubeConfigFromSpec(spec, clustername)
 	if err != nil {
 		t.Fatal("buildKubeConfigFromSpec failed!")
 	}

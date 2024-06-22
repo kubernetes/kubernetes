@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// ComponentConditionApplyConfiguration represents an declarative configuration of the ComponentCondition type for use
+// ComponentConditionApplyConfiguration represents a declarative configuration of the ComponentCondition type for use
 // with apply.
 type ComponentConditionApplyConfiguration struct {
 	Type    *v1.ComponentConditionType `json:"type,omitempty"`
@@ -31,7 +31,7 @@ type ComponentConditionApplyConfiguration struct {
 	Error   *string                    `json:"error,omitempty"`
 }
 
-// ComponentConditionApplyConfiguration constructs an declarative configuration of the ComponentCondition type for use with
+// ComponentConditionApplyConfiguration constructs a declarative configuration of the ComponentCondition type for use with
 // apply.
 func ComponentCondition() *ComponentConditionApplyConfiguration {
 	return &ComponentConditionApplyConfiguration{}

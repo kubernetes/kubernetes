@@ -62,7 +62,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	revision := obj.(*apps.ControllerRevision)
 
-	return validation.ValidateControllerRevision(revision)
+	return validation.ValidateControllerRevisionCreate(revision)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

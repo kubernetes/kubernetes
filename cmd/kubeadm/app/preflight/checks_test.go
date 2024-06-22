@@ -32,17 +32,14 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 var (
@@ -848,108 +845,6 @@ func TestSetHasItemOrAll(t *testing.T) {
 				)
 			}
 		})
-	}
-}
-
-func TestImagePullCheck(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeAction{
-			// Test case 1: img1 and img2 exist, img3 doesn't exist
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-
-			// Test case 2: images don't exist
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-		CombinedOutputScript: []fakeexec.FakeAction{
-			// Test case1: pull only img3
-			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// Test case 2: fail to pull image2 and image3
-			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
-			func() ([]byte, []byte, error) { return []byte("pause"), nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	containerRuntime, err := utilruntime.NewContainerRuntime(fexec, constants.DefaultCRISocket)
-	if err != nil {
-		t.Errorf("unexpected NewContainerRuntime error: %v", err)
-	}
-
-	check := ImagePullCheck{
-		runtime:         containerRuntime,
-		sandboxImage:    "pause",
-		imageList:       []string{"img1", "img2", "img3"},
-		imagePullPolicy: corev1.PullIfNotPresent,
-		imagePullSerial: true,
-	}
-	warnings, errors := check.Check()
-	if len(warnings) != 0 {
-		t.Fatalf("did not expect any warnings but got %q", warnings)
-	}
-	if len(errors) != 0 {
-		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
-	}
-
-	warnings, errors = check.Check()
-	if len(warnings) != 0 {
-		t.Fatalf("did not expect any warnings but got %q", warnings)
-	}
-	if len(errors) != 2 {
-		t.Fatalf("expected 2 errors but got %d: %q", len(errors), errors)
-	}
-
-	// Test with unknown policy
-	check = ImagePullCheck{
-		runtime:         containerRuntime,
-		sandboxImage:    "pause",
-		imageList:       []string{"img1", "img2", "img3"},
-		imagePullPolicy: "",
-		imagePullSerial: true,
-	}
-	_, errors = check.Check()
-	if len(errors) != 1 {
-		t.Fatalf("expected 1 error but got %d: %q", len(errors), errors)
 	}
 }
 

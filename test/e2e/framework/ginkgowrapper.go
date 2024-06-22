@@ -209,8 +209,9 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
-			if arg.extra != "" {
-				addLabel(arg.extra)
+			if arg.extraFeature != "" {
+				texts = append(texts, fmt.Sprintf("[%s]", arg.extraFeature))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.extraFeature))
 			}
 			if fullLabel == "Serial" {
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Serial)
@@ -309,6 +310,10 @@ func validateText(location types.CodeLocation, text string, labels []string) {
 			recordTextBug(location, fmt.Sprintf("[%s] in plain text is deprecated and must be added through With%s instead", tag, tag))
 		}
 		if deprecatedStability.Has(tag) {
+			if slices.Contains(labels, "Feature:"+tag) {
+				// Okay, was also set as label.
+				continue
+			}
 			recordTextBug(location, fmt.Sprintf("[%s] in plain text is deprecated and must be added by defining the feature gate through WithFeatureGate instead", tag))
 		}
 		if index := strings.Index(tag, ":"); index > 0 {
@@ -353,6 +358,16 @@ func withFeature(name Feature) interface{} {
 // [k8s.io/apiserver/pkg/util/feature.DefaultMutableFeatureGate]. Once a
 // feature gate gets removed from there, the WithFeatureGate calls using it
 // also need to be removed.
+//
+// [Alpha] resp. [Beta] get added to the test name automatically depending
+// on the current stability level of the feature. Feature:Alpha resp.
+// Feature:Beta get added to the Ginkgo labels because this is a special
+// requirement for how the cluster needs to be configured.
+//
+// If the test can run in any cluster that has alpha resp. beta features and
+// API groups enabled, then annotating it with just WithFeatureGate is
+// sufficient. Otherwise, WithFeature has to be used to define the additional
+// requirements.
 func WithFeatureGate(featureGate featuregate.Feature) interface{} {
 	return withFeatureGate(featureGate)
 }
@@ -376,7 +391,7 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 	}
 
 	l := newLabel("FeatureGate", string(featureGate))
-	l.extra = level
+	l.extraFeature = level
 	return l
 }
 
@@ -544,8 +559,9 @@ func withFlaky() interface{} {
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
-	// extra is an optional fully-formed extra label.
-	extra string
+	// extra is an optional feature name. It gets added as [<extraFeature>]
+	// to the test name and as Feature:<extraFeature> to the labels.
+	extraFeature string
 	// explanation gets set for each label to help developers
 	// who pass a label to a ginkgo function. They need to use
 	// the corresponding framework function instead.
@@ -572,7 +588,7 @@ func TagsEqual(a, b interface{}) bool {
 	if !ok {
 		return false
 	}
-	if al.extra != bl.extra {
+	if al.extraFeature != bl.extraFeature {
 		return false
 	}
 	return slices.Equal(al.parts, bl.parts)

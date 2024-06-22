@@ -46,7 +46,7 @@ const (
 // AggregationController periodically checks the list of group-versions handled by each APIService and updates the discovery page periodically
 type AggregationController struct {
 	openAPIAggregationManager aggregator.SpecProxier
-	queue                     workqueue.RateLimitingInterface
+	queue                     workqueue.TypedRateLimitingInterface[string]
 
 	// To allow injection for testing.
 	syncHandler func(key string) (syncAction, error)
@@ -56,9 +56,9 @@ type AggregationController struct {
 func NewAggregationController(openAPIAggregationManager aggregator.SpecProxier) *AggregationController {
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
-		queue: workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
-			"open_api_v3_aggregation_controller",
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](successfulUpdateDelay, failedUpdateMaxExpDelay),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "open_api_v3_aggregation_controller"},
 		),
 	}
 
@@ -98,7 +98,7 @@ func (c *AggregationController) processNextWorkItem() bool {
 		return false
 	}
 
-	if aggregator.IsLocalAPIService(key.(string)) {
+	if aggregator.IsLocalAPIService(key) {
 		// for local delegation targets that are aggregated once per second, log at
 		// higher level to avoid flooding the log
 		klog.V(6).Infof("OpenAPI AggregationController: Processing item %s", key)
@@ -106,7 +106,7 @@ func (c *AggregationController) processNextWorkItem() bool {
 		klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
 	}
 
-	action, err := c.syncHandler(key.(string))
+	action, err := c.syncHandler(key)
 	if err == nil {
 		c.queue.Forget(key)
 	} else {
@@ -115,7 +115,7 @@ func (c *AggregationController) processNextWorkItem() bool {
 
 	switch action {
 	case syncRequeue:
-		if aggregator.IsLocalAPIService(key.(string)) {
+		if aggregator.IsLocalAPIService(key) {
 			klog.V(7).Infof("OpenAPI AggregationController: action for local item %s: Requeue after %s.", key, successfulUpdateDelayLocal)
 			c.queue.AddAfter(key, successfulUpdateDelayLocal)
 		} else {

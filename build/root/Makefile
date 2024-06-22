@@ -33,10 +33,12 @@ endif
 SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
 BASH_ENV := ./hack/lib/logging.sh
 
-# Define variables so `make --warn-undefined-variables` works.
+# Define optional user-input variables so `make --warn-undefined-variables` works.
+# Usage is described below with each target that respects these
 PRINT_HELP ?=
 WHAT ?=
 TESTS ?=
+BRANCH ?=
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules

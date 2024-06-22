@@ -26,11 +26,9 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,9 +44,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -66,7 +64,7 @@ func removePtr(replicas *int32) int32 {
 	return *replicas
 }
 
-func WaitUntilPodIsScheduled(ctx context.Context, c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
+func waitUntilPodIsScheduled(ctx context.Context, c clientset.Interface, name, namespace string, timeout time.Duration) (*v1.Pod, error) {
 	// Wait until it's scheduled
 	p, err := c.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{ResourceVersion: "0"})
 	if err == nil && p.Spec.NodeName != "" {
@@ -90,7 +88,7 @@ func RunPodAndGetNodeName(ctx context.Context, c clientset.Interface, pod *v1.Po
 	if err := CreatePodWithRetries(c, namespace, pod); err != nil {
 		return "", err
 	}
-	p, err := WaitUntilPodIsScheduled(ctx, c, name, namespace, timeout)
+	p, err := waitUntilPodIsScheduled(ctx, c, name, namespace, timeout)
 	if err != nil {
 		return "", err
 	}
@@ -218,11 +216,11 @@ type podInfo struct {
 	phase       string
 }
 
-// PodDiff is a map of pod name to podInfos
-type PodDiff map[string]*podInfo
+// podDiff is a map of pod name to podInfos
+type podDiff map[string]*podInfo
 
-// Print formats and prints the give PodDiff.
-func (p PodDiff) String(ignorePhases sets.String) string {
+// Print formats and prints the give podDiff.
+func (p podDiff) String(ignorePhases sets.String) string {
 	ret := ""
 	for name, info := range p {
 		if ignorePhases.Has(info.phase) {
@@ -259,7 +257,7 @@ func (p PodDiff) String(ignorePhases sets.String) string {
 
 // DeletedPods returns a slice of pods that were present at the beginning
 // and then disappeared.
-func (p PodDiff) DeletedPods() []string {
+func (p podDiff) DeletedPods() []string {
 	var deletedPods []string
 	for podName, podInfo := range p {
 		if podInfo.hostname == nonExist {
@@ -269,9 +267,9 @@ func (p PodDiff) DeletedPods() []string {
 	return deletedPods
 }
 
-// Diff computes a PodDiff given 2 lists of pods.
-func Diff(oldPods []*v1.Pod, curPods []*v1.Pod) PodDiff {
-	podInfoMap := PodDiff{}
+// diff computes a podDiff given 2 lists of pods.
+func diff(oldPods []*v1.Pod, curPods []*v1.Pod) podDiff {
+	podInfoMap := podDiff{}
 
 	// New pods will show up in the curPods list but not in oldPods. They have oldhostname/phase == nonexist.
 	for _, pod := range curPods {
@@ -456,81 +454,6 @@ func (config *ReplicaSetConfig) create() error {
 		return fmt.Errorf("error creating replica set: %v", err)
 	}
 	config.RCConfigLog("Created replica set with name: %v, namespace: %v, replica count: %v", rs.Name, config.Namespace, removePtr(rs.Spec.Replicas))
-	return nil
-}
-
-// RunJob baunches (and verifies correctness) of a Job
-// and will wait for all pods it spawns to become "Running".
-// It's the caller's responsibility to clean up externally (i.e. use the
-// namespace lifecycle for handling Cleanup).
-func RunJob(ctx context.Context, config JobConfig) error {
-	err := config.create()
-	if err != nil {
-		return err
-	}
-	return config.start(ctx)
-}
-
-func (config *JobConfig) Run(ctx context.Context) error {
-	return RunJob(ctx, *config)
-}
-
-func (config *JobConfig) GetKind() schema.GroupKind {
-	return batchinternal.Kind("Job")
-}
-
-func (config *JobConfig) GetGroupResource() schema.GroupResource {
-	return batchinternal.Resource("jobs")
-}
-
-func (config *JobConfig) GetGroupVersionResource() schema.GroupVersionResource {
-	return batchinternal.SchemeGroupVersion.WithResource("jobs")
-}
-
-func (config *JobConfig) create() error {
-	job := &batch.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Name,
-		},
-		Spec: batch.JobSpec{
-			Parallelism: pointer.Int32(int32(config.Replicas)),
-			Completions: pointer.Int32(int32(config.Replicas)),
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels:      map[string]string{"name": config.Name},
-					Annotations: config.Annotations,
-				},
-				Spec: v1.PodSpec{
-					Affinity:                      config.Affinity,
-					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
-					Containers: []v1.Container{
-						{
-							Name:            config.Name,
-							Image:           config.Image,
-							Command:         config.Command,
-							Lifecycle:       config.Lifecycle,
-							SecurityContext: config.SecurityContext,
-						},
-					},
-					RestartPolicy: v1.RestartPolicyOnFailure,
-				},
-			},
-		},
-	}
-
-	if len(config.SecretNames) > 0 {
-		attachSecrets(&job.Spec.Template, config.SecretNames)
-	}
-	if len(config.ConfigMapNames) > 0 {
-		attachConfigMaps(&job.Spec.Template, config.ConfigMapNames)
-	}
-
-	config.applyTo(&job.Spec.Template)
-
-	if err := CreateJobWithRetries(config.Client, config.Namespace, job); err != nil {
-		return fmt.Errorf("error creating job: %v", err)
-	}
-	config.RCConfigLog("Created job with name: %v, namespace: %v, parallelism/completions: %v", job.Name, config.Namespace, job.Spec.Parallelism)
 	return nil
 }
 
@@ -737,7 +660,7 @@ func (s *RCStartupStatus) String(name string) string {
 		name, len(s.Created), s.Expected, s.Running, s.Pending, s.Waiting, s.Inactive, s.Terminating, s.Unknown, s.RunningButNotReady)
 }
 
-func ComputeRCStartupStatus(pods []*v1.Pod, expected int) RCStartupStatus {
+func computeRCStartupStatus(pods []*v1.Pod, expected int) RCStartupStatus {
 	startupStatus := RCStartupStatus{
 		Expected:              expected,
 		Created:               make([]*v1.Pod, 0, expected),
@@ -819,7 +742,7 @@ func (config *RCConfig) start(ctx context.Context) error {
 		time.Sleep(interval)
 
 		pods := ps.List()
-		startupStatus := ComputeRCStartupStatus(pods, config.Replicas)
+		startupStatus := computeRCStartupStatus(pods, config.Replicas)
 
 		if config.CreatedPods != nil {
 			*config.CreatedPods = startupStatus.Created
@@ -843,7 +766,7 @@ func (config *RCConfig) start(ctx context.Context) error {
 			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
 		}
 
-		diff := Diff(oldPods, pods)
+		diff := diff(oldPods, pods)
 		deletedPods := diff.DeletedPods()
 		podDeletionsCount += len(deletedPods)
 		if podDeletionsCount > config.MaxAllowedPodDeletions {
@@ -948,16 +871,6 @@ func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label l
 		return fmt.Errorf("timeout while waiting for pods with labels %q to be running", label.String())
 	}
 	return nil
-}
-
-type CountToStrategy struct {
-	Count    int
-	Strategy PrepareNodeStrategy
-}
-
-type TestNodePreparer interface {
-	PrepareNodes(ctx context.Context, nextNodeIndex int) error
-	CleanupNodes(ctx context.Context) error
 }
 
 type PrepareNodeStrategy interface {
@@ -1242,46 +1155,6 @@ func DoPrepareNode(ctx context.Context, client clientset.Interface, node *v1.Nod
 	return nil
 }
 
-func DoCleanupNode(ctx context.Context, client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
-	var err error
-	for attempt := 0; attempt < retries; attempt++ {
-		var node *v1.Node
-		node, err = client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
-		}
-		updatedNode := strategy.CleanupNode(ctx, node)
-		if apiequality.Semantic.DeepEqual(node, updatedNode) {
-			return nil
-		}
-		if _, err = client.CoreV1().Nodes().Update(ctx, updatedNode, metav1.UpdateOptions{}); err == nil {
-			break
-		}
-		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("error when updating Node %v: %v", nodeName, err)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if err != nil {
-		return fmt.Errorf("too many conflicts when trying to cleanup Node %v: %s", nodeName, err)
-	}
-
-	for attempt := 0; attempt < retries; attempt++ {
-		err = strategy.CleanupDependentObjects(ctx, nodeName, client)
-		if err == nil {
-			break
-		}
-		if !apierrors.IsConflict(err) {
-			return fmt.Errorf("error when cleaning up Node %v objects: %v", nodeName, err)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if err != nil {
-		return fmt.Errorf("too many conflicts when trying to cleanup Node %v objects: %s", nodeName, err)
-	}
-	return nil
-}
-
 type TestPodCreateStrategy func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error
 
 type CountToPodStrategy struct {
@@ -1294,6 +1167,16 @@ type TestPodCreatorConfig map[string][]CountToPodStrategy
 func NewTestPodCreatorConfig() *TestPodCreatorConfig {
 	config := make(TestPodCreatorConfig)
 	return &config
+}
+
+type CountToStrategy struct {
+	Count    int
+	Strategy PrepareNodeStrategy
+}
+
+type TestNodePreparer interface {
+	PrepareNodes(ctx context.Context, nextNodeIndex int) error
+	CleanupNodes(ctx context.Context) error
 }
 
 func (c *TestPodCreatorConfig) AddStrategy(
@@ -1329,7 +1212,7 @@ func MakePodSpec() v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
 			Name:  "pause",
-			Image: "registry.k8s.io/pause:3.9",
+			Image: imageutils.GetE2EImage(imageutils.Pause),
 			Ports: []v1.ContainerPort{{ContainerPort: 80}},
 			Resources: v1.ResourceRequirements{
 				Limits: v1.ResourceList{
@@ -1352,14 +1235,22 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 	return nil
 }
 
-func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate *v1.Pod) error {
+func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate PodTemplate) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
+		pod, err := podTemplate.GetPodTemplate(i, podCount)
+		if err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = err
+			return
+		}
+		pod = pod.DeepCopy()
 		// client-go writes into the object that is passed to Create,
 		// causing a data race unless we create a new copy for each
 		// parallel call.
-		if err := makeCreatePod(client, namespace, podTemplate.DeepCopy()); err != nil {
+		if err := makeCreatePod(client, namespace, pod); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
 			createError = err
@@ -1374,7 +1265,7 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 	return createError
 }
 
-func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod, count int, bindVolume bool) error {
+func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate, count int, bindVolume bool) error {
 	var createError error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
@@ -1435,7 +1326,14 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		}
 
 		// pod
-		pod := podTemplate.DeepCopy()
+		pod, err := podTemplate.GetPodTemplate(i, count)
+		if err != nil {
+			lock.Lock()
+			defer lock.Unlock()
+			createError = fmt.Errorf("error getting pod template: %s", err)
+			return
+		}
+		pod = pod.DeepCopy()
 		pod.Spec.Volumes = []v1.Volume{
 			{
 				Name: "vol",
@@ -1462,29 +1360,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 	return createError
 }
 
-func createController(client clientset.Interface, controllerName, namespace string, podCount int, podTemplate *v1.Pod) error {
-	rc := &v1.ReplicationController{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: controllerName,
-		},
-		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(int32(podCount)),
-			Selector: map[string]string{"name": controllerName},
-			Template: &v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"name": controllerName},
-				},
-				Spec: podTemplate.Spec,
-			},
-		},
-	}
-	if err := CreateRCWithRetries(client, namespace, rc); err != nil {
-		return fmt.Errorf("error creating replication controller: %v", err)
-	}
-	return nil
-}
-
-func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
+func NewCustomCreatePodStrategy(podTemplate PodTemplate) TestPodCreateStrategy {
 	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
 		return CreatePod(ctx, client, namespace, podCount, podTemplate)
 	}
@@ -1493,111 +1369,35 @@ func NewCustomCreatePodStrategy(podTemplate *v1.Pod) TestPodCreateStrategy {
 // volumeFactory creates an unique PersistentVolume for given integer.
 type volumeFactory func(uniqueID int) *v1.PersistentVolume
 
-func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
+// PodTemplate is responsible for creating a v1.Pod instance that is ready
+// to be sent to the API server.
+type PodTemplate interface {
+	// GetPodTemplate returns a pod template for one out of many different pods.
+	// Pods with numbers in the range [index, index+count-1] will be created
+	// based on what GetPodTemplate returns. It gets called multiple times
+	// with a fixed index and increasing count parameters. This number can,
+	// but doesn't have to be, used to modify parts of the pod spec like
+	// for example a named reference to some other object.
+	GetPodTemplate(index, count int) (*v1.Pod, error)
+}
+
+// StaticPodTemplate returns an implementation of PodTemplate for a fixed pod that is the same regardless of the index.
+func StaticPodTemplate(pod *v1.Pod) PodTemplate {
+	return (*staticPodTemplate)(pod)
+}
+
+type staticPodTemplate v1.Pod
+
+// GetPodTemplate implements [PodTemplate.GetPodTemplate] by returning the same pod
+// for each call.
+func (s *staticPodTemplate) GetPodTemplate(index, count int) (*v1.Pod, error) {
+	return (*v1.Pod)(s), nil
+}
+
+func NewCreatePodWithPersistentVolumeStrategy(claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate) TestPodCreateStrategy {
 	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
 		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factory, podTemplate, podCount, true /* bindVolume */)
 	}
-}
-
-func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
-			StorageClassName: &storageClass,
-			Resources: v1.VolumeResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("1Gi"),
-				},
-			},
-		},
-	}
-}
-
-func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
-		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
-		storageClass := &storagev1.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "storagev1-class-1",
-			},
-			Provisioner:       "kubernetes.io/gce-pd",
-			VolumeBindingMode: &volumeBindingMode,
-		}
-		claimTemplate := makeUnboundPersistentVolumeClaim(storageClass.Name)
-
-		if err := CreateStorageClassWithRetries(client, storageClass); err != nil {
-			return fmt.Errorf("failed to create storagev1 class: %v", err)
-		}
-
-		factoryWithStorageClass := func(i int) *v1.PersistentVolume {
-			pv := factory(i)
-			pv.Spec.StorageClassName = storageClass.Name
-			return pv
-		}
-
-		return CreatePodWithPersistentVolume(ctx, client, namespace, claimTemplate, factoryWithStorageClass, podTemplate, podCount, false /* bindVolume */)
-	}
-}
-
-func NewSimpleCreatePodStrategy() TestPodCreateStrategy {
-	basePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "simple-pod-",
-		},
-		Spec: MakePodSpec(),
-	}
-	return NewCustomCreatePodStrategy(basePod)
-}
-
-func NewSimpleWithControllerCreatePodStrategy(controllerName string) TestPodCreateStrategy {
-	return func(ctx context.Context, client clientset.Interface, namespace string, podCount int) error {
-		basePod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: controllerName + "-pod-",
-				Labels:       map[string]string{"name": controllerName},
-			},
-			Spec: MakePodSpec(),
-		}
-		if err := createController(client, controllerName, namespace, podCount, basePod); err != nil {
-			return err
-		}
-		return CreatePod(ctx, client, namespace, podCount, basePod)
-	}
-}
-
-type SecretConfig struct {
-	Content   map[string]string
-	Client    clientset.Interface
-	Name      string
-	Namespace string
-	// If set this function will be used to print log lines instead of klog.
-	LogFunc func(fmt string, args ...interface{})
-}
-
-func (config *SecretConfig) Run() error {
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Name,
-		},
-		StringData: map[string]string{},
-	}
-	for k, v := range config.Content {
-		secret.StringData[k] = v
-	}
-
-	if err := CreateSecretWithRetries(config.Client, config.Namespace, secret); err != nil {
-		return fmt.Errorf("error creating secret: %v", err)
-	}
-	config.LogFunc("Created secret %v/%v", config.Namespace, config.Name)
-	return nil
-}
-
-func (config *SecretConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("Secret"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
-		return fmt.Errorf("error deleting secret: %v", err)
-	}
-	config.LogFunc("Deleted secret %v/%v", config.Namespace, config.Name)
-	return nil
 }
 
 // TODO: attach secrets using different possibilities: env vars, image pull secrets.
@@ -1621,41 +1421,6 @@ func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 
 	template.Spec.Volumes = volumes
 	template.Spec.Containers[0].VolumeMounts = mounts
-}
-
-type ConfigMapConfig struct {
-	Content   map[string]string
-	Client    clientset.Interface
-	Name      string
-	Namespace string
-	// If set this function will be used to print log lines instead of klog.
-	LogFunc func(fmt string, args ...interface{})
-}
-
-func (config *ConfigMapConfig) Run() error {
-	configMap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Name,
-		},
-		Data: map[string]string{},
-	}
-	for k, v := range config.Content {
-		configMap.Data[k] = v
-	}
-
-	if err := CreateConfigMapWithRetries(config.Client, config.Namespace, configMap); err != nil {
-		return fmt.Errorf("error creating configmap: %v", err)
-	}
-	config.LogFunc("Created configmap %v/%v", config.Namespace, config.Name)
-	return nil
-}
-
-func (config *ConfigMapConfig) Stop() error {
-	if err := DeleteResourceWithRetries(config.Client, api.Kind("ConfigMap"), config.Namespace, config.Name, metav1.DeleteOptions{}); err != nil {
-		return fmt.Errorf("error deleting configmap: %v", err)
-	}
-	config.LogFunc("Deleted configmap %v/%v", config.Namespace, config.Name)
-	return nil
 }
 
 // TODO: attach configmaps using different possibilities: env vars.
@@ -1754,7 +1519,7 @@ type DaemonConfig struct {
 
 func (config *DaemonConfig) Run(ctx context.Context) error {
 	if config.Image == "" {
-		config.Image = "registry.k8s.io/pause:3.9"
+		config.Image = imageutils.GetE2EImage(imageutils.Pause)
 	}
 	nameLabel := map[string]string{
 		"name": config.Name + "-daemon",

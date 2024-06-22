@@ -223,7 +223,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -244,7 +244,7 @@ func TestReScheduling(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			}

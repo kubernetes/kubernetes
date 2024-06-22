@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/internal/unittests/bugs"
 )
 
-func TestListTests(t *testing.T) {
+func TestListLabels(t *testing.T) {
 	bugs.Describe()
 	framework.CheckForBugs = false
 	output, code := unittests.GetFrameworkOutput(t, map[string]string{"list-labels": "true"})

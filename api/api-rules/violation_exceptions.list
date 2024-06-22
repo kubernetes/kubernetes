@@ -3,7 +3,6 @@ API rule violation: list_type_missing,k8s.io/cloud-provider/config/v1alpha1,Webh
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,GenericControllerManagerConfiguration,Controllers
 API rule violation: list_type_missing,k8s.io/controller-manager/config/v1alpha1,LeaderMigrationConfiguration,ControllerLeaders
 API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,GarbageCollectorControllerConfiguration,GCIgnoredResources
-API rule violation: list_type_missing,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostCIDRDenylist
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,NodePortAddresses
 API rule violation: list_type_missing,k8s.io/kube-proxy/config/v1alpha1,KubeProxyIPVSConfiguration,ExcludeCIDRs
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1,CredentialProvider,Args
@@ -179,12 +178,10 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,G
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,GroupResource,Resource
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,ConcurrentHorizontalPodAutoscalerSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerCPUInitializationPeriod
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleStabilizationWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerInitialReadinessDelay
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUpscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,AttachDetachController
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,KubeControllerManagerConfiguration,CSRSigningController
@@ -232,8 +229,6 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,N
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,UnhealthyZoneThreshold
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,PVClaimBinderSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeConfiguration
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostAllowLocalLoopback
-API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeHostCIDRDenylist
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,IncrementTimeoutHostPath
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,IncrementTimeoutNFS
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,MaximumRetry

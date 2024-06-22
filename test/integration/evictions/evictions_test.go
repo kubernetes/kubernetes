@@ -688,7 +688,7 @@ func newV1Eviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *
 
 func rmSetup(ctx context.Context, t *testing.T) (kubeapiservertesting.TearDownFunc, *disruption.DisruptionController, informers.SharedInformerFactory, *restclient.Config, clientset.Interface) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)

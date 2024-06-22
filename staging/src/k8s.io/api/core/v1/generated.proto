@@ -1109,6 +1109,19 @@ message ContainerStatus {
   // +listMapKey=mountPath
   // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
+
+  // User represents user identity information initially attached to the first process of the container
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional ContainerUser user = 13;
+}
+
+// ContainerUser represents user identity information
+message ContainerUser {
+  // Linux holds user identity information initially attached to the first process of the containers in Linux.
+  // Note that the actual running identity can be changed if the process has enough privilege to do so.
+  // +optional
+  optional LinuxContainerUser linux = 1;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1986,6 +1999,7 @@ message HTTPHeader {
 // pod's hosts file.
 message HostAlias {
   // IP address of the host file entry.
+  // +required
   optional string ip = 1;
 
   // Hostnames for the above IP address.
@@ -2254,6 +2268,20 @@ message LimitRangeSpec {
   repeated LimitRangeItem limits = 1;
 }
 
+// LinuxContainerUser represents user identity information in Linux containers
+message LinuxContainerUser {
+  // UID is the primary uid initially attached to the first process in the container
+  optional int64 uid = 1;
+
+  // GID is the primary gid initially attached to the first process in the container
+  optional int64 gid = 2;
+
+  // SupplementalGroups are the supplemental groups initially attached to the first process in the container
+  // +optional
+  // +listType=atomic
+  repeated int64 supplementalGroups = 3;
+}
+
 // List holds a list of objects, which may not be known by the server.
 message List {
   // Standard list metadata.
@@ -2308,9 +2336,15 @@ message LoadBalancerStatus {
 // +structType=atomic
 message LocalObjectReference {
   // Name of the referent.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // This field is effectively required, but due to backwards compatibility is
+  // allowed to be empty. Instances of this type with an empty value here are
+  // almost certainly wrong.
   // TODO: Add other useful fields. apiVersion, kind, uid?
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // +optional
+  // +default=""
+  // +kubebuilder:default=""
+  // TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
   optional string name = 1;
 }
 
@@ -2706,7 +2740,7 @@ message NodeSpec {
 // NodeStatus is information about the current status of a node.
 message NodeStatus {
   // Capacity represents the total resources of a node.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#capacity
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
@@ -2809,7 +2843,7 @@ message NodeSystemInfo {
   // Kubelet Version reported by the node.
   optional string kubeletVersion = 7;
 
-  // KubeProxy Version reported by the node.
+  // Deprecated: KubeProxy Version reported by the node.
   optional string kubeProxyVersion = 8;
 
   // The Operating System reported by the node
@@ -3508,7 +3542,8 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
   // Also, matchLabelKeys cannot be set when labelSelector isn't set.
-  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+  //
   // +listType=atomic
   // +optional
   repeated string matchLabelKeys = 5;
@@ -3521,7 +3556,8 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
   // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+  //
   // +listType=atomic
   // +optional
   repeated string mismatchLabelKeys = 6;
@@ -3875,16 +3911,28 @@ message PodSecurityContext {
   // +optional
   optional bool runAsNonRoot = 3;
 
-  // A list of groups applied to the first process run in each container, in addition
-  // to the container's primary GID, the fsGroup (if specified), and group memberships
-  // defined in the container image for the uid of the container process. If unspecified,
-  // no additional groups are added to any container. Note that group memberships
-  // defined in the container image for the uid of the container process are still effective,
-  // even if they are not included in this list.
+  // A list of groups applied to the first process run in each container, in
+  // addition to the container's primary GID and fsGroup (if specified).  If
+  // the SupplementalGroupsPolicy feature is enabled, the
+  // supplementalGroupsPolicy field determines whether these are in addition
+  // to or instead of any group memberships defined in the container image.
+  // If unspecified, no additional groups are added, though group memberships
+  // defined in the container image may still be used, depending on the
+  // supplementalGroupsPolicy field.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   // +listType=atomic
   repeated int64 supplementalGroups = 4;
+
+  // Defines how supplemental groups of the first container processes are calculated.
+  // Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+  // (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+  // and the container runtime must implement support for this feature.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional string supplementalGroupsPolicy = 12;
 
   // A special supplemental group that applies to all containers in a pod.
   // Some volume types allow the Kubelet to change the ownership of that volume
@@ -4225,6 +4273,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.securityContext.supplementalGroupsPolicy
   // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile

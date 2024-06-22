@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// PodFailurePolicyOnPodConditionsPatternApplyConfiguration represents an declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use
+// PodFailurePolicyOnPodConditionsPatternApplyConfiguration represents a declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use
 // with apply.
 type PodFailurePolicyOnPodConditionsPatternApplyConfiguration struct {
 	Type   *v1.PodConditionType `json:"type,omitempty"`
 	Status *v1.ConditionStatus  `json:"status,omitempty"`
 }
 
-// PodFailurePolicyOnPodConditionsPatternApplyConfiguration constructs an declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use with
+// PodFailurePolicyOnPodConditionsPatternApplyConfiguration constructs a declarative configuration of the PodFailurePolicyOnPodConditionsPattern type for use with
 // apply.
 func PodFailurePolicyOnPodConditionsPattern() *PodFailurePolicyOnPodConditionsPatternApplyConfiguration {
 	return &PodFailurePolicyOnPodConditionsPatternApplyConfiguration{}

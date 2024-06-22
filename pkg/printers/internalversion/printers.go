@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -865,7 +866,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	lastRestartDate := metav1.NewTime(time.Time{})
 	lastRestartableInitContainerRestartDate := metav1.NewTime(time.Time{})
 
-	reason := string(pod.Status.Phase)
+	podPhase := pod.Status.Phase
+	reason := string(podPhase)
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
 	}
@@ -988,7 +990,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
 		reason = "Unknown"
-	} else if pod.DeletionTimestamp != nil {
+	} else if pod.DeletionTimestamp != nil && !podutil.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
 		reason = "Terminating"
 	}
 
@@ -3207,6 +3209,9 @@ func (list SortableResourceNames) Less(i, j int) bool {
 }
 
 func isRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer == nil {
+		return false
+	}
 	if initContainer.RestartPolicy == nil {
 		return false
 	}

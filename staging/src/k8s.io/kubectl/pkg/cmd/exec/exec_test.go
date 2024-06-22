@@ -110,20 +110,17 @@ func TestPodAndContainer(t *testing.T) {
 			p:             &ExecOptions{},
 			args:          []string{"foo", "cmd"},
 			argsLenAtDash: -1,
-			expectedPod:   "foo",
-			expectedArgs:  []string{"cmd"},
+			expectError:   true,
 			name:          "cmd, cmd is behind dash",
 			obj:           execPod(),
 		},
 		{
-			p:                 &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
-			args:              []string{"foo", "cmd"},
-			argsLenAtDash:     -1,
-			expectedPod:       "foo",
-			expectedContainer: "bar",
-			expectedArgs:      []string{"cmd"},
-			name:              "cmd, container in flag",
-			obj:               execPod(),
+			p:             &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
+			args:          []string{"foo", "cmd"},
+			argsLenAtDash: -1,
+			expectError:   true,
+			name:          "cmd, container in flag",
+			obj:           execPod(),
 		},
 	}
 	for _, test := range tests {
@@ -238,8 +235,8 @@ func TestExec(t *testing.T) {
 				Executor: ex,
 			}
 			cmd := NewCmdExec(tf, genericiooptions.NewTestIOStreamsDiscard())
-			args := []string{"pod/foo", "command"}
-			if err := params.Complete(tf, cmd, args, -1); err != nil {
+			args := []string{"pod/foo", "--", "command"}
+			if err := params.Complete(tf, cmd, args, 1); err != nil {
 				t.Fatal(err)
 			}
 			err := params.Run()

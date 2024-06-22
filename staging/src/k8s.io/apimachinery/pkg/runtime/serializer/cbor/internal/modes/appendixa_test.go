@@ -56,8 +56,6 @@ func TestAppendixA(t *testing.T) {
 	const (
 		reasonArrayFixedLength  = "indefinite-length arrays are re-encoded with fixed length"
 		reasonByteString        = "strings are encoded as the byte string major type"
-		reasonFloatPacked       = "floats are packed into the smallest value-preserving width"
-		reasonNaN               = "all NaN values are represented with a single encoding"
 		reasonMapFixedLength    = "indefinite-length maps are re-encoded with fixed length"
 		reasonMapSorted         = "map entries are sorted"
 		reasonStringFixedLength = "indefinite-length strings are re-encoded with fixed length"
@@ -202,68 +200,41 @@ func TestAppendixA(t *testing.T) {
 			example: hex("fbc010666666666666"),
 			decoded: -4.1,
 		},
-		// TODO: Should Inf/-Inf/NaN be supported? Current Protobuf will encode this, but
-		// JSON will produce an error.  This is less than ideal -- we can't transcode
-		// everything to JSON.
 		{
 			example: hex("f97c00"),
-			decoded: math.Inf(1),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f97e00"),
-			decoded: math.Float64frombits(0x7ff8000000000000),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f9fc00"),
-			decoded: math.Inf(-1),
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fa7f800000"),
-			decoded: math.Inf(1),
-			encoded: hex("f97c00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fa7fc00000"),
-			decoded: math.NaN(),
-			encoded: hex("f97e00"),
-			reasons: []string{
-				reasonNaN,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("faff800000"),
-			decoded: math.Inf(-1),
-			encoded: hex("f9fc00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fb7ff0000000000000"),
-			decoded: math.Inf(1),
-			encoded: hex("f97c00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fb7ff8000000000000"),
-			decoded: math.NaN(),
-			encoded: hex("f97e00"),
-			reasons: []string{
-				reasonNaN,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("fbfff0000000000000"),
-			decoded: math.Inf(-1),
-			encoded: hex("f9fc00"),
-			reasons: []string{
-				reasonFloatPacked,
-			},
+			reject:  "floating-point NaN and infinities are not accepted",
 		},
 		{
 			example: hex("f4"),
@@ -300,17 +271,15 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c11a514b67b0"),
-			decoded: "2013-03-21T16:04:00Z",
-			encoded: hex("54323031332d30332d32315431363a30343a30305a"),
+			decoded: "2013-03-21T20:04:00Z",
+			encoded: hex("54323031332d30332d32315432303a30343a30305a"),
 			reasons: []string{
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("c1fb41d452d9ec200000"),
@@ -320,7 +289,6 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTimeToInterface,
 			},
-			fixme: "decoding of tagged time into interface{} must produce RFC3339 timestamp compatible with JSON, not time.Time",
 		},
 		{
 			example: hex("d74401020304"),

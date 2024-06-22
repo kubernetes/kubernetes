@@ -31,7 +31,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -71,7 +71,7 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring, oteltrace.NewNoopTracerProvider().Tracer(""))
+	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring, noopoteltrace.NewTracerProvider().Tracer(""))
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -246,8 +246,8 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.String) (sets.String, bool) {
-	actual := sets.NewString()
+func verifyFakeContainerList(fakeRuntime *apitest.FakeRuntimeService, expected sets.Set[string]) (sets.Set[string], bool) {
+	actual := sets.New[string]()
 	for _, c := range fakeRuntime.Containers {
 		actual.Insert(c.Id)
 	}
@@ -741,7 +741,7 @@ func TestPruneInitContainers(t *testing.T) {
 	assert.NoError(t, err)
 
 	m.pruneInitContainersBeforeStart(ctx, pod, podStatus)
-	expectedContainers := sets.NewString(fakes[0].Id, fakes[2].Id)
+	expectedContainers := sets.New[string](fakes[0].Id, fakes[2].Id)
 	if actual, ok := verifyFakeContainerList(fakeRuntime, expectedContainers); !ok {
 		t.Errorf("expected %v, got %v", expectedContainers, actual)
 	}
@@ -2436,7 +2436,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			// compute hash
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		makeAndSetFakePod(t, m, fakeRuntime, pod)
@@ -2452,7 +2451,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 		for idx := range pod.Spec.Containers {
 			if kcs := kps.FindContainerStatusByName(pod.Spec.Containers[idx].Name); kcs != nil {
 				kcs.Hash = kubecontainer.HashContainer(&pod.Spec.Containers[idx])
-				kcs.HashWithoutResources = kubecontainer.HashContainerWithoutResources(&pod.Spec.Containers[idx])
 			}
 		}
 		if test.mutatePodFn != nil {

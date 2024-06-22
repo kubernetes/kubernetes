@@ -182,13 +182,13 @@ aliases:
     - ardaguclu
     - apelisse
     - brianpursley
-    - deads2k
     - eddiezane
     - seans3
     - soltysh
   # emeritus:
   # - adohe
   # - brendandburns
+  # - deads2k
   # - droot
   # - janetkuo
   # - mengqiy
@@ -200,7 +200,6 @@ aliases:
     - ardaguclu
     - brianpursley
     - eddiezane
-    - KnVerey
     - mpuckett159
     - seans3
     - soltysh
@@ -298,9 +297,8 @@ aliases:
   # - tnozicka
 
   sig-autoscaling-maintainers:
-    - bskiba
+    - gjtempleton
     - MaciekPytel
-    - mwielgus
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -432,7 +430,7 @@ aliases:
     - pwittrock
     - soltysh
   sig-cloud-provider-api-reviewers:
-    - andrewsykim
+    - elmiko
     - cheftako
     - dims
   # sig-cluster-lifecycle-api-reviewers:
@@ -505,6 +503,7 @@ aliases:
     - eddiezane # CLI
     - ehashman # Instrumentation
     - enj # Auth
+    - gjtempleton # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
     - jpbetz # API Machinery
@@ -515,11 +514,11 @@ aliases:
     - liggitt # Auth
     - logicalhan # Instrumentation
     - luxas # Cluster Lifecycle
+    - maciekpytel # Autoscaling
     - marosset # Windows
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
-    - mwielgus # Autoscaling
     - rexagod # Instrumentation
     - saad-ali # Storage
     - sergeykanzhelev # Node

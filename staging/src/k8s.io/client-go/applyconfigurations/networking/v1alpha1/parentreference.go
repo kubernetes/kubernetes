@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha1
 
-// ParentReferenceApplyConfiguration represents an declarative configuration of the ParentReference type for use
+// ParentReferenceApplyConfiguration represents a declarative configuration of the ParentReference type for use
 // with apply.
 type ParentReferenceApplyConfiguration struct {
 	Group     *string `json:"group,omitempty"`
@@ -27,7 +27,7 @@ type ParentReferenceApplyConfiguration struct {
 	Name      *string `json:"name,omitempty"`
 }
 
-// ParentReferenceApplyConfiguration constructs an declarative configuration of the ParentReference type for use with
+// ParentReferenceApplyConfiguration constructs a declarative configuration of the ParentReference type for use with
 // apply.
 func ParentReference() *ParentReferenceApplyConfiguration {
 	return &ParentReferenceApplyConfiguration{}

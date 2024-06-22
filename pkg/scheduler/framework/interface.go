@@ -49,7 +49,8 @@ type NodeScore struct {
 	Score int64
 }
 
-// NodeToStatusMap declares map from node name to its status.
+// NodeToStatusMap contains the statuses of the Nodes where the incoming Pod was not schedulable.
+// A PostFilter plugin that uses this map should interpret absent Nodes as UnschedulableAndUnresolvable.
 type NodeToStatusMap map[string]*Status
 
 // NodePluginScores is a struct with node name and scores for that node.
@@ -448,6 +449,7 @@ type PostFilterPlugin interface {
 	// If this scheduling cycle failed at PreFilter, all Nodes have the status from the rejector PreFilter plugin in NodeToStatusMap.
 	// Note that the scheduling framework runs PostFilter plugins even when PreFilter returned UnschedulableAndUnresolvable.
 	// In that case, NodeToStatusMap contains all Nodes with UnschedulableAndUnresolvable.
+	// If there is no entry in the NodeToStatus map, its implicit status is UnschedulableAndUnresolvable.
 	//
 	// Also, ignoring Nodes with UnschedulableAndUnresolvable is the responsibility of each PostFilter plugin,
 	// meaning NodeToStatusMap obviously could have Nodes with UnschedulableAndUnresolvable

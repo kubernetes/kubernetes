@@ -37,7 +37,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -75,6 +74,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 	// v1.15: v1beta1 read-only, writes only v1beta2 config. Errors if the user tries to use v1alpha1, v1alpha2 or v1alpha3
 	// v1.22: v1beta2 read-only, writes only v1beta3 config. Errors if the user tries to use v1beta1 and older
 	// v1.27: only v1beta3 config. Errors if the user tries to use v1beta2 and older
+	// v1.31: v1beta3 read-only, writes only v1beta4 config, errors if the user tries to use older APIs.
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
@@ -83,15 +83,13 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated, allowExpe
 		"kubeadm.k8s.io/v1beta2":  "v1.22",
 	}
 
-	// v1.28: v1beta4 is released as experimental
-	experimentalAPIVersions := map[string]string{
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2890
-		// remove this from experimental once v1beta4 is released
-		"kubeadm.k8s.io/v1beta4": "v1.28",
-	}
+	// Experimental API versions are present here until released. Can be used only if allowed.
+	experimentalAPIVersions := map[string]string{}
 
-	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{}
+	// Deprecated API versions are supported until removed. They throw a warning.
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1beta3": {},
+	}
 
 	gvString := gv.String()
 
@@ -272,7 +270,8 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		return []byte{}, err
 	}
 
-	gv := kubeadmapiv1old.SchemeGroupVersion
+	gv := kubeadmapiv1.SchemeGroupVersion
+	// Update GV to an experimental version if needed
 	if allowExperimental {
 		gv = kubeadmapiv1.SchemeGroupVersion
 	}

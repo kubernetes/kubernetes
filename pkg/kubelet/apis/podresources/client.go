@@ -24,9 +24,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"k8s.io/cri-client/pkg/util"
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 // Note: Consumers of the pod resources API should not be importing this package.

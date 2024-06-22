@@ -353,7 +353,10 @@ func TestSchedulingGatedCondition(t *testing.T) {
 				}
 			}
 
-			if diff := cmp.Diff(tt.want, got); diff != "" {
+			if got.LastTransitionTime.IsZero() && got.Type != "" {
+				t.Errorf("unexpected empty LastTransitionTime in condition")
+			}
+			if diff := cmp.Diff(tt.want, got, cmpopts.IgnoreFields(api.PodCondition{}, "LastTransitionTime")); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})

@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// RuntimeClassApplyConfiguration represents an declarative configuration of the RuntimeClass type for use
+// RuntimeClassApplyConfiguration represents a declarative configuration of the RuntimeClass type for use
 // with apply.
 type RuntimeClassApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type RuntimeClassApplyConfiguration struct {
 	Spec                             *RuntimeClassSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// RuntimeClass constructs an declarative configuration of the RuntimeClass type for use with
+// RuntimeClass constructs a declarative configuration of the RuntimeClass type for use with
 // apply.
 func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 	b := &RuntimeClassApplyConfiguration{}
@@ -244,4 +244,10 @@ func (b *RuntimeClassApplyConfiguration) ensureObjectMetaApplyConfigurationExist
 func (b *RuntimeClassApplyConfiguration) WithSpec(value *RuntimeClassSpecApplyConfiguration) *RuntimeClassApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *RuntimeClassApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

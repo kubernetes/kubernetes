@@ -22,13 +22,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
@@ -89,12 +91,13 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 	}
 
 	var tests = []struct {
-		name            string
-		command         string
-		clusterName     string
-		withClientCert  bool
-		withToken       bool
-		additionalFlags []string
+		name                   string
+		command                string
+		clusterName            string
+		withClientCert         bool
+		withToken              bool
+		additionalFlags        []string
+		expectedValidityPeriod time.Duration
 	}{
 		{
 			name:           "user subCommand withClientCert",
@@ -119,6 +122,13 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 			command:         "user",
 			clusterName:     "my-cluster-with-token",
 			additionalFlags: []string{"--token=123456"},
+		},
+		{
+			name:                   "user subCommand with validity period",
+			withClientCert:         true,
+			command:                "user",
+			additionalFlags:        []string{"--validity-period=12h"},
+			expectedValidityPeriod: 12 * time.Hour,
 		},
 	}
 
@@ -156,8 +166,13 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 			kubeconfigtestutil.AssertKubeConfigCurrentCluster(t, config, "https://1.2.3.4:1234", caCert)
 
 			if test.withClientCert {
+				if test.expectedValidityPeriod == 0 {
+					test.expectedValidityPeriod = kubeadmconstants.CertificateValidityPeriod
+				}
 				// checks that kubeconfig files have expected client cert
-				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, "myUser")
+				startTime := kubeadmutil.StartTimeUTC()
+				notAfter := startTime.Add(test.expectedValidityPeriod)
+				kubeconfigtestutil.AssertKubeConfigCurrentAuthInfoWithClientCert(t, config, caCert, notAfter, "myUser")
 			}
 
 			if test.withToken {

@@ -230,7 +230,7 @@ func TestDesiredTTL(t *testing.T) {
 
 	for i, testCase := range testCases {
 		ttlController := &Controller{
-			queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]()),
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,
 			boundaryStep:      testCase.boundaryStep,

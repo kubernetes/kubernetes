@@ -1,0 +1,6 @@
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaim
+metadata:
+  name: test-claim-{{.Index}}
+spec:
+  resourceClassName: test-class

@@ -767,7 +767,7 @@ function construct-linux-kubelet-flags {
   # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
   flags+=" --cert-dir=/var/lib/kubelet/pki/"
 
-  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth 
+  # If ENABLE_AUTH_PROVIDER_GCP is set to true, kubelet is enabled to use out-of-tree auth
   # credential provider instead of in-tree auth credential provider.
   # https://kubernetes.io/docs/tasks/kubelet-credential-provider/kubelet-credential-provider
   if [[ "${ENABLE_AUTH_PROVIDER_GCP:-true}" == "true" ]]; then
@@ -1029,6 +1029,18 @@ authentication:
   x509:
     clientCAFile: /etc/srv/kubernetes/pki/ca-certificates.crt
 EOF
+
+  if [[ -n "${SHUTDOWN_GRACE_PERIOD:-}" ]]; then
+  cat <<EOF
+shutdownGracePeriod: ${SHUTDOWN_GRACE_PERIOD}
+EOF
+  fi
+
+  if [[ -n "${SHUTDOWN_GRACE_PERIOD_CRITICAL_PODS:-}" ]]; then
+  cat <<EOF
+shutdownGracePeriodCriticalPods: ${SHUTDOWN_GRACE_PERIOD_CRITICAL_PODS}
+EOF
+  fi
 }
 
 # cat the Kubelet config yaml for windows nodes
@@ -1178,6 +1190,7 @@ ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote "${ENABLE_APISERVER_ADVANCED_AUDIT
 ENABLE_APISERVER_DYNAMIC_AUDIT: $(yaml-quote "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}")
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote "${ENABLE_CACHE_MUTATION_DETECTOR:-false}")
 ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR: $(yaml-quote "${ENABLE_KUBE_WATCHLIST_INCONSISTENCY_DETECTOR:-false}")
+ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR: $(yaml-quote "${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR:-false}")
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote "${ENABLE_PATCH_CONVERSION_DETECTOR:-false}")
 ADVANCED_AUDIT_POLICY: $(yaml-quote "${ADVANCED_AUDIT_POLICY:-}")
 ADVANCED_AUDIT_BACKEND: $(yaml-quote "${ADVANCED_AUDIT_BACKEND:-log}")

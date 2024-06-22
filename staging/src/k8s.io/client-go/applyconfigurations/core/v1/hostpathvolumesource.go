@@ -22,14 +22,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// HostPathVolumeSourceApplyConfiguration represents an declarative configuration of the HostPathVolumeSource type for use
+// HostPathVolumeSourceApplyConfiguration represents a declarative configuration of the HostPathVolumeSource type for use
 // with apply.
 type HostPathVolumeSourceApplyConfiguration struct {
 	Path *string          `json:"path,omitempty"`
 	Type *v1.HostPathType `json:"type,omitempty"`
 }
 
-// HostPathVolumeSourceApplyConfiguration constructs an declarative configuration of the HostPathVolumeSource type for use with
+// HostPathVolumeSourceApplyConfiguration constructs a declarative configuration of the HostPathVolumeSource type for use with
 // apply.
 func HostPathVolumeSource() *HostPathVolumeSourceApplyConfiguration {
 	return &HostPathVolumeSourceApplyConfiguration{}

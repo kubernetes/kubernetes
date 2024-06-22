@@ -22554,6 +22554,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.SeccompProfile",
 		"SecurityContext.ShareProcessNamespace",
 		"SecurityContext.SupplementalGroups",
+		"SecurityContext.SupplementalGroupsPolicy",
 		"SecurityContext.Sysctls",
 		"SecurityContext.WindowsOptions",
 	)
@@ -26243,5 +26244,235 @@ func TestValidateSleepAction(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
+	fldPath := field.NewPath("spec")
+	badSupplementalGroupsPolicyEmpty := ptr.To(core.SupplementalGroupsPolicy(""))
+	badSupplementalGroupsPolicyNotSupported := ptr.To(core.SupplementalGroupsPolicy("not-supported"))
+
+	validatePodSpecTestCases := map[string]struct {
+		securityContext *core.PodSecurityContext
+		wantFieldErrors field.ErrorList
+	}{
+		"nil SecurityContext is valid": {
+			securityContext: nil,
+		},
+		"nil SupplementalGroupsPolicy is valid": {
+			securityContext: &core.PodSecurityContext{},
+		},
+		"SupplementalGroupsPolicyMerge is valid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
+			},
+		},
+		"SupplementalGroupsPolicyStrict is valid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict),
+			},
+		},
+		"empty SupplementalGroupsPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: badSupplementalGroupsPolicyEmpty,
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					badSupplementalGroupsPolicyEmpty, sets.List(validSupplementalGroupsPolicies)),
+			},
+		},
+		"not-supported SupplementalGroupsPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: badSupplementalGroupsPolicyNotSupported,
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					badSupplementalGroupsPolicyNotSupported, sets.List(validSupplementalGroupsPolicies)),
+			},
+		},
+	}
+	for name, tt := range validatePodSpecTestCases {
+		t.Run(name, func(t *testing.T) {
+			podSpec := &core.PodSpec{
+				SecurityContext: tt.securityContext,
+				Containers: []core.Container{
+					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+			}
+			if tt.wantFieldErrors == nil {
+				tt.wantFieldErrors = field.ErrorList{}
+			}
+			errs := ValidatePodSpec(podSpec, nil, fldPath, PodValidationOptions{})
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TODO: merge these testcases to TestValidateWindowsPodSecurityContext after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T) {
+	fldPath := field.NewPath("spec")
+
+	testCases := map[string]struct {
+		securityContext *core.PodSecurityContext
+		wantFieldErrors field.ErrorList
+	}{
+		"nil SecurityContext is valid": {
+			securityContext: nil,
+		},
+		"nil SupplementalGroupdPolicy is valid": {
+			securityContext: &core.PodSecurityContext{},
+		},
+		"non-empty SupplementalGroupdPolicy is invalid": {
+			securityContext: &core.PodSecurityContext{
+				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Forbidden(
+					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
+					"cannot be set for a windows pod"),
+			},
+		},
+	}
+
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			podSpec := &core.PodSpec{
+				OS:              &core.PodOS{Name: core.Windows},
+				SecurityContext: tt.securityContext,
+				Containers: []core.Container{
+					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSClusterFirst,
+			}
+			if tt.wantFieldErrors == nil {
+				tt.wantFieldErrors = field.ErrorList{}
+			}
+			errs := validateWindows(podSpec, fldPath)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TODO: merge these testcases to TestValidatePodStatusUpdate after SupplementalGroupsPolicy feature graduates to Beta
+func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
+	badUID := int64(-1)
+	badGID := int64(-1)
+
+	containerTypes := map[string]func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus){
+		"container": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.ContainerStatuses = containerStatus
+		},
+		"initContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.InitContainerStatuses = containerStatus
+		},
+		"ephemeralContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
+			podStatus.EphemeralContainerStatuses = containerStatus
+		},
+	}
+
+	testCases := map[string]struct {
+		podOSes           []*core.PodOS
+		containerStatuses []core.ContainerStatus
+		wantFieldErrors   field.ErrorList
+	}{
+		"nil container user is valid": {
+			podOSes:           []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{},
+		},
+		"empty container user is valid": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{},
+			}},
+		},
+		"container user with valid ids": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{},
+				},
+			}},
+		},
+		"container user with invalid ids": {
+			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{
+						UID:                badUID,
+						GID:                badGID,
+						SupplementalGroups: []int64{badGID},
+					},
+				},
+			}},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(field.NewPath("[0].linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
+			},
+		},
+		"user.linux must not be set in windows": {
+			podOSes: []*core.PodOS{{Name: core.Windows}},
+			containerStatuses: []core.ContainerStatus{{
+				User: &core.ContainerUser{
+					Linux: &core.LinuxContainerUser{},
+				},
+			}},
+			wantFieldErrors: field.ErrorList{
+				field.Forbidden(field.NewPath("[0].linux"), "cannot be set for a windows pod"),
+			},
+		},
+	}
+
+	for name, tt := range testCases {
+		for _, podOS := range tt.podOSes {
+			for containerType, setContainerStatuses := range containerTypes {
+				t.Run(fmt.Sprintf("[podOS=%v][containerType=%s] %s", podOS, containerType, name), func(t *testing.T) {
+					oldPod := &core.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "foo",
+							ResourceVersion: "1",
+						},
+						Spec: core.PodSpec{
+							OS: podOS,
+						},
+						Status: core.PodStatus{},
+					}
+					newPod := &core.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:            "foo",
+							ResourceVersion: "1",
+						},
+						Spec: core.PodSpec{
+							OS: podOS,
+						},
+					}
+					setContainerStatuses(&newPod.Status, tt.containerStatuses)
+					var expectedFieldErrors field.ErrorList
+					for _, err := range tt.wantFieldErrors {
+						expectedField := fmt.Sprintf("%s%s", field.NewPath("status").Child(containerType+"Statuses"), err.Field)
+						expectedFieldErrors = append(expectedFieldErrors, &field.Error{
+							Type:     err.Type,
+							Field:    expectedField,
+							BadValue: err.BadValue,
+							Detail:   err.Detail,
+						})
+					}
+					errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
+					if diff := cmp.Diff(expectedFieldErrors, errs); diff != "" {
+						t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+					}
+				})
+			}
+		}
 	}
 }

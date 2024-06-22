@@ -19,10 +19,12 @@ package v1beta3
 import (
 	"sort"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration converts a private InitConfiguration to public InitConfiguration.
@@ -38,9 +40,11 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	}
 	err = Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
 	// Required to pass fuzzer tests. This ClusterConfiguration is empty and is never defaulted.
-	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() it will receive
-	// a default value, thus here we need to reset it back to "".
+	// If we call Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration() these fields will receive
+	// a default value, thus here we need to reset them back to empty.
 	out.EncryptionAlgorithm = ""
+	out.CertificateValidityPeriod = nil
+	out.CACertificateValidityPeriod = nil
 	// Set default timeouts.
 	kubeadm.SetDefaultTimeouts(&out.Timeouts)
 	return err
@@ -48,12 +52,16 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 
 // Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration converts a private JoinConfiguration to public JoinConfiguration.
 func Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	// Migrate the discovery timeout.
+	out.Discovery.Timeout = in.Timeouts.Discovery.DeepCopy()
 	return autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in, out, s)
 }
 
 // Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration converts a public JoinConfiguration to a private JoinConfiguration.
 func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
 	kubeadm.SetDefaultTimeouts(&out.Timeouts)
+	// Migrate the discovery timeout.
+	out.Timeouts.Discovery = in.Discovery.Timeout.DeepCopy()
 	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
@@ -64,15 +72,19 @@ func Convert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *ku
 
 // Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required due to missing EncryptionAlgorithm in v1beta3.
 func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
-	// Required to pass validation and fuzzer tests. The field is missing in v1beta3, thus we have to
-	// default it to a sane (default) value in the internal type.
+	// Required to pass validation and fuzzer tests. These fields are missing in v1beta3, thus we have to
+	// default them to a sane (default) value in the internal type.
 	out.EncryptionAlgorithm = kubeadm.EncryptionAlgorithmRSA2048
+	out.CertificateValidityPeriod = &metav1.Duration{Duration: constants.CertificateValidityPeriod}
+	out.CACertificateValidityPeriod = &metav1.Duration{Duration: constants.CACertificateValidityPeriod}
+	if in.APIServer.TimeoutForControlPlane != nil && in.APIServer.TimeoutForControlPlane.Duration != 0 {
+		kubeadm.SetConversionTimeoutControlPlane(in.APIServer.TimeoutForControlPlane)
+	}
 	return autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
 
-// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the missing ControlPlaneComponent.ExtraEnvs in v1beta3.
+// Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent is required due to the different ControlPlaneComponent.ExtraArgs in v1beta3.
 func Convert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in, out, s)
 }
@@ -83,9 +95,8 @@ func Convert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in *
 	return autoConvert_kubeadm_ControlPlaneComponent_To_v1beta3_ControlPlaneComponent(in, out, s)
 }
 
-// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the missing LocalEtcd.ExtraEnvs in v1beta3.
+// Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd is required due to the different LocalEtcd.Args in v1beta3.
 func Convert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kubeadm.LocalEtcd, s conversion.Scope) error {
-	out.ExtraEnvs = []kubeadm.EnvVar{}
 	out.ExtraArgs = convertToArgs(in.ExtraArgs)
 	return autoConvert_v1beta3_LocalEtcd_To_kubeadm_LocalEtcd(in, out, s)
 }
@@ -115,7 +126,7 @@ func Convert_kubeadm_DNS_To_v1beta3_DNS(in *kubeadm.DNS, out *DNS, s conversion.
 }
 
 // convertToArgs takes a argument map and converts it to a slice of arguments.
-// Te resulting argument slice is sorted alpha-numerically.
+// The resulting argument slice is sorted alpha-numerically.
 func convertToArgs(in map[string]string) []kubeadm.Arg {
 	if in == nil {
 		return nil

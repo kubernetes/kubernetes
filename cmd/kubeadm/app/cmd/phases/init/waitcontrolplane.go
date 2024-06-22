@@ -26,8 +26,10 @@ import (
 	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -107,11 +109,16 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		}
 
 		kubeletFailTempl.Execute(data.OutputWriter(), context)
-		return errors.New("couldn't initialize a Kubernetes cluster")
+		return errors.New("could not initialize a Kubernetes cluster")
 	}
 
 	waiter.SetTimeout(data.Cfg().Timeouts.KubeletHealthCheck.Duration)
-	if err := waiter.WaitForKubelet(); err != nil {
+	kubeletConfig := data.Cfg().ClusterConfiguration.ComponentConfigs[componentconfigs.KubeletGroup].Get()
+	kubeletConfigTyped, ok := kubeletConfig.(*kubeletconfig.KubeletConfiguration)
+	if !ok {
+		return errors.New("could not convert the KubeletConfiguration to a typed object")
+	}
+	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
 		return handleError(err)
 	}
 

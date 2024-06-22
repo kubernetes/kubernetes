@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
-// StorageVersionMigrationStatusApplyConfiguration represents an declarative configuration of the StorageVersionMigrationStatus type for use
+// StorageVersionMigrationStatusApplyConfiguration represents a declarative configuration of the StorageVersionMigrationStatus type for use
 // with apply.
 type StorageVersionMigrationStatusApplyConfiguration struct {
 	Conditions      []MigrationConditionApplyConfiguration `json:"conditions,omitempty"`
 	ResourceVersion *string                                `json:"resourceVersion,omitempty"`
 }
 
-// StorageVersionMigrationStatusApplyConfiguration constructs an declarative configuration of the StorageVersionMigrationStatus type for use with
+// StorageVersionMigrationStatusApplyConfiguration constructs a declarative configuration of the StorageVersionMigrationStatus type for use with
 // apply.
 func StorageVersionMigrationStatus() *StorageVersionMigrationStatusApplyConfiguration {
 	return &StorageVersionMigrationStatusApplyConfiguration{}

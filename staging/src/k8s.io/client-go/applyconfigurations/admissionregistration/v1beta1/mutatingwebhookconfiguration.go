@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// MutatingWebhookConfigurationApplyConfiguration represents an declarative configuration of the MutatingWebhookConfiguration type for use
+// MutatingWebhookConfigurationApplyConfiguration represents a declarative configuration of the MutatingWebhookConfiguration type for use
 // with apply.
 type MutatingWebhookConfigurationApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -35,7 +35,7 @@ type MutatingWebhookConfigurationApplyConfiguration struct {
 	Webhooks                         []MutatingWebhookApplyConfiguration `json:"webhooks,omitempty"`
 }
 
-// MutatingWebhookConfiguration constructs an declarative configuration of the MutatingWebhookConfiguration type for use with
+// MutatingWebhookConfiguration constructs a declarative configuration of the MutatingWebhookConfiguration type for use with
 // apply.
 func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationApplyConfiguration {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
@@ -249,4 +249,10 @@ func (b *MutatingWebhookConfigurationApplyConfiguration) WithWebhooks(values ...
 		b.Webhooks = append(b.Webhooks, *values[i])
 	}
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *MutatingWebhookConfigurationApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

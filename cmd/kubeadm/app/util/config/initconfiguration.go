@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -37,7 +38,7 @@ import (
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -307,7 +308,19 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
 
-	for gvk, fileContent := range gvkmap {
+	// Sort the GVKs deterministically by GVK string.
+	// This allows ClusterConfiguration to be decoded first.
+	gvks := make([]schema.GroupVersionKind, 0, len(gvkmap))
+	for gvk := range gvkmap {
+		gvks = append(gvks, gvk)
+	}
+	sort.Slice(gvks, func(i, j int) bool {
+		return gvks[i].String() < gvks[j].String()
+	})
+
+	for _, gvk := range gvks {
+		fileContent := gvkmap[gvk]
+
 		// first, check if this GVK is supported and possibly not deprecated
 		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, allowExperimental); err != nil {
 			return nil, err

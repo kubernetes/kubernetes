@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,6 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/pager"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -254,9 +254,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	// don't overwrite UseWatchList if already set
 	// because the higher layers (e.g. storage/cacher) disabled it on purpose
 	if r.UseWatchList == nil {
-		if s := os.Getenv("ENABLE_CLIENT_GO_WATCH_LIST_ALPHA"); len(s) > 0 {
-			r.UseWatchList = ptr.To(true)
-		}
+		r.UseWatchList = ptr.To(clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient))
 	}
 
 	return r
@@ -368,12 +366,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	}
 
 	klog.V(2).Infof("Caches populated for %v from %s", r.typeDescription, r.name)
-
-	resyncerrc := make(chan error, 1)
-	cancelCh := make(chan struct{})
-	defer close(cancelCh)
-	go r.startResync(stopCh, cancelCh, resyncerrc)
-	return r.watch(w, stopCh, resyncerrc)
+	return r.watchWithResync(w, stopCh)
 }
 
 // startResync periodically calls r.store.Resync() method.
@@ -402,6 +395,15 @@ func (r *Reflector) startResync(stopCh <-chan struct{}, cancelCh <-chan struct{}
 		cleanup()
 		resyncCh, cleanup = r.resyncChan()
 	}
+}
+
+// watchWithResync runs watch with startResync in the background.
+func (r *Reflector) watchWithResync(w watch.Interface, stopCh <-chan struct{}) error {
+	resyncerrc := make(chan error, 1)
+	cancelCh := make(chan struct{})
+	defer close(cancelCh)
+	go r.startResync(stopCh, cancelCh, resyncerrc)
+	return r.watch(w, stopCh, resyncerrc)
 }
 
 // watch simply starts a watch request with the server.
@@ -453,13 +455,14 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 			}
 		}
 
-		err = watchHandler(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion, nil, r.clock, resyncerrc, stopCh)
+		err = handleWatch(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
+			r.clock, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
 		retry.After(err)
 		if err != nil {
-			if err != errorStopRequested {
+			if !errors.Is(err, errorStopRequested) {
 				switch {
 				case isExpiredError(err):
 					// Don't set LastSyncResourceVersionUnavailable - LIST call with ResourceVersion=RV already
@@ -670,14 +673,12 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 			}
 			return nil, err
 		}
-		bookmarkReceived := pointer.Bool(false)
-		err = watchHandler(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+		watchListBookmarkReceived, err := handleListWatch(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
-			bookmarkReceived,
 			r.clock, make(chan error), stopCh)
 		if err != nil {
 			w.Stop() // stop and retry with clean state
-			if err == errorStopRequested {
+			if errors.Is(err, errorStopRequested) {
 				return nil, nil
 			}
 			if isErrorRetriableWithSideEffectsFn(err) {
@@ -685,7 +686,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 			}
 			return nil, err
 		}
-		if *bookmarkReceived {
+		if watchListBookmarkReceived {
 			break
 		}
 	}
@@ -697,10 +698,10 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 	// we utilize the temporaryStore to ensure independence from the current store implementation.
 	// as of today, the store is implemented as a queue and will be drained by the higher-level
 	// component as soon as it finishes replacing the content.
-	checkWatchListConsistencyIfRequested(stopCh, r.name, resourceVersion, r.listerWatcher, temporaryStore)
+	checkWatchListDataConsistencyIfRequested(wait.ContextForChannel(stopCh), r.name, resourceVersion, wrapListFuncWithContext(r.listerWatcher.List), temporaryStore.List)
 
-	if err = r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
-		return nil, fmt.Errorf("unable to sync watch-list result: %v", err)
+	if err := r.store.Replace(temporaryStore.List(), resourceVersion); err != nil {
+		return nil, fmt.Errorf("unable to sync watch-list result: %w", err)
 	}
 	initTrace.Step("SyncWith done")
 	r.setLastSyncResourceVersion(resourceVersion)
@@ -717,8 +718,12 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 	return r.store.Replace(found, resourceVersion)
 }
 
-// watchHandler watches w and sets setLastSyncResourceVersion
-func watchHandler(start time.Time,
+// handleListWatch consumes events from w, updates the Store, and records the
+// last seen ResourceVersion, to allow continuing from that ResourceVersion on
+// retry. If successful, the watcher will be left open after receiving the
+// initial set of objects, to allow watching for future events.
+func handleListWatch(
+	start time.Time,
 	w watch.Interface,
 	store Store,
 	expectedType reflect.Type,
@@ -726,31 +731,77 @@ func watchHandler(start time.Time,
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
-	exitOnInitialEventsEndBookmark *bool,
 	clock clock.Clock,
-	errc chan error,
+	errCh chan error,
+	stopCh <-chan struct{},
+) (bool, error) {
+	exitOnWatchListBookmarkReceived := true
+	return handleAnyWatch(start, w, store, expectedType, expectedGVK, name, expectedTypeName,
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, stopCh)
+}
+
+// handleListWatch consumes events from w, updates the Store, and records the
+// last seen ResourceVersion, to allow continuing from that ResourceVersion on
+// retry. The watcher will always be stopped on exit.
+func handleWatch(
+	start time.Time,
+	w watch.Interface,
+	store Store,
+	expectedType reflect.Type,
+	expectedGVK *schema.GroupVersionKind,
+	name string,
+	expectedTypeName string,
+	setLastSyncResourceVersion func(string),
+	clock clock.Clock,
+	errCh chan error,
 	stopCh <-chan struct{},
 ) error {
+	exitOnWatchListBookmarkReceived := false
+	_, err := handleAnyWatch(start, w, store, expectedType, expectedGVK, name, expectedTypeName,
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, stopCh)
+	return err
+}
+
+// handleAnyWatch consumes events from w, updates the Store, and records the last
+// seen ResourceVersion, to allow continuing from that ResourceVersion on retry.
+// If exitOnWatchListBookmarkReceived is true, the watch events will be consumed
+// until a bookmark event is received with the WatchList annotation present.
+// Returns true (watchListBookmarkReceived) if the WatchList bookmark was
+// received, even if exitOnWatchListBookmarkReceived is false.
+// The watcher will always be stopped, unless exitOnWatchListBookmarkReceived is
+// true and watchListBookmarkReceived is true. This allows the same watch stream
+// to be re-used by the caller to continue watching for new events.
+func handleAnyWatch(start time.Time,
+	w watch.Interface,
+	store Store,
+	expectedType reflect.Type,
+	expectedGVK *schema.GroupVersionKind,
+	name string,
+	expectedTypeName string,
+	setLastSyncResourceVersion func(string),
+	exitOnWatchListBookmarkReceived bool,
+	clock clock.Clock,
+	errCh chan error,
+	stopCh <-chan struct{},
+) (bool, error) {
+	watchListBookmarkReceived := false
 	eventCount := 0
-	if exitOnInitialEventsEndBookmark != nil {
-		// set it to false just in case somebody
-		// made it positive
-		*exitOnInitialEventsEndBookmark = false
-	}
+	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(name, clock, start, exitOnWatchListBookmarkReceived)
+	defer initialEventsEndBookmarkWarningTicker.Stop()
 
 loop:
 	for {
 		select {
 		case <-stopCh:
-			return errorStopRequested
-		case err := <-errc:
-			return err
+			return watchListBookmarkReceived, errorStopRequested
+		case err := <-errCh:
+			return watchListBookmarkReceived, err
 		case event, ok := <-w.ResultChan():
 			if !ok {
 				break loop
 			}
 			if event.Type == watch.Error {
-				return apierrors.FromObject(event.Object)
+				return watchListBookmarkReceived, apierrors.FromObject(event.Object)
 			}
 			if expectedType != nil {
 				if e, a := expectedType, reflect.TypeOf(event.Object); e != a {
@@ -792,9 +843,7 @@ loop:
 			case watch.Bookmark:
 				// A `Bookmark` means watch has synced here, just update the resourceVersion
 				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
-					if exitOnInitialEventsEndBookmark != nil {
-						*exitOnInitialEventsEndBookmark = true
-					}
+					watchListBookmarkReceived = true
 				}
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", name, event))
@@ -804,20 +853,23 @@ loop:
 				rvu.UpdateResourceVersion(resourceVersion)
 			}
 			eventCount++
-			if exitOnInitialEventsEndBookmark != nil && *exitOnInitialEventsEndBookmark {
+			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
 				watchDuration := clock.Since(start)
 				klog.V(4).Infof("exiting %v Watch because received the bookmark that marks the end of initial events stream, total %v items received in %v", name, eventCount, watchDuration)
-				return nil
+				return watchListBookmarkReceived, nil
 			}
+			initialEventsEndBookmarkWarningTicker.observeLastEventTimeStamp(clock.Now())
+		case <-initialEventsEndBookmarkWarningTicker.C():
+			initialEventsEndBookmarkWarningTicker.warnIfExpired()
 		}
 	}
 
 	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		return fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
+		return watchListBookmarkReceived, fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
 	}
 	klog.V(4).Infof("%s: Watch close - %v total %v items received", name, expectedTypeName, eventCount)
-	return nil
+	return watchListBookmarkReceived, nil
 }
 
 // LastSyncResourceVersion is the resource version observed when last sync with the underlying store
@@ -929,3 +981,95 @@ func isWatchErrorRetriable(err error) bool {
 	}
 	return false
 }
+
+// wrapListFuncWithContext simply wraps ListFunction into another function that accepts a context and ignores it.
+func wrapListFuncWithContext(listFn ListFunc) func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+	return func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+		return listFn(options)
+	}
+}
+
+// initialEventsEndBookmarkTicker a ticker that produces a warning if the bookmark event
+// which marks the end of the watch stream, has not been received within the defined tick interval.
+//
+// Note:
+// The methods exposed by this type are not thread-safe.
+type initialEventsEndBookmarkTicker struct {
+	clock.Ticker
+	clock clock.Clock
+	name  string
+
+	watchStart           time.Time
+	tickInterval         time.Duration
+	lastEventObserveTime time.Time
+}
+
+// newInitialEventsEndBookmarkTicker returns a noop ticker if exitOnInitialEventsEndBookmarkRequested is false.
+// Otherwise, it returns a ticker that exposes a method producing a warning if the bookmark event,
+// which marks the end of the watch stream, has not been received within the defined tick interval.
+//
+// Note that the caller controls whether to call t.C() and t.Stop().
+//
+// In practice, the reflector exits the watchHandler as soon as the bookmark event is received and calls the t.C() method.
+func newInitialEventsEndBookmarkTicker(name string, c clock.Clock, watchStart time.Time, exitOnWatchListBookmarkReceived bool) *initialEventsEndBookmarkTicker {
+	return newInitialEventsEndBookmarkTickerInternal(name, c, watchStart, 10*time.Second, exitOnWatchListBookmarkReceived)
+}
+
+func newInitialEventsEndBookmarkTickerInternal(name string, c clock.Clock, watchStart time.Time, tickInterval time.Duration, exitOnWatchListBookmarkReceived bool) *initialEventsEndBookmarkTicker {
+	clockWithTicker, ok := c.(clock.WithTicker)
+	if !ok || !exitOnWatchListBookmarkReceived {
+		if exitOnWatchListBookmarkReceived {
+			klog.Warningf("clock does not support WithTicker interface but exitOnInitialEventsEndBookmark was requested")
+		}
+		return &initialEventsEndBookmarkTicker{
+			Ticker: &noopTicker{},
+		}
+	}
+
+	return &initialEventsEndBookmarkTicker{
+		Ticker:       clockWithTicker.NewTicker(tickInterval),
+		clock:        c,
+		name:         name,
+		watchStart:   watchStart,
+		tickInterval: tickInterval,
+	}
+}
+
+func (t *initialEventsEndBookmarkTicker) observeLastEventTimeStamp(lastEventObserveTime time.Time) {
+	t.lastEventObserveTime = lastEventObserveTime
+}
+
+func (t *initialEventsEndBookmarkTicker) warnIfExpired() {
+	if err := t.produceWarningIfExpired(); err != nil {
+		klog.Warning(err)
+	}
+}
+
+// produceWarningIfExpired returns an error that represents a warning when
+// the time elapsed since the last received event exceeds the tickInterval.
+//
+// Note that this method should be called when t.C() yields a value.
+func (t *initialEventsEndBookmarkTicker) produceWarningIfExpired() error {
+	if _, ok := t.Ticker.(*noopTicker); ok {
+		return nil /*noop ticker*/
+	}
+	if t.lastEventObserveTime.IsZero() {
+		return fmt.Errorf("%s: awaiting required bookmark event for initial events stream, no events received for %v", t.name, t.clock.Since(t.watchStart))
+	}
+	elapsedTime := t.clock.Now().Sub(t.lastEventObserveTime)
+	hasBookmarkTimerExpired := elapsedTime >= t.tickInterval
+
+	if !hasBookmarkTimerExpired {
+		return nil
+	}
+	return fmt.Errorf("%s: hasn't received required bookmark event marking the end of initial events stream, received last event %v ago", t.name, elapsedTime)
+}
+
+var _ clock.Ticker = &noopTicker{}
+
+// TODO(#115478): move to k8s/utils repo
+type noopTicker struct{}
+
+func (t *noopTicker) C() <-chan time.Time { return nil }
+
+func (t *noopTicker) Stop() {}

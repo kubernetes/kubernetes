@@ -177,6 +177,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		DriverName:     op.DriverName,
 		NodeLocal:      true,
 		MaxAllocations: op.MaxClaimsPerNode,
+		Shareable:      true,
 	}
 
 	nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})

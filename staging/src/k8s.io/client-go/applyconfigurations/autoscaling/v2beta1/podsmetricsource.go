@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// PodsMetricSourceApplyConfiguration represents an declarative configuration of the PodsMetricSource type for use
+// PodsMetricSourceApplyConfiguration represents a declarative configuration of the PodsMetricSource type for use
 // with apply.
 type PodsMetricSourceApplyConfiguration struct {
 	MetricName         *string                             `json:"metricName,omitempty"`
@@ -31,7 +31,7 @@ type PodsMetricSourceApplyConfiguration struct {
 	Selector           *v1.LabelSelectorApplyConfiguration `json:"selector,omitempty"`
 }
 
-// PodsMetricSourceApplyConfiguration constructs an declarative configuration of the PodsMetricSource type for use with
+// PodsMetricSourceApplyConfiguration constructs a declarative configuration of the PodsMetricSource type for use with
 // apply.
 func PodsMetricSource() *PodsMetricSourceApplyConfiguration {
 	return &PodsMetricSourceApplyConfiguration{}

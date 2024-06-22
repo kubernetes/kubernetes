@@ -178,7 +178,7 @@ func (o replicaSetsByCreationTimestamp) Less(i, j int) bool {
 // name.  A slice of BASH commands can be supplied as args to be run by the pod
 func testDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace string, pvclaims []*v1.PersistentVolumeClaim, securityLevel admissionapi.Level, command string) *appsv1.Deployment {
 	if len(command) == 0 {
-		command = "trap exit TERM; while true; do sleep 1; done"
+		command = e2epod.InfiniteSleepCommand
 	}
 	zero := int64(0)
 	deploymentName := "deployment-" + string(uuid.NewUUID())

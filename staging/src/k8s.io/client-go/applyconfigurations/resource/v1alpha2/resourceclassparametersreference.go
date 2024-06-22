@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceClassParametersReferenceApplyConfiguration represents an declarative configuration of the ResourceClassParametersReference type for use
+// ResourceClassParametersReferenceApplyConfiguration represents a declarative configuration of the ResourceClassParametersReference type for use
 // with apply.
 type ResourceClassParametersReferenceApplyConfiguration struct {
 	APIGroup  *string `json:"apiGroup,omitempty"`
@@ -27,7 +27,7 @@ type ResourceClassParametersReferenceApplyConfiguration struct {
 	Namespace *string `json:"namespace,omitempty"`
 }
 
-// ResourceClassParametersReferenceApplyConfiguration constructs an declarative configuration of the ResourceClassParametersReference type for use with
+// ResourceClassParametersReferenceApplyConfiguration constructs a declarative configuration of the ResourceClassParametersReference type for use with
 // apply.
 func ResourceClassParametersReference() *ResourceClassParametersReferenceApplyConfiguration {
 	return &ResourceClassParametersReferenceApplyConfiguration{}

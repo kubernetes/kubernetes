@@ -6,7 +6,7 @@ package patchjson6902
 import (
 	"strings"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	k8syaml "sigs.k8s.io/yaml"

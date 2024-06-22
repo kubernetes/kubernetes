@@ -24,14 +24,14 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// JobTemplateSpecApplyConfiguration represents an declarative configuration of the JobTemplateSpec type for use
+// JobTemplateSpecApplyConfiguration represents a declarative configuration of the JobTemplateSpec type for use
 // with apply.
 type JobTemplateSpecApplyConfiguration struct {
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *JobSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
-// JobTemplateSpecApplyConfiguration constructs an declarative configuration of the JobTemplateSpec type for use with
+// JobTemplateSpecApplyConfiguration constructs a declarative configuration of the JobTemplateSpec type for use with
 // apply.
 func JobTemplateSpec() *JobTemplateSpecApplyConfiguration {
 	return &JobTemplateSpecApplyConfiguration{}
@@ -185,4 +185,10 @@ func (b *JobTemplateSpecApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 func (b *JobTemplateSpecApplyConfiguration) WithSpec(value *JobSpecApplyConfiguration) *JobTemplateSpecApplyConfiguration {
 	b.Spec = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *JobTemplateSpecApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

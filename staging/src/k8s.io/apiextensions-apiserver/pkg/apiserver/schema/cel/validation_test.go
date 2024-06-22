@@ -61,6 +61,7 @@ func TestValidationExpressions(t *testing.T) {
 		costBudget    int64
 		isRoot        bool
 		expectSkipped bool
+		expectedCost  int64
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -2006,6 +2007,59 @@ func TestValidationExpressions(t *testing.T) {
 				`quantity(self.val1).isInteger()`,
 			},
 		},
+		{name: "cost for extended lib calculated correctly: isSorted",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"[1,2,3,4].isSorted()",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: url",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"url('https:://kubernetes.io/').getHostname() != 'test'",
+			},
+			expectedCost: 4,
+		},
+		{name: "cost for extended lib calculated correctly: split",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size('abc 123 def 123'.split(' ')) > 0",
+			},
+			expectedCost: 5,
+		},
+		{name: "cost for extended lib calculated correctly: join",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				"size(['aa', 'bb', 'cc', 'd', 'e', 'f', 'g', 'h', 'i', 'j'].join(' ')) > 0",
+			},
+			expectedCost: 7,
+		},
+		{name: "IP and CIDR",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				`isIP("192.168.0.1")`,
+				`ip.isCanonical("127.0.0.1")`,
+				`ip("192.168.0.1").family() > 0`,
+				`ip("0.0.0.0").isUnspecified()`,
+				`ip("127.0.0.1").isLoopback()`,
+				`ip("224.0.0.1").isLinkLocalMulticast()`,
+				`ip("192.168.0.1").isGlobalUnicast()`,
+				`type(ip("192.168.0.1")) == net.IP`,
+				`cidr("192.168.0.0/24").containsIP(ip("192.168.0.1"))`,
+				`cidr("192.168.0.0/24").containsCIDR("192.168.0.0/25")`,
+				`cidr("2001:db8::/32").containsCIDR(cidr("2001:db8::/33"))`,
+				`type(cidr("2001:db8::/32").ip()) == net.IP`,
+				`cidr('192.168.0.0/24') == cidr('192.168.0.0/24').masked()`,
+				`cidr('192.168.0.0/16').prefixLength() == 16`,
+				`cidr('::1/128').ip().family() == 6`,
+			},
+		},
 	}
 
 	for i := range tests {
@@ -2013,7 +2067,9 @@ func TestValidationExpressions(t *testing.T) {
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
-			tt.costBudget = celconfig.RuntimeCELCostBudget
+			if tt.costBudget == 0 {
+				tt.costBudget = celconfig.RuntimeCELCostBudget
+			}
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
@@ -2024,13 +2080,20 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
+					celValidator := validator(&s, &s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
 					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+
+					if tt.expectedCost != 0 {
+						if remainingBudget != tt.costBudget-tt.expectedCost {
+							t.Errorf("expected cost to be %d, but got %d", tt.expectedCost, tt.costBudget-remainingBudget)
+						}
+						return
 					}
 					if tt.expectSkipped {
 						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
@@ -2255,6 +2318,470 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, size(rule.key) <= 63 && rule.key.matches("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"))`),
 			errors: []string{"failed rule"},
 		},
+		{
+			name: "allOf rule",
+			errors: []string{
+				`key must be 'value' and key2 must be 'value2'`,
+				`key must not be equal to key2`,
+			},
+			obj: map[string]interface{}{
+				"key":  "value",
+				"key2": "value",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"key":  stringType,
+					"key2": stringType,
+				},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key == 'value' && self.key2 == 'value2'",
+										Message: "key must be 'value' and key2 must be 'value2'",
+									},
+								},
+							},
+						},
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key != self.key2",
+										Message: "key must not be equal to key2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			// anyOf is not suppored due to the fact that to properly implement it
+			// the SchemaValidator would need to call out to CEL. This test
+			// shows that a rule that would otherwise be an error has those
+			// fields ignored (CRD validation shoulds will throw error in this case)
+			name: "anyOf rule ignored",
+			obj: map[string]interface{}{
+				"key":  "value",
+				"key2": "value",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"key":  stringType,
+					"key2": stringType,
+				},
+				ValidationExtensions: schema.ValidationExtensions{
+					XValidations: []apiextensions.ValidationRule{
+						{
+							Rule: "true",
+						},
+					},
+				},
+				ValueValidation: &schema.ValueValidation{
+					AnyOf: []schema.NestedValueValidation{
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key == 'value' && self.key2 == 'value2'",
+										Message: "key must be 'value' and key2 must be 'value2'",
+									},
+								},
+							},
+						},
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key != self.key2",
+										Message: "key must not be equal to key2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			// OneOf is not suppored due to the fact that to properly implement it
+			// the SchemaValidator would need to call out to CEL. This test
+			// shows that a rule that would otherwise be an error has those
+			// fields ignored (CRD validation shoulds will throw error in this case)
+			name: "oneOf rule ignored",
+			obj: map[string]interface{}{
+				"key":  "value",
+				"key2": "value",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"key":  stringType,
+					"key2": stringType,
+				},
+				ValidationExtensions: schema.ValidationExtensions{
+					XValidations: []apiextensions.ValidationRule{
+						{
+							Rule: "true",
+						},
+					},
+				},
+				ValueValidation: &schema.ValueValidation{
+					OneOf: []schema.NestedValueValidation{
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key == 'value' && self.key2 == 'value2'",
+										Message: "key must be 'value' and key2 must be 'value2'",
+									},
+								},
+							},
+						},
+						{
+							ValidationExtensions: schema.ValidationExtensions{
+								XValidations: []apiextensions.ValidationRule{
+									{
+										Rule:    "self.key != self.key2",
+										Message: "key must not be equal to key2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			// Not is not suppored due to the fact that to properly implement it
+			// the SchemaValidator would need to call out to CEL. This test
+			// shows that a rule that would otherwise be an error has those
+			// fields ignored (CRD validation shoulds will throw error in this case)
+			name: "not rule ignored",
+			obj: map[string]interface{}{
+				"key":  "value",
+				"key2": "value",
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"key":  stringType,
+					"key2": stringType,
+				},
+				ValidationExtensions: schema.ValidationExtensions{
+					XValidations: []apiextensions.ValidationRule{
+						{
+							Rule: "true",
+						},
+					},
+				},
+				ValueValidation: &schema.ValueValidation{
+					Not: &schema.NestedValueValidation{
+						ValidationExtensions: schema.ValidationExtensions{
+							XValidations: []apiextensions.ValidationRule{
+								{
+									Rule:    "self.key == 'value' && self.key2 == 'value2'",
+									Message: "key must be 'value' and key2 must be 'value2'",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allOf.items",
+			obj: map[string]interface{}{
+				"myList": []interface{}{"value", "value2"},
+			},
+			errors: []string{
+				`must be value2 or not value`,
+				`len must be 5`,
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"myList": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &stringType,
+						ValueValidation: &schema.ValueValidation{
+							AllOf: []schema.NestedValueValidation{
+								{
+									Items: &schema.NestedValueValidation{
+										ValidationExtensions: schema.ValidationExtensions{
+											XValidations: []apiextensions.ValidationRule{
+												{
+													Rule:    "self.size() == 5",
+													Message: "len must be 5",
+												},
+											},
+										},
+									},
+								},
+								{
+									Items: &schema.NestedValueValidation{
+										ValidationExtensions: schema.ValidationExtensions{
+											XValidations: []apiextensions.ValidationRule{
+												{
+													Rule:    `self == "value2" || self != "value"`,
+													Message: "must be value2 or not value",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allOf.additionalProperties",
+			obj: map[string]interface{}{
+				"myProperty": map[string]interface{}{
+					"key":  "value",
+					"key2": "value2",
+				},
+			},
+			errors: []string{
+				`root.myProperty[key]: Invalid value: "string": must be value2 or not value`,
+				`root.myProperty[key2]: Invalid value: "string": len must be 5`,
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				// need to put all tests in Properties due to WithTypeAndObjectMeta
+				// enforcing structs for all top level schemas
+				Properties: map[string]schema.Structural{
+					"myProperty": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						AdditionalProperties: &schema.StructuralOrBool{Structural: &stringType},
+						ValueValidation: &schema.ValueValidation{
+							AllOf: []schema.NestedValueValidation{
+								{
+									AdditionalProperties: &schema.NestedValueValidation{
+										ValidationExtensions: schema.ValidationExtensions{
+											XValidations: []apiextensions.ValidationRule{
+												{
+													Rule:    `self == "value2" || self != "value"`,
+													Message: "must be value2 or not value",
+												},
+												{
+													Rule:    "self.size() == 5",
+													Message: "len must be 5",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allOf.properties",
+			obj: map[string]interface{}{
+				"key":  "value",
+				"key2": "value2",
+			},
+			errors: []string{
+				`root.key: Invalid value: "string": must be value2 or not value`,
+				`root.key2: Invalid value: "string": len must be 5`,
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"key":  stringType,
+					"key2": stringType,
+				},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{
+							Properties: map[string]schema.NestedValueValidation{
+								"key": {
+									ValidationExtensions: schema.ValidationExtensions{
+										XValidations: []apiextensions.ValidationRule{
+											{
+												Rule:    `self == "value2" || self != "value"`,
+												Message: "must be value2 or not value",
+											},
+										},
+									},
+								},
+								"key2": {
+									ValidationExtensions: schema.ValidationExtensions{
+										XValidations: []apiextensions.ValidationRule{
+											{
+												Rule:    "self.size() == 5",
+												Message: "len must be 5",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "allOf.items.allOf",
+			obj:  map[string]interface{}{"myList": []interface{}{"value", "value2"}},
+			errors: []string{
+				`must be value2 or not value`,
+				`len must be 5`,
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"myList": {
+						Generic: schema.Generic{
+							Type: "array",
+						},
+						Items: &stringType,
+						ValueValidation: &schema.ValueValidation{
+							AllOf: []schema.NestedValueValidation{
+								{
+									Items: &schema.NestedValueValidation{
+										ValueValidation: schema.ValueValidation{
+											AllOf: []schema.NestedValueValidation{
+												{
+													ValidationExtensions: schema.ValidationExtensions{
+														XValidations: []apiextensions.ValidationRule{
+															{
+																Rule:    "self.size() == 5",
+																Message: "len must be 5",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								{
+									Items: &schema.NestedValueValidation{
+										ValueValidation: schema.ValueValidation{
+											AllOf: []schema.NestedValueValidation{
+												{
+													ValidationExtensions: schema.ValidationExtensions{
+														XValidations: []apiextensions.ValidationRule{
+															{
+																Rule:    `self == "value2" || self != "value"`,
+																Message: "must be value2 or not value",
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "properties.allOf.additionalProperties.allOf.properties",
+			obj: map[string]interface{}{
+				"myProperty": map[string]interface{}{
+					"randomKey": map[string]interface{}{
+						"key":  "value",
+						"key2": "value2",
+					},
+				},
+			},
+			errors: []string{
+				`must be value2 or not value`,
+				`len must be 5`,
+			},
+			schema: &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"myProperty": {
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						AdditionalProperties: &schema.StructuralOrBool{Structural: objectTypePtr(map[string]schema.Structural{
+							"key":  stringType,
+							"key2": stringType,
+						})},
+					},
+				},
+				ValueValidation: &schema.ValueValidation{
+					AllOf: []schema.NestedValueValidation{
+						{
+							Properties: map[string]schema.NestedValueValidation{
+								"myProperty": {
+									AdditionalProperties: &schema.NestedValueValidation{
+										ValueValidation: schema.ValueValidation{
+											AllOf: []schema.NestedValueValidation{
+												{
+													Properties: map[string]schema.NestedValueValidation{
+														"key": {
+															ValidationExtensions: schema.ValidationExtensions{
+																XValidations: []apiextensions.ValidationRule{
+																	{
+																		Rule:    `self == "value2" || self != "value"`,
+																		Message: "must be value2 or not value",
+																	},
+																},
+															},
+														},
+														"key2": {
+															ValidationExtensions: schema.ValidationExtensions{
+																XValidations: []apiextensions.ValidationRule{
+																	{
+																		Rule:    "self.size() == 5",
+																		Message: "len must be 5",
+																	},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2262,7 +2789,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			celValidator := validator(tt.schema, tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2329,7 +2856,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
+					celValidator := validator(&s, &s, false, model.SchemaDeclType(&s, false), celconfig.PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -2463,7 +2990,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
+					celValidator := validator(&s, &s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), celconfig.PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2745,7 +3272,7 @@ func TestReasonAndFldPath(t *testing.T) {
 					"field2": stringType,
 					"field3": stringType,
 				},
-				Extensions: schema.Extensions{
+				ValidationExtensions: schema.ValidationExtensions{
 					XValidations: apiextensions.ValidationRules{
 						{
 							Rule:      `self.field2 != "value2"`,
@@ -2784,7 +3311,7 @@ func TestReasonAndFldPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
+			celValidator := validator(tt.schema, tt.schema, true, model.SchemaDeclType(tt.schema, true), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -2810,16 +3337,16 @@ func TestValidateFieldPath(t *testing.T) {
 			"foo": {
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{
-						Structural: &schema.Structural{
-							Generic: schema.Generic{
-								Type: "object",
-							},
-							Properties: map[string]schema.Structural{
-								"subAdd": {
-									Generic: schema.Generic{
-										Type: "number",
-									},
+				},
+				AdditionalProperties: &schema.StructuralOrBool{
+					Structural: &schema.Structural{
+						Generic: schema.Generic{
+							Type: "object",
+						},
+						Properties: map[string]schema.Structural{
+							"subAdd": {
+								Generic: schema.Generic{
+									Type: "number",
 								},
 							},
 						},
@@ -3943,7 +4470,7 @@ func TestOptionalOldSelf(t *testing.T) {
 			// t.Parallel()
 
 			ctx := context.TODO()
-			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, false), celconfig.PerCallLimit)
+			celValidator := validator(tt.schema, tt.schema, true, model.SchemaDeclType(tt.schema, false), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -4097,7 +4624,7 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			celValidator := validator(&tt.schema, &tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -4183,7 +4710,7 @@ func TestOptionalOldSelfIsOptionalType(t *testing.T) {
 				tt.schema.XValidations[i].OptionalOldSelf = ptr.To(true)
 			}
 
-			celValidator := validator(&tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
+			celValidator := validator(&tt.schema, &tt.schema, false, model.SchemaDeclType(&tt.schema, false), celconfig.PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -4345,7 +4872,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 						ValueValidation: &schema.ValueValidation{
 							Format: "date-time",
 						},
-						Extensions: schema.Extensions{
+						ValidationExtensions: schema.ValidationExtensions{
 							XValidations: []apiextensions.ValidationRule{
 								{Rule: rule},
 							},
@@ -4478,9 +5005,9 @@ func objectTypePtr(props map[string]schema.Structural) *schema.Structural {
 func mapType(valSchema *schema.Structural) schema.Structural {
 	result := schema.Structural{
 		Generic: schema.Generic{
-			Type:                 "object",
-			AdditionalProperties: &schema.StructuralOrBool{Bool: true, Structural: valSchema},
+			Type: "object",
 		},
+		AdditionalProperties: &schema.StructuralOrBool{Bool: true, Structural: valSchema},
 	}
 	return result
 }
@@ -4499,7 +5026,7 @@ func intOrStringType() schema.Structural {
 }
 
 func withRule(s schema.Structural, rule string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
 		},
@@ -4508,7 +5035,7 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 }
 
 func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, messageExpression string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:              rule,
 			Message:           message,
@@ -4519,7 +5046,7 @@ func withRuleMessageAndMessageExpression(s schema.Structural, rule, message, mes
 }
 
 func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *apiextensions.FieldValueErrorReason) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:      rule,
 			FieldPath: jsonPath,
@@ -4530,7 +5057,7 @@ func withReasonAndFldPath(s schema.Structural, rule, jsonPath string, reason *ap
 }
 
 func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression string) schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule:              rule,
 			MessageExpression: messageExpression,
@@ -4540,7 +5067,7 @@ func withRuleAndMessageExpression(s schema.Structural, rule, messageExpression s
 }
 
 func withRulePtr(s *schema.Structural, rule string) *schema.Structural {
-	s.Extensions.XValidations = apiextensions.ValidationRules{
+	s.XValidations = apiextensions.ValidationRules{
 		{
 			Rule: rule,
 		},

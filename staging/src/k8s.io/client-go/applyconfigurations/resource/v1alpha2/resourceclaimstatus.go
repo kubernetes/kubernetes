@@ -18,7 +18,7 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceClaimStatusApplyConfiguration represents an declarative configuration of the ResourceClaimStatus type for use
+// ResourceClaimStatusApplyConfiguration represents a declarative configuration of the ResourceClaimStatus type for use
 // with apply.
 type ResourceClaimStatusApplyConfiguration struct {
 	DriverName            *string                                            `json:"driverName,omitempty"`
@@ -27,7 +27,7 @@ type ResourceClaimStatusApplyConfiguration struct {
 	DeallocationRequested *bool                                              `json:"deallocationRequested,omitempty"`
 }
 
-// ResourceClaimStatusApplyConfiguration constructs an declarative configuration of the ResourceClaimStatus type for use with
+// ResourceClaimStatusApplyConfiguration constructs a declarative configuration of the ResourceClaimStatus type for use with
 // apply.
 func ResourceClaimStatus() *ResourceClaimStatusApplyConfiguration {
 	return &ResourceClaimStatusApplyConfiguration{}

@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
+
 	inf "gopkg.in/inf.v0"
 )
 
@@ -683,6 +685,12 @@ func (q Quantity) MarshalJSON() ([]byte, error) {
 	return result, nil
 }
 
+func (q Quantity) MarshalCBOR() ([]byte, error) {
+	// The call to String() should never return the string "<nil>" because the receiver's
+	// address will never be nil.
+	return cbor.Marshal(q.String())
+}
+
 // ToUnstructured implements the value.UnstructuredConverter interface.
 func (q Quantity) ToUnstructured() interface{} {
 	return q.String()
@@ -707,6 +715,27 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	}
 
 	// This copy is safe because parsed will not be referred to again.
+	*q = parsed
+	return nil
+}
+
+func (q *Quantity) UnmarshalCBOR(value []byte) error {
+	var s *string
+	if err := cbor.Unmarshal(value, &s); err != nil {
+		return err
+	}
+
+	if s == nil {
+		q.d.Dec = nil
+		q.i = int64Amount{}
+		return nil
+	}
+
+	parsed, err := ParseQuantity(strings.TrimSpace(*s))
+	if err != nil {
+		return err
+	}
+
 	*q = parsed
 	return nil
 }

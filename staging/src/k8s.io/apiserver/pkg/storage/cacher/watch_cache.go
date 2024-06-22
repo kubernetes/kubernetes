@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
@@ -311,24 +312,25 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		RecordTime:      w.clock.Now(),
 	}
 
+	// We can call w.store.Get() outside of a critical section,
+	// because the w.store itself is thread-safe and the only
+	// place where w.store is modified is below (via updateFunc)
+	// and these calls are serialized because reflector is processing
+	// events one-by-one.
+	previous, exists, err := w.store.Get(elem)
+	if err != nil {
+		return err
+	}
+	if exists {
+		previousElem := previous.(*storeElement)
+		wcEvent.PrevObject = previousElem.Object
+		wcEvent.PrevObjLabels = previousElem.Labels
+		wcEvent.PrevObjFields = previousElem.Fields
+	}
+
 	if err := func() error {
-		// TODO: We should consider moving this lock below after the watchCacheEvent
-		// is created. In such situation, the only problematic scenario is Replace()
-		// happening after getting object from store and before acquiring a lock.
-		// Maybe introduce another lock for this purpose.
 		w.Lock()
 		defer w.Unlock()
-
-		previous, exists, err := w.store.Get(elem)
-		if err != nil {
-			return err
-		}
-		if exists {
-			previousElem := previous.(*storeElement)
-			wcEvent.PrevObject = previousElem.Object
-			wcEvent.PrevObjLabels = previousElem.Labels
-			wcEvent.PrevObjFields = previousElem.Fields
-		}
 
 		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
@@ -346,6 +348,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if w.eventHandler != nil {
 		w.eventHandler(wcEvent)
 	}
+	metrics.RecordResourceVersion(w.groupResource.String(), resourceVersion)
 	return nil
 }
 
@@ -428,6 +431,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 		}
 		w.eventHandler(wcEvent)
 	}
+	metrics.RecordResourceVersion(w.groupResource.String(), rv)
 }
 
 // List returns list of pointers to <storeElement> objects.
@@ -498,7 +502,8 @@ func (s sortableStoreElements) Swap(i, j int) {
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
 func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, matchValues []storage.MatchValue) (result []interface{}, rv uint64, index string, err error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && w.notFresh(resourceVersion) {
+	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 		w.waitingUntilFresh.Remove()
@@ -626,7 +631,9 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		w.onReplace()
 	}
 	w.cond.Broadcast()
-	klog.V(3).Infof("Replace watchCache (rev: %v) ", resourceVersion)
+
+	metrics.RecordResourceVersion(w.groupResource.String(), version)
+	klog.V(3).Infof("Replaced watchCache (rev: %v) ", resourceVersion)
 	return nil
 }
 
@@ -639,6 +646,12 @@ func (w *watchCache) SetOnReplace(onReplace func()) {
 func (w *watchCache) Resync() error {
 	// Nothing to do
 	return nil
+}
+
+func (w *watchCache) getListResourceVersion() uint64 {
+	w.RLock()
+	defer w.RUnlock()
+	return w.listResourceVersion
 }
 
 func (w *watchCache) currentCapacity() int {
@@ -703,9 +716,10 @@ func (w *watchCache) isIndexValidLocked(index int) bool {
 // getAllEventsSinceLocked returns a watchCacheInterval that can be used to
 // retrieve events since a certain resourceVersion. This function assumes to
 // be called under the watchCache lock.
-func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, opts storage.ListOptions) (*watchCacheInterval, error) {
+func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, key string, opts storage.ListOptions) (*watchCacheInterval, error) {
+	_, matchesSingle := opts.Predicate.MatchesSingle()
 	if opts.SendInitialEvents != nil && *opts.SendInitialEvents {
-		return w.getIntervalFromStoreLocked()
+		return w.getIntervalFromStoreLocked(key, matchesSingle)
 	}
 
 	size := w.endIndex - w.startIndex
@@ -734,7 +748,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, opts storag
 			// current state and only then start watching from that point.
 			//
 			// TODO: In v2 api, we should stop returning the current state - #13969.
-			return w.getIntervalFromStoreLocked()
+			return w.getIntervalFromStoreLocked(key, matchesSingle)
 		}
 		// SendInitialEvents = false and resourceVersion = 0
 		// means that the request would like to start watching
@@ -753,15 +767,15 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64, opts storag
 	indexerFunc := func(i int) *watchCacheEvent {
 		return w.cache[i%w.capacity]
 	}
-	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, &w.RWMutex)
+	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, w.RWMutex.RLocker())
 	return ci, nil
 }
 
 // getIntervalFromStoreLocked returns a watchCacheInterval
 // that covers the entire storage state.
 // This function assumes to be called under the watchCache lock.
-func (w *watchCache) getIntervalFromStoreLocked() (*watchCacheInterval, error) {
-	ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, w.getAttrsFunc)
+func (w *watchCache) getIntervalFromStoreLocked(key string, matchesSingle bool) (*watchCacheInterval, error) {
+	ci, err := newCacheIntervalFromStore(w.resourceVersion, w.store, w.getAttrsFunc, key, matchesSingle)
 	if err != nil {
 		return nil, err
 	}

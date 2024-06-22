@@ -121,7 +121,7 @@ function kube::codegen::gen_helpers() {
         input_pkgs+=("${pkg}")
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+k8s:deepcopy-gen=' \
+            -e '^\s*//\s*+k8s:deepcopy-gen=' \
             -r "${in_dir}" \
             --include '*.go' \
             || true \
@@ -153,7 +153,7 @@ function kube::codegen::gen_helpers() {
         input_pkgs+=("${pkg}")
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+k8s:defaulter-gen=' \
+            -e '^\s*//\s*+k8s:defaulter-gen=' \
             -r "${in_dir}" \
             --include '*.go' \
             || true \
@@ -185,7 +185,7 @@ function kube::codegen::gen_helpers() {
         input_pkgs+=("${pkg}")
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+k8s:conversion-gen=' \
+            -e '^\s*//\s*+k8s:conversion-gen=' \
             -r "${in_dir}" \
             --include '*.go' \
             || true \
@@ -338,7 +338,7 @@ function kube::codegen::gen_openapi() {
         input_pkgs+=("${pkg}")
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+k8s:openapi-gen=' \
+            -e '^\s*//\s*+k8s:openapi-gen=' \
             -r "${in_dir}" \
             --include '*.go' \
             || true \
@@ -568,7 +568,7 @@ function kube::codegen::gen_client() {
         fi
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+genclient' \
+            -e '^\s*//\s*+genclient' \
             -r "${in_dir}${one_input_api}" \
             --include '*.go' \
             || true \
