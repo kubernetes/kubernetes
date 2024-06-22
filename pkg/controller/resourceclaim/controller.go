@@ -102,7 +102,7 @@ type Controller struct {
 	templateLister  resourcev1alpha2listers.ResourceClaimTemplateLister
 	templatesSynced cache.InformerSynced
 
-	// podIndexer has the common PodResourceClaim indexer indexer installed To
+	// podIndexer has the common PodResourceClaim indexer installed To
 	// limit iteration over pods to those of interest.
 	podIndexer cache.Indexer
 
@@ -308,10 +308,11 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 			return true, fmt.Sprintf("internal error while checking for claim: %v", err)
 		}
 
-		if checkOwner &&
-			resourceclaim.IsForPod(pod, claim) != nil {
-			// Cannot proceed with the pod unless that other claim gets deleted.
-			return false, "conflicting claim needs to be removed by user"
+		if checkOwner {
+			if err := resourceclaim.IsForPod(pod, claim); err != nil {
+				// Cannot proceed with the pod unless that other claim gets deleted.
+				return false, err.Error()
+			}
 		}
 
 		// This check skips over the reasons below that only apply
@@ -340,14 +341,14 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 			}
 			if scheduling.Spec.SelectedNode != pod.Spec.NodeName {
 				// Need to update PodSchedulingContext.
-				return true, "need to updated PodSchedulingContext for scheduled pod"
+				return true, fmt.Sprintf("need to update PodSchedulingContext %s for scheduled pod", klog.KObj(scheduling))
 			}
 		}
 		if claim.Status.Allocation != nil &&
 			!resourceclaim.IsReservedForPod(pod, claim) &&
 			resourceclaim.CanBeReserved(claim) {
 			// Need to reserve it.
-			return true, "need to reserve claim for pod"
+			return true, fmt.Sprintf("need to reserve claim %s for pod", klog.KObj(claim))
 		}
 	}
 
@@ -521,10 +522,10 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 			continue
 		}
 		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			return fmt.Errorf("retrieve claim: %v", err)
 		}
 		if checkOwner {
@@ -550,7 +551,7 @@ func (ec *Controller) syncPod(ctx context.Context, namespace, name string) error
 	return nil
 }
 
-// handleResourceClaim is invoked for each resource claim of a pod.
+// handleClaim is invoked for each resource claim of a pod.
 func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim, newPodClaims *map[string]string) error {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "podClaim", podClaim.Name)
 	ctx = klog.NewContext(ctx, logger)
@@ -735,7 +736,7 @@ func (ec *Controller) ensurePodSchedulingContext(ctx context.Context, pod *v1.Po
 			},
 		}
 		if _, err := ec.kubeClient.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Create(ctx, scheduling, metav1.CreateOptions{}); err != nil {
-			return fmt.Errorf("create PodSchedulingContext: %v", err)
+			return fmt.Errorf("create PodSchedulingContext %s: %w", klog.KObj(scheduling), err)
 		}
 		return nil
 	}
@@ -744,7 +745,7 @@ func (ec *Controller) ensurePodSchedulingContext(ctx context.Context, pod *v1.Po
 		scheduling := scheduling.DeepCopy()
 		scheduling.Spec.SelectedNode = pod.Spec.NodeName
 		if _, err := ec.kubeClient.ResourceV1alpha2().PodSchedulingContexts(pod.Namespace).Update(ctx, scheduling, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("update spec.selectedNode in PodSchedulingContext: %v", err)
+			return fmt.Errorf("update spec.selectedNode in PodSchedulingContext %s: %w", klog.KObj(scheduling), err)
 		}
 	}
 
@@ -760,7 +761,7 @@ func (ec *Controller) reserveForPod(ctx context.Context, pod *v1.Pod, claim *res
 			UID:      pod.UID,
 		})
 	if _, err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
-		return fmt.Errorf("reserve claim for pod: %v", err)
+		return fmt.Errorf("reserve claim %s for pod: %w", klog.KObj(claim), err)
 	}
 	return nil
 }
@@ -930,7 +931,7 @@ func (ec *Controller) syncClaim(ctx context.Context, namespace, name string) err
 					logger.V(5).Info("deleting unused generated claim", "claim", klog.KObj(claim), "pod", klog.KObj(pod))
 					err := ec.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
 					if err != nil {
-						return fmt.Errorf("delete claim: %v", err)
+						return fmt.Errorf("delete claim %s: %w", klog.KObj(claim), err)
 					}
 				} else {
 					logger.V(6).Info("wrong pod content, not deleting claim", "claim", klog.KObj(claim), "podUID", podUID, "podContent", pod)
