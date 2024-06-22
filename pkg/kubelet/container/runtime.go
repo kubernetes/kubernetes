@@ -556,6 +556,8 @@ type RuntimeStatus struct {
 	Conditions []RuntimeCondition
 	// Handlers is an array of current available handlers
 	Handlers []RuntimeHandler
+	// Features is the set of features implemented by the runtime
+	Features *RuntimeFeatures
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.
@@ -579,7 +581,7 @@ func (r *RuntimeStatus) String() string {
 	for _, h := range r.Handlers {
 		sh = append(sh, h.String())
 	}
-	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s", strings.Join(ss, ", "), strings.Join(sh, ", "))
+	return fmt.Sprintf("Runtime Conditions: %s; Handlers: %s, Features: %s", strings.Join(ss, ", "), strings.Join(sh, ", "), r.Features.String())
 }
 
 // RuntimeHandler contains condition information for the runtime handler.
@@ -615,6 +617,19 @@ type RuntimeCondition struct {
 // String formats the runtime condition into human readable string.
 func (c *RuntimeCondition) String() string {
 	return fmt.Sprintf("%s=%t reason:%s message:%s", c.Type, c.Status, c.Reason, c.Message)
+}
+
+// RuntimeFeatures contains the set of features implemented by the runtime
+type RuntimeFeatures struct {
+	SupplementalGroupsPolicy bool
+}
+
+// String formats the runtime condition into a human readable string.
+func (f *RuntimeFeatures) String() string {
+	if f == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
 }
 
 // Pods represents the list of pods
