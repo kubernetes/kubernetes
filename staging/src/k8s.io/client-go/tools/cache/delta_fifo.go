@@ -451,7 +451,7 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 		return KeyError{obj, err}
 	}
 
-  // Every object comes through this code path once, so this is a good
+	// Every object comes through this code path once, so this is a good
 	// place to call the transform func.
 	//
 	// If obj is a DeletedFinalStateUnknown tombstone or the action is a Sync,
