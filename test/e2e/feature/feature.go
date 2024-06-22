@@ -334,6 +334,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StorageVersionAPI = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
 
+	// Owner: sig-node
+	// Marks tests that require a cluster with SupplementalGroupsPolicy
+	// (used for testing fine-grained SupplementalGroups control <https://kep.k8s.io/3619>)
+	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
+
 	// Owner: sig-network
 	// Marks tests that require a cluster with Topology Hints enabled.
 	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
