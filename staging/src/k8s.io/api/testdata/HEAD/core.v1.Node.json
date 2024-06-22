@@ -164,6 +164,9 @@
           "recursiveReadOnlyMounts": true
         }
       }
-    ]
+    ],
+    "features": {
+      "supplementalGroupsPolicy": true
+    }
   }
 }
