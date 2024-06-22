@@ -3741,6 +3741,16 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.NodeFeatures": {
+        "description": "NodeFeatures describes the set of features implemented by the CRI implementation. The features contained in the NodeFeatures should depend only on the cri implementation independent of runtime handlers.",
+        "properties": {
+          "supplementalGroupsPolicy": {
+            "description": "SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.NodeList": {
         "description": "NodeList is the whole list of all Nodes which have been registered with master.",
         "properties": {
@@ -3806,7 +3816,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.NodeRuntimeHandlerFeatures": {
-        "description": "NodeRuntimeHandlerFeatures is a set of runtime features.",
+        "description": "NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.",
         "properties": {
           "recursiveReadOnlyMounts": {
             "description": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
@@ -4026,6 +4036,14 @@
             ],
             "default": {},
             "description": "Endpoints of daemons running on the Node."
+          },
+          "features": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeFeatures"
+              }
+            ],
+            "description": "Features describes the set of features implemented by the CRI implementation."
           },
           "images": {
             "description": "List of container images on this node",
