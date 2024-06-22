@@ -1025,7 +1025,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		if !calledDone {
 			// Basically, AddUnschedulableIfNotPresent calls DonePod internally.
 			// But, AddUnschedulableIfNotPresent isn't called in some corner cases.
-			// Here, we call DonePod explicitly to avoid leaking the pod.
+			// Here, we call Done explicitly to avoid leaking the pod.
 			sched.SchedulingQueue.Done(podInfo.Pod.UID)
 		}
 	}()
@@ -1074,9 +1074,18 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
-			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				logger.Error(err, "Error occurred")
-			}
+			schedulingCycle := sched.SchedulingQueue.SchedulingCycle()
+			go func() {
+				// When handling events takes time in the queue, AddUnschedulableIfNotPresent could be blocked by a shared lock within the queue,
+				// which negatively impacts the scheduling throughput.
+				// So, we put an unschedulable pod back to the queue in a goroutine.
+				//
+				// We handle a nominatingInfo outside goroutine below,
+				// and hence there shouldn't be any race condition etc that caused by doing this in goroutine.
+				if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, schedulingCycle); err != nil {
+					logger.Error(err, "Error occurred when putting an unschedulable pod back to the queue", "pod", klog.KObj(pod))
+				}
+			}()
 			calledDone = true
 		}
 	}

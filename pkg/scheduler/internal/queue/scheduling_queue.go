@@ -769,7 +769,6 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
 	}
 
-	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	return nil
 }
 
@@ -822,7 +821,6 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		p.cond.Broadcast()
 	}
 
-	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	return nil
 }
 
