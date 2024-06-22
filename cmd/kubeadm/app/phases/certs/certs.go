@@ -129,16 +129,6 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 	)
 }
 
-// NewCSR will generate a new CSR and accompanying key
-func NewCSR(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) (*x509.CertificateRequest, crypto.Signer, error) {
-	certConfig, err := certSpec.GetConfig(cfg)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to retrieve cert configuration")
-	}
-
-	return pkiutil.NewCSRAndKey(certConfig)
-}
-
 // CreateCertAndKeyFilesWithCA loads the given certificate authority from disk, then generates and writes out the given certificate and key.
 // The certSpec and caCertSpec should both be one of the variables from this package.
 func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
