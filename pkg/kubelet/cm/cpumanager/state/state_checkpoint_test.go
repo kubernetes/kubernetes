@@ -279,8 +279,7 @@ func TestCheckpointStateStore(t *testing.T) {
 			}
 
 			// set values of cs1 instance so they are stored in checkpoint and can be read by cs2
-			cs1.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
-			cs1.SetCPUAssignments(tc.expectedState.assignments)
+			cs1.SetCPUAssignments(tc.expectedState.assignments, tc.expectedState.defaultCPUSet)
 
 			// restore checkpoint with previously stored values
 			cs2, err := NewCheckpointState(testingDir, testingCheckpoint, "none", nil)
@@ -350,16 +349,15 @@ func TestCheckpointStateHelpers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
-			state.SetDefaultCPUSet(tc.defaultCPUset)
 
 			for pod := range tc.assignments {
 				for container, set := range tc.assignments[pod] {
-					state.SetCPUSet(pod, container, set)
+					state.SetCPUSet(pod, container, set, tc.defaultCPUset.Difference(set))
 					if cpus, _ := state.GetCPUSet(pod, container); !cpus.Equals(set) {
 						t.Fatalf("state inconsistent, got %q instead of %q", set, cpus)
 					}
 
-					state.Delete(pod, container)
+					state.Delete(pod, container, state.GetDefaultCPUSet().Union(set))
 					if _, ok := state.GetCPUSet(pod, container); ok {
 						t.Fatal("deleted container still existing in state")
 					}
@@ -400,8 +398,7 @@ func TestCheckpointStateClear(t *testing.T) {
 				t.Fatalf("could not create testing checkpointState instance: %v", err)
 			}
 
-			state.SetDefaultCPUSet(tc.defaultCPUset)
-			state.SetCPUAssignments(tc.assignments)
+			state.SetCPUAssignments(tc.assignments, tc.defaultCPUset)
 
 			state.ClearState()
 			if !cpuset.New().Equals(state.GetDefaultCPUSet()) {

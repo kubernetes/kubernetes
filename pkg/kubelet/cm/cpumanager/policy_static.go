@@ -357,7 +357,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 		return err
 	}
-	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
+	s.SetCPUSet(string(pod.UID), container.Name, cpuset, s.GetDefaultCPUSet().Difference(cpuset))
 	p.updateCPUsToReuse(pod, container, cpuset)
 
 	return nil
@@ -380,10 +380,9 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 	klog.InfoS("Static policy: RemoveContainer", "podUID", podUID, "containerName", containerName)
 	cpusInUse := getAssignedCPUsOfSiblings(s, podUID, containerName)
 	if toRelease, ok := s.GetCPUSet(podUID, containerName); ok {
-		s.Delete(podUID, containerName)
 		// Mutate the shared pool, adding released cpus.
 		toRelease = toRelease.Difference(cpusInUse)
-		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		s.Delete(podUID, containerName, s.GetDefaultCPUSet().Union(toRelease))
 	}
 	return nil
 }
@@ -417,9 +416,6 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 		return cpuset.New(), err
 	}
 	result = result.Union(remainingCPUs)
-
-	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
 
 	klog.InfoS("AllocateCPUs", "result", result)
 	return result, nil

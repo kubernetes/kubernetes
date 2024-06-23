@@ -268,7 +268,7 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 	m.Lock()
 	defer m.Unlock()
 	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
-		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset, m.state.GetDefaultCPUSet())
 	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
 }
@@ -294,7 +294,7 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 
 	err = m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
-		m.lastUpdateState.Delete(podUID, containerName)
+		m.lastUpdateState.Delete(podUID, containerName, m.state.GetDefaultCPUSet())
 		m.containerMap.RemoveByContainerID(containerID)
 	}
 
@@ -304,7 +304,7 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) error {
 	err := m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
-		m.lastUpdateState.Delete(podUID, containerName)
+		m.lastUpdateState.Delete(podUID, containerName, m.state.GetDefaultCPUSet())
 		m.containerMap.RemoveByContainerRef(podUID, containerName)
 	}
 
@@ -477,7 +477,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 					failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
 					continue
 				}
-				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset, m.state.GetDefaultCPUSet())
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
 		}
