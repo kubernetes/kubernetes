@@ -1260,6 +1260,10 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 
 	// process pods and exit.
 	if runOnce {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LegacyNodeRunOnceMode) {
+			panic("Cannot run runonce mode when LegacyNodeRunOnceMode feature gate is disabled")
+		}
+		klog.ErrorS(nil, "RunOnce mode is deprecated, please refer to https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/4580-deprecate-kubelet-runonce/README.md#risks-and-mitigations for migration solutions.")
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %w", err)
 		}
