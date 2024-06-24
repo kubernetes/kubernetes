@@ -331,14 +331,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 
 		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-			informerFactory.Start(context.StopCh)
-			c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+			informerFactory.Start(context.Done())
+			c.GenericConfig.SharedInformerFactory.Start(context.Done())
 			return nil
 		})
 
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
 			// if we end up blocking for long periods of time, we may need to increase workers.
-			go availableController.Run(5, context.StopCh)
+			go availableController.Run(5, context.Done())
 			return nil
 		})
 	}
