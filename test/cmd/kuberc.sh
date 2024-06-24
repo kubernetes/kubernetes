@@ -29,54 +29,53 @@ run_kuberc_tests() {
   export KUBECTL_KUBERC=true
 
   cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
-apiVersion: config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1alpha1
 kind: Preferences
-spec:
-  aliases:
-  - name: crns
-    command: create namespace
-    args:
-     - test-kuberc-ns
-  - name: runx
-    command: run
-    flags:
-    - name: image
-      default: nginx
-    - name: labels
-      default: app=test,env=test
-    - name: env
-      default: DNS_DOMAIN=test
-    - name: namespace
-      default: test-kuberc-ns
-    args:
-    - test-pod-2
-    - --
-    - custom-arg1
-    - custom-arg2
-  - name: setx
-    command: set image
-    args:
-    - pod/test-pod-2
-    - test-pod-2=busybox
-  overrides:
-  - command: apply
-    flags:
-    - name: server-side
-      default: "true"
-    - name: dry-run
-      default: "server"
-    - name: validate
-      default: "strict"
-  - command: delete
-    flags:
-    - name: interactive
-      default: "true"
-  - command: get
-    flags:
-    - name: namespace
-      default: "test-kuberc-ns"
-    - name: output
-      default: "json"
+aliases:
+- name: crns
+  command: create namespace
+  args:
+   - test-kuberc-ns
+- name: runx
+  command: run
+  flags:
+  - name: image
+    default: nginx
+  - name: labels
+    default: app=test,env=test
+  - name: env
+    default: DNS_DOMAIN=test
+  - name: namespace
+    default: test-kuberc-ns
+  args:
+  - test-pod-2
+  - --
+  - custom-arg1
+  - custom-arg2
+- name: setx
+  command: set image
+  args:
+  - pod/test-pod-2
+  - test-pod-2=busybox
+overrides:
+- command: apply
+  flags:
+  - name: server-side
+    default: "true"
+  - name: dry-run
+    default: "server"
+  - name: validate
+    default: "strict"
+- command: delete
+  flags:
+  - name: interactive
+    default: "true"
+- command: get
+  flags:
+  - name: namespace
+    default: "test-kuberc-ns"
+  - name: output
+    default: "json"
 EOF
 
   # Pre-condition: the test-kuberc-ns namespace does not exist
