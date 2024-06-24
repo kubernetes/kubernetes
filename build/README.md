@@ -50,8 +50,11 @@ All Docker names are suffixed with a hash derived from the file path (to allow c
 ## Build artifacts
 The build system output all its products to a top level directory in the source repository named `_output`.
 These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
-If you intend to run a component with a docker image you will need to import it from this directory with
-the appropriate command (e.g. `docker import _output/release-images/amd64/kube-scheduler.tar k8s.io/kube-scheduler:$(git describe)`).
+If you intend to run a component with a docker image you will need to load it from this directory with
+the appropriate command, e.g.
+```
+docker load --input _output/release-images/amd64/kube-controller-manager.tar
+```
 
 ## Releasing
 
