@@ -31,11 +31,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestFinishRequest(t *testing.T) {
+func TestFinishRequestWithPerHandlerReadWriteTimeoutEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, true)
+	testFinishRequest(t)
+}
+
+func TestFinishRequestWithPerHandlerReadWriteTimeoutDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerHandlerReadWriteTimeout, false)
+	testFinishRequest(t)
+}
+
+func testFinishRequest(t *testing.T) {
 	exampleObj := &example.Pod{}
 	exampleErr := fmt.Errorf("error")
 	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
@@ -234,7 +247,7 @@ func TestFinishRequestWithPostTimeoutTracker(t *testing.T) {
 				logPostTimeoutResult(timedOutAt, r)
 			}
 
-			_, err := finishRequest(ctx, resultFn, test.postTimeoutWait, decoratedPostTimeoutLogger)
+			_, err := asyncFinisher(ctx, resultFn, test.postTimeoutWait, decoratedPostTimeoutLogger)
 			if err == nil || err.Error() != expectedTimeoutErr.Error() {
 				t.Errorf("expected timeout error: %v, but got: %v", expectedTimeoutErr, err)
 			}

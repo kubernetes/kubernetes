@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -81,10 +83,36 @@ const (
 
 // FinishRequest makes a given ResultFunc asynchronous and handles errors returned by the response.
 func FinishRequest(ctx context.Context, fn ResultFunc) (runtime.Object, error) {
-	return finishRequest(ctx, fn, postTimeoutLoggerWait, logPostTimeoutResult)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PerHandlerReadWriteTimeout) {
+		return serialFinisher(ctx, fn)
+	}
+	return asyncFinisher(ctx, fn, postTimeoutLoggerWait, logPostTimeoutResult)
 }
 
-func finishRequest(ctx context.Context, fn ResultFunc, postTimeoutWait time.Duration, postTimeoutLogger PostTimeoutLoggerFunc) (runtime.Object, error) {
+// serialFinisher executes the given function in the same goroutine as the caller
+func serialFinisher(ctx context.Context, fn ResultFunc) (runtime.Object, error) {
+	result := &result{}
+	func() {
+		// capture the panic here to be rethrown later, this is in
+		// keepting with the behavior of the asynchronous finisher
+		defer func() {
+			if reason := recover(); reason != nil {
+				// store the panic reason into the result.
+				result.reason = capture(reason)
+			}
+		}()
+		result.object, result.err = fn()
+	}()
+
+	return result.Return()
+}
+
+// asyncFinisher invokes the given function on a new goroutine (callee), the
+// caller goroutine blocks by waiting on a receiving channel for the result.
+// the caller will abandon its wait as soon as the given context is
+// canceled or expires, and will return a timeout error to the client.
+// the callee goroutine may continue to run after the given context expires.
+func asyncFinisher(ctx context.Context, fn ResultFunc, postTimeoutWait time.Duration, postTimeoutLogger PostTimeoutLoggerFunc) (runtime.Object, error) {
 	// the channel needs to be buffered since the post-timeout receiver goroutine
 	// waits up to 5 minutes for the child goroutine to return.
 	resultCh := make(chan *result, 1)
@@ -94,20 +122,9 @@ func finishRequest(ctx context.Context, fn ResultFunc, postTimeoutWait time.Dura
 
 		// panics don't cross goroutine boundaries, so we have to handle ourselves
 		defer func() {
-			reason := recover()
-			if reason != nil {
-				// do not wrap the sentinel ErrAbortHandler panic value
-				if reason != http.ErrAbortHandler {
-					// Same as stdlib http server code. Manually allocate stack
-					// trace buffer size to prevent excessively large logs
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:goruntime.Stack(buf, false)]
-					reason = fmt.Sprintf("%v\n%s", reason, buf)
-				}
-
+			if reason := recover(); reason != nil {
 				// store the panic reason into the result.
-				result.reason = reason
+				result.reason = capture(reason)
 			}
 
 			// Propagate the result to the parent goroutine
@@ -173,4 +190,17 @@ func logPostTimeoutResult(timedOutAt time.Time, r *result) {
 	err := fmt.Errorf("FinishRequest: post-timeout activity - time-elapsed: %s, panicked: %t, err: %v, panic-reason: %v",
 		time.Since(timedOutAt), r.reason != nil, r.err, r.reason)
 	utilruntime.HandleError(err)
+}
+
+func capture(recovered interface{}) interface{} {
+	// do not wrap the sentinel ErrAbortHandler panic value
+	if recovered == http.ErrAbortHandler {
+		return recovered
+	}
+	// Same as stdlib http server code. Manually allocate stack
+	// trace buffer size to prevent excessively large logs
+	const size = 64 << 10
+	buf := make([]byte, size)
+	buf = buf[:goruntime.Stack(buf, false)]
+	return fmt.Sprintf("%v\n%s", recovered, buf)
 }
