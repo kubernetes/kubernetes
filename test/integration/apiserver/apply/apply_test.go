@@ -39,9 +39,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
+	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -4419,6 +4424,109 @@ spec:
 	}
 ]
 `)
+}
+
+func TestApplyMatchesFakeClientsetApply(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+	fakeClient := fake.NewClientset()
+
+	// The fake client does not default fields, so we set all defaulted fields directly.
+	deployment := appsv1ac.Deployment("deployment", "default").
+		WithLabels(map[string]string{"app": "nginx"}).
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithReplicas(3).
+			WithStrategy(appsv1ac.DeploymentStrategy().
+				WithType(appsv1.RollingUpdateDeploymentStrategyType).
+				WithRollingUpdate(appsv1ac.RollingUpdateDeployment().
+					WithMaxUnavailable(intstr.FromString("25%")).
+					WithMaxSurge(intstr.FromString("25%")))).
+			WithRevisionHistoryLimit(10).
+			WithProgressDeadlineSeconds(600).
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"})).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithRestartPolicy(v1.RestartPolicyAlways).
+					WithTerminationGracePeriodSeconds(30).
+					WithDNSPolicy(v1.DNSClusterFirst).
+					WithSecurityContext(corev1ac.PodSecurityContext()).
+					WithSchedulerName("default-scheduler").
+					WithContainers(corev1ac.Container().
+						WithName("nginx").
+						WithImage("nginx:latest").
+						WithTerminationMessagePath("/dev/termination-log").
+						WithTerminationMessagePolicy("File").
+						WithImagePullPolicy(v1.PullAlways)))))
+	fieldManager := "m-1"
+
+	realCreated, err := client.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	fakeCreated, err := fakeClient.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: fieldManager})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// wipe metadata except name, namespace, labels and managedFields (but wipe timestamps in managedFields)
+	realCreated.ObjectMeta = wipeMetadataForFakeClientTests(realCreated.ObjectMeta)
+	fakeCreated.ObjectMeta = wipeMetadataForFakeClientTests(fakeCreated.ObjectMeta)
+	// wipe status
+	realCreated.Status = appsv1.DeploymentStatus{}
+	fakeCreated.Status = appsv1.DeploymentStatus{}
+	// TODO: Remove once https://github.com/kubernetes/kubernetes/issues/125671 is fixed.
+	fakeCreated.TypeMeta = metav1.TypeMeta{}
+
+	if diff := cmp.Diff(realCreated, fakeCreated); diff != "" {
+		t.Errorf("Unexpected fake created: (-want +got): %v", diff)
+	}
+
+	// Force apply with a different field manager
+	deploymentUpdate := appsv1ac.Deployment("deployment", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithReplicas(4))
+	updateManager := "m-2"
+	realUpdated, err := client.AppsV1().Deployments("default").Apply(context.TODO(), deploymentUpdate, metav1.ApplyOptions{FieldManager: updateManager, Force: true})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	fakeUpdated, err := fakeClient.AppsV1().Deployments("default").Apply(context.TODO(), deploymentUpdate, metav1.ApplyOptions{FieldManager: updateManager, Force: true})
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	// wipe metadata except name, namespace, labels and managedFields (but wipe timestamps in managedFields)
+	realUpdated.ObjectMeta = wipeMetadataForFakeClientTests(realUpdated.ObjectMeta)
+	fakeUpdated.ObjectMeta = wipeMetadataForFakeClientTests(fakeUpdated.ObjectMeta)
+	// wipe status
+	realUpdated.Status = appsv1.DeploymentStatus{}
+	fakeUpdated.Status = appsv1.DeploymentStatus{}
+	// TODO: Remove once https://github.com/kubernetes/kubernetes/issues/125671 is fixed.
+	fakeUpdated.TypeMeta = metav1.TypeMeta{}
+
+	if diff := cmp.Diff(realUpdated, fakeUpdated); diff != "" {
+		t.Errorf("Unexpected fake updated: (-want +got): %v", diff)
+	}
+}
+
+var wipeTime = metav1.NewTime(time.Date(2000, 1, 1, 0, 0, 0, 0, time.FixedZone("EDT", -4*60*60)))
+
+func wipeMetadataForFakeClientTests(meta metav1.ObjectMeta) metav1.ObjectMeta {
+	wipedManagedFields := make([]metav1.ManagedFieldsEntry, len(meta.ManagedFields))
+	copy(meta.ManagedFields, wipedManagedFields)
+	for _, mf := range wipedManagedFields {
+		mf.Time = &wipeTime
+	}
+	return metav1.ObjectMeta{
+		Name:          meta.Name,
+		Namespace:     meta.Namespace,
+		Labels:        meta.Labels,
+		ManagedFields: wipedManagedFields,
+	}
 }
 
 func expectManagedFields(t *testing.T, managedFields []metav1.ManagedFieldsEntry, expect string) {
