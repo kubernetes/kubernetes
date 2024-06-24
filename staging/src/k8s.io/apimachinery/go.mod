@@ -7,7 +7,7 @@ go 1.22.0
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
-	github.com/fxamacker/cbor/v2 v2.7.0-beta
+	github.com/fxamacker/cbor/v2 v2.7.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/gnostic-models v0.6.8

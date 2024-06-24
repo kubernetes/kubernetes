@@ -1444,7 +1444,7 @@ func encodeStruct(e *bytes.Buffer, em *encMode, v reflect.Value) (err error) {
 	flds := structType.getFields(em)
 
 	start := 0
-	if em.sort == SortFastShuffle {
+	if em.sort == SortFastShuffle && len(flds) > 0 {
 		start = rand.Intn(len(flds)) //nolint:gosec // Don't need a CSPRNG for deck cutting.
 	}
 
