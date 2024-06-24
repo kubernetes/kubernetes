@@ -46,7 +46,7 @@ var rolebindingsKind = v1beta1.SchemeGroupVersion.WithKind("RoleBinding")
 func (c *FakeRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.RoleBinding, err error) {
 	emptyResult := &v1beta1.RoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rolebindingsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(rolebindingsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeRoleBindings) Get(ctx context.Context, name string, options v1.GetO
 func (c *FakeRoleBindings) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
 	emptyResult := &v1beta1.RoleBindingList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolebindingsResource, rolebindingsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(rolebindingsResource, rolebindingsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeRoleBindings) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested roleBindings.
 func (c *FakeRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(rolebindingsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(rolebindingsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watc
 func (c *FakeRoleBindings) Create(ctx context.Context, roleBinding *v1beta1.RoleBinding, opts v1.CreateOptions) (result *v1beta1.RoleBinding, err error) {
 	emptyResult := &v1beta1.RoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolebindingsResource, c.ns, roleBinding), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(rolebindingsResource, c.ns, roleBinding, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeRoleBindings) Create(ctx context.Context, roleBinding *v1beta1.Role
 func (c *FakeRoleBindings) Update(ctx context.Context, roleBinding *v1beta1.RoleBinding, opts v1.UpdateOptions) (result *v1beta1.RoleBinding, err error) {
 	emptyResult := &v1beta1.RoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolebindingsResource, c.ns, roleBinding), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(rolebindingsResource, c.ns, roleBinding, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeRoleBindings) Delete(ctx context.Context, name string, opts v1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolebindingsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(rolebindingsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.RoleBindingList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeRoleBindings) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *FakeRoleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.RoleBinding, err error) {
 	emptyResult := &v1beta1.RoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolebindingsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeRoleBindings) Apply(ctx context.Context, roleBinding *rbacv1beta1.R
 	}
 	emptyResult := &v1beta1.RoleBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolebindingsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolebindingsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

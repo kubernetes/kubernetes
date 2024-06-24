@@ -45,7 +45,7 @@ var ipaddressesKind = v1alpha1.SchemeGroupVersion.WithKind("IPAddress")
 func (c *FakeIPAddresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.IPAddress, err error) {
 	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(ipaddressesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(ipaddressesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeIPAddresses) Get(ctx context.Context, name string, options v1.GetOp
 func (c *FakeIPAddresses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.IPAddressList, err error) {
 	emptyResult := &v1alpha1.IPAddressList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(ipaddressesResource, ipaddressesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(ipaddressesResource, ipaddressesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeIPAddresses) List(ctx context.Context, opts v1.ListOptions) (result
 // Watch returns a watch.Interface that watches the requested iPAddresses.
 func (c *FakeIPAddresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(ipaddressesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(ipaddressesResource, opts))
 }
 
 // Create takes the representation of a iPAddress and creates it.  Returns the server's representation of the iPAddress, and an error, if there is any.
 func (c *FakeIPAddresses) Create(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.CreateOptions) (result *v1alpha1.IPAddress, err error) {
 	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(ipaddressesResource, iPAddress), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(ipaddressesResource, iPAddress, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeIPAddresses) Create(ctx context.Context, iPAddress *v1alpha1.IPAddr
 func (c *FakeIPAddresses) Update(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.UpdateOptions) (result *v1alpha1.IPAddress, err error) {
 	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(ipaddressesResource, iPAddress), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(ipaddressesResource, iPAddress, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeIPAddresses) Delete(ctx context.Context, name string, opts v1.Delet
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeIPAddresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(ipaddressesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(ipaddressesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.IPAddressList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeIPAddresses) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *FakeIPAddresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.IPAddress, err error) {
 	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ipaddressesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeIPAddresses) Apply(ctx context.Context, iPAddress *networkingv1alph
 	}
 	emptyResult := &v1alpha1.IPAddress{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ipaddressesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ipaddressesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

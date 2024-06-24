@@ -46,7 +46,7 @@ var networkpoliciesKind = v1beta1.SchemeGroupVersion.WithKind("NetworkPolicy")
 func (c *FakeNetworkPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.NetworkPolicy, err error) {
 	emptyResult := &v1beta1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(networkpoliciesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(networkpoliciesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeNetworkPolicies) Get(ctx context.Context, name string, options v1.G
 func (c *FakeNetworkPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.NetworkPolicyList, err error) {
 	emptyResult := &v1beta1.NetworkPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(networkpoliciesResource, networkpoliciesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(networkpoliciesResource, networkpoliciesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeNetworkPolicies) List(ctx context.Context, opts v1.ListOptions) (re
 // Watch returns a watch.Interface that watches the requested networkPolicies.
 func (c *FakeNetworkPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(networkpoliciesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(networkpoliciesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeNetworkPolicies) Watch(ctx context.Context, opts v1.ListOptions) (w
 func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy, opts v1.CreateOptions) (result *v1beta1.NetworkPolicy, err error) {
 	emptyResult := &v1beta1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(networkpoliciesResource, c.ns, networkPolicy), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(networkpoliciesResource, c.ns, networkPolicy, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeNetworkPolicies) Create(ctx context.Context, networkPolicy *v1beta1
 func (c *FakeNetworkPolicies) Update(ctx context.Context, networkPolicy *v1beta1.NetworkPolicy, opts v1.UpdateOptions) (result *v1beta1.NetworkPolicy, err error) {
 	emptyResult := &v1beta1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(networkpoliciesResource, c.ns, networkPolicy), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(networkpoliciesResource, c.ns, networkPolicy, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeNetworkPolicies) Delete(ctx context.Context, name string, opts v1.D
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(networkpoliciesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(networkpoliciesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.NetworkPolicyList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeNetworkPolicies) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeNetworkPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.NetworkPolicy, err error) {
 	emptyResult := &v1beta1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(networkpoliciesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeNetworkPolicies) Apply(ctx context.Context, networkPolicy *extensio
 	}
 	emptyResult := &v1beta1.NetworkPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(networkpoliciesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

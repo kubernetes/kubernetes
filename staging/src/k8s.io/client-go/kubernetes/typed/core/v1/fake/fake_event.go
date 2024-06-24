@@ -46,7 +46,7 @@ var eventsKind = v1.SchemeGroupVersion.WithKind("Event")
 func (c *FakeEvents) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Event, err error) {
 	emptyResult := &v1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(eventsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(eventsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeEvents) Get(ctx context.Context, name string, options metav1.GetOpt
 func (c *FakeEvents) List(ctx context.Context, opts metav1.ListOptions) (result *v1.EventList, err error) {
 	emptyResult := &v1.EventList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(eventsResource, eventsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(eventsResource, eventsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeEvents) List(ctx context.Context, opts metav1.ListOptions) (result 
 // Watch returns a watch.Interface that watches the requested events.
 func (c *FakeEvents) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(eventsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(eventsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeEvents) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 func (c *FakeEvents) Create(ctx context.Context, event *v1.Event, opts metav1.CreateOptions) (result *v1.Event, err error) {
 	emptyResult := &v1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(eventsResource, c.ns, event, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeEvents) Create(ctx context.Context, event *v1.Event, opts metav1.Cr
 func (c *FakeEvents) Update(ctx context.Context, event *v1.Event, opts metav1.UpdateOptions) (result *v1.Event, err error) {
 	emptyResult := &v1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(eventsResource, c.ns, event, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeEvents) Delete(ctx context.Context, name string, opts metav1.Delete
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeEvents) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(eventsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(eventsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.EventList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeEvents) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Event, err error) {
 	emptyResult := &v1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(eventsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeEvents) Apply(ctx context.Context, event *corev1.EventApplyConfigur
 	}
 	emptyResult := &v1.Event{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(eventsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

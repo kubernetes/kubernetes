@@ -48,7 +48,7 @@ var replicasetsKind = v1.SchemeGroupVersion.WithKind("ReplicaSet")
 func (c *FakeReplicaSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ReplicaSet, err error) {
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(replicasetsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(replicasetsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -60,7 +60,7 @@ func (c *FakeReplicaSets) Get(ctx context.Context, name string, options metav1.G
 func (c *FakeReplicaSets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ReplicaSetList, err error) {
 	emptyResult := &v1.ReplicaSetList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(replicasetsResource, replicasetsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(replicasetsResource, replicasetsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -82,7 +82,7 @@ func (c *FakeReplicaSets) List(ctx context.Context, opts metav1.ListOptions) (re
 // Watch returns a watch.Interface that watches the requested replicaSets.
 func (c *FakeReplicaSets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(replicasetsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(replicasetsResource, c.ns, opts))
 
 }
 
@@ -90,7 +90,7 @@ func (c *FakeReplicaSets) Watch(ctx context.Context, opts metav1.ListOptions) (w
 func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.CreateOptions) (result *v1.ReplicaSet, err error) {
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(replicasetsResource, c.ns, replicaSet), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(replicasetsResource, c.ns, replicaSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -102,7 +102,7 @@ func (c *FakeReplicaSets) Create(ctx context.Context, replicaSet *v1.ReplicaSet,
 func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.UpdateOptions) (result *v1.ReplicaSet, err error) {
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(replicasetsResource, c.ns, replicaSet), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(replicasetsResource, c.ns, replicaSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -115,7 +115,7 @@ func (c *FakeReplicaSets) Update(ctx context.Context, replicaSet *v1.ReplicaSet,
 func (c *FakeReplicaSets) UpdateStatus(ctx context.Context, replicaSet *v1.ReplicaSet, opts metav1.UpdateOptions) (result *v1.ReplicaSet, err error) {
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "status", c.ns, replicaSet), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(replicasetsResource, "status", c.ns, replicaSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -133,7 +133,7 @@ func (c *FakeReplicaSets) Delete(ctx context.Context, name string, opts metav1.D
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(replicasetsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(replicasetsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ReplicaSetList{})
 	return err
@@ -143,7 +143,7 @@ func (c *FakeReplicaSets) DeleteCollection(ctx context.Context, opts metav1.Dele
 func (c *FakeReplicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicaSet, err error) {
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -166,7 +166,7 @@ func (c *FakeReplicaSets) Apply(ctx context.Context, replicaSet *appsv1.ReplicaS
 	}
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -190,7 +190,7 @@ func (c *FakeReplicaSets) ApplyStatus(ctx context.Context, replicaSet *appsv1.Re
 	}
 	emptyResult := &v1.ReplicaSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -202,7 +202,7 @@ func (c *FakeReplicaSets) ApplyStatus(ctx context.Context, replicaSet *appsv1.Re
 func (c *FakeReplicaSets) GetScale(ctx context.Context, replicaSetName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(replicasetsResource, c.ns, "scale", replicaSetName), emptyResult)
+		Invokes(testing.NewGetSubresourceActionWithOptions(replicasetsResource, c.ns, "scale", replicaSetName, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -214,7 +214,7 @@ func (c *FakeReplicaSets) GetScale(ctx context.Context, replicaSetName string, o
 func (c *FakeReplicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(replicasetsResource, "scale", c.ns, scale, opts), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return emptyResult, err
@@ -234,7 +234,7 @@ func (c *FakeReplicaSets) ApplyScale(ctx context.Context, replicaSetName string,
 	}
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(replicasetsResource, c.ns, replicaSetName, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, replicaSetName, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

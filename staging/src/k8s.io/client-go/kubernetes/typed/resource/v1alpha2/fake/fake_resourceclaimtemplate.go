@@ -46,7 +46,7 @@ var resourceclaimtemplatesKind = v1alpha2.SchemeGroupVersion.WithKind("ResourceC
 func (c *FakeResourceClaimTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
 	emptyResult := &v1alpha2.ResourceClaimTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(resourceclaimtemplatesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(resourceclaimtemplatesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeResourceClaimTemplates) Get(ctx context.Context, name string, optio
 func (c *FakeResourceClaimTemplates) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimTemplateList, err error) {
 	emptyResult := &v1alpha2.ResourceClaimTemplateList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(resourceclaimtemplatesResource, resourceclaimtemplatesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(resourceclaimtemplatesResource, resourceclaimtemplatesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeResourceClaimTemplates) List(ctx context.Context, opts v1.ListOptio
 // Watch returns a watch.Interface that watches the requested resourceClaimTemplates.
 func (c *FakeResourceClaimTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(resourceclaimtemplatesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(resourceclaimtemplatesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeResourceClaimTemplates) Watch(ctx context.Context, opts v1.ListOpti
 func (c *FakeResourceClaimTemplates) Create(ctx context.Context, resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, opts v1.CreateOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
 	emptyResult := &v1alpha2.ResourceClaimTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(resourceclaimtemplatesResource, c.ns, resourceClaimTemplate), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(resourceclaimtemplatesResource, c.ns, resourceClaimTemplate, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeResourceClaimTemplates) Create(ctx context.Context, resourceClaimTe
 func (c *FakeResourceClaimTemplates) Update(ctx context.Context, resourceClaimTemplate *v1alpha2.ResourceClaimTemplate, opts v1.UpdateOptions) (result *v1alpha2.ResourceClaimTemplate, err error) {
 	emptyResult := &v1alpha2.ResourceClaimTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(resourceclaimtemplatesResource, c.ns, resourceClaimTemplate), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(resourceclaimtemplatesResource, c.ns, resourceClaimTemplate, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeResourceClaimTemplates) Delete(ctx context.Context, name string, op
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeResourceClaimTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(resourceclaimtemplatesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(resourceclaimtemplatesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha2.ResourceClaimTemplateList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeResourceClaimTemplates) DeleteCollection(ctx context.Context, opts 
 func (c *FakeResourceClaimTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClaimTemplate, err error) {
 	emptyResult := &v1alpha2.ResourceClaimTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclaimtemplatesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourceclaimtemplatesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeResourceClaimTemplates) Apply(ctx context.Context, resourceClaimTem
 	}
 	emptyResult := &v1alpha2.ResourceClaimTemplate{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourceclaimtemplatesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourceclaimtemplatesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

@@ -46,7 +46,7 @@ var configmapsKind = v1.SchemeGroupVersion.WithKind("ConfigMap")
 func (c *FakeConfigMaps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ConfigMap, err error) {
 	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(configmapsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(configmapsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeConfigMaps) Get(ctx context.Context, name string, options metav1.Ge
 func (c *FakeConfigMaps) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ConfigMapList, err error) {
 	emptyResult := &v1.ConfigMapList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(configmapsResource, configmapsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(configmapsResource, configmapsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeConfigMaps) List(ctx context.Context, opts metav1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested configMaps.
 func (c *FakeConfigMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(configmapsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(configmapsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeConfigMaps) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 func (c *FakeConfigMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (result *v1.ConfigMap, err error) {
 	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(configmapsResource, c.ns, configMap), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(configmapsResource, c.ns, configMap, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeConfigMaps) Create(ctx context.Context, configMap *v1.ConfigMap, op
 func (c *FakeConfigMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (result *v1.ConfigMap, err error) {
 	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(configmapsResource, c.ns, configMap), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(configmapsResource, c.ns, configMap, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeConfigMaps) Delete(ctx context.Context, name string, opts metav1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(configmapsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(configmapsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ConfigMapList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeConfigMaps) DeleteCollection(ctx context.Context, opts metav1.Delet
 func (c *FakeConfigMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error) {
 	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(configmapsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeConfigMaps) Apply(ctx context.Context, configMap *corev1.ConfigMapA
 	}
 	emptyResult := &v1.ConfigMap{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(configmapsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(configmapsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

@@ -45,7 +45,7 @@ var resourceslicesKind = v1alpha2.SchemeGroupVersion.WithKind("ResourceSlice")
 func (c *FakeResourceSlices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceSlice, err error) {
 	emptyResult := &v1alpha2.ResourceSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(resourceslicesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(resourceslicesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeResourceSlices) Get(ctx context.Context, name string, options v1.Ge
 func (c *FakeResourceSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceSliceList, err error) {
 	emptyResult := &v1alpha2.ResourceSliceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(resourceslicesResource, resourceslicesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(resourceslicesResource, resourceslicesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeResourceSlices) List(ctx context.Context, opts v1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested resourceSlices.
 func (c *FakeResourceSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(resourceslicesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(resourceslicesResource, opts))
 }
 
 // Create takes the representation of a resourceSlice and creates it.  Returns the server's representation of the resourceSlice, and an error, if there is any.
 func (c *FakeResourceSlices) Create(ctx context.Context, resourceSlice *v1alpha2.ResourceSlice, opts v1.CreateOptions) (result *v1alpha2.ResourceSlice, err error) {
 	emptyResult := &v1alpha2.ResourceSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(resourceslicesResource, resourceSlice), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(resourceslicesResource, resourceSlice, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeResourceSlices) Create(ctx context.Context, resourceSlice *v1alpha2
 func (c *FakeResourceSlices) Update(ctx context.Context, resourceSlice *v1alpha2.ResourceSlice, opts v1.UpdateOptions) (result *v1alpha2.ResourceSlice, err error) {
 	emptyResult := &v1alpha2.ResourceSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(resourceslicesResource, resourceSlice), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(resourceslicesResource, resourceSlice, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeResourceSlices) Delete(ctx context.Context, name string, opts v1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeResourceSlices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(resourceslicesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(resourceslicesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha2.ResourceSliceList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeResourceSlices) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeResourceSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceSlice, err error) {
 	emptyResult := &v1alpha2.ResourceSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceslicesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(resourceslicesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeResourceSlices) Apply(ctx context.Context, resourceSlice *resourcev
 	}
 	emptyResult := &v1alpha2.ResourceSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceslicesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(resourceslicesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
