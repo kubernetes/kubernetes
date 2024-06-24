@@ -48,7 +48,19 @@ var (
 // Implementations are expected to be thread safe.
 type ImageManager interface {
 	// EnsureImageExists ensures that image specified in `container` exists.
-	EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string) (string, string, error)
+	EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (string, string, error)
+
+	EnsureOCIObject(
+		ctx context.Context,
+		pullType string,
+		ref *v1.ObjectReference,
+		pod *v1.Pod,
+		ociReference string,
+		pullSecrets []v1.Secret,
+		podSandboxConfig *runtimeapi.PodSandboxConfig,
+		podRuntimeHandler string,
+		pullPolicy v1.PullPolicy,
+	) (imageRef, message string, err error)
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface
 }

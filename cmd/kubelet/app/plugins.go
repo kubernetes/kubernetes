@@ -18,10 +18,12 @@ package app
 
 // This file exists to force the desired plugin implementations to be linked.
 import (
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/utils/exec"
 
 	// Volume plugins
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/oci"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
 )
@@ -65,6 +68,9 @@ func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlu
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	if utilfeature.DefaultFeatureGate.Enabled(features.OCIVolume) {
+		allPlugins = append(allPlugins, oci.ProbeVolumePlugins()...)
+	}
 	return allPlugins, nil
 }
 
