@@ -69,6 +69,15 @@ func SetDefaults_Volume(obj *v1.Volume) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) && obj.Image != nil && obj.Image.PullPolicy == "" {
+		// PullPolicy defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+		_, tag, _, _ := parsers.ParseImageName(obj.Image.Reference)
+		if tag == "latest" {
+			obj.Image.PullPolicy = v1.PullAlways
+		} else {
+			obj.Image.PullPolicy = v1.PullIfNotPresent
+		}
+	}
 }
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {

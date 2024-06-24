@@ -1094,6 +1094,9 @@ spec:
         hostPath:
           path: pathValue
           type: typeValue
+        image:
+          pullPolicy: pullPolicyValue
+          reference: referenceValue
         iscsi:
           chapAuthDiscovery: true
           chapAuthSession: true

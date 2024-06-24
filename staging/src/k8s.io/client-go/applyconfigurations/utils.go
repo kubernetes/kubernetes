@@ -754,6 +754,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.HTTPGetActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HTTPHeader"):
 		return &applyconfigurationscorev1.HTTPHeaderApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ImageVolumeSource"):
+		return &applyconfigurationscorev1.ImageVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.ISCSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIVolumeSource"):
