@@ -732,6 +732,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			}
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.OCIVolume) && source.OCI != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("oci"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateOCIVolumeSource(source.OCI, fldPath.Child("oci"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -2918,6 +2926,18 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		}
 		if mountPathAlreadyExists(mnt.MountPath, voldevices) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must not already exist as a path in volumeDevices"))
+		}
+
+		// Disallow subPath/subPathExpr for OCI volumes
+		if utilfeature.DefaultFeatureGate.Enabled(features.OCIVolume) {
+			if v, ok := volumes[mnt.Name]; ok && v.OCI != nil {
+				if mnt.SubPath != "" {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPath"), mnt.SubPath, "not allowed in OCI volume sources"))
+				}
+				if mnt.SubPathExpr != "" {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "not allowed in OCI volume sources"))
+				}
+			}
 		}
 
 		if len(mnt.SubPath) > 0 {
@@ -8171,4 +8191,13 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 		}
 	}
 	return allErrors
+}
+
+func validateOCIVolumeSource(oci *core.OCIVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(oci.Reference) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("reference"), ""))
+	}
+	allErrs = append(allErrs, validatePullPolicy(oci.PullPolicy, fldPath.Child("pullPolicy"))...)
+	return allErrs
 }

@@ -492,6 +492,10 @@
                   "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
+            },
+            "oci": {
+              "reference": "referenceValue",
+              "pullPolicy": "pullPolicyValue"
             }
           }
         ],

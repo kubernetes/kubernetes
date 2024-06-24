@@ -1327,6 +1327,16 @@ func (NodeSystemInfo) SwaggerDoc() map[string]string {
 	return map_NodeSystemInfo
 }
 
+var map_OCIVolumeSource = map[string]string{
+	"":           "OCIVolumeSource represents a OCI volume resource.",
+	"reference":  "Required: Image or artifact reference to be used.",
+	"pullPolicy": "Policy for pulling OCI objects. Defaults to IfNotPresent",
+}
+
+func (OCIVolumeSource) SwaggerDoc() map[string]string {
+	return map_OCIVolumeSource
+}
+
 var map_ObjectFieldSelector = map[string]string{
 	"":           "ObjectFieldSelector selects an APIVersioned field of an object.",
 	"apiVersion": "Version of the schema the FieldPath is written in terms of, defaults to \"v1\".",
@@ -2705,6 +2715,7 @@ var map_VolumeSource = map[string]string{
 	"storageos":             "storageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
 	"csi":                   "csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).",
 	"ephemeral":             "ephemeral represents a volume that is handled by a cluster storage driver. The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts, and deleted when the pod is removed.\n\nUse this if: a) the volume is only needed while the pod runs, b) features of normal volumes like restoring from snapshot or capacity\n   tracking are needed,\nc) the storage driver is specified through a storage class, and d) the storage driver supports dynamic volume provisioning through\n   a PersistentVolumeClaim (see EphemeralVolumeSource for more\n   information on the connection between this volume type\n   and PersistentVolumeClaim).\n\nUse PersistentVolumeClaim or one of the vendor-specific APIs for volumes that persist for longer than the lifecycle of an individual pod.\n\nUse CSI for light-weight local ephemeral volumes if the CSI driver is meant to be used that way - see the documentation of the driver for more information.\n\nA pod can use both types of ephemeral volumes and persistent volumes at the same time.",
+	"oci":                   "oci represents a OCI object (image or artifact) pulled and mounted on the kubelet's host machine.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

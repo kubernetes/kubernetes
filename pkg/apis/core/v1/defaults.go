@@ -69,6 +69,9 @@ func SetDefaults_Volume(obj *v1.Volume) {
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.OCIVolume) && obj.OCI != nil && obj.OCI.PullPolicy == "" {
+		obj.OCI.PullPolicy = v1.PullIfNotPresent
+	}
 }
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
