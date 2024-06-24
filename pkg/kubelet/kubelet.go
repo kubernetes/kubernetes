@@ -1475,12 +1475,21 @@ func (kl *Kubelet) StartGarbageCollection() {
 	go wait.Until(func() {
 		ctx := context.Background()
 		if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
+			freedLower := errors.Is(err, images.ErrImageGCFailedLowerFreedBytes)
 			if prevImageGCFailed {
-				klog.ErrorS(err, "Image garbage collection failed multiple times in a row")
+				if freedLower {
+					klog.InfoS("Image garbage collection failed due to insufficient freed bytes, multiple times in a row", "err", err)
+				} else {
+					klog.ErrorS(err, "Image garbage collection failed multiple times in a row")
+				}
 				// Only create an event for repeated failures
 				kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
 			} else {
-				klog.ErrorS(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
+				if freedLower {
+					klog.InfoS("Image garbage collection failed due to insufficient freed bytes", "err", err)
+				} else {
+					klog.ErrorS(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
+				}
 			}
 			prevImageGCFailed = true
 		} else {
