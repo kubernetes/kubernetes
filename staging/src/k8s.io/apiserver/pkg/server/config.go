@@ -1035,9 +1035,13 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	// to make the addition of warning headers threadsafe
 	handler = genericapifilters.WithWarningRecorder(handler)
 
-	// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
-	// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
-	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	handler = genericapifilters.WithRequestTimeoutDelegator(handler, func(handler http.Handler) http.Handler {
+		// WithTimeoutForNonLongRunningRequests will call the rest of the request handling in a go-routine with the
+		// context with deadline. The go-routine can keep running, while the timeout logic will return a timeout to the client.
+		return genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc)
+	}, func(handler http.Handler) http.Handler {
+		return genericapifilters.WithPerRequestDeadline(handler)
+	})
 
 	handler = genericapifilters.WithRequestDeadline(handler, c.AuditBackend, c.AuditPolicyRuleEvaluator,
 		c.LongRunningFunc, c.Serializer, c.RequestTimeout)

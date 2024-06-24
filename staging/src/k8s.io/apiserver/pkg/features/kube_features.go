@@ -322,6 +322,12 @@ const (
 	// the 'nominalConcurrencyShares' field of the 'limited' section of a
 	// priority level.
 	ZeroLimitedNominalConcurrencyShares featuregate.Feature = "ZeroLimitedNominalConcurrencyShares"
+
+	// owner: @tkashem
+	// beta: v1.31
+	//
+	// Allow the API server to enable per request read/write deadline
+	PerHandlerReadWriteTimeout featuregate.Feature = "PerHandlerReadWriteTimeout"
 )
 
 func init() {
@@ -413,4 +419,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 
 	ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+
+	PerHandlerReadWriteTimeout: {Default: false, PreRelease: featuregate.Alpha},
 }

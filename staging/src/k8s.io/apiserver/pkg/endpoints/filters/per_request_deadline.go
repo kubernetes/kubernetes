@@ -18,7 +18,61 @@ package filters
 
 import (
 	"net/http"
+
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
+
+// WithRequestTimeoutDelegator adds the appropriate request timeout handler to the
+// chain, depending on whether PerHandlerReadWriteTimeout is enabled/disabled
+// - timeoutHandlerFn: function that creates the legacy timeout handler
+// - perRequestHandlerFn: function that creates the per-request deadline handler
+// - chain: the chain of handlers constructed so far
+func WithRequestTimeoutDelegator(chain http.Handler, timeoutHandlerFn, perRequestHandlerFn func(http.Handler) http.Handler) http.Handler {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.PerHandlerReadWriteTimeout) {
+		// PerHandlerReadWriteTimeout is disabled:
+		// return the timeout handler, in keeping with the legacy behavior.
+		return timeoutHandlerFn(chain)
+	}
+
+	// PerHandlerReadWriteTimeout is enabled: we have to handle
+	// http/1x differently than http/2.0
+	//
+	// HTTP/1x: we want to retain the legacy timeout filter
+	//    chain --> per-request --> timeout  --> ...
+	//
+	//  timeout.ServeHTTP:
+	//     |
+	//     |-- per-request.ServeHTTP
+	//     |     |
+	//           |-- chain.ServeHTTP
+	//           |
+	//
+	// this will help us avoid client potentially hanging indefinitely
+	// see https://github.com/golang/go/issues/65526
+	http1 := perRequestHandlerFn(chain)
+	http1 = timeoutHandlerFn(http1)
+
+	// HTTP/2.0: we don't need the legacy timeout filter
+	//
+	//  per-request.ServeHTTP:
+	//     |
+	//     |-- chain.ServeHTTP
+	//     |
+	//
+	http2 := perRequestHandlerFn(chain)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// PerHandlerReadWriteTimeout excludes http/1x requests, so the
+		// timeout filter applies to http/1x requests only.
+		if req.ProtoMajor == 1 {
+			http1.ServeHTTP(w, req)
+			return
+		}
+
+		http2.ServeHTTP(w, req)
+	})
+}
 
 // WithPerRequestDeadline applies per-request read/write deadline to the given
 // request handler. If the context associated with the request has a valid
