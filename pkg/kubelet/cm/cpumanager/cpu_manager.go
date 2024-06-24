@@ -378,10 +378,10 @@ func (m *manager) removeStaleState() {
 	// Loop through the CPUManager state. Remove any state for containers not
 	// in the `activeContainers` list built above.
 	assignments := m.state.GetCPUAssignments()
-	for podUID := range assignments {
-		for containerName := range assignments[podUID] {
+	for podUID, containers := range assignments {
+		for containerName := range containers {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
-				klog.ErrorS(nil, "RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
+				klog.InfoS("RemoveStaleState: removing container (based on the latest CPU assignments)", "podUID", podUID, "containerName", containerName)
 				err := m.policyRemoveContainerByRef(podUID, containerName)
 				if err != nil {
 					klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
@@ -392,7 +392,7 @@ func (m *manager) removeStaleState() {
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		if _, ok := activeContainers[podUID][containerName]; !ok {
-			klog.ErrorS(nil, "RemoveStaleState: removing container", "podUID", podUID, "containerName", containerName)
+			klog.InfoS("RemoveStaleState: removing container (from container map cache)", "podUID", podUID, "containerName", containerName)
 			err := m.policyRemoveContainerByRef(podUID, containerName)
 			if err != nil {
 				klog.ErrorS(err, "RemoveStaleState: failed to remove container", "podUID", podUID, "containerName", containerName)
