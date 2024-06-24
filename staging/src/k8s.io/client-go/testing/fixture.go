@@ -271,6 +271,14 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 }
 
 func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Interface, error) {
+	return t.watch(gvr, ns, false)
+}
+
+func (t *tracker) WatchWithReplay(gvr schema.GroupVersionResource, ns string) (watch.Interface, error) {
+	return t.watch(gvr, ns, true)
+}
+
+func (t *tracker) watch(gvr schema.GroupVersionResource, ns string, sendInitialEvents bool) (watch.Interface, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -280,6 +288,16 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Inter
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
 	}
 	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
+
+	// Replay all objects in the tracker to the watcher.
+	if sendInitialEvents {
+		if objs, ok := t.objects[gvr]; ok {
+			for _, obj := range objs {
+				fakewatcher.Add(obj.DeepCopyObject())
+			}
+		}
+	}
+
 	return fakewatcher, nil
 }
 
