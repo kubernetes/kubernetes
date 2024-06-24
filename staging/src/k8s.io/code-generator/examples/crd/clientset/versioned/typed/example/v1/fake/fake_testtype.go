@@ -200,7 +200,7 @@ func (c *FakeTestTypes) ApplyStatus(ctx context.Context, testType *examplev1.Tes
 func (c *FakeTestTypes) GetClusterTestType(ctx context.Context, name string, options metav1.GetOptions) (result *v1.TestType, err error) {
 	emptyResult := &v1.TestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(testtypesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(testtypesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
