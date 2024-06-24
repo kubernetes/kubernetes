@@ -25,7 +25,7 @@ import (
 
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
@@ -64,13 +64,9 @@ func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1beta1.DeploymentList{ListMeta: obj.(*v1beta1.DeploymentList).ListMeta}
 	for _, item := range obj.(*v1beta1.DeploymentList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

@@ -25,7 +25,7 @@ import (
 
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	autoscalingv2beta1 "k8s.io/client-go/applyconfigurations/autoscaling/v2beta1"
@@ -64,13 +64,9 @@ func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOpt
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v2beta1.HorizontalPodAutoscalerList{ListMeta: obj.(*v2beta1.HorizontalPodAutoscalerList).ListMeta}
 	for _, item := range obj.(*v2beta1.HorizontalPodAutoscalerList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

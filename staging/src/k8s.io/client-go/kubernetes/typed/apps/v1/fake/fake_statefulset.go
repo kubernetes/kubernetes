@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
@@ -66,13 +66,9 @@ func (c *FakeStatefulSets) List(ctx context.Context, opts metav1.ListOptions) (r
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1.StatefulSetList{ListMeta: obj.(*v1.StatefulSetList).ListMeta}
 	for _, item := range obj.(*v1.StatefulSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

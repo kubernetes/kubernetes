@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1 "k8s.io/client-go/applyconfigurations/rbac/v1"
@@ -61,13 +61,9 @@ func (c *FakeClusterRoles) List(ctx context.Context, opts metav1.ListOptions) (r
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1.ClusterRoleList{ListMeta: obj.(*v1.ClusterRoleList).ListMeta}
 	for _, item := range obj.(*v1.ClusterRoleList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

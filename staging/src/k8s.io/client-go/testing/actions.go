@@ -74,8 +74,7 @@ func NewRootListAction(resource schema.GroupVersionResource, kind schema.GroupVe
 	action.Verb = "list"
 	action.Resource = resource
 	action.Kind = kind
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	action.ListRestrictions = ExtractFromListOptions(opts).ToListRestrictions()
 
 	return action
 }
@@ -86,8 +85,7 @@ func NewListAction(resource schema.GroupVersionResource, kind schema.GroupVersio
 	action.Resource = resource
 	action.Kind = kind
 	action.Namespace = namespace
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	action.ListRestrictions = ExtractFromListOptions(opts).ToListRestrictions()
 
 	return action
 }
@@ -275,8 +273,7 @@ func NewRootDeleteCollectionAction(resource schema.GroupVersionResource, opts in
 	action := DeleteCollectionActionImpl{}
 	action.Verb = "delete-collection"
 	action.Resource = resource
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	action.ListRestrictions = ExtractFromListOptions(opts).ToListRestrictions()
 
 	return action
 }
@@ -286,8 +283,7 @@ func NewDeleteCollectionAction(resource schema.GroupVersionResource, namespace s
 	action.Verb = "delete-collection"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector, fieldSelector, _ := ExtractFromListOptions(opts)
-	action.ListRestrictions = ListRestrictions{labelSelector, fieldSelector}
+	action.ListRestrictions = ExtractFromListOptions(opts).ToListRestrictions()
 
 	return action
 }
@@ -296,35 +292,66 @@ func NewRootWatchAction(resource schema.GroupVersionResource, opts interface{}) 
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
-	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	action.WatchRestrictions = ExtractFromListOptions(opts).ToWatchRestrictions()
 
 	return action
 }
 
-func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fieldSelector fields.Selector, resourceVersion string) {
-	var err error
+type Restrictions struct {
+	Labels          labels.Selector
+	Fields          fields.Selector
+	ResourceVersion string
+	Limit           int64
+	Continue        string
+}
+
+func (r Restrictions) ToListRestrictions() ListRestrictions {
+	return ListRestrictions{
+		Labels:   r.Labels,
+		Fields:   r.Fields,
+		Limit:    r.Limit,
+		Continue: r.Continue,
+	}
+}
+
+func (r Restrictions) ToWatchRestrictions() WatchRestrictions {
+	return WatchRestrictions{
+		Labels:          r.Labels,
+		Fields:          r.Fields,
+		ResourceVersion: r.ResourceVersion,
+		Limit:           r.Limit,
+		Continue:        r.Continue,
+	}
+}
+
+func ExtractFromListOptions(opts interface{}) Restrictions {
+	var (
+		restrictions Restrictions
+		err          error
+	)
 	switch t := opts.(type) {
 	case metav1.ListOptions:
-		labelSelector, err = labels.Parse(t.LabelSelector)
+		restrictions.Labels, err = labels.Parse(t.LabelSelector)
 		if err != nil {
 			panic(fmt.Errorf("invalid selector %q: %v", t.LabelSelector, err))
 		}
-		fieldSelector, err = fields.ParseSelector(t.FieldSelector)
+		restrictions.Fields, err = fields.ParseSelector(t.FieldSelector)
 		if err != nil {
 			panic(fmt.Errorf("invalid selector %q: %v", t.FieldSelector, err))
 		}
-		resourceVersion = t.ResourceVersion
+		restrictions.ResourceVersion = t.ResourceVersion
+		restrictions.Limit = t.Limit
+		restrictions.Continue = t.Continue
 	default:
 		panic(fmt.Errorf("expect a ListOptions %T", opts))
 	}
-	if labelSelector == nil {
-		labelSelector = labels.Everything()
+	if restrictions.Labels == nil {
+		restrictions.Labels = labels.Everything()
 	}
-	if fieldSelector == nil {
-		fieldSelector = fields.Everything()
+	if restrictions.Fields == nil {
+		restrictions.Fields = fields.Everything()
 	}
-	return labelSelector, fieldSelector, resourceVersion
+	return restrictions
 }
 
 func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
@@ -332,8 +359,7 @@ func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
-	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
-	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
+	action.WatchRestrictions = ExtractFromListOptions(opts).ToWatchRestrictions()
 
 	return action
 }
@@ -352,13 +378,18 @@ func NewProxyGetAction(resource schema.GroupVersionResource, namespace, scheme, 
 }
 
 type ListRestrictions struct {
-	Labels labels.Selector
-	Fields fields.Selector
+	Labels   labels.Selector
+	Fields   fields.Selector
+	Limit    int64
+	Continue string
 }
+
 type WatchRestrictions struct {
 	Labels          labels.Selector
 	Fields          fields.Selector
 	ResourceVersion string
+	Limit           int64
+	Continue        string
 }
 
 type Action interface {
@@ -649,6 +680,8 @@ func (a WatchActionImpl) DeepCopy() Action {
 			Labels:          a.WatchRestrictions.Labels.DeepCopySelector(),
 			Fields:          a.WatchRestrictions.Fields.DeepCopySelector(),
 			ResourceVersion: a.WatchRestrictions.ResourceVersion,
+			Limit:           a.WatchRestrictions.Limit,
+			Continue:        a.WatchRestrictions.Continue,
 		},
 	}
 }

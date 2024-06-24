@@ -25,7 +25,7 @@ import (
 
 	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	storagemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
@@ -61,13 +61,9 @@ func (c *FakeStorageVersionMigrations) List(ctx context.Context, opts v1.ListOpt
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1alpha1.StorageVersionMigrationList{ListMeta: obj.(*v1alpha1.StorageVersionMigrationList).ListMeta}
 	for _, item := range obj.(*v1alpha1.StorageVersionMigrationList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

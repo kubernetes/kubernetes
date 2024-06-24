@@ -324,11 +324,6 @@ func (c *metadataResourceClient) List(ctx context.Context, opts metav1.ListOptio
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-
 	inputList, ok := obj.(*metav1.List)
 	if !ok {
 		return nil, fmt.Errorf("incoming object is incorrect type %T", obj)
@@ -346,7 +341,7 @@ func (c *metadataResourceClient) List(ctx context.Context, opts metav1.ListOptio
 		if err != nil {
 			return nil, err
 		}
-		if label.Matches(labels.Set(metadata.GetLabels())) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(metadata.GetLabels())) {
 			list.Items = append(list.Items, *item)
 		}
 	}

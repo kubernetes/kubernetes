@@ -25,7 +25,7 @@ import (
 
 	v1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	flowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
@@ -61,13 +61,9 @@ func (c *FakeFlowSchemas) List(ctx context.Context, opts v1.ListOptions) (result
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1beta1.FlowSchemaList{ListMeta: obj.(*v1beta1.FlowSchemaList).ListMeta}
 	for _, item := range obj.(*v1beta1.FlowSchemaList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

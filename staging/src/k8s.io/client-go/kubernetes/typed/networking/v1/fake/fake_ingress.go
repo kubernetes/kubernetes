@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	networkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
@@ -64,13 +64,9 @@ func (c *FakeIngresses) List(ctx context.Context, opts metav1.ListOptions) (resu
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1.IngressList{ListMeta: obj.(*v1.IngressList).ListMeta}
 	for _, item := range obj.(*v1.IngressList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

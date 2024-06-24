@@ -372,11 +372,6 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 		return nil, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-
 	retUnstructured := &unstructured.Unstructured{}
 	if err := c.client.scheme.Convert(obj, retUnstructured, nil); err != nil {
 		return nil, err
@@ -397,7 +392,7 @@ func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOption
 		if err != nil {
 			return nil, err
 		}
-		if label.Matches(labels.Set(metadata.GetLabels())) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(metadata.GetLabels())) {
 			list.Items = append(list.Items, *item)
 		}
 	}

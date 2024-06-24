@@ -25,7 +25,7 @@ import (
 
 	v1alpha1 "k8s.io/api/certificates/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesv1alpha1 "k8s.io/client-go/applyconfigurations/certificates/v1alpha1"
@@ -61,13 +61,9 @@ func (c *FakeClusterTrustBundles) List(ctx context.Context, opts v1.ListOptions)
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1alpha1.ClusterTrustBundleList{ListMeta: obj.(*v1alpha1.ClusterTrustBundleList).ListMeta}
 	for _, item := range obj.(*v1alpha1.ClusterTrustBundleList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}

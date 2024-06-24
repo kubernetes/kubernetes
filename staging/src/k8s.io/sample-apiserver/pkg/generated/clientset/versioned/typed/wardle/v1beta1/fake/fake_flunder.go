@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -64,13 +64,9 @@ func (c *FakeFlunders) List(ctx context.Context, opts v1.ListOptions) (result *v
 		return emptyResult, err
 	}
 
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
 	list := &v1beta1.FlunderList{ListMeta: obj.(*v1beta1.FlunderList).ListMeta}
 	for _, item := range obj.(*v1beta1.FlunderList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
+		if testing.ExtractFromListOptions(opts).Labels.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
 	}
