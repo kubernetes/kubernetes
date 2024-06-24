@@ -18,5 +18,6 @@ reviewers:
   - jpbetz
 labels:
   - sig/api-machinery
+  - sig/etcd
 emeritus_approvers:
   - lavalamp
