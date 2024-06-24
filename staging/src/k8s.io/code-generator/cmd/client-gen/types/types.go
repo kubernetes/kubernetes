@@ -56,6 +56,8 @@ func (g Group) PackageName() string {
 	return strings.ToLower(parts[0])
 }
 
+type Kind string
+
 type PackageVersion struct {
 	Version
 	// The fully qualified package, e.g. k8s.io/kubernetes/pkg/apis/apps, where the types.go is found.
@@ -67,12 +69,22 @@ type GroupVersion struct {
 	Version Version
 }
 
+type GroupVersionKind struct {
+	Group   Group
+	Version Version
+	Kind    Kind
+}
+
 func (gv GroupVersion) ToAPIVersion() string {
 	if len(gv.Group) > 0 && gv.Group.NonEmpty() != "core" {
 		return gv.Group.String() + "/" + gv.Version.String()
 	} else {
 		return gv.Version.String()
 	}
+}
+
+func (gv GroupVersion) WithKind(kind Kind) GroupVersionKind {
+	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 }
 
 type GroupVersions struct {
