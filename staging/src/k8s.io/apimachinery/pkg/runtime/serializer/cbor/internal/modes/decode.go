@@ -96,6 +96,10 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// representation (RFC 8259 Section 6).
 		NaN: cbor.NaNDecodeForbidden,
 		Inf: cbor.InfDecodeForbidden,
+
+		// Reject the arbitrary-precision integer tags because they can't be faithfully
+		// roundtripped through the allowable Unstructured types.
+		BignumTag: cbor.BignumTagForbidden,
 	}.DecMode()
 	if err != nil {
 		panic(err)
