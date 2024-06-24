@@ -244,6 +244,237 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 	}
 }
 
+// TestNoOpApplyWithEmptyMap
+func TestNoOpApplyWithEmptyMap(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	deploymentName := "no-op"
+	deploymentsResource := "deployments"
+	deploymentBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "` + deploymentName + `",
+			"labels": {
+				"app": "nginx"
+			}
+		},
+		"spec": {
+			"replicas": 1,
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"annotations": {},
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name": "nginx",
+						"image": "nginx:1.14.2",
+						"ports": [{
+							"containerPort": 80
+						}]
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(deploymentsResource).
+		Name(deploymentName).
+		Body(deploymentBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// This sleep is necessary to consistently produce different timestamps because the time field in managedFields has
+	// 1 second granularity and if both apply requests happen during the same second, this test would flake.
+	time.Sleep(1 * time.Second)
+
+	createdObject, err := client.AppsV1().RESTClient().Get().Namespace("default").Resource(deploymentsResource).Name(deploymentName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve created object: %v", err)
+	}
+
+	createdAccessor, err := meta.Accessor(createdObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for created object: %v", err)
+	}
+
+	createdBytes, err := json.MarshalIndent(createdObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+
+	// Test that we can apply the same object and don't change the RV
+	_, err = client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(deploymentsResource).
+		Name(deploymentName).
+		Body(deploymentBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updatedObject, err := client.AppsV1().RESTClient().Get().Namespace("default").Resource(deploymentsResource).Name(deploymentName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated object: %v", err)
+	}
+
+	updatedAccessor, err := meta.Accessor(updatedObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for updated object: %v", err)
+	}
+
+	updatedBytes, err := json.MarshalIndent(updatedObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal updated object: %v", err)
+	}
+
+	if createdAccessor.GetResourceVersion() != updatedAccessor.GetResourceVersion() {
+		t.Fatalf("Expected same resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
+			createdAccessor.GetResourceVersion(),
+			updatedAccessor.GetResourceVersion(),
+			string(createdBytes),
+			string(updatedBytes),
+		)
+	}
+}
+
+// TestApplyEmptyMarkerStructDifferentFromNil
+func TestApplyEmptyMarkerStructDifferentFromNil(t *testing.T) {
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	podName := "pod-with-empty-dir"
+	podsResource := "pods"
+	podBytesWithEmptyDir := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "` + podName + `"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one",
+				"volumeMounts": [{
+					"mountPath": "/cache",
+					"name": "cache-volume"
+				}],
+			}],
+			"volumes": [{
+				"name": "cache-volume",
+				"emptyDir": {}
+			}]
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(podsResource).
+		Name(podName).
+		Body(podBytesWithEmptyDir).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	// This sleep is necessary to consistently produce different timestamps because the time field in managedFields has
+	// 1 second granularity and if both apply requests happen during the same second, this test would flake.
+	time.Sleep(1 * time.Second)
+
+	createdObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podsResource).Name(podName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve created object: %v", err)
+	}
+
+	createdAccessor, err := meta.Accessor(createdObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for created object: %v", err)
+	}
+
+	createdBytes, err := json.MarshalIndent(createdObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal created object: %v", err)
+	}
+
+	podBytesNoEmptyDir := []byte(`{
+		"apiVersion": "v1",
+		"kind": "Pod",
+		"metadata": {
+			"name": "` + podName + `"
+		},
+		"spec": {
+			"containers": [{
+				"name":  "test-container-a",
+				"image": "test-image-one",
+				"volumeMounts": [{
+					"mountPath": "/cache",
+					"name": "cache-volume"
+				}],
+			}],
+			"volumes": [{
+				"name": "cache-volume"
+			}]
+		}
+	}`)
+
+	// Test that an apply with no emptyDir is recognized as distinct from an empty marker struct emptyDir.
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource(podsResource).
+		Name(podName).
+		Body(podBytesNoEmptyDir).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	updatedObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podsResource).Name(podName).Do(context.TODO()).Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve updated object: %v", err)
+	}
+
+	updatedAccessor, err := meta.Accessor(updatedObject)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor for updated object: %v", err)
+	}
+
+	updatedBytes, err := json.MarshalIndent(updatedObject, "\t", "\t")
+	if err != nil {
+		t.Fatalf("Failed to marshal updated object: %v", err)
+	}
+
+	if createdAccessor.GetResourceVersion() == updatedAccessor.GetResourceVersion() {
+		t.Fatalf("Expected different resource version to be %v but got: %v\nold object:\n%v\nnew object:\n%v",
+			createdAccessor.GetResourceVersion(),
+			updatedAccessor.GetResourceVersion(),
+			string(createdBytes),
+			string(updatedBytes),
+		)
+	}
+}
+
 func getRV(obj runtime.Object) (string, error) {
 	acc, err := meta.Accessor(obj)
 	if err != nil {
