@@ -45,7 +45,7 @@ var storageclassesKind = v1beta1.SchemeGroupVersion.WithKind("StorageClass")
 func (c *FakeStorageClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.StorageClass, err error) {
 	emptyResult := &v1beta1.StorageClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(storageclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(storageclassesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeStorageClasses) Get(ctx context.Context, name string, options v1.Ge
 func (c *FakeStorageClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StorageClassList, err error) {
 	emptyResult := &v1beta1.StorageClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(storageclassesResource, storageclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(storageclassesResource, storageclassesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeStorageClasses) List(ctx context.Context, opts v1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested storageClasses.
 func (c *FakeStorageClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(storageclassesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(storageclassesResource, opts))
 }
 
 // Create takes the representation of a storageClass and creates it.  Returns the server's representation of the storageClass, and an error, if there is any.
 func (c *FakeStorageClasses) Create(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.CreateOptions) (result *v1beta1.StorageClass, err error) {
 	emptyResult := &v1beta1.StorageClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storageclassesResource, storageClass), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(storageclassesResource, storageClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeStorageClasses) Create(ctx context.Context, storageClass *v1beta1.S
 func (c *FakeStorageClasses) Update(ctx context.Context, storageClass *v1beta1.StorageClass, opts v1.UpdateOptions) (result *v1beta1.StorageClass, err error) {
 	emptyResult := &v1beta1.StorageClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storageclassesResource, storageClass), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(storageclassesResource, storageClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeStorageClasses) Delete(ctx context.Context, name string, opts v1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeStorageClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageclassesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(storageclassesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StorageClassList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeStorageClasses) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeStorageClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StorageClass, err error) {
 	emptyResult := &v1beta1.StorageClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageclassesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeStorageClasses) Apply(ctx context.Context, storageClass *storagev1b
 	}
 	emptyResult := &v1beta1.StorageClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

@@ -45,7 +45,7 @@ var ingressclassesKind = v1beta1.SchemeGroupVersion.WithKind("IngressClass")
 func (c *FakeIngressClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.IngressClass, err error) {
 	emptyResult := &v1beta1.IngressClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(ingressclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(ingressclassesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeIngressClasses) Get(ctx context.Context, name string, options v1.Ge
 func (c *FakeIngressClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.IngressClassList, err error) {
 	emptyResult := &v1beta1.IngressClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(ingressclassesResource, ingressclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(ingressclassesResource, ingressclassesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeIngressClasses) List(ctx context.Context, opts v1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested ingressClasses.
 func (c *FakeIngressClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(ingressclassesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(ingressclassesResource, opts))
 }
 
 // Create takes the representation of a ingressClass and creates it.  Returns the server's representation of the ingressClass, and an error, if there is any.
 func (c *FakeIngressClasses) Create(ctx context.Context, ingressClass *v1beta1.IngressClass, opts v1.CreateOptions) (result *v1beta1.IngressClass, err error) {
 	emptyResult := &v1beta1.IngressClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(ingressclassesResource, ingressClass), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(ingressclassesResource, ingressClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeIngressClasses) Create(ctx context.Context, ingressClass *v1beta1.I
 func (c *FakeIngressClasses) Update(ctx context.Context, ingressClass *v1beta1.IngressClass, opts v1.UpdateOptions) (result *v1beta1.IngressClass, err error) {
 	emptyResult := &v1beta1.IngressClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(ingressclassesResource, ingressClass), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(ingressclassesResource, ingressClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeIngressClasses) Delete(ctx context.Context, name string, opts v1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeIngressClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(ingressclassesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(ingressclassesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.IngressClassList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeIngressClasses) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeIngressClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.IngressClass, err error) {
 	emptyResult := &v1beta1.IngressClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ingressclassesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeIngressClasses) Apply(ctx context.Context, ingressClass *networking
 	}
 	emptyResult := &v1beta1.IngressClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(ingressclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(ingressclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

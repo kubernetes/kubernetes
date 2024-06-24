@@ -45,7 +45,7 @@ var fischersKind = v1alpha1.SchemeGroupVersion.WithKind("Fischer")
 func (c *FakeFischers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Fischer, err error) {
 	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(fischersResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(fischersResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeFischers) Get(ctx context.Context, name string, options v1.GetOptio
 func (c *FakeFischers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FischerList, err error) {
 	emptyResult := &v1alpha1.FischerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(fischersResource, fischersKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(fischersResource, fischersKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeFischers) List(ctx context.Context, opts v1.ListOptions) (result *v
 // Watch returns a watch.Interface that watches the requested fischers.
 func (c *FakeFischers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(fischersResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(fischersResource, opts))
 }
 
 // Create takes the representation of a fischer and creates it.  Returns the server's representation of the fischer, and an error, if there is any.
 func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.CreateOptions) (result *v1alpha1.Fischer, err error) {
 	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(fischersResource, fischer), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(fischersResource, fischer, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeFischers) Create(ctx context.Context, fischer *v1alpha1.Fischer, op
 func (c *FakeFischers) Update(ctx context.Context, fischer *v1alpha1.Fischer, opts v1.UpdateOptions) (result *v1alpha1.Fischer, err error) {
 	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(fischersResource, fischer), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(fischersResource, fischer, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeFischers) Delete(ctx context.Context, name string, opts v1.DeleteOp
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeFischers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(fischersResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(fischersResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.FischerList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeFischers) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeFischers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Fischer, err error) {
 	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(fischersResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeFischers) Apply(ctx context.Context, fischer *wardlev1alpha1.Fische
 	}
 	emptyResult := &v1alpha1.Fischer{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(fischersResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(fischersResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

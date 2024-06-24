@@ -45,7 +45,7 @@ var priorityclassesKind = v1.SchemeGroupVersion.WithKind("PriorityClass")
 func (c *FakePriorityClasses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PriorityClass, err error) {
 	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(priorityclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(priorityclassesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakePriorityClasses) Get(ctx context.Context, name string, options meta
 func (c *FakePriorityClasses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PriorityClassList, err error) {
 	emptyResult := &v1.PriorityClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(priorityclassesResource, priorityclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(priorityclassesResource, priorityclassesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakePriorityClasses) List(ctx context.Context, opts metav1.ListOptions)
 // Watch returns a watch.Interface that watches the requested priorityClasses.
 func (c *FakePriorityClasses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(priorityclassesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(priorityclassesResource, opts))
 }
 
 // Create takes the representation of a priorityClass and creates it.  Returns the server's representation of the priorityClass, and an error, if there is any.
 func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.CreateOptions) (result *v1.PriorityClass, err error) {
 	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(priorityclassesResource, priorityClass), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(priorityclassesResource, priorityClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakePriorityClasses) Create(ctx context.Context, priorityClass *v1.Prio
 func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *v1.PriorityClass, opts metav1.UpdateOptions) (result *v1.PriorityClass, err error) {
 	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(priorityclassesResource, priorityClass), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(priorityclassesResource, priorityClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakePriorityClasses) Delete(ctx context.Context, name string, opts meta
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePriorityClasses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(priorityclassesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(priorityclassesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.PriorityClassList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakePriorityClasses) DeleteCollection(ctx context.Context, opts metav1.
 func (c *FakePriorityClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PriorityClass, err error) {
 	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(priorityclassesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakePriorityClasses) Apply(ctx context.Context, priorityClass *scheduli
 	}
 	emptyResult := &v1.PriorityClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(priorityclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(priorityclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

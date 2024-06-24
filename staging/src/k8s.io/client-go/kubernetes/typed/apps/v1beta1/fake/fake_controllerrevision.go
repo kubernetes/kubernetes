@@ -46,7 +46,7 @@ var controllerrevisionsKind = v1beta1.SchemeGroupVersion.WithKind("ControllerRev
 func (c *FakeControllerRevisions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ControllerRevision, err error) {
 	emptyResult := &v1beta1.ControllerRevision{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(controllerrevisionsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(controllerrevisionsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeControllerRevisions) Get(ctx context.Context, name string, options 
 func (c *FakeControllerRevisions) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.ControllerRevisionList, err error) {
 	emptyResult := &v1beta1.ControllerRevisionList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(controllerrevisionsResource, controllerrevisionsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(controllerrevisionsResource, controllerrevisionsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeControllerRevisions) List(ctx context.Context, opts v1.ListOptions)
 // Watch returns a watch.Interface that watches the requested controllerRevisions.
 func (c *FakeControllerRevisions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(controllerrevisionsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(controllerrevisionsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeControllerRevisions) Watch(ctx context.Context, opts v1.ListOptions
 func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision *v1beta1.ControllerRevision, opts v1.CreateOptions) (result *v1beta1.ControllerRevision, err error) {
 	emptyResult := &v1beta1.ControllerRevision{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(controllerrevisionsResource, c.ns, controllerRevision), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(controllerrevisionsResource, c.ns, controllerRevision, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeControllerRevisions) Create(ctx context.Context, controllerRevision
 func (c *FakeControllerRevisions) Update(ctx context.Context, controllerRevision *v1beta1.ControllerRevision, opts v1.UpdateOptions) (result *v1beta1.ControllerRevision, err error) {
 	emptyResult := &v1beta1.ControllerRevision{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(controllerrevisionsResource, c.ns, controllerRevision), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(controllerrevisionsResource, c.ns, controllerRevision, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeControllerRevisions) Delete(ctx context.Context, name string, opts 
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(controllerrevisionsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(controllerrevisionsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.ControllerRevisionList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeControllerRevisions) DeleteCollection(ctx context.Context, opts v1.
 func (c *FakeControllerRevisions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ControllerRevision, err error) {
 	emptyResult := &v1beta1.ControllerRevision{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(controllerrevisionsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeControllerRevisions) Apply(ctx context.Context, controllerRevision 
 	}
 	emptyResult := &v1beta1.ControllerRevision{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(controllerrevisionsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

@@ -46,7 +46,7 @@ var statefulsetsKind = v1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 func (c *FakeStatefulSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.StatefulSet, err error) {
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(statefulsetsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(statefulsetsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeStatefulSets) Get(ctx context.Context, name string, options v1.GetO
 func (c *FakeStatefulSets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.StatefulSetList, err error) {
 	emptyResult := &v1beta1.StatefulSetList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(statefulsetsResource, statefulsetsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(statefulsetsResource, statefulsetsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeStatefulSets) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested statefulSets.
 func (c *FakeStatefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(statefulsetsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(statefulsetsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeStatefulSets) Watch(ctx context.Context, opts v1.ListOptions) (watc
 func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.CreateOptions) (result *v1beta1.StatefulSet, err error) {
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(statefulsetsResource, c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(statefulsetsResource, c.ns, statefulSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeStatefulSets) Create(ctx context.Context, statefulSet *v1beta1.Stat
 func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(statefulsetsResource, c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(statefulsetsResource, c.ns, statefulSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeStatefulSets) Update(ctx context.Context, statefulSet *v1beta1.Stat
 func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta1.StatefulSet, opts v1.UpdateOptions) (result *v1beta1.StatefulSet, err error) {
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "status", c.ns, statefulSet), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(statefulsetsResource, "status", c.ns, statefulSet, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeStatefulSets) Delete(ctx context.Context, name string, opts v1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(statefulsetsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(statefulsetsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.StatefulSetList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.StatefulSet, err error) {
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(statefulsetsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *appsv1beta1.S
 	}
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1b
 	}
 	emptyResult := &v1beta1.StatefulSet{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

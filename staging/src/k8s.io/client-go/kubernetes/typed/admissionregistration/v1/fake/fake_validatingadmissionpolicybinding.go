@@ -45,7 +45,7 @@ var validatingadmissionpolicybindingsKind = v1.SchemeGroupVersion.WithKind("Vali
 func (c *FakeValidatingAdmissionPolicyBindings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ValidatingAdmissionPolicyBinding, err error) {
 	emptyResult := &v1.ValidatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(validatingadmissionpolicybindingsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(validatingadmissionpolicybindingsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeValidatingAdmissionPolicyBindings) Get(ctx context.Context, name st
 func (c *FakeValidatingAdmissionPolicyBindings) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ValidatingAdmissionPolicyBindingList, err error) {
 	emptyResult := &v1.ValidatingAdmissionPolicyBindingList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(validatingadmissionpolicybindingsResource, validatingadmissionpolicybindingsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(validatingadmissionpolicybindingsResource, validatingadmissionpolicybindingsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeValidatingAdmissionPolicyBindings) List(ctx context.Context, opts m
 // Watch returns a watch.Interface that watches the requested validatingAdmissionPolicyBindings.
 func (c *FakeValidatingAdmissionPolicyBindings) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(validatingadmissionpolicybindingsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(validatingadmissionpolicybindingsResource, opts))
 }
 
 // Create takes the representation of a validatingAdmissionPolicyBinding and creates it.  Returns the server's representation of the validatingAdmissionPolicyBinding, and an error, if there is any.
 func (c *FakeValidatingAdmissionPolicyBindings) Create(ctx context.Context, validatingAdmissionPolicyBinding *v1.ValidatingAdmissionPolicyBinding, opts metav1.CreateOptions) (result *v1.ValidatingAdmissionPolicyBinding, err error) {
 	emptyResult := &v1.ValidatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(validatingadmissionpolicybindingsResource, validatingAdmissionPolicyBinding), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(validatingadmissionpolicybindingsResource, validatingAdmissionPolicyBinding, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeValidatingAdmissionPolicyBindings) Create(ctx context.Context, vali
 func (c *FakeValidatingAdmissionPolicyBindings) Update(ctx context.Context, validatingAdmissionPolicyBinding *v1.ValidatingAdmissionPolicyBinding, opts metav1.UpdateOptions) (result *v1.ValidatingAdmissionPolicyBinding, err error) {
 	emptyResult := &v1.ValidatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(validatingadmissionpolicybindingsResource, validatingAdmissionPolicyBinding), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(validatingadmissionpolicybindingsResource, validatingAdmissionPolicyBinding, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeValidatingAdmissionPolicyBindings) Delete(ctx context.Context, name
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeValidatingAdmissionPolicyBindings) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(validatingadmissionpolicybindingsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(validatingadmissionpolicybindingsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ValidatingAdmissionPolicyBindingList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeValidatingAdmissionPolicyBindings) DeleteCollection(ctx context.Con
 func (c *FakeValidatingAdmissionPolicyBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ValidatingAdmissionPolicyBinding, err error) {
 	emptyResult := &v1.ValidatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpolicybindingsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingadmissionpolicybindingsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeValidatingAdmissionPolicyBindings) Apply(ctx context.Context, valid
 	}
 	emptyResult := &v1.ValidatingAdmissionPolicyBinding{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingadmissionpolicybindingsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

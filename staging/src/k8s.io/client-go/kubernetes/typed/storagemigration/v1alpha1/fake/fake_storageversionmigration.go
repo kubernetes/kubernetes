@@ -45,7 +45,7 @@ var storageversionmigrationsKind = v1alpha1.SchemeGroupVersion.WithKind("Storage
 func (c *FakeStorageVersionMigrations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersionMigration, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(storageversionmigrationsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(storageversionmigrationsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeStorageVersionMigrations) Get(ctx context.Context, name string, opt
 func (c *FakeStorageVersionMigrations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.StorageVersionMigrationList, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigrationList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(storageversionmigrationsResource, storageversionmigrationsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(storageversionmigrationsResource, storageversionmigrationsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeStorageVersionMigrations) List(ctx context.Context, opts v1.ListOpt
 // Watch returns a watch.Interface that watches the requested storageVersionMigrations.
 func (c *FakeStorageVersionMigrations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(storageversionmigrationsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(storageversionmigrationsResource, opts))
 }
 
 // Create takes the representation of a storageVersionMigration and creates it.  Returns the server's representation of the storageVersionMigration, and an error, if there is any.
 func (c *FakeStorageVersionMigrations) Create(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.CreateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(storageversionmigrationsResource, storageVersionMigration), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(storageversionmigrationsResource, storageVersionMigration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeStorageVersionMigrations) Create(ctx context.Context, storageVersio
 func (c *FakeStorageVersionMigrations) Update(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(storageversionmigrationsResource, storageVersionMigration), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(storageversionmigrationsResource, storageVersionMigration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -107,7 +107,7 @@ func (c *FakeStorageVersionMigrations) Update(ctx context.Context, storageVersio
 func (c *FakeStorageVersionMigrations) UpdateStatus(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(storageversionmigrationsResource, "status", storageVersionMigration), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(storageversionmigrationsResource, "status", storageVersionMigration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -123,7 +123,7 @@ func (c *FakeStorageVersionMigrations) Delete(ctx context.Context, name string, 
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeStorageVersionMigrations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(storageversionmigrationsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(storageversionmigrationsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.StorageVersionMigrationList{})
 	return err
@@ -133,7 +133,7 @@ func (c *FakeStorageVersionMigrations) DeleteCollection(ctx context.Context, opt
 func (c *FakeStorageVersionMigrations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersionMigration, err error) {
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionmigrationsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -155,7 +155,7 @@ func (c *FakeStorageVersionMigrations) Apply(ctx context.Context, storageVersion
 	}
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionmigrationsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -178,7 +178,7 @@ func (c *FakeStorageVersionMigrations) ApplyStatus(ctx context.Context, storageV
 	}
 	emptyResult := &v1alpha1.StorageVersionMigration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(storageversionmigrationsResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

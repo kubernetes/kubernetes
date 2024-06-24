@@ -45,7 +45,7 @@ var validatingadmissionpoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("Vali
 func (c *FakeValidatingAdmissionPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(validatingadmissionpoliciesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(validatingadmissionpoliciesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeValidatingAdmissionPolicies) Get(ctx context.Context, name string, 
 func (c *FakeValidatingAdmissionPolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ValidatingAdmissionPolicyList, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicyList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(validatingadmissionpoliciesResource, validatingadmissionpoliciesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(validatingadmissionpoliciesResource, validatingadmissionpoliciesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeValidatingAdmissionPolicies) List(ctx context.Context, opts v1.List
 // Watch returns a watch.Interface that watches the requested validatingAdmissionPolicies.
 func (c *FakeValidatingAdmissionPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(validatingadmissionpoliciesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(validatingadmissionpoliciesResource, opts))
 }
 
 // Create takes the representation of a validatingAdmissionPolicy and creates it.  Returns the server's representation of the validatingAdmissionPolicy, and an error, if there is any.
 func (c *FakeValidatingAdmissionPolicies) Create(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.CreateOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(validatingadmissionpoliciesResource, validatingAdmissionPolicy), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(validatingadmissionpoliciesResource, validatingAdmissionPolicy, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeValidatingAdmissionPolicies) Create(ctx context.Context, validating
 func (c *FakeValidatingAdmissionPolicies) Update(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(validatingadmissionpoliciesResource, validatingAdmissionPolicy), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(validatingadmissionpoliciesResource, validatingAdmissionPolicy, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -107,7 +107,7 @@ func (c *FakeValidatingAdmissionPolicies) Update(ctx context.Context, validating
 func (c *FakeValidatingAdmissionPolicies) UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(validatingadmissionpoliciesResource, "status", validatingAdmissionPolicy), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(validatingadmissionpoliciesResource, "status", validatingAdmissionPolicy, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -123,7 +123,7 @@ func (c *FakeValidatingAdmissionPolicies) Delete(ctx context.Context, name strin
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeValidatingAdmissionPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(validatingadmissionpoliciesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(validatingadmissionpoliciesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ValidatingAdmissionPolicyList{})
 	return err
@@ -133,7 +133,7 @@ func (c *FakeValidatingAdmissionPolicies) DeleteCollection(ctx context.Context, 
 func (c *FakeValidatingAdmissionPolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ValidatingAdmissionPolicy, err error) {
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingadmissionpoliciesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -155,7 +155,7 @@ func (c *FakeValidatingAdmissionPolicies) Apply(ctx context.Context, validatingA
 	}
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -178,7 +178,7 @@ func (c *FakeValidatingAdmissionPolicies) ApplyStatus(ctx context.Context, valid
 	}
 	emptyResult := &v1alpha1.ValidatingAdmissionPolicy{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingadmissionpoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

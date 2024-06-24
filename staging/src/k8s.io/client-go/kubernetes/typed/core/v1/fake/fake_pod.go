@@ -46,7 +46,7 @@ var podsKind = v1.SchemeGroupVersion.WithKind("Pod")
 func (c *FakePods) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(podsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakePods) Get(ctx context.Context, name string, options metav1.GetOptio
 func (c *FakePods) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PodList, err error) {
 	emptyResult := &v1.PodList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(podsResource, podsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakePods) List(ctx context.Context, opts metav1.ListOptions) (result *v
 // Watch returns a watch.Interface that watches the requested pods.
 func (c *FakePods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(podsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(podsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakePods) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 func (c *FakePods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOptions) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(podsResource, c.ns, pod, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakePods) Create(ctx context.Context, pod *v1.Pod, opts metav1.CreateOp
 func (c *FakePods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(podsResource, c.ns, pod, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakePods) Update(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOp
 func (c *FakePods) UpdateStatus(ctx context.Context, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "status", c.ns, pod, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakePods) Delete(ctx context.Context, name string, opts metav1.DeleteOp
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(podsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.PodList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakePods) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 func (c *FakePods) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakePods) Apply(ctx context.Context, pod *corev1.PodApplyConfiguration,
 	}
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakePods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfigur
 	}
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -200,7 +200,7 @@ func (c *FakePods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfigur
 func (c *FakePods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
 	emptyResult := &v1.Pod{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "ephemeralcontainers", c.ns, pod), &v1.Pod{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podsResource, "ephemeralcontainers", c.ns, pod, opts), &v1.Pod{})
 
 	if obj == nil {
 		return emptyResult, err

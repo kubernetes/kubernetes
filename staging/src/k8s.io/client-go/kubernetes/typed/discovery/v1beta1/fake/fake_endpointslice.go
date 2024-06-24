@@ -46,7 +46,7 @@ var endpointslicesKind = v1beta1.SchemeGroupVersion.WithKind("EndpointSlice")
 func (c *FakeEndpointSlices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.EndpointSlice, err error) {
 	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(endpointslicesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(endpointslicesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeEndpointSlices) Get(ctx context.Context, name string, options v1.Ge
 func (c *FakeEndpointSlices) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EndpointSliceList, err error) {
 	emptyResult := &v1beta1.EndpointSliceList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(endpointslicesResource, endpointslicesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(endpointslicesResource, endpointslicesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeEndpointSlices) List(ctx context.Context, opts v1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested endpointSlices.
 func (c *FakeEndpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(endpointslicesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(endpointslicesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeEndpointSlices) Watch(ctx context.Context, opts v1.ListOptions) (wa
 func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.CreateOptions) (result *v1beta1.EndpointSlice, err error) {
 	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(endpointslicesResource, c.ns, endpointSlice), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(endpointslicesResource, c.ns, endpointSlice, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeEndpointSlices) Create(ctx context.Context, endpointSlice *v1beta1.
 func (c *FakeEndpointSlices) Update(ctx context.Context, endpointSlice *v1beta1.EndpointSlice, opts v1.UpdateOptions) (result *v1beta1.EndpointSlice, err error) {
 	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(endpointslicesResource, c.ns, endpointSlice), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(endpointslicesResource, c.ns, endpointSlice, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeEndpointSlices) Delete(ctx context.Context, name string, opts v1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeEndpointSlices) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(endpointslicesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(endpointslicesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.EndpointSliceList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeEndpointSlices) DeleteCollection(ctx context.Context, opts v1.Delet
 func (c *FakeEndpointSlices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.EndpointSlice, err error) {
 	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(endpointslicesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeEndpointSlices) Apply(ctx context.Context, endpointSlice *discovery
 	}
 	emptyResult := &v1beta1.EndpointSlice{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(endpointslicesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

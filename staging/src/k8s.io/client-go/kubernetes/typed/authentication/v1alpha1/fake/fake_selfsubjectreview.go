@@ -39,7 +39,7 @@ var selfsubjectreviewsKind = v1alpha1.SchemeGroupVersion.WithKind("SelfSubjectRe
 func (c *FakeSelfSubjectReviews) Create(ctx context.Context, selfSubjectReview *v1alpha1.SelfSubjectReview, opts v1.CreateOptions) (result *v1alpha1.SelfSubjectReview, err error) {
 	emptyResult := &v1alpha1.SelfSubjectReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(selfsubjectreviewsResource, selfSubjectReview), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(selfsubjectreviewsResource, selfSubjectReview, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

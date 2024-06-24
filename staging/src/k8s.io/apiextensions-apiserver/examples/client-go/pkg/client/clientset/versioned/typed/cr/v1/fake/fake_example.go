@@ -46,7 +46,7 @@ var examplesKind = v1.SchemeGroupVersion.WithKind("Example")
 func (c *FakeExamples) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Example, err error) {
 	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(examplesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(examplesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeExamples) Get(ctx context.Context, name string, options metav1.GetO
 func (c *FakeExamples) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ExampleList, err error) {
 	emptyResult := &v1.ExampleList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(examplesResource, examplesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(examplesResource, examplesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeExamples) List(ctx context.Context, opts metav1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested examples.
 func (c *FakeExamples) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(examplesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(examplesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeExamples) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 func (c *FakeExamples) Create(ctx context.Context, example *v1.Example, opts metav1.CreateOptions) (result *v1.Example, err error) {
 	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(examplesResource, c.ns, example), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(examplesResource, c.ns, example, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeExamples) Create(ctx context.Context, example *v1.Example, opts met
 func (c *FakeExamples) Update(ctx context.Context, example *v1.Example, opts metav1.UpdateOptions) (result *v1.Example, err error) {
 	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(examplesResource, c.ns, example), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(examplesResource, c.ns, example, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeExamples) Delete(ctx context.Context, name string, opts metav1.Dele
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeExamples) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(examplesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(examplesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ExampleList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeExamples) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 func (c *FakeExamples) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Example, err error) {
 	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(examplesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeExamples) Apply(ctx context.Context, example *crv1.ExampleApplyConf
 	}
 	emptyResult := &v1.Example{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(examplesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(examplesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
