@@ -75,6 +75,7 @@ const (
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
 	FailedMountOnFilesystemMismatch      = "FailedMountOnFilesystemMismatch"
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
+	FailedResizePodInPlace               = "FailedResizePodInPlace"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
 )

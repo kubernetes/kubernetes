@@ -1319,6 +1319,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	if isInPlacePodVerticalScalingAllowed(pod) {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
 			m.doPodResizeAction(pod, podStatus, podContainerChanges, result)
+			if result.SyncError != nil {
+				ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+				if referr != nil {
+					klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+				}
+				m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedResizePodInPlace, result.SyncError.Error())
+			}
 		}
 	}
 
