@@ -22,7 +22,7 @@ import (
 )
 
 // GroupName is the group name used in this package
-const GroupName = "config.k8s.io"
+const GroupName = "kubectl.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}

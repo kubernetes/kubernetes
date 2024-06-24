@@ -16,6 +16,6 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:openapi-gen=true
-// +groupName=preferences.config.k8s.io
+// +groupName=kubectl.config.k8s.io
 
 package v1alpha1 // Package v1alpha1 import "k8s.io/kubectl/pkg/config/v1alpha1"

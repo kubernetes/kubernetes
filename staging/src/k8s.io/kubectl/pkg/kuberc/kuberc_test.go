@@ -71,15 +71,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -118,15 +116,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -171,15 +167,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "first",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "first",
+									Default: "changed",
 								},
 							},
 						},
@@ -228,15 +222,13 @@ func TestApplyOverride(t *testing.T) {
 				}
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -280,15 +272,13 @@ func TestApplyOverride(t *testing.T) {
 				}
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -332,15 +322,13 @@ func TestApplyOverride(t *testing.T) {
 				}
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -384,15 +372,13 @@ func TestApplyOverride(t *testing.T) {
 				}
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -432,15 +418,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -481,15 +465,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -531,15 +513,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -580,15 +560,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -634,15 +612,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -696,15 +672,13 @@ func TestApplyOverride(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Overrides: []v1alpha1.PreferencesCommandOverride{
-							{
-								Command: "command1 command2",
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Overrides: []v1alpha1.CommandOverride{
+						{
+							Command: "command1 command2",
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -794,20 +768,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "getcmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -847,20 +819,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "getcmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -901,20 +871,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "getcmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -956,20 +924,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "getcmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -1014,20 +980,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "getcmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "getcmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -1070,20 +1034,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "aliascmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "aliascmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -1123,20 +1085,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "aliascmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "aliascmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -1176,20 +1136,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "aliascmd",
-								Command: "command1",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "aliascmd",
+							Command: "command1",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed",
 								},
 							},
 						},
@@ -1241,20 +1199,18 @@ func TestApplyAlias(t *testing.T) {
 			getPreferencesFunc: func(kuberc string) (*v1alpha1.Preferences, error) {
 				return &v1alpha1.Preferences{
 					TypeMeta: metav1.TypeMeta{},
-					Spec: v1alpha1.PreferencesSpec{
-						Aliases: []v1alpha1.PreferencesAliasOverride{
-							{
-								Name:    "aliascmd",
-								Command: "command1 command2",
-								Args: []string{
-									"resources",
-									"nodes",
-								},
-								Flags: []v1alpha1.PreferencesCommandOverrideFlag{
-									{
-										Name:    "firstflag",
-										Default: "changed2",
-									},
+					Aliases: []v1alpha1.AliasOverride{
+						{
+							Name:    "aliascmd",
+							Command: "command1 command2",
+							Args: []string{
+								"resources",
+								"nodes",
+							},
+							Flags: []v1alpha1.CommandOverrideFlag{
+								{
+									Name:    "firstflag",
+									Default: "changed2",
 								},
 							},
 						},

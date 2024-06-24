@@ -112,7 +112,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *v1alpha1.Pr
 		return nil
 	}
 
-	for _, c := range kuberc.Spec.Overrides {
+	for _, c := range kuberc.Overrides {
 		parsedCmds := strings.Split(c.Command, " ")
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
@@ -155,11 +155,11 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 
 	aliasArgsMap := make(map[string]struct {
 		args    []string
-		flags   []v1alpha1.PreferencesCommandOverrideFlag
+		flags   []v1alpha1.CommandOverrideFlag
 		command *cobra.Command
 	})
 
-	for _, alias := range kuberc.Spec.Aliases {
+	for _, alias := range kuberc.Aliases {
 		// do not allow shadowing built-ins
 		if _, _, err := rootCmd.Find([]string{alias.Name}); err == nil {
 			fmt.Fprintf(errOut, "Warning: Setting alias %q to a built-in command is not supported\n", alias.Name)
@@ -184,7 +184,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 
 		aliasArgsMap[alias.Name] = struct {
 			args    []string
-			flags   []v1alpha1.PreferencesCommandOverrideFlag
+			flags   []v1alpha1.CommandOverrideFlag
 			command *cobra.Command
 		}{
 			args:    alias.Args,
@@ -229,12 +229,12 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 	}
 
 	// all args defined in kuberc should be appended to actual args.
-	args = append(args, aliasArgs.args...)
+	newArgs := append(args, aliasArgs.args...)
 	// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
 	// We are appending the additional args defined in kuberc in here and
 	// expect that it will be passed along to the actual command.
-	rootCmd.SetArgs(args[1:])
-	return args, nil
+	rootCmd.SetArgs(newArgs[1:])
+	return newArgs, nil
 }
 
 // DefaultGetPreferences returns v1alpha1.KubeRCConfiguration.
