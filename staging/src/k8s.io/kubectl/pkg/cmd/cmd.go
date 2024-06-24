@@ -495,10 +495,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
-	var err error
-	_, err = pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
+	_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
 	if err != nil {
-		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying aliases %v\n", err)
+		fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)
 		os.Exit(1)
 	}
 	return cmds
