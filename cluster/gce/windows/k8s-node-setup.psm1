@@ -561,7 +561,7 @@ function Create-NodePki {
 }
 
 # Creates the bootstrap kubelet kubeconfig at $env:BOOTSTRAP_KUBECONFIG.
-# https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-tls-bootstrapping/
+# https://kubernetes.io/docs/reference/access-authn-authz/kubelet-tls-bootstrapping/
 #
 # Create-NodePki() must be called first.
 #
