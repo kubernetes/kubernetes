@@ -826,6 +826,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ObjectFieldSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &applyconfigurationscorev1.ObjectReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("OCIVolumeSource"):
+		return &applyconfigurationscorev1.OCIVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PersistentVolume"):
 		return &applyconfigurationscorev1.PersistentVolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"):

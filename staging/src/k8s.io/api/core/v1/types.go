@@ -181,6 +181,10 @@ type VolumeSource struct {
 	//
 	// +optional
 	Ephemeral *EphemeralVolumeSource `json:"ephemeral,omitempty" protobuf:"bytes,29,opt,name=ephemeral"`
+	// oci represents a OCI object (image or artifact) pulled and mounted on the kubelet's host machine.
+	// +featureGate=OCIVolume
+	// +optional
+	OCI *OCIVolumeSource `json:"oci,omitempty" protobuf:"bytes,30,opt,name=oci"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -7645,3 +7649,14 @@ const (
 	// the destination set to the node's IP and port or the pod's IP and port.
 	LoadBalancerIPModeProxy LoadBalancerIPMode = "Proxy"
 )
+
+// OCIVolumeSource represents a OCI volume resource.
+type OCIVolumeSource struct {
+	// Required: Image or artifact reference to be used.
+	Reference string `json:"reference" protobuf:"bytes,1,opt,name=reference"`
+
+	// Policy for pulling OCI objects.
+	// Defaults to IfNotPresent
+	// +optional
+	PullPolicy PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,2,opt,name=pullPolicy,casttype=PullPolicy"`
+}

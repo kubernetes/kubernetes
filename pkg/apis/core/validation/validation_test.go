@@ -3624,6 +3624,7 @@ func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 // type on its own, but we want to also make sure that the logic works through
 // the one-of wrapper, so we just do it all in one place.
 func TestValidateVolumes(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OCIVolume, true)
 	validInitiatorName := "iqn.2015-02.example.com:init"
 	invalidInitiatorName := "2015-02.example.com:init"
 
@@ -5352,6 +5353,64 @@ func TestValidateVolumes(t *testing.T) {
 				field: "projected.sources[1]",
 			}},
 		},
+		// OCIVolumeSource
+		{
+			name: "valid OCI volume",
+			vol: core.Volume{
+				Name: "oci-volume",
+				VolumeSource: core.VolumeSource{
+					OCI: &core.OCIVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+		}, {
+			name: "OCI volume with empty name",
+			vol: core.Volume{
+				Name: "",
+				VolumeSource: core.VolumeSource{
+					OCI: &core.OCIVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "name",
+			}},
+		}, {
+			name: "OCI volume with empty reference",
+			vol: core.Volume{
+				Name: "oci-volume",
+				VolumeSource: core.VolumeSource{
+					OCI: &core.OCIVolumeSource{
+						Reference:  "",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "oci.reference",
+			}},
+		}, {
+			name: "OCI volume with wrong pullPolicy",
+			vol: core.Volume{
+				Name: "oci-volume",
+				VolumeSource: core.VolumeSource{
+					OCI: &core.OCIVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "wrong",
+					},
+				},
+			},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "oci.pullPolicy",
+			}},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -6943,6 +7002,7 @@ func TestRelaxedValidateEnvFrom(t *testing.T) {
 }
 
 func TestValidateVolumeMounts(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OCIVolume, true)
 	volumes := []core.Volume{
 		{Name: "abc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim1"}}},
 		{Name: "abc-123", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "testclaim2"}}},
@@ -6959,6 +7019,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 				},
 			},
 		}}}},
+		{Name: "oci-volume", VolumeSource: core.VolumeSource{OCI: &core.OCIVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
 	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
 	if len(v1err) > 0 {
@@ -6988,6 +7049,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/rro-ifpossible", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)},
 		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
 		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
+		{Name: "oci-volume", MountPath: "/oci-volume"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7013,6 +7075,8 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"rro but not ro":                         {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
 		"rro with incompatible propagation":      {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
 		"rro-if-possible but not ro":             {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"subPath not allowed for OCI vol":        {{Name: "oci-volume", MountPath: "/oci-volume-err-1", SubPath: "/foo"}},
+		"subPathExpr not allowed for OCI vol":    {{Name: "oci-volume", MountPath: "/oci-volume-err-2", SubPathExpr: "$(POD_NAME)"}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
