@@ -1557,7 +1557,7 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 				mergeValue, ok := typedV[mergeKey]
 				if ok {
 					var err error
-					original, err = deleteMatchingEntries(original, mergeKey, mergeValue)
+					original, err = deleteMatchingEntry(original, mergeKey, mergeValue)
 					if err != nil {
 						return nil, nil, err
 					}
@@ -1578,6 +1578,20 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 		return patchWithoutSpecialElements, nil, nil
 	}
 	return original, patchWithoutSpecialElements, nil
+}
+
+// delete matching entry (based on merge key) from a merging list
+func deleteMatchingEntry(original []interface{}, mergeKey string, mergeValue interface{}) ([]interface{}, error) {
+	_, originalKey, found, err := findLastMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+	if err != nil {
+		return nil, err
+	}
+
+	if found {
+		// Delete the element at originalKey.
+		original = append(original[:originalKey], original[originalKey+1:]...)
+	}
+	return original, nil
 }
 
 // delete all matching entries (based on merge key) from a merging list
@@ -1644,6 +1658,34 @@ func deleteFromSlice(current, toDelete []interface{}) []interface{} {
 		}
 	}
 	return processed
+}
+
+// This method no longer panics if any element of the slice is not a map.
+func findLastMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{}) (map[string]interface{}, int, bool, error) {
+	found := false
+	returnTypedV := map[string]interface{}{}
+	returnKeyIndex := 0
+
+	for keyIndex, v := range m {
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			return nil, 0, false, fmt.Errorf("value for key %v is not a map", keyIndex)
+		}
+
+		valueToMatch, ok := typedV[key]
+		if ok && valueToMatch == value {
+			returnTypedV = typedV
+			returnKeyIndex = keyIndex
+			found = true
+			continue
+		}
+	}
+
+	if found {
+		return returnTypedV, returnKeyIndex, true, nil
+	}
+
+	return nil, 0, false, nil
 }
 
 // This method no longer panics if any element of the slice is not a map.
