@@ -45,7 +45,7 @@ var componentstatusesKind = v1.SchemeGroupVersion.WithKind("ComponentStatus")
 func (c *FakeComponentStatuses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ComponentStatus, err error) {
 	emptyResult := &v1.ComponentStatus{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(componentstatusesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(componentstatusesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeComponentStatuses) Get(ctx context.Context, name string, options me
 func (c *FakeComponentStatuses) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ComponentStatusList, err error) {
 	emptyResult := &v1.ComponentStatusList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(componentstatusesResource, componentstatusesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(componentstatusesResource, componentstatusesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeComponentStatuses) List(ctx context.Context, opts metav1.ListOption
 // Watch returns a watch.Interface that watches the requested componentStatuses.
 func (c *FakeComponentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(componentstatusesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(componentstatusesResource, opts))
 }
 
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
 func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (result *v1.ComponentStatus, err error) {
 	emptyResult := &v1.ComponentStatus{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(componentstatusesResource, componentStatus), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(componentstatusesResource, componentStatus, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeComponentStatuses) Create(ctx context.Context, componentStatus *v1.
 func (c *FakeComponentStatuses) Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (result *v1.ComponentStatus, err error) {
 	emptyResult := &v1.ComponentStatus{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(componentstatusesResource, componentStatus), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(componentstatusesResource, componentStatus, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeComponentStatuses) Delete(ctx context.Context, name string, opts me
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeComponentStatuses) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(componentstatusesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(componentstatusesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ComponentStatusList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeComponentStatuses) DeleteCollection(ctx context.Context, opts metav
 func (c *FakeComponentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
 	emptyResult := &v1.ComponentStatus{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(componentstatusesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeComponentStatuses) Apply(ctx context.Context, componentStatus *core
 	}
 	emptyResult := &v1.ComponentStatus{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(componentstatusesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

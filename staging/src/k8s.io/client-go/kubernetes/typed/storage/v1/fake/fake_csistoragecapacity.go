@@ -46,7 +46,7 @@ var csistoragecapacitiesKind = v1.SchemeGroupVersion.WithKind("CSIStorageCapacit
 func (c *FakeCSIStorageCapacities) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CSIStorageCapacity, err error) {
 	emptyResult := &v1.CSIStorageCapacity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(csistoragecapacitiesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(csistoragecapacitiesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeCSIStorageCapacities) Get(ctx context.Context, name string, options
 func (c *FakeCSIStorageCapacities) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CSIStorageCapacityList, err error) {
 	emptyResult := &v1.CSIStorageCapacityList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(csistoragecapacitiesResource, csistoragecapacitiesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(csistoragecapacitiesResource, csistoragecapacitiesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeCSIStorageCapacities) List(ctx context.Context, opts metav1.ListOpt
 // Watch returns a watch.Interface that watches the requested cSIStorageCapacities.
 func (c *FakeCSIStorageCapacities) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(csistoragecapacitiesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(csistoragecapacitiesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeCSIStorageCapacities) Watch(ctx context.Context, opts metav1.ListOp
 func (c *FakeCSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.CreateOptions) (result *v1.CSIStorageCapacity, err error) {
 	emptyResult := &v1.CSIStorageCapacity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(csistoragecapacitiesResource, c.ns, cSIStorageCapacity), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(csistoragecapacitiesResource, c.ns, cSIStorageCapacity, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeCSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacit
 func (c *FakeCSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v1.CSIStorageCapacity, opts metav1.UpdateOptions) (result *v1.CSIStorageCapacity, err error) {
 	emptyResult := &v1.CSIStorageCapacity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(csistoragecapacitiesResource, c.ns, cSIStorageCapacity), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(csistoragecapacitiesResource, c.ns, cSIStorageCapacity, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeCSIStorageCapacities) Delete(ctx context.Context, name string, opts
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeCSIStorageCapacities) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(csistoragecapacitiesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(csistoragecapacitiesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.CSIStorageCapacityList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeCSIStorageCapacities) DeleteCollection(ctx context.Context, opts me
 func (c *FakeCSIStorageCapacities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSIStorageCapacity, err error) {
 	emptyResult := &v1.CSIStorageCapacity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(csistoragecapacitiesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(csistoragecapacitiesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeCSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity
 	}
 	emptyResult := &v1.CSIStorageCapacity{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(csistoragecapacitiesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(csistoragecapacitiesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

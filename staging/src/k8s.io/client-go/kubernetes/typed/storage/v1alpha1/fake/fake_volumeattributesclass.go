@@ -45,7 +45,7 @@ var volumeattributesclassesKind = v1alpha1.SchemeGroupVersion.WithKind("VolumeAt
 func (c *FakeVolumeAttributesClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.VolumeAttributesClass, err error) {
 	emptyResult := &v1alpha1.VolumeAttributesClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(volumeattributesclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(volumeattributesclassesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeVolumeAttributesClasses) Get(ctx context.Context, name string, opti
 func (c *FakeVolumeAttributesClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.VolumeAttributesClassList, err error) {
 	emptyResult := &v1alpha1.VolumeAttributesClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(volumeattributesclassesResource, volumeattributesclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(volumeattributesclassesResource, volumeattributesclassesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeVolumeAttributesClasses) List(ctx context.Context, opts v1.ListOpti
 // Watch returns a watch.Interface that watches the requested volumeAttributesClasses.
 func (c *FakeVolumeAttributesClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(volumeattributesclassesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(volumeattributesclassesResource, opts))
 }
 
 // Create takes the representation of a volumeAttributesClass and creates it.  Returns the server's representation of the volumeAttributesClass, and an error, if there is any.
 func (c *FakeVolumeAttributesClasses) Create(ctx context.Context, volumeAttributesClass *v1alpha1.VolumeAttributesClass, opts v1.CreateOptions) (result *v1alpha1.VolumeAttributesClass, err error) {
 	emptyResult := &v1alpha1.VolumeAttributesClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(volumeattributesclassesResource, volumeAttributesClass), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(volumeattributesclassesResource, volumeAttributesClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeVolumeAttributesClasses) Create(ctx context.Context, volumeAttribut
 func (c *FakeVolumeAttributesClasses) Update(ctx context.Context, volumeAttributesClass *v1alpha1.VolumeAttributesClass, opts v1.UpdateOptions) (result *v1alpha1.VolumeAttributesClass, err error) {
 	emptyResult := &v1alpha1.VolumeAttributesClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(volumeattributesclassesResource, volumeAttributesClass), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(volumeattributesclassesResource, volumeAttributesClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeVolumeAttributesClasses) Delete(ctx context.Context, name string, o
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeVolumeAttributesClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(volumeattributesclassesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(volumeattributesclassesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.VolumeAttributesClassList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeVolumeAttributesClasses) DeleteCollection(ctx context.Context, opts
 func (c *FakeVolumeAttributesClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.VolumeAttributesClass, err error) {
 	emptyResult := &v1alpha1.VolumeAttributesClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattributesclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(volumeattributesclassesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeVolumeAttributesClasses) Apply(ctx context.Context, volumeAttribute
 	}
 	emptyResult := &v1alpha1.VolumeAttributesClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattributesclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(volumeattributesclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

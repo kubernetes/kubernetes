@@ -46,7 +46,7 @@ var resourcequotasKind = v1.SchemeGroupVersion.WithKind("ResourceQuota")
 func (c *FakeResourceQuotas) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ResourceQuota, err error) {
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(resourcequotasResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(resourcequotasResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeResourceQuotas) Get(ctx context.Context, name string, options metav
 func (c *FakeResourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ResourceQuotaList, err error) {
 	emptyResult := &v1.ResourceQuotaList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(resourcequotasResource, resourcequotasKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(resourcequotasResource, resourcequotasKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeResourceQuotas) List(ctx context.Context, opts metav1.ListOptions) 
 // Watch returns a watch.Interface that watches the requested resourceQuotas.
 func (c *FakeResourceQuotas) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(resourcequotasResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(resourcequotasResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeResourceQuotas) Watch(ctx context.Context, opts metav1.ListOptions)
 func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.CreateOptions) (result *v1.ResourceQuota, err error) {
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(resourcequotasResource, c.ns, resourceQuota), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(resourcequotasResource, c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeResourceQuotas) Create(ctx context.Context, resourceQuota *v1.Resou
 func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(resourcequotasResource, c.ns, resourceQuota), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(resourcequotasResource, c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeResourceQuotas) Update(ctx context.Context, resourceQuota *v1.Resou
 func (c *FakeResourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.ResourceQuota, opts metav1.UpdateOptions) (result *v1.ResourceQuota, err error) {
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(resourcequotasResource, "status", c.ns, resourceQuota), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(resourcequotasResource, "status", c.ns, resourceQuota, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeResourceQuotas) Delete(ctx context.Context, name string, opts metav
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeResourceQuotas) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(resourcequotasResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(resourcequotasResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ResourceQuotaList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeResourceQuotas) DeleteCollection(ctx context.Context, opts metav1.D
 func (c *FakeResourceQuotas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ResourceQuota, err error) {
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeResourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.Re
 	}
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeResourceQuotas) ApplyStatus(ctx context.Context, resourceQuota *cor
 	}
 	emptyResult := &v1.ResourceQuota{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(resourcequotasResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

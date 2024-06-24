@@ -47,7 +47,7 @@ var serviceaccountsKind = v1.SchemeGroupVersion.WithKind("ServiceAccount")
 func (c *FakeServiceAccounts) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ServiceAccount, err error) {
 	emptyResult := &v1.ServiceAccount{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(serviceaccountsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(serviceaccountsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -59,7 +59,7 @@ func (c *FakeServiceAccounts) Get(ctx context.Context, name string, options meta
 func (c *FakeServiceAccounts) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ServiceAccountList, err error) {
 	emptyResult := &v1.ServiceAccountList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(serviceaccountsResource, serviceaccountsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(serviceaccountsResource, serviceaccountsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -81,7 +81,7 @@ func (c *FakeServiceAccounts) List(ctx context.Context, opts metav1.ListOptions)
 // Watch returns a watch.Interface that watches the requested serviceAccounts.
 func (c *FakeServiceAccounts) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(serviceaccountsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(serviceaccountsResource, c.ns, opts))
 
 }
 
@@ -89,7 +89,7 @@ func (c *FakeServiceAccounts) Watch(ctx context.Context, opts metav1.ListOptions
 func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.CreateOptions) (result *v1.ServiceAccount, err error) {
 	emptyResult := &v1.ServiceAccount{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(serviceaccountsResource, c.ns, serviceAccount), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(serviceaccountsResource, c.ns, serviceAccount, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -101,7 +101,7 @@ func (c *FakeServiceAccounts) Create(ctx context.Context, serviceAccount *v1.Ser
 func (c *FakeServiceAccounts) Update(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.UpdateOptions) (result *v1.ServiceAccount, err error) {
 	emptyResult := &v1.ServiceAccount{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(serviceaccountsResource, c.ns, serviceAccount), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(serviceaccountsResource, c.ns, serviceAccount, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -119,7 +119,7 @@ func (c *FakeServiceAccounts) Delete(ctx context.Context, name string, opts meta
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeServiceAccounts) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(serviceaccountsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(serviceaccountsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ServiceAccountList{})
 	return err
@@ -129,7 +129,7 @@ func (c *FakeServiceAccounts) DeleteCollection(ctx context.Context, opts metav1.
 func (c *FakeServiceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error) {
 	emptyResult := &v1.ServiceAccount{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(serviceaccountsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -152,7 +152,7 @@ func (c *FakeServiceAccounts) Apply(ctx context.Context, serviceAccount *corev1.
 	}
 	emptyResult := &v1.ServiceAccount{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serviceaccountsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(serviceaccountsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeServiceAccounts) Apply(ctx context.Context, serviceAccount *corev1.
 func (c *FakeServiceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
 	emptyResult := &authenticationv1.TokenRequest{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateSubresourceAction(serviceaccountsResource, serviceAccountName, "token", c.ns, tokenRequest), emptyResult)
+		Invokes(testing.NewCreateSubresourceActionWithOptions(serviceaccountsResource, serviceAccountName, "token", c.ns, tokenRequest, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

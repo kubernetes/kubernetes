@@ -46,7 +46,7 @@ var clustertesttypesKind = v1.SchemeGroupVersion.WithKind("ClusterTestType")
 func (c *FakeClusterTestTypes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterTestType, err error) {
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clustertesttypesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(clustertesttypesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -57,7 +57,7 @@ func (c *FakeClusterTestTypes) Get(ctx context.Context, name string, options met
 func (c *FakeClusterTestTypes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterTestTypeList, err error) {
 	emptyResult := &v1.ClusterTestTypeList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clustertesttypesResource, clustertesttypesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(clustertesttypesResource, clustertesttypesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -78,14 +78,14 @@ func (c *FakeClusterTestTypes) List(ctx context.Context, opts metav1.ListOptions
 // Watch returns a watch.Interface that watches the requested clusterTestTypes.
 func (c *FakeClusterTestTypes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clustertesttypesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(clustertesttypesResource, opts))
 }
 
 // Create takes the representation of a clusterTestType and creates it.  Returns the server's representation of the clusterTestType, and an error, if there is any.
 func (c *FakeClusterTestTypes) Create(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.CreateOptions) (result *v1.ClusterTestType, err error) {
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clustertesttypesResource, clusterTestType), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(clustertesttypesResource, clusterTestType, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -96,7 +96,7 @@ func (c *FakeClusterTestTypes) Create(ctx context.Context, clusterTestType *v1.C
 func (c *FakeClusterTestTypes) Update(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clustertesttypesResource, clusterTestType), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(clustertesttypesResource, clusterTestType, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -108,7 +108,7 @@ func (c *FakeClusterTestTypes) Update(ctx context.Context, clusterTestType *v1.C
 func (c *FakeClusterTestTypes) UpdateStatus(ctx context.Context, clusterTestType *v1.ClusterTestType, opts metav1.UpdateOptions) (result *v1.ClusterTestType, err error) {
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "status", clusterTestType), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clustertesttypesResource, "status", clusterTestType, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -124,7 +124,7 @@ func (c *FakeClusterTestTypes) Delete(ctx context.Context, name string, opts met
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clustertesttypesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(clustertesttypesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ClusterTestTypeList{})
 	return err
@@ -134,7 +134,7 @@ func (c *FakeClusterTestTypes) DeleteCollection(ctx context.Context, opts metav1
 func (c *FakeClusterTestTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterTestType, err error) {
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -156,7 +156,7 @@ func (c *FakeClusterTestTypes) Apply(ctx context.Context, clusterTestType *examp
 	}
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -179,7 +179,7 @@ func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType 
 	}
 	emptyResult := &v1.ClusterTestType{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clustertesttypesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -190,7 +190,7 @@ func (c *FakeClusterTestTypes) ApplyStatus(ctx context.Context, clusterTestType 
 func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), emptyResult)
+		Invokes(testing.NewRootGetSubresourceActionWithOptions(clustertesttypesResource, "scale", clusterTestTypeName, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -201,7 +201,7 @@ func (c *FakeClusterTestTypes) GetScale(ctx context.Context, clusterTestTypeName
 func (c *FakeClusterTestTypes) UpdateScale(ctx context.Context, clusterTestTypeName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(clustertesttypesResource, "scale", scale), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clustertesttypesResource, "scale", scale, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

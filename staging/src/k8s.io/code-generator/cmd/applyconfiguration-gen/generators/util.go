@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"path"
 	"sort"
 	"strings"
 
@@ -37,6 +38,7 @@ type utilGenerator struct {
 	groupGoNames         map[string]string
 	typesForGroupVersion map[clientgentypes.GroupVersion][]applyConfig
 	filtered             bool
+	typeModels           *typeModels
 }
 
 var _ generator.Generator = &utilGenerator{}
@@ -92,6 +94,7 @@ func (v versionSort) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
 type applyConfig struct {
 	Type               *types.Type
 	ApplyConfiguration *types.Type
+	OpenAPIName        string
 }
 
 type applyConfigSort []applyConfig
@@ -133,15 +136,25 @@ func (g *utilGenerator) GenerateType(c *generator.Context, _ *types.Type, w io.W
 	sort.Sort(groupSort(groups))
 
 	m := map[string]interface{}{
+		"applyConfiguration":     applyConfiguration,
 		"groups":                 groups,
+		"internalParser":         types.Ref(path.Join(g.outputPackage, "internal"), "Parser"),
+		"runtimeScheme":          runtimeScheme,
 		"schemeGVs":              schemeGVs,
 		"schemaGroupVersionKind": groupVersionKind,
-		"applyConfiguration":     applyConfiguration,
+		"testingTypeConverter":   testingTypeConverter,
 	}
 	sw.Do(forKindFunc, m)
+	sw.Do(typeConverter, m)
 
 	return sw.Error()
 }
+
+var typeConverter = `
+func NewTypeConverter(scheme *{{.runtimeScheme|raw}}) *{{.testingTypeConverter|raw}} {
+	return &{{.testingTypeConverter|raw}}{Scheme: scheme, TypeResolver: {{.internalParser|raw}}()}
+}
+`
 
 var forKindFunc = `
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no

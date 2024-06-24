@@ -46,7 +46,7 @@ var horizontalpodautoscalersKind = v2beta1.SchemeGroupVersion.WithKind("Horizont
 func (c *FakeHorizontalPodAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(horizontalpodautoscalersResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(horizontalpodautoscalersResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeHorizontalPodAutoscalers) Get(ctx context.Context, name string, opt
 func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *v2beta1.HorizontalPodAutoscalerList, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscalerList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(horizontalpodautoscalersResource, horizontalpodautoscalersKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeHorizontalPodAutoscalers) List(ctx context.Context, opts v1.ListOpt
 // Watch returns a watch.Interface that watches the requested horizontalPodAutoscalers.
 func (c *FakeHorizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(horizontalpodautoscalersResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeHorizontalPodAutoscalers) Watch(ctx context.Context, opts v1.ListOp
 func (c *FakeHorizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.CreateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeHorizontalPodAutoscalers) Create(ctx context.Context, horizontalPod
 func (c *FakeHorizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(horizontalpodautoscalersResource, c.ns, horizontalPodAutoscaler, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeHorizontalPodAutoscalers) Update(ctx context.Context, horizontalPod
 func (c *FakeHorizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalPodAutoscaler *v2beta1.HorizontalPodAutoscaler, opts v1.UpdateOptions) (result *v2beta1.HorizontalPodAutoscaler, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(horizontalpodautoscalersResource, "status", c.ns, horizontalPodAutoscaler), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(horizontalpodautoscalersResource, "status", c.ns, horizontalPodAutoscaler, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeHorizontalPodAutoscalers) Delete(ctx context.Context, name string, 
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(horizontalpodautoscalersResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(horizontalpodautoscalersResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v2beta1.HorizontalPodAutoscalerList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeHorizontalPodAutoscalers) DeleteCollection(ctx context.Context, opt
 func (c *FakeHorizontalPodAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v2beta1.HorizontalPodAutoscaler, err error) {
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(horizontalpodautoscalersResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeHorizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodA
 	}
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeHorizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizont
 	}
 	emptyResult := &v2beta1.HorizontalPodAutoscaler{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(horizontalpodautoscalersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
