@@ -230,6 +230,10 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *v1alpha1.Pref
 
 	// all args defined in kuberc should be appended to actual args.
 	args = append(args, aliasArgs.args...)
+	// Cobra (command.go#L1078) appends only root command's args into the actual args and ignores the others.
+	// We are appending the additional args defined in kuberc in here and
+	// expect that it will be passed along to the actual command.
+	rootCmd.SetArgs(args[1:])
 	return args, nil
 }
 
