@@ -414,6 +414,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		deletionTimeStamp *metav1.Time
 		nodeName          string
 	}
+	dt := clienttesting.AncientTime
 
 	testCases := []struct {
 		name                          string
@@ -425,9 +426,9 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		{
 			name: "Unscheduled pod in any phase must be deleted, the phase of the running pod is changed to Failed; PodDisruptionConditions enabled",
 			pods: []nameToPhase{
-				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &dt, nodeName: ""},
+				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &dt, nodeName: ""},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &dt, nodeName: ""},
 			},
 			deletedPodNames:               sets.New("a", "b", "c"),
 			patchedPodNames:               sets.New("c"),
@@ -436,9 +437,9 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		{
 			name: "Unscheduled pod in any phase must be deleted",
 			pods: []nameToPhase{
-				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
+				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &dt, nodeName: ""},
+				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &dt, nodeName: ""},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &dt, nodeName: ""},
 			},
 			deletedPodNames: sets.New("a", "b", "c"),
 			patchedPodNames: sets.New("c"),
@@ -448,7 +449,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed, deletionTimeStamp: nil, nodeName: ""},
 				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: nil, nodeName: "node"},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: "node"},
+				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &dt, nodeName: "node"},
 			},
 		},
 	}
@@ -504,6 +505,7 @@ func TestGCTerminating(t *testing.T) {
 		nodeName          string
 	}
 
+	dt := clienttesting.AncientTime
 	testCases := []struct {
 		name                          string
 		pods                          []nameToPodConfig
@@ -519,8 +521,8 @@ func TestGCTerminating(t *testing.T) {
 				{name: "worker-1", readyCondition: v1.ConditionFalse},
 			},
 			pods: []nameToPodConfig{
-				{name: "a", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-0"},
-				{name: "b", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-1"},
+				{name: "a", deletionTimeStamp: &dt, nodeName: "worker-0"},
+				{name: "b", deletionTimeStamp: &dt, nodeName: "worker-1"},
 			},
 		},
 
@@ -548,42 +550,42 @@ func TestGCTerminating(t *testing.T) {
 			pods: []nameToPodConfig{
 				// pods a1, b1, c1, d1 and e1 are on node worker-0
 				{name: "a1", nodeName: "worker-0"},
-				{name: "b1", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-0"},
+				{name: "b1", deletionTimeStamp: &dt, nodeName: "worker-0"},
 				{name: "c1", phase: v1.PodPending, nodeName: "worker-0"},
 				{name: "d1", phase: v1.PodRunning, nodeName: "worker-0"},
 				{name: "e1", phase: v1.PodUnknown, nodeName: "worker-0"},
 
 				// pods a2, b2, c2, d2 and e2 are on node worker-1
 				{name: "a2", nodeName: "worker-1"},
-				{name: "b2", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-1"},
+				{name: "b2", deletionTimeStamp: &dt, nodeName: "worker-1"},
 				{name: "c2", phase: v1.PodPending, nodeName: "worker-1"},
 				{name: "d2", phase: v1.PodRunning, nodeName: "worker-1"},
 				{name: "e2", phase: v1.PodUnknown, nodeName: "worker-1"},
 
 				// pods a3, b3, c3, d3 and e3 are on node worker-2
 				{name: "a3", nodeName: "worker-2"},
-				{name: "b3", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-2"},
+				{name: "b3", deletionTimeStamp: &dt, nodeName: "worker-2"},
 				{name: "c3", phase: v1.PodPending, nodeName: "worker-2"},
 				{name: "d3", phase: v1.PodRunning, nodeName: "worker-2"},
 				{name: "e3", phase: v1.PodUnknown, nodeName: "worker-2"},
 
 				// pods a4, b4, c4, d4 and e4 are on node worker-3
 				{name: "a4", nodeName: "worker-3"},
-				{name: "b4", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-3"},
+				{name: "b4", deletionTimeStamp: &dt, nodeName: "worker-3"},
 				{name: "c4", phase: v1.PodPending, nodeName: "worker-3"},
 				{name: "d4", phase: v1.PodRunning, nodeName: "worker-3"},
 				{name: "e4", phase: v1.PodUnknown, nodeName: "worker-3"},
 
 				// pods a5, b5, c5, d5 and e5 are on node worker-4
 				{name: "a5", nodeName: "worker-3"},
-				{name: "b5", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-4"},
+				{name: "b5", deletionTimeStamp: &dt, nodeName: "worker-4"},
 				{name: "c5", phase: v1.PodPending, nodeName: "worker-4"},
 				{name: "d5", phase: v1.PodRunning, nodeName: "worker-4"},
 				{name: "e5", phase: v1.PodUnknown, nodeName: "worker-4"},
 
 				// pods a6, b6, c6, d6 and e6 are on node worker-5
 				{name: "a6", nodeName: "worker-5"},
-				{name: "b6", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-5"},
+				{name: "b6", deletionTimeStamp: &dt, nodeName: "worker-5"},
 				{name: "c6", phase: v1.PodPending, nodeName: "worker-5"},
 				{name: "d6", phase: v1.PodRunning, nodeName: "worker-5"},
 				{name: "e6", phase: v1.PodUnknown, nodeName: "worker-5"},
@@ -598,9 +600,9 @@ func TestGCTerminating(t *testing.T) {
 					Effect: v1.TaintEffectNoExecute}}},
 			},
 			pods: []nameToPodConfig{
-				{name: "a", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
-				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
-				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
+				{name: "a", phase: v1.PodRunning, deletionTimeStamp: &dt, nodeName: "worker"},
+				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &dt, nodeName: "worker"},
+				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &dt, nodeName: "worker"},
 			},
 			deletedPodNames:               sets.New("a", "b", "c"),
 			patchedPodNames:               sets.New("a"),

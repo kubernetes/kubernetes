@@ -5496,6 +5496,7 @@ func TestJobPodLookup(t *testing.T) {
 func TestGetPodsForJob(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
+	job.Finalizers = []string{"kubernetes.io/testing"}
 	job.Name = "test_job"
 	otherJob := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	otherJob.Name = "other_job"
@@ -6069,22 +6070,22 @@ func TestWatchOrphanPods(t *testing.T) {
 				})
 			}
 
-			podBuilder := buildPod().name(name).deletionTimestamp().trackingFinalizer()
+			podBuilder := buildPod().ns("default").name(name).deletionTimestamp().trackingFinalizer()
 			if tc.job != nil {
 				podBuilder = podBuilder.job(tc.job)
 			}
 			orphanPod := podBuilder.Pod
-			orphanPod, err := clientset.CoreV1().Pods("default").Create(context.Background(), orphanPod, metav1.CreateOptions{})
+			err := clientset.Tracker().Add(orphanPod)
 			if err != nil {
-				t.Fatalf("Creating orphan pod: %v", err)
+				t.Fatalf("Failed to insert pod in tracker: %v", err)
 			}
 
 			if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-				p, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
-				if err != nil {
-					return false, err
+				_, err := clientset.CoreV1().Pods(orphanPod.Namespace).Get(context.Background(), orphanPod.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return true, nil
 				}
-				return !hasJobTrackingFinalizer(p), nil
+				return false, err
 			}); err != nil {
 				t.Errorf("Waiting for Pod to get the finalizer removed: %v", err)
 			}
@@ -6937,18 +6938,19 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 
 	update = pods[1].DeepCopy()
 	update.Finalizers = nil
-	update.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	update.ResourceVersion = "1"
 	err = clientset.Tracker().Update(podsResource, update, update.Namespace)
 	if err != nil {
-		t.Errorf("Removing finalizer and setting deletion timestamp: %v", err)
+		t.Errorf("Removing finalizer...: %v", err)
+	}
+	err = clientset.Tracker().Delete(podsResource, update.Namespace, update.Name)
+	if err != nil {
+		t.Errorf("... and deleting: %v", err)
 	}
 
 	// Preserve the finalizer.
-	update = pods[2].DeepCopy()
-	update.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	update.ResourceVersion = "1"
-	err = clientset.Tracker().Update(podsResource, update, update.Namespace)
+	update = pods[2]
+	err = clientset.Tracker().Delete(podsResource, update.Namespace, update.Name)
 	if err != nil {
 		t.Errorf("Setting deletion timestamp: %v", err)
 	}
@@ -6956,6 +6958,17 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 	err = clientset.Tracker().Delete(podsResource, pods[3].Namespace, pods[3].Name)
 	if err != nil {
 		t.Errorf("Deleting pod that had finalizer: %v", err)
+	}
+	obj, err := clientset.Tracker().Get(podsResource, pods[3].Namespace, pods[3].Name)
+	if err != nil {
+		t.Errorf("Getting pod that had finalizer: %v", err)
+	}
+	update = obj.(*v1.Pod)
+	update.Finalizers = nil
+	update.ResourceVersion = "1"
+	err = clientset.Tracker().Update(podsResource, update, update.Namespace)
+	if err != nil {
+		t.Errorf("Removing finalizer for deleting pod: %v", err)
 	}
 
 	uids = sets.New(string(pods[2].UID))
@@ -7216,7 +7229,7 @@ func (pb podBuilder) trackingFinalizer() podBuilder {
 }
 
 func (pb podBuilder) deletionTimestamp() podBuilder {
-	pb.DeletionTimestamp = &metav1.Time{}
+	pb.DeletionTimestamp = &core.AncientTime
 	return pb
 }
 

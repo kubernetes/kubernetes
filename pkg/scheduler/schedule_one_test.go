@@ -2004,7 +2004,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"node1", "node2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
+			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &clienttesting.AncientTime, Finalizers: []string{"kubernetes.io/testing"}}}},
 			pod:   st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 			name:  "deleted PVC",
 			wErr: &framework.FitError{
@@ -2470,10 +2470,16 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			for _, pvc := range test.pvcs {
 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volume.AnnBindCompleted, "true")
-				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
+				err := cs.Tracker().Add(&pvc)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if pvName := pvc.Spec.VolumeName; pvName != "" {
 					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
-					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
+					err := cs.Tracker().Add(&pv)
+					if err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)

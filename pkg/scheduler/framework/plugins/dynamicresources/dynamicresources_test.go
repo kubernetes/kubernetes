@@ -460,6 +460,7 @@ func TestPlugin(t *testing.T) {
 			pod: podWithClaimTemplateInStatus,
 			claims: func() []*resourcev1alpha2.ResourceClaim {
 				claim := allocatedClaim.DeepCopy()
+				claim.Finalizers = []string{"kubernetes.io/testing"}
 				claim.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return []*resourcev1alpha2.ResourceClaim{claim}
 			}(),
@@ -1409,6 +1410,11 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	for _, claim := range claims {
 		_, err := tc.client.ResourceV1alpha2().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
 		require.NoError(t, err, "create resource claim")
+		if claim.DeletionTimestamp != nil {
+			// Create do not preserve deletion timestamps.
+			err := tc.client.ResourceV1alpha2().ResourceClaims(claim.Namespace).Delete(tc.ctx, claim.Name, metav1.DeleteOptions{})
+			require.NoError(t, err, "delete resource claim")
+		}
 	}
 	for _, class := range classes {
 		_, err := tc.client.ResourceV1alpha2().ResourceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
