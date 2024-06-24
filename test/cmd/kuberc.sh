@@ -121,7 +121,8 @@ EOF
 
   # explicitly overwriting the value that is also defaulted in kuberc and
   # assure that explicit value supersedes
-  kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file
+  output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
+  kube::test::if_has_string "${output_message}" 'namespace "test-kuberc-ns" deleted'
 
   unset KUBECTL_KUBERC
 
