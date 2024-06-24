@@ -74,11 +74,11 @@ func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
 // Apply firstly applies the aliases in the preferences file and secondly overrides
 // the default values of flags.
 func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Writer) ([]string, error) {
-	if len(args) <= 1 {
+	if !util.KubeRC.IsEnabled() {
 		return args, nil
 	}
 
-	if !util.KubeRC.IsEnabled() {
+	if len(args) <= 1 {
 		return args, nil
 	}
 
@@ -274,6 +274,10 @@ func DefaultGetPreferences(kuberc string) (*v1alpha1.Preferences, error) {
 	return decoded.(*v1alpha1.Preferences), nil
 }
 
+// Normally, we should extract this value directly from kuberc flag.
+// However, flag values are set during the command execution and
+// we are in very early stages to prepare commands prior to execute them.
+// Besides, we only need kuberc flag value in this stage.
 func getExplicitKuberc(args []string) string {
 	var kubercPath string
 	for i, arg := range args {
