@@ -249,17 +249,14 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("f7"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "the undefined simple value should not successfully decode as nil",
 		},
 		{
 			example: hex("f0"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("f8ff"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("c074323031332d30332d32315432303a30343a30305a"),
