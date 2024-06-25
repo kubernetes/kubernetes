@@ -167,6 +167,7 @@ func aberrantLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
 	ed := &filedesc.Enum{L2: new(filedesc.EnumL2)}
 	ed.L0.FullName = AberrantDeriveFullName(t) // e.g., github_com.user.repo.MyEnum
 	ed.L0.ParentFile = filedesc.SurrogateProto3
+	ed.L1.EditionFeatures = ed.L0.ParentFile.L1.EditionFeatures
 	ed.L2.Values.List = append(ed.L2.Values.List, filedesc.EnumValue{})
 
 	// TODO: Use the presence of a UnmarshalJSON method to determine proto2?

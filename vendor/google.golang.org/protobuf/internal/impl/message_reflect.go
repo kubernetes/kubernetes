@@ -247,11 +247,10 @@ func (m *extensionMap) Range(f func(protoreflect.FieldDescriptor, protoreflect.V
 		}
 	}
 }
-func (m *extensionMap) Has(xt protoreflect.ExtensionType) (ok bool) {
+func (m *extensionMap) Has(xd protoreflect.ExtensionTypeDescriptor) (ok bool) {
 	if m == nil {
 		return false
 	}
-	xd := xt.TypeDescriptor()
 	x, ok := (*m)[int32(xd.Number())]
 	if !ok {
 		return false
@@ -261,25 +260,22 @@ func (m *extensionMap) Has(xt protoreflect.ExtensionType) (ok bool) {
 		return x.Value().List().Len() > 0
 	case xd.IsMap():
 		return x.Value().Map().Len() > 0
-	case xd.Message() != nil:
-		return x.Value().Message().IsValid()
 	}
 	return true
 }
-func (m *extensionMap) Clear(xt protoreflect.ExtensionType) {
-	delete(*m, int32(xt.TypeDescriptor().Number()))
+func (m *extensionMap) Clear(xd protoreflect.ExtensionTypeDescriptor) {
+	delete(*m, int32(xd.Number()))
 }
-func (m *extensionMap) Get(xt protoreflect.ExtensionType) protoreflect.Value {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Get(xd protoreflect.ExtensionTypeDescriptor) protoreflect.Value {
 	if m != nil {
 		if x, ok := (*m)[int32(xd.Number())]; ok {
 			return x.Value()
 		}
 	}
-	return xt.Zero()
+	return xd.Type().Zero()
 }
-func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Set(xd protoreflect.ExtensionTypeDescriptor, v protoreflect.Value) {
+	xt := xd.Type()
 	isValid := true
 	switch {
 	case !xt.IsValidValue(v):
@@ -292,7 +288,7 @@ func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) 
 		isValid = v.Message().IsValid()
 	}
 	if !isValid {
-		panic(fmt.Sprintf("%v: assigning invalid value", xt.TypeDescriptor().FullName()))
+		panic(fmt.Sprintf("%v: assigning invalid value", xd.FullName()))
 	}
 
 	if *m == nil {
@@ -302,16 +298,15 @@ func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) 
 	x.Set(xt, v)
 	(*m)[int32(xd.Number())] = x
 }
-func (m *extensionMap) Mutable(xt protoreflect.ExtensionType) protoreflect.Value {
-	xd := xt.TypeDescriptor()
+func (m *extensionMap) Mutable(xd protoreflect.ExtensionTypeDescriptor) protoreflect.Value {
 	if xd.Kind() != protoreflect.MessageKind && xd.Kind() != protoreflect.GroupKind && !xd.IsList() && !xd.IsMap() {
 		panic("invalid Mutable on field with non-composite type")
 	}
 	if x, ok := (*m)[int32(xd.Number())]; ok {
 		return x.Value()
 	}
-	v := xt.New()
-	m.Set(xt, v)
+	v := xd.Type().New()
+	m.Set(xd, v)
 	return v
 }
 
@@ -428,7 +423,7 @@ func (m *messageIfaceWrapper) protoUnwrap() interface{} {
 
 // checkField verifies that the provided field descriptor is valid.
 // Exactly one of the returned values is populated.
-func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, protoreflect.ExtensionType) {
+func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, protoreflect.ExtensionTypeDescriptor) {
 	var fi *fieldInfo
 	if n := fd.Number(); 0 < n && int(n) < len(mi.denseFields) {
 		fi = mi.denseFields[n]
@@ -457,7 +452,7 @@ func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, 
 		if !ok {
 			panic(fmt.Sprintf("extension %v does not implement protoreflect.ExtensionTypeDescriptor", fd.FullName()))
 		}
-		return nil, xtd.Type()
+		return nil, xtd
 	}
 	panic(fmt.Sprintf("field %v is invalid", fd.FullName()))
 }

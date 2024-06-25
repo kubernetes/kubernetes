@@ -11,18 +11,21 @@ import (
 // HasExtension reports whether an extension field is populated.
 // It returns false if m is invalid or if xt does not extend m.
 func HasExtension(m Message, xt protoreflect.ExtensionType) bool {
-	// Treat nil message interface as an empty message; no populated fields.
-	if m == nil {
+	// Treat nil message interface or descriptor as an empty message; no populated
+	// fields.
+	if m == nil || xt == nil {
 		return false
 	}
 
 	// As a special-case, we reports invalid or mismatching descriptors
 	// as always not being populated (since they aren't).
-	if xt == nil || m.ProtoReflect().Descriptor() != xt.TypeDescriptor().ContainingMessage() {
+	mr := m.ProtoReflect()
+	xd := xt.TypeDescriptor()
+	if mr.Descriptor() != xd.ContainingMessage() {
 		return false
 	}
 
-	return m.ProtoReflect().Has(xt.TypeDescriptor())
+	return mr.Has(xd)
 }
 
 // ClearExtension clears an extension field such that subsequent
