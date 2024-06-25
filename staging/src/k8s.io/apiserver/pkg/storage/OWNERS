@@ -19,5 +19,3 @@ emeritus_approvers:
   - xiang90
   - timothysc
   - lavalamp
-labels:
-  - sig/etcd
