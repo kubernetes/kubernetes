@@ -28,3 +28,13 @@ func PerTestOutput(enabled bool) InitOption {
 		c.PerTestOutput = enabled
 	}
 }
+
+// BufferLogs controls whether log entries are captured in memory in addition
+// to being printed. Off by default. Unit tests that want to verify that
+// log entries are emitted as expected can turn this on and then retrieve
+// the captured log through the Underlier LogSink interface.
+func BufferLogs(enabled bool) InitOption {
+	return func(c *internal.InitConfig) {
+		c.BufferLogs = enabled
+	}
+}
