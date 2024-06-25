@@ -504,8 +504,8 @@ Detected go version: ${go_version[*]}.
 Kubernetes requires ${minimum_go_version} or greater.
 Please install ${minimum_go_version} or later.
 EOF
-    return 2
-  fi
+  return 2
+ fi
 }
 
 # kube::golang::setup_env will check that the `go` commands is available in
