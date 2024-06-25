@@ -17,13 +17,10 @@ limitations under the License.
 package testing
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 
@@ -40,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/ptr"
 )
 
@@ -289,7 +285,7 @@ func TestApplyCreate(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), fakeTypeConverter)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	patch := []byte(`{"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "cm-1"}, "data": {"k": "v"}}`)
@@ -309,7 +305,7 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
 	codecs := serializer.NewCodecFactory(scheme)
-	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), fakeTypeConverter)
+	o := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
 
 	reaction := ObjectReaction(o)
 	action := NewCreateAction(cmResource, "default", &v1.ConfigMap{
@@ -549,24 +545,98 @@ func Test_resourceCovers(t *testing.T) {
 	}
 }
 
-var fakeTypeConverter = func() managedfields.TypeConverter {
-	data, err := os.ReadFile(filepath.Join(strings.Repeat(".."+string(filepath.Separator), 5),
-		"api", "openapi-spec", "swagger.json"))
+func configMapTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
+	parser, err := typed.NewParser(configMapTypedSchema)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to parse schema: %v", err))
 	}
-	swag := spec.Swagger{}
-	if err := json.Unmarshal(data, &swag); err != nil {
-		panic(err)
-	}
-	convertedDefs := map[string]*spec.Schema{}
-	for k, v := range swag.Definitions {
-		vCopy := v
-		convertedDefs[k] = &vCopy
-	}
-	typeConverter, err := managedfields.NewTypeConverter(convertedDefs, false)
-	if err != nil {
-		panic(err)
-	}
-	return typeConverter
-}()
+
+	return TypeConverter{Scheme: scheme, TypeResolver: parser}
+}
+
+var configMapTypedSchema = typed.YAMLObject(`types:
+- name: io.k8s.api.core.v1.ConfigMap
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: data
+      type:
+        map:
+          elementType:
+            scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+  map:
+    fields:
+    - name: creationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: managedFields
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: fieldsType
+      type:
+        scalar: string
+    - name: fieldsV1
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+    - name: manager
+      type:
+        scalar: string
+    - name: operation
+      type:
+        scalar: string
+    - name: subresource
+      type:
+        scalar: string
+    - name: time
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+  scalar: untyped
+- name: __untyped_deduced_
+  scalar: untyped
+  list:
+    elementType:
+      namedType: __untyped_atomic_
+    elementRelationship: atomic
+  map:
+    elementType:
+      namedType: __untyped_deduced_
+    elementRelationship: separable
+`)
