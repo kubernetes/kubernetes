@@ -179,7 +179,7 @@ func findPreexistingExpressionsInSchema(schema *apiextensions.JSONSchemaProps, e
 		for _, v := range s.XValidations {
 			expressions.rules.Insert(v.Rule)
 			if len(v.MessageExpression) > 0 {
-				expressions.messageExpressions.Insert(v.Rule)
+				expressions.messageExpressions.Insert(v.MessageExpression)
 			}
 		}
 		return false
