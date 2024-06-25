@@ -291,25 +291,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 		// We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
 		// context is not used at all. So passing a empty context shouldn't be a problem
-		ctx := context.TODO()
-		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
+		if err := aggregatorProxyCerts.RunOnce(context.Background()); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
 		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
 
 		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(postStartHookContext genericapiserver.PostStartHookContext) error {
-			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-			// TODO: See if we can pass ctx to the current method
-			ctx, cancel := context.WithCancel(context.Background())
-			go func() {
-				select {
-				case <-postStartHookContext.Done():
-					cancel() // stopCh closed, so cancel our context
-				case <-ctx.Done():
-				}
-			}()
-			go aggregatorProxyCerts.Run(ctx, 1)
+			go aggregatorProxyCerts.Run(postStartHookContext, 1)
 			return nil
 		})
 	}
