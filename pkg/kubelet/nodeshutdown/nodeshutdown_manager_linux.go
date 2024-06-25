@@ -22,9 +22,12 @@ package nodeshutdown
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -248,6 +251,10 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
 	}
 
+	unifiedCh := make(chan bool, 1)
+	sigUSR1 := make(chan os.Signal, 1)
+	signal.Notify(sigUSR1, syscall.SIGUSR1)
+
 	stop := make(chan struct{})
 	go func() {
 		// Monitor for shutdown events. This follows the logind Inhibit Delay pattern described on https://www.freedesktop.org/wiki/Software/systemd/inhibit/
@@ -256,12 +263,19 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
+
+			case <-sigUSR1:
+				m.logger.V(1).Info("Received shutdown signal from USR1")
+				unifiedCh <- true
 			case isShuttingDown, ok := <-events:
 				if !ok {
 					m.logger.Error(err, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
+				unifiedCh <- isShuttingDown
+
+			case isShuttingDown := <-unifiedCh:
 				m.logger.V(1).Info("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
 
 				var shutdownType string
