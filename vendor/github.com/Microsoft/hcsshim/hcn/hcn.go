@@ -264,6 +264,18 @@ func SetPolicySupported() error {
 	return platformDoesNotSupportError("SetPolicy")
 }
 
+// ModifyLoadbalancerSupported returns an error if the HCN version does not support ModifyLoadbalancer.
+func ModifyLoadbalancerSupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.ModifyLoadbalancer {
+		return nil
+	}
+	return platformDoesNotSupportError("ModifyLoadbalancer")
+}
+
 // VxlanPortSupported returns an error if the HCN version does not support configuring the VXLAN TCP port.
 func VxlanPortSupported() error {
 	supported, err := GetCachedSupportedFeatures()
