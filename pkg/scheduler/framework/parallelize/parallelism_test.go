@@ -17,8 +17,12 @@ limitations under the License.
 package parallelize
 
 import (
+	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestChunkSize(t *testing.T) {
@@ -48,6 +52,48 @@ func TestChunkSize(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", test.input), func(t *testing.T) {
 			if chunkSizeFor(test.input, DefaultParallelism) != test.wantOutput {
 				t.Errorf("Expected: %d, got: %d", test.wantOutput, chunkSizeFor(test.input, DefaultParallelism))
+			}
+		})
+	}
+}
+
+func TestParallelizeUntil(t *testing.T) {
+	tests := []struct {
+		pieces    int
+		chunkSize int
+	}{
+		{
+			pieces:    1000,
+			chunkSize: 1,
+		},
+		{
+			pieces:    1000,
+			chunkSize: 10,
+		},
+		{
+			pieces:    1000,
+			chunkSize: 100,
+		},
+		{
+			pieces:    999,
+			chunkSize: 13,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("pieces:%v,chunkSize:%v", tc.pieces, tc.chunkSize), func(t *testing.T) {
+			seen := make([]int32, tc.pieces)
+			parallelizer := NewParallelizer(DefaultParallelism)
+			parallelizer.Until(context.Background(), tc.pieces, func(p int) {
+				atomic.AddInt32(&seen[p], 1)
+			}, "test-parallelize-until")
+
+			wantSeen := make([]int32, tc.pieces)
+			for i := 0; i < tc.pieces; i++ {
+				wantSeen[i] = 1
+			}
+
+			if diff := cmp.Diff(wantSeen, seen); diff != "" {
+				t.Errorf("bad number of visits (-want,+got):\n%s", diff)
 			}
 		})
 	}
