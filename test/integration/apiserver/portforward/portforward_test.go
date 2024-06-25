@@ -39,14 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubectl/pkg/cmd/portforward"
 	kubeletportforward "k8s.io/kubelet/pkg/cri/streaming/portforward"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -54,9 +51,6 @@ import (
 const remotePort = "8765"
 
 func TestPortforward(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PortForwardWebsockets, true)
-	t.Setenv("KUBECTL_PORT_FORWARD_WEBSOCKETS", "true")
-
 	var podName string
 	var podUID types.UID
 	backendServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
