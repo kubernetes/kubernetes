@@ -21,13 +21,13 @@ package conntrack
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
+
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // Interface for dealing with conntrack
@@ -49,95 +49,131 @@ type Interface interface {
 	ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error
 }
 
-// execCT implements Interface by execing the conntrack tool
-type execCT struct {
-	execer exec.Interface
+// netlinkHandler allows consuming real and mockable implementation for testing.
+type netlinkHandler interface {
+	ConntrackDeleteFilters(netlink.ConntrackTableType, netlink.InetFamily, ...netlink.CustomConntrackFilter) (uint, error)
 }
 
-var _ Interface = &execCT{}
-
-func NewExec(execer exec.Interface) Interface {
-	return &execCT{execer: execer}
+// conntracker implements Interface by using netlink APIs.
+type conntracker struct {
+	handler netlinkHandler
 }
 
-// noConnectionToDelete is the error string returned by conntrack when no matching connections are found
-const noConnectionToDelete = "0 flow entries have been deleted"
+var _ Interface = &conntracker{}
 
-func protoStr(proto v1.Protocol) string {
-	return strings.ToLower(string(proto))
+func New() Interface {
+	return newConntracker(&netlink.Handle{})
 }
 
-func parametersWithFamily(isIPv6 bool, parameters ...string) []string {
+func newConntracker(handler netlinkHandler) Interface {
+	return &conntracker{handler: handler}
+}
+
+// getNetlinkFamily returns the Netlink IP family constant
+func getNetlinkFamily(isIPv6 bool) netlink.InetFamily {
 	if isIPv6 {
-		parameters = append(parameters, "-f", "ipv6")
+		return unix.AF_INET6
 	}
-	return parameters
+	return unix.AF_INET
 }
 
-// exec executes the conntrack tool using the given parameters
-func (ct *execCT) exec(parameters ...string) error {
-	conntrackPath, err := ct.execer.LookPath("conntrack")
-	if err != nil {
-		return fmt.Errorf("error looking for path of conntrack: %v", err)
-	}
-	klog.V(4).InfoS("Clearing conntrack entries", "parameters", parameters)
-	output, err := ct.execer.Command(conntrackPath, parameters...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("conntrack command returned: %q, error message: %s", string(output), err)
-	}
-	klog.V(4).InfoS("Conntrack entries deleted", "output", string(output))
-	return nil
+// protocolMap maps v1.Protocol to the Assigned Internet Protocol Number.
+// https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+var protocolMap = map[v1.Protocol]uint8{
+	v1.ProtocolTCP:  unix.IPPROTO_TCP,
+	v1.ProtocolUDP:  unix.IPPROTO_UDP,
+	v1.ProtocolSCTP: unix.IPPROTO_SCTP,
 }
 
-// ClearEntriesForIP is part of Interface
-func (ct *execCT) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
-	parameters := parametersWithFamily(utilnet.IsIPv6String(ip), "-D", "--orig-dst", ip, "-p", protoStr(protocol))
-	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+// ClearEntriesForIP delete the conntrack entries for connections specified by the
+// destination IP(original direction).
+func (ct *conntracker) ClearEntriesForIP(ip string, protocol v1.Protocol) error {
+	filter := &conntrackFilter{
+		protocol: protocolMap[protocol],
+		original: &connectionTuple{
+			dstIP: netutils.ParseIPSloppy(ip),
+		},
+	}
+	klog.V(4).InfoS("Clearing conntrack entries", "org-dst", ip, "protocol", protocol)
+
+	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, getNetlinkFamily(netutils.IsIPv6String(ip)), filter)
+	if err != nil {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby-sit all udp connections to kubernetes services.
-		return fmt.Errorf("error deleting connection tracking state for UDP service IP: %s, error: %v", ip, err)
+		return fmt.Errorf("error deleting connection tracking state for %s service IP: %s, error: %w", protocol, ip, err)
 	}
+	klog.V(4).InfoS("Cleared conntrack entries", "count", n)
 	return nil
 }
 
-// ClearEntriesForPort is part of Interface
-func (ct *execCT) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
+// ClearEntriesForPort delete the conntrack entries for connections specified by the
+// destination Port(original direction) and IPFamily.
+func (ct *conntracker) ClearEntriesForPort(port int, isIPv6 bool, protocol v1.Protocol) error {
+	filter := &conntrackFilter{
+		protocol: protocolMap[protocol],
+		original: &connectionTuple{
+			dstPort: uint16(port),
+		},
+	}
 	if port <= 0 {
 		return fmt.Errorf("wrong port number. The port number must be greater than zero")
 	}
-	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
-	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
-		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
+
+	klog.V(4).InfoS("Clearing conntrack entries", "org-port-dst", port, "protocol", protocol)
+	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, getNetlinkFamily(isIPv6), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting connection tracking state for %s port: %d, error: %w", protocol, port, err)
 	}
+	klog.V(4).InfoS("Cleared conntrack entries", "count", n)
 	return nil
 }
 
-// ClearEntriesForNAT is part of Interface
-func (ct *execCT) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
-	parameters := parametersWithFamily(utilnet.IsIPv6String(origin), "-D", "--orig-dst", origin, "--dst-nat", dest,
-		"-p", protoStr(protocol))
-	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
+// ClearEntriesForNAT delete the conntrack entries for connections specified by the
+// destination IP(original direction) and source IP(reply direction).
+func (ct *conntracker) ClearEntriesForNAT(origin, dest string, protocol v1.Protocol) error {
+	filter := &conntrackFilter{
+		protocol: protocolMap[protocol],
+		original: &connectionTuple{
+			dstIP: netutils.ParseIPSloppy(origin),
+		},
+		reply: &connectionTuple{
+			srcIP: netutils.ParseIPSloppy(dest),
+		},
+	}
+
+	klog.V(4).InfoS("Clearing conntrack entries", "org-dst", origin, "reply-src", dest, "protocol", protocol)
+	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, getNetlinkFamily(netutils.IsIPv6String(origin)), filter)
+	if err != nil {
 		// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 		// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
 		// is expensive to baby sit all udp connections to kubernetes services.
-		return fmt.Errorf("error deleting conntrack entries for UDP peer {%s, %s}, error: %v", origin, dest, err)
+		return fmt.Errorf("error deleting conntrack entries for %s peer {%s, %s}, error: %w", protocol, origin, dest, err)
 	}
+	klog.V(4).InfoS("Cleared conntrack entries", "count", n)
 	return nil
 }
 
-// ClearEntriesForPortNAT is part of Interface
-func (ct *execCT) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
+// ClearEntriesForPortNAT delete the conntrack entries for connections specified by the
+// destination Port(original direction) and source IP(reply direction).
+func (ct *conntracker) ClearEntriesForPortNAT(dest string, port int, protocol v1.Protocol) error {
 	if port <= 0 {
 		return fmt.Errorf("wrong port number. The port number must be greater than zero")
 	}
-	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
-	err := ct.exec(parameters...)
-	if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
-		return fmt.Errorf("error deleting conntrack entries for UDP port: %d, error: %v", port, err)
+	filter := &conntrackFilter{
+		protocol: protocolMap[protocol],
+		original: &connectionTuple{
+			dstPort: uint16(port),
+		},
+		reply: &connectionTuple{
+			srcIP: netutils.ParseIPSloppy(dest),
+		},
 	}
+	klog.V(4).InfoS("Clearing conntrack entries", "reply-src", dest, "org-port-dst", port, "protocol", protocol)
+	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, getNetlinkFamily(netutils.IsIPv6String(dest)), filter)
+	if err != nil {
+		return fmt.Errorf("error deleting conntrack entries for %s port: %d, error: %w", protocol, port, err)
+	}
+	klog.V(4).InfoS("Cleared conntrack entries", "count", n)
 	return nil
 }
