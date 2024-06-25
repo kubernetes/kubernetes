@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -241,7 +242,19 @@ func Init(tb TB, opts ...InitOption) TContext {
 	if c.PerTestOutput {
 		config := ktesting.NewConfig(
 			ktesting.AnyToString(func(v interface{}) string {
-				return format.Object(v, 1)
+				// For basic types where the string
+				// representation is "obvious" we use
+				// fmt.Sprintf because format.Object always
+				// adds a <"type"> prefix, which is too long
+				// for simple values.
+				switch v := v.(type) {
+				case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
+					return fmt.Sprintf("%v", v)
+				case string:
+					return v
+				default:
+					return strings.TrimSpace(format.Object(v, 1))
+				}
 			}),
 			ktesting.VerbosityFlagName("v"),
 			ktesting.VModuleFlagName("vmodule"),
