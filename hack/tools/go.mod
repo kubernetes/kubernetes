@@ -1,6 +1,6 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.21
+go 1.22
 
 require (
 	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975
@@ -11,7 +11,7 @@ require (
 	github.com/vektra/mockery/v2 v2.40.3
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
-	honnef.co/go/tools v0.4.6
+	honnef.co/go/tools v0.5.0-0.dev.0.20240624124555-dec278f2f0d9
 	sigs.k8s.io/logtools v0.8.1
 )
 
@@ -23,7 +23,7 @@ require (
 	github.com/Antonboom/errname v0.1.12 // indirect
 	github.com/Antonboom/nilnil v0.1.7 // indirect
 	github.com/Antonboom/testifylint v1.1.2 // indirect
-	github.com/BurntSushi/toml v1.3.2 // indirect
+	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/Djarvur/go-err113 v0.0.0-20210108212216-aea10b59be24 // indirect
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.2.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -192,12 +192,12 @@ require (
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc // indirect
 	golang.org/x/exp/typeparams v0.0.0-20231219180239-dc181d75b848 // indirect
-	golang.org/x/mod v0.15.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.18.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240531212143-b6235391adb3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
