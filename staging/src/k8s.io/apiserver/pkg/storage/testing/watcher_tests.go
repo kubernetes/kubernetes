@@ -1486,11 +1486,15 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 					expectedBookmarkEventWithMinRV := scenario.expectedInitialEventsBookmarkWithMinimalRV(createdPods)
 					expectedObj, err := meta.Accessor(expectedBookmarkEventWithMinRV.Object)
 					require.NoError(t, err)
+					expectedRV, err := storage.APIObjectVersioner{}.ObjectResourceVersion(expectedBookmarkEventWithMinRV.Object)
+					require.NoError(t, err)
 
 					actualObj, err := meta.Accessor(actualEvent.Object)
 					require.NoError(t, err)
+					actualRV, err := storage.APIObjectVersioner{}.ObjectResourceVersion(actualEvent.Object)
+					require.NoError(t, err)
 
-					require.GreaterOrEqual(t, actualObj.GetResourceVersion(), expectedObj.GetResourceVersion())
+					require.GreaterOrEqual(t, actualRV, expectedRV)
 
 					// once we know that the RV is at least >= the expected one
 					// rewrite it so that we can compare the objs
