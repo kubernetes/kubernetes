@@ -535,6 +535,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	forceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
