@@ -44,7 +44,7 @@ ENV GO_COMPLIANCE_EXCLUDE=".*"
 ENV KUBE_STATIC_OVERRIDES=kube-apiserver
 RUN make WHAT='cmd/kube-apiserver'
 
-FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 COPY --from=macbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/amd64/kube-apiserver /usr/share/openshift/darwin/amd64/kube-apiserver
 COPY --from=macarmbuilder /go/src/k8s.io/kubernetes/_output/local/bin/darwin/arm64/kube-apiserver /usr/share/openshift/darwin/arm64/kube-apiserver
 COPY --from=linuxbuilder /go/src/k8s.io/kubernetes/_output/local/bin/linux/amd64/kube-apiserver /usr/share/openshift/linux/amd64/kube-apiserver

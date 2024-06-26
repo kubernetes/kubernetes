@@ -7,7 +7,7 @@ RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler
     cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/{kube-apiserver,kube-controller-manager,kube-scheduler,kubelet,watch-termination,k8s-tests} \
     /tmp/build
 
-FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 RUN yum install -y --setopt=tsflags=nodocs --setopt=skip_missing_names_on_install=False iproute && yum clean all
 COPY --from=builder /tmp/build/* /usr/bin/
 LABEL io.k8s.display-name="OpenShift Kubernetes Server Commands" \
