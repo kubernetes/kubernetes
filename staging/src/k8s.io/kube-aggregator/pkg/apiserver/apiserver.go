@@ -95,6 +95,13 @@ type ExtraConfig struct {
 	ServiceResolver ServiceResolver
 
 	RejectForwardingRedirects bool
+
+	// DisableAvailableConditionController disables the controller that updates the Available conditions for
+	// APIServices, Endpoints and Services. This controller runs in kube-aggregator and can interfere with
+	// Generic Control Plane components when certain apis are not available.
+	// TODO: We should find a better way to handle this. For now it will be for Generic Control Plane authors to
+	// disable this controller if they see issues.
+	DisableAvailableConditionController bool
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -307,24 +314,35 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		})
 	}
 
-	availableController, err := statuscontrollers.NewAvailableConditionController(
-		informerFactory.Apiregistration().V1().APIServices(),
-		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
-		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
-		apiregistrationClient.ApiregistrationV1(),
-		proxyTransportDial,
-		(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
-		s.serviceResolver,
-	)
-	if err != nil {
-		return nil, err
+	// If the AvailableConditionController is disabled, we don't need to start the informers
+	// and the controller.
+	if !c.ExtraConfig.DisableAvailableConditionController {
+		availableController, err := statuscontrollers.NewAvailableConditionController(
+			informerFactory.Apiregistration().V1().APIServices(),
+			c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
+			c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
+			apiregistrationClient.ApiregistrationV1(),
+			proxyTransportDial,
+			(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
+			s.serviceResolver,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+			informerFactory.Start(context.Done())
+			c.GenericConfig.SharedInformerFactory.Start(context.Done())
+			return nil
+		})
+
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+			// if we end up blocking for long periods of time, we may need to increase workers.
+			go availableController.Run(5, context.Done())
+			return nil
+		})
 	}
 
-	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-		informerFactory.Start(context.StopCh)
-		c.GenericConfig.SharedInformerFactory.Start(context.StopCh)
-		return nil
-	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
 		go apiserviceRegistrationController.Run(context.StopCh, apiServiceRegistrationControllerInitiated)
 		select {
@@ -332,11 +350,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		case <-apiServiceRegistrationControllerInitiated:
 		}
 
-		return nil
-	})
-	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
-		// if we end up blocking for long periods of time, we may need to increase workers.
-		go availableController.Run(5, context.StopCh)
 		return nil
 	})
 
