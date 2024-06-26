@@ -767,7 +767,7 @@ func (svm *svmTest) waitForCRDUpdate(
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		wait.ForeverTestTimeout,
+		time.Second*60,
 		true,
 		func(ctx context.Context) (bool, error) {
 			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
