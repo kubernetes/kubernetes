@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
@@ -58,10 +69,6 @@ type Meter interface {
 	// synchronously record the distribution of int64 measurements during a
 	// computational operation.
 	Int64Histogram(name string, options ...Int64HistogramOption) (Int64Histogram, error)
-	// Int64Gauge returns a new Int64Gauge instrument identified by name and
-	// configured with options. The instrument is used to synchronously record
-	// instantaneous int64 measurements during a computational operation.
-	Int64Gauge(name string, options ...Int64GaugeOption) (Int64Gauge, error)
 	// Int64ObservableCounter returns a new Int64ObservableCounter identified
 	// by name and configured with options. The instrument is used to
 	// asynchronously record increasing int64 measurements once per a
@@ -108,10 +115,6 @@ type Meter interface {
 	// synchronously record the distribution of float64 measurements during a
 	// computational operation.
 	Float64Histogram(name string, options ...Float64HistogramOption) (Float64Histogram, error)
-	// Float64Gauge returns a new Float64Gauge instrument identified by name and
-	// configured with options. The instrument is used to synchronously record
-	// instantaneous float64 measurements during a computational operation.
-	Float64Gauge(name string, options ...Float64GaugeOption) (Float64Gauge, error)
 	// Float64ObservableCounter returns a new Float64ObservableCounter
 	// instrument identified by name and configured with options. The
 	// instrument is used to asynchronously record increasing float64

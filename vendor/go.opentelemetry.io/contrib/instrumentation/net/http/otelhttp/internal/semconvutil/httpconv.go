@@ -2,7 +2,18 @@
 // source: internal/shared/semconvutil/httpconv.go.tmpl
 
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package semconvutil // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil"
 
@@ -13,7 +24,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 // HTTPClientResponse returns trace attributes for an HTTP response received by a
@@ -32,20 +43,12 @@ func HTTPClientResponse(resp *http.Response) []attribute.KeyValue {
 }
 
 // HTTPClientRequest returns trace attributes for an HTTP request made by a client.
-// The following attributes are always returned: "http.url", "http.method",
-// "net.peer.name". The following attributes are returned if the related values
-// are defined in req: "net.peer.port", "user_agent.original",
-// "http.request_content_length".
+// The following attributes are always returned: "http.url", "http.flavor",
+// "http.method", "net.peer.name". The following attributes are returned if the
+// related values are defined in req: "net.peer.port", "http.user_agent",
+// "http.request_content_length", "enduser.id".
 func HTTPClientRequest(req *http.Request) []attribute.KeyValue {
 	return hc.ClientRequest(req)
-}
-
-// HTTPClientRequestMetrics returns metric attributes for an HTTP request made by a client.
-// The following attributes are always returned: "http.method", "net.peer.name".
-// The following attributes are returned if the
-// related values are defined in req: "net.peer.port".
-func HTTPClientRequestMetrics(req *http.Request) []attribute.KeyValue {
-	return hc.ClientRequestMetrics(req)
 }
 
 // HTTPClientStatus returns a span status code and message for an HTTP status code
@@ -72,9 +75,10 @@ func HTTPClientStatus(code int) (codes.Code, string) {
 // The req Host will be used to determine the server instead.
 //
 // The following attributes are always returned: "http.method", "http.scheme",
-// "http.target", "net.host.name". The following attributes are returned if
-// they related values are defined in req: "net.host.port", "net.sock.peer.addr",
-// "net.sock.peer.port", "user_agent.original", "http.client_ip".
+// "http.flavor", "http.target", "net.host.name". The following attributes are
+// returned if they related values are defined in req: "net.host.port",
+// "net.sock.peer.addr", "net.sock.peer.port", "http.user_agent", "enduser.id",
+// "http.client_ip".
 func HTTPServerRequest(server string, req *http.Request) []attribute.KeyValue {
 	return hc.ServerRequest(server, req)
 }
@@ -97,8 +101,8 @@ func HTTPServerRequest(server string, req *http.Request) []attribute.KeyValue {
 // The req Host will be used to determine the server instead.
 //
 // The following attributes are always returned: "http.method", "http.scheme",
-// "net.host.name". The following attributes are returned if they related
-// values are defined in req: "net.host.port".
+// "http.flavor", "net.host.name". The following attributes are
+// returned if they related values are defined in req: "net.host.port".
 func HTTPServerRequestMetrics(server string, req *http.Request) []attribute.KeyValue {
 	return hc.ServerRequestMetrics(server, req)
 }
@@ -110,12 +114,44 @@ func HTTPServerStatus(code int) (codes.Code, string) {
 	return hc.ServerStatus(code)
 }
 
+// HTTPRequestHeader returns the contents of h as attributes.
+//
+// Instrumentation should require an explicit configuration of which headers to
+// captured and then prune what they pass here. Including all headers can be a
+// security risk - explicit configuration helps avoid leaking sensitive
+// information.
+//
+// The User-Agent header is already captured in the http.user_agent attribute
+// from ClientRequest and ServerRequest. Instrumentation may provide an option
+// to capture that header here even though it is not recommended. Otherwise,
+// instrumentation should filter that out of what is passed.
+func HTTPRequestHeader(h http.Header) []attribute.KeyValue {
+	return hc.RequestHeader(h)
+}
+
+// HTTPResponseHeader returns the contents of h as attributes.
+//
+// Instrumentation should require an explicit configuration of which headers to
+// captured and then prune what they pass here. Including all headers can be a
+// security risk - explicit configuration helps avoid leaking sensitive
+// information.
+//
+// The User-Agent header is already captured in the http.user_agent attribute
+// from ClientRequest and ServerRequest. Instrumentation may provide an option
+// to capture that header here even though it is not recommended. Otherwise,
+// instrumentation should filter that out of what is passed.
+func HTTPResponseHeader(h http.Header) []attribute.KeyValue {
+	return hc.ResponseHeader(h)
+}
+
 // httpConv are the HTTP semantic convention attributes defined for a version
 // of the OpenTelemetry specification.
 type httpConv struct {
 	NetConv *netConv
 
+	EnduserIDKey                 attribute.Key
 	HTTPClientIPKey              attribute.Key
+	HTTPFlavorKey                attribute.Key
 	HTTPMethodKey                attribute.Key
 	HTTPRequestContentLengthKey  attribute.Key
 	HTTPResponseContentLengthKey attribute.Key
@@ -125,13 +161,15 @@ type httpConv struct {
 	HTTPStatusCodeKey            attribute.Key
 	HTTPTargetKey                attribute.Key
 	HTTPURLKey                   attribute.Key
-	UserAgentOriginalKey         attribute.Key
+	HTTPUserAgentKey             attribute.Key
 }
 
 var hc = &httpConv{
 	NetConv: nc,
 
+	EnduserIDKey:                 semconv.EnduserIDKey,
 	HTTPClientIPKey:              semconv.HTTPClientIPKey,
+	HTTPFlavorKey:                semconv.HTTPFlavorKey,
 	HTTPMethodKey:                semconv.HTTPMethodKey,
 	HTTPRequestContentLengthKey:  semconv.HTTPRequestContentLengthKey,
 	HTTPResponseContentLengthKey: semconv.HTTPResponseContentLengthKey,
@@ -141,7 +179,7 @@ var hc = &httpConv{
 	HTTPStatusCodeKey:            semconv.HTTPStatusCodeKey,
 	HTTPTargetKey:                semconv.HTTPTargetKey,
 	HTTPURLKey:                   semconv.HTTPURLKey,
-	UserAgentOriginalKey:         semconv.UserAgentOriginalKey,
+	HTTPUserAgentKey:             semconv.HTTPUserAgentKey,
 }
 
 // ClientResponse returns attributes for an HTTP response received by a client
@@ -155,10 +193,6 @@ var hc = &httpConv{
 //
 //	append(ClientResponse(resp), ClientRequest(resp.Request)...)
 func (c *httpConv) ClientResponse(resp *http.Response) []attribute.KeyValue {
-	/* The following semantic conventions are returned if present:
-	http.status_code                int
-	http.response_content_length    int
-	*/
 	var n int
 	if resp.StatusCode > 0 {
 		n++
@@ -178,31 +212,11 @@ func (c *httpConv) ClientResponse(resp *http.Response) []attribute.KeyValue {
 }
 
 // ClientRequest returns attributes for an HTTP request made by a client. The
-// following attributes are always returned: "http.url", "http.method",
-// "net.peer.name". The following attributes are returned if the related values
-// are defined in req: "net.peer.port", "user_agent.original",
-// "http.request_content_length", "user_agent.original".
+// following attributes are always returned: "http.url", "http.flavor",
+// "http.method", "net.peer.name". The following attributes are returned if the
+// related values are defined in req: "net.peer.port", "http.user_agent",
+// "http.request_content_length", "enduser.id".
 func (c *httpConv) ClientRequest(req *http.Request) []attribute.KeyValue {
-	/* The following semantic conventions are returned if present:
-	http.method                     string
-	user_agent.original             string
-	http.url                        string
-	net.peer.name                   string
-	net.peer.port                   int
-	http.request_content_length     int
-	*/
-
-	/* The following semantic conventions are not returned:
-	http.status_code                This requires the response. See ClientResponse.
-	http.response_content_length    This requires the response. See ClientResponse.
-	net.sock.family                 This requires the socket used.
-	net.sock.peer.addr              This requires the socket used.
-	net.sock.peer.name              This requires the socket used.
-	net.sock.peer.port              This requires the socket used.
-	http.resend_count               This is something outside of a single request.
-	net.protocol.name               The value is the Request is ignored, and the go client will always use "http".
-	net.protocol.version            The value in the Request is ignored, and the go client will always use 1.1 or 2.0.
-	*/
 	n := 3 // URL, peer name, proto, and method.
 	var h string
 	if req.URL != nil {
@@ -220,10 +234,14 @@ func (c *httpConv) ClientRequest(req *http.Request) []attribute.KeyValue {
 	if req.ContentLength > 0 {
 		n++
 	}
-
+	userID, _, hasUserID := req.BasicAuth()
+	if hasUserID {
+		n++
+	}
 	attrs := make([]attribute.KeyValue, 0, n)
 
 	attrs = append(attrs, c.method(req.Method))
+	attrs = append(attrs, c.flavor(req.Proto))
 
 	var u string
 	if req.URL != nil {
@@ -242,43 +260,15 @@ func (c *httpConv) ClientRequest(req *http.Request) []attribute.KeyValue {
 	}
 
 	if useragent != "" {
-		attrs = append(attrs, c.UserAgentOriginalKey.String(useragent))
+		attrs = append(attrs, c.HTTPUserAgentKey.String(useragent))
 	}
 
 	if l := req.ContentLength; l > 0 {
 		attrs = append(attrs, c.HTTPRequestContentLengthKey.Int64(l))
 	}
 
-	return attrs
-}
-
-// ClientRequestMetrics returns metric attributes for an HTTP request made by a client. The
-// following attributes are always returned: "http.method", "net.peer.name".
-// The following attributes are returned if the related values
-// are defined in req: "net.peer.port".
-func (c *httpConv) ClientRequestMetrics(req *http.Request) []attribute.KeyValue {
-	/* The following semantic conventions are returned if present:
-	http.method                     string
-	net.peer.name                   string
-	net.peer.port                   int
-	*/
-
-	n := 2 // method, peer name.
-	var h string
-	if req.URL != nil {
-		h = req.URL.Host
-	}
-	peer, p := firstHostPort(h, req.Header.Get("Host"))
-	port := requiredHTTPPort(req.URL != nil && req.URL.Scheme == "https", p)
-	if port > 0 {
-		n++
-	}
-
-	attrs := make([]attribute.KeyValue, 0, n)
-	attrs = append(attrs, c.method(req.Method), c.NetConv.PeerName(peer))
-
-	if port > 0 {
-		attrs = append(attrs, c.NetConv.PeerPort(port))
+	if hasUserID {
+		attrs = append(attrs, c.EnduserIDKey.String(userID))
 	}
 
 	return attrs
@@ -301,35 +291,18 @@ func (c *httpConv) ClientRequestMetrics(req *http.Request) []attribute.KeyValue 
 // The req Host will be used to determine the server instead.
 //
 // The following attributes are always returned: "http.method", "http.scheme",
-// "http.target", "net.host.name". The following attributes are returned if they
-// related values are defined in req: "net.host.port", "net.sock.peer.addr",
-// "net.sock.peer.port", "user_agent.original", "http.client_ip",
-// "net.protocol.name", "net.protocol.version".
+// "http.flavor", "http.target", "net.host.name". The following attributes are
+// returned if they related values are defined in req: "net.host.port",
+// "net.sock.peer.addr", "net.sock.peer.port", "http.user_agent", "enduser.id",
+// "http.client_ip".
 func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.KeyValue {
-	/* The following semantic conventions are returned if present:
-	http.method             string
-	http.scheme             string
-	net.host.name           string
-	net.host.port           int
-	net.sock.peer.addr      string
-	net.sock.peer.port      int
-	user_agent.original     string
-	http.client_ip          string
-	net.protocol.name       string Note: not set if the value is "http".
-	net.protocol.version    string
-	http.target             string Note: doesn't include the query parameter.
-	*/
+	// TODO: This currently does not add the specification required
+	// `http.target` attribute. It has too high of a cardinality to safely be
+	// added. An alternate should be added, or this comment removed, when it is
+	// addressed by the specification. If it is ultimately decided to continue
+	// not including the attribute, the HTTPTargetKey field of the httpConv
+	// should be removed as well.
 
-	/* The following semantic conventions are not returned:
-	http.status_code                This requires the response.
-	http.request_content_length     This requires the len() of body, which can mutate it.
-	http.response_content_length    This requires the response.
-	http.route                      This is not available.
-	net.sock.peer.name              This would require a DNS lookup.
-	net.sock.host.addr              The request doesn't have access to the underlying socket.
-	net.sock.host.port              The request doesn't have access to the underlying socket.
-
-	*/
 	n := 4 // Method, scheme, proto, and host name.
 	var host string
 	var p int
@@ -357,31 +330,19 @@ func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.K
 	if useragent != "" {
 		n++
 	}
-
+	userID, _, hasUserID := req.BasicAuth()
+	if hasUserID {
+		n++
+	}
 	clientIP := serverClientIP(req.Header.Get("X-Forwarded-For"))
 	if clientIP != "" {
 		n++
 	}
-
-	var target string
-	if req.URL != nil {
-		target = req.URL.Path
-		if target != "" {
-			n++
-		}
-	}
-	protoName, protoVersion := netProtocol(req.Proto)
-	if protoName != "" && protoName != "http" {
-		n++
-	}
-	if protoVersion != "" {
-		n++
-	}
-
 	attrs := make([]attribute.KeyValue, 0, n)
 
 	attrs = append(attrs, c.method(req.Method))
 	attrs = append(attrs, c.scheme(req.TLS != nil))
+	attrs = append(attrs, c.flavor(req.Proto))
 	attrs = append(attrs, c.NetConv.HostName(host))
 
 	if hostPort > 0 {
@@ -398,22 +359,15 @@ func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.K
 	}
 
 	if useragent != "" {
-		attrs = append(attrs, c.UserAgentOriginalKey.String(useragent))
+		attrs = append(attrs, c.HTTPUserAgentKey.String(useragent))
+	}
+
+	if hasUserID {
+		attrs = append(attrs, c.EnduserIDKey.String(userID))
 	}
 
 	if clientIP != "" {
 		attrs = append(attrs, c.HTTPClientIPKey.String(clientIP))
-	}
-
-	if target != "" {
-		attrs = append(attrs, c.HTTPTargetKey.String(target))
-	}
-
-	if protoName != "" && protoName != "http" {
-		attrs = append(attrs, c.NetConv.NetProtocolName.String(protoName))
-	}
-	if protoVersion != "" {
-		attrs = append(attrs, c.NetConv.NetProtocolVersion.String(protoVersion))
 	}
 
 	return attrs
@@ -437,21 +391,17 @@ func (c *httpConv) ServerRequest(server string, req *http.Request) []attribute.K
 // The req Host will be used to determine the server instead.
 //
 // The following attributes are always returned: "http.method", "http.scheme",
-// "net.host.name". The following attributes are returned if they related
-// values are defined in req: "net.host.port".
+// "http.flavor", "net.host.name". The following attributes are
+// returned if they related values are defined in req: "net.host.port".
 func (c *httpConv) ServerRequestMetrics(server string, req *http.Request) []attribute.KeyValue {
-	/* The following semantic conventions are returned if present:
-	http.scheme             string
-	http.route              string
-	http.method             string
-	http.status_code        int
-	net.host.name           string
-	net.host.port           int
-	net.protocol.name       string Note: not set if the value is "http".
-	net.protocol.version    string
-	*/
+	// TODO: This currently does not add the specification required
+	// `http.target` attribute. It has too high of a cardinality to safely be
+	// added. An alternate should be added, or this comment removed, when it is
+	// addressed by the specification. If it is ultimately decided to continue
+	// not including the attribute, the HTTPTargetKey field of the httpConv
+	// should be removed as well.
 
-	n := 3 // Method, scheme, and host name.
+	n := 4 // Method, scheme, proto, and host name.
 	var host string
 	var p int
 	if server == "" {
@@ -467,28 +417,15 @@ func (c *httpConv) ServerRequestMetrics(server string, req *http.Request) []attr
 	if hostPort > 0 {
 		n++
 	}
-	protoName, protoVersion := netProtocol(req.Proto)
-	if protoName != "" {
-		n++
-	}
-	if protoVersion != "" {
-		n++
-	}
-
 	attrs := make([]attribute.KeyValue, 0, n)
 
 	attrs = append(attrs, c.methodMetric(req.Method))
 	attrs = append(attrs, c.scheme(req.TLS != nil))
+	attrs = append(attrs, c.flavor(req.Proto))
 	attrs = append(attrs, c.NetConv.HostName(host))
 
 	if hostPort > 0 {
 		attrs = append(attrs, c.NetConv.HostPort(hostPort))
-	}
-	if protoName != "" {
-		attrs = append(attrs, c.NetConv.NetProtocolName.String(protoName))
-	}
-	if protoVersion != "" {
-		attrs = append(attrs, c.NetConv.NetProtocolVersion.String(protoVersion))
 	}
 
 	return attrs
@@ -516,6 +453,21 @@ func (c *httpConv) scheme(https bool) attribute.KeyValue { // nolint:revive
 		return c.HTTPSchemeHTTPS
 	}
 	return c.HTTPSchemeHTTP
+}
+
+func (c *httpConv) flavor(proto string) attribute.KeyValue {
+	switch proto {
+	case "HTTP/1.0":
+		return c.HTTPFlavorKey.String("1.0")
+	case "HTTP/1.1":
+		return c.HTTPFlavorKey.String("1.1")
+	case "HTTP/2":
+		return c.HTTPFlavorKey.String("2.0")
+	case "HTTP/3":
+		return c.HTTPFlavorKey.String("3.0")
+	default:
+		return c.HTTPFlavorKey.String(proto)
+	}
 }
 
 func serverClientIP(xForwardedFor string) string {
@@ -547,6 +499,31 @@ func firstHostPort(source ...string) (host string, port int) {
 		}
 	}
 	return
+}
+
+// RequestHeader returns the contents of h as OpenTelemetry attributes.
+func (c *httpConv) RequestHeader(h http.Header) []attribute.KeyValue {
+	return c.header("http.request.header", h)
+}
+
+// ResponseHeader returns the contents of h as OpenTelemetry attributes.
+func (c *httpConv) ResponseHeader(h http.Header) []attribute.KeyValue {
+	return c.header("http.response.header", h)
+}
+
+func (c *httpConv) header(prefix string, h http.Header) []attribute.KeyValue {
+	key := func(k string) attribute.Key {
+		k = strings.ToLower(k)
+		k = strings.ReplaceAll(k, "-", "_")
+		k = fmt.Sprintf("%s.%s", prefix, k)
+		return attribute.Key(k)
+	}
+
+	attrs := make([]attribute.KeyValue, 0, len(h))
+	for k, v := range h {
+		attrs = append(attrs, key(k).StringSlice(v))
+	}
+	return attrs
 }
 
 // ClientStatus returns a span status code and message for an HTTP status code

@@ -113,10 +113,8 @@ func (fd *File) unmarshalSeed(b []byte) {
 				switch string(v) {
 				case "proto2":
 					fd.L1.Syntax = protoreflect.Proto2
-					fd.L1.Edition = EditionProto2
 				case "proto3":
 					fd.L1.Syntax = protoreflect.Proto3
-					fd.L1.Edition = EditionProto3
 				case "editions":
 					fd.L1.Syntax = protoreflect.Editions
 				default:
@@ -179,10 +177,11 @@ func (fd *File) unmarshalSeed(b []byte) {
 	// If syntax is missing, it is assumed to be proto2.
 	if fd.L1.Syntax == 0 {
 		fd.L1.Syntax = protoreflect.Proto2
-		fd.L1.Edition = EditionProto2
 	}
 
-	fd.L1.EditionFeatures = getFeaturesFor(fd.L1.Edition)
+	if fd.L1.Syntax == protoreflect.Editions {
+		fd.L1.EditionFeatures = getFeaturesFor(fd.L1.Edition)
+	}
 
 	// Parse editions features from options if any
 	if options != nil {
@@ -268,7 +267,6 @@ func (ed *Enum) unmarshalSeed(b []byte, sb *strs.Builder, pf *File, pd protorefl
 	ed.L0.ParentFile = pf
 	ed.L0.Parent = pd
 	ed.L0.Index = i
-	ed.L1.EditionFeatures = featuresFromParentDesc(ed.Parent())
 
 	var numValues int
 	for b := b; len(b) > 0; {
@@ -445,7 +443,6 @@ func (xd *Extension) unmarshalSeed(b []byte, sb *strs.Builder, pf *File, pd prot
 	xd.L0.ParentFile = pf
 	xd.L0.Parent = pd
 	xd.L0.Index = i
-	xd.L1.EditionFeatures = featuresFromParentDesc(pd)
 
 	for len(b) > 0 {
 		num, typ, n := protowire.ConsumeTag(b)
@@ -470,38 +467,6 @@ func (xd *Extension) unmarshalSeed(b []byte, sb *strs.Builder, pf *File, pd prot
 				xd.L0.FullName = appendFullName(sb, pd.FullName(), v)
 			case genid.FieldDescriptorProto_Extendee_field_number:
 				xd.L1.Extendee = PlaceholderMessage(makeFullName(sb, v))
-			case genid.FieldDescriptorProto_Options_field_number:
-				xd.unmarshalOptions(v)
-			}
-		default:
-			m := protowire.ConsumeFieldValue(num, typ, b)
-			b = b[m:]
-		}
-	}
-
-	if xd.L1.Kind == protoreflect.MessageKind && xd.L1.EditionFeatures.IsDelimitedEncoded {
-		xd.L1.Kind = protoreflect.GroupKind
-	}
-}
-
-func (xd *Extension) unmarshalOptions(b []byte) {
-	for len(b) > 0 {
-		num, typ, n := protowire.ConsumeTag(b)
-		b = b[n:]
-		switch typ {
-		case protowire.VarintType:
-			v, m := protowire.ConsumeVarint(b)
-			b = b[m:]
-			switch num {
-			case genid.FieldOptions_Packed_field_number:
-				xd.L1.EditionFeatures.IsPacked = protowire.DecodeBool(v)
-			}
-		case protowire.BytesType:
-			v, m := protowire.ConsumeBytes(b)
-			b = b[m:]
-			switch num {
-			case genid.FieldOptions_Features_field_number:
-				xd.L1.EditionFeatures = unmarshalFeatureSet(v, xd.L1.EditionFeatures)
 			}
 		default:
 			m := protowire.ConsumeFieldValue(num, typ, b)

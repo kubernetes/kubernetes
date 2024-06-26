@@ -61,10 +61,6 @@ func (b *builder) Scheme() string {
 	return b.scheme
 }
 
-func (b *builder) OverrideAuthority(resolver.Target) string {
-	return "localhost"
-}
-
 type nopResolver struct {
 }
 

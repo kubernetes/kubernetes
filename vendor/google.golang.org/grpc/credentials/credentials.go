@@ -28,9 +28,9 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/attributes"
 	icredentials "google.golang.org/grpc/internal/credentials"
-	"google.golang.org/protobuf/proto"
 )
 
 // PerRPCCredentials defines the common interface for the credentials which need to
@@ -237,7 +237,7 @@ func ClientHandshakeInfoFromContext(ctx context.Context) ClientHandshakeInfo {
 }
 
 // CheckSecurityLevel checks if a connection's security level is greater than or equal to the specified one.
-// It returns success if 1) the condition is satisfied or 2) AuthInfo struct does not implement GetCommonAuthInfo() method
+// It returns success if 1) the condition is satisified or 2) AuthInfo struct does not implement GetCommonAuthInfo() method
 // or 3) CommonAuthInfo.SecurityLevel has an invalid zero value. For 2) and 3), it is for the purpose of backward-compatibility.
 //
 // This API is experimental.

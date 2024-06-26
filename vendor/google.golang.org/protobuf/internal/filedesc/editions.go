@@ -14,13 +14,9 @@ import (
 )
 
 var defaultsCache = make(map[Edition]EditionFeatures)
-var defaultsKeys = []Edition{}
 
 func init() {
 	unmarshalEditionDefaults(editiondefaults.Defaults)
-	SurrogateProto2.L1.EditionFeatures = getFeaturesFor(EditionProto2)
-	SurrogateProto3.L1.EditionFeatures = getFeaturesFor(EditionProto3)
-	SurrogateEdition2023.L1.EditionFeatures = getFeaturesFor(Edition2023)
 }
 
 func unmarshalGoFeature(b []byte, parent EditionFeatures) EditionFeatures {
@@ -108,15 +104,12 @@ func unmarshalEditionDefault(b []byte) {
 			v, m := protowire.ConsumeBytes(b)
 			b = b[m:]
 			switch num {
-			case genid.FeatureSetDefaults_FeatureSetEditionDefault_FixedFeatures_field_number:
-				fs = unmarshalFeatureSet(v, fs)
-			case genid.FeatureSetDefaults_FeatureSetEditionDefault_OverridableFeatures_field_number:
+			case genid.FeatureSetDefaults_FeatureSetEditionDefault_Features_field_number:
 				fs = unmarshalFeatureSet(v, fs)
 			}
 		}
 	}
 	defaultsCache[ed] = fs
-	defaultsKeys = append(defaultsKeys, ed)
 }
 
 func unmarshalEditionDefaults(b []byte) {
@@ -142,15 +135,8 @@ func unmarshalEditionDefaults(b []byte) {
 }
 
 func getFeaturesFor(ed Edition) EditionFeatures {
-	match := EditionUnknown
-	for _, key := range defaultsKeys {
-		if key > ed {
-			break
-		}
-		match = key
+	if def, ok := defaultsCache[ed]; ok {
+		return def
 	}
-	if match == EditionUnknown {
-		panic(fmt.Sprintf("unsupported edition: %v", ed))
-	}
-	return defaultsCache[match]
+	panic(fmt.Sprintf("unsupported edition: %v", ed))
 }

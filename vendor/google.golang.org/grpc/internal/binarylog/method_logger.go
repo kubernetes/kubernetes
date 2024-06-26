@@ -25,12 +25,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 	binlogpb "google.golang.org/grpc/binarylog/grpc_binarylog_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type callIDGenerator struct {
@@ -65,7 +64,7 @@ type TruncatingMethodLogger struct {
 	callID          uint64
 	idWithinCallGen *callIDGenerator
 
-	sink Sink // TODO(blog): make this pluggable.
+	sink Sink // TODO(blog): make this plugable.
 }
 
 // NewTruncatingMethodLogger returns a new truncating method logger.
@@ -80,7 +79,7 @@ func NewTruncatingMethodLogger(h, m uint64) *TruncatingMethodLogger {
 		callID:          idGen.next(),
 		idWithinCallGen: &callIDGenerator{},
 
-		sink: DefaultSink, // TODO(blog): make it pluggable.
+		sink: DefaultSink, // TODO(blog): make it plugable.
 	}
 }
 
@@ -89,7 +88,7 @@ func NewTruncatingMethodLogger(h, m uint64) *TruncatingMethodLogger {
 // in TruncatingMethodLogger as possible.
 func (ml *TruncatingMethodLogger) Build(c LogEntryConfig) *binlogpb.GrpcLogEntry {
 	m := c.toProto()
-	timestamp := timestamppb.Now()
+	timestamp, _ := ptypes.TimestampProto(time.Now())
 	m.Timestamp = timestamp
 	m.CallId = ml.callID
 	m.SequenceIdWithinCall = ml.idWithinCallGen.next()
@@ -179,7 +178,7 @@ func (c *ClientHeader) toProto() *binlogpb.GrpcLogEntry {
 		Authority:  c.Authority,
 	}
 	if c.Timeout > 0 {
-		clientHeader.Timeout = durationpb.New(c.Timeout)
+		clientHeader.Timeout = ptypes.DurationProto(c.Timeout)
 	}
 	ret := &binlogpb.GrpcLogEntry{
 		Type: binlogpb.GrpcLogEntry_EVENT_TYPE_CLIENT_HEADER,
@@ -397,7 +396,7 @@ func metadataKeyOmit(key string) bool {
 	switch key {
 	case "lb-token", ":path", ":authority", "content-encoding", "content-type", "user-agent", "te":
 		return true
-	case "grpc-trace-bin": // grpc-trace-bin is special because it's visible to users.
+	case "grpc-trace-bin": // grpc-trace-bin is special because it's visiable to users.
 		return false
 	}
 	return strings.HasPrefix(key, "grpc-")

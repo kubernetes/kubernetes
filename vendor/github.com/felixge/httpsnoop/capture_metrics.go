@@ -52,7 +52,7 @@ func (m *Metrics) CaptureMetrics(w http.ResponseWriter, fn func(http.ResponseWri
 				return func(code int) {
 					next(code)
 
-					if !(code >= 100 && code <= 199) && !headerWritten {
+					if !headerWritten {
 						m.Code = code
 						headerWritten = true
 					}

@@ -71,9 +71,6 @@ type Clock interface {
 	Now() time.Time
 }
 
-// ExponentialBackOffOpts is a function type used to configure ExponentialBackOff options.
-type ExponentialBackOffOpts func(*ExponentialBackOff)
-
 // Default values for ExponentialBackOff.
 const (
 	DefaultInitialInterval     = 500 * time.Millisecond
@@ -84,7 +81,7 @@ const (
 )
 
 // NewExponentialBackOff creates an instance of ExponentialBackOff using default values.
-func NewExponentialBackOff(opts ...ExponentialBackOffOpts) *ExponentialBackOff {
+func NewExponentialBackOff() *ExponentialBackOff {
 	b := &ExponentialBackOff{
 		InitialInterval:     DefaultInitialInterval,
 		RandomizationFactor: DefaultRandomizationFactor,
@@ -94,60 +91,8 @@ func NewExponentialBackOff(opts ...ExponentialBackOffOpts) *ExponentialBackOff {
 		Stop:                Stop,
 		Clock:               SystemClock,
 	}
-	for _, fn := range opts {
-		fn(b)
-	}
 	b.Reset()
 	return b
-}
-
-// WithInitialInterval sets the initial interval between retries.
-func WithInitialInterval(duration time.Duration) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.InitialInterval = duration
-	}
-}
-
-// WithRandomizationFactor sets the randomization factor to add jitter to intervals.
-func WithRandomizationFactor(randomizationFactor float64) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.RandomizationFactor = randomizationFactor
-	}
-}
-
-// WithMultiplier sets the multiplier for increasing the interval after each retry.
-func WithMultiplier(multiplier float64) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.Multiplier = multiplier
-	}
-}
-
-// WithMaxInterval sets the maximum interval between retries.
-func WithMaxInterval(duration time.Duration) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.MaxInterval = duration
-	}
-}
-
-// WithMaxElapsedTime sets the maximum total time for retries.
-func WithMaxElapsedTime(duration time.Duration) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.MaxElapsedTime = duration
-	}
-}
-
-// WithRetryStopDuration sets the duration after which retries should stop.
-func WithRetryStopDuration(duration time.Duration) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.Stop = duration
-	}
-}
-
-// WithClockProvider sets the clock used to measure time.
-func WithClockProvider(clock Clock) ExponentialBackOffOpts {
-	return func(ebo *ExponentialBackOff) {
-		ebo.Clock = clock
-	}
 }
 
 type systemClock struct{}

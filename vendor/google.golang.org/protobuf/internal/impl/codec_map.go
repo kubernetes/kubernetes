@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	"google.golang.org/protobuf/encoding/protowire"
-	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -241,16 +240,11 @@ func appendMapItem(b []byte, keyrv, valrv reflect.Value, mapi *mapInfo, f *coder
 		size += mapi.keyFuncs.size(key.Value(), mapKeyTagSize, opts)
 		size += mapi.valFuncs.size(val, mapValTagSize, opts)
 		b = protowire.AppendVarint(b, uint64(size))
-		before := len(b)
 		b, err := mapi.keyFuncs.marshal(b, key.Value(), mapi.keyWiretag, opts)
 		if err != nil {
 			return nil, err
 		}
-		b, err = mapi.valFuncs.marshal(b, val, mapi.valWiretag, opts)
-		if measuredSize := len(b) - before; size != measuredSize && err == nil {
-			return nil, errors.MismatchedSizeCalculation(size, measuredSize)
-		}
-		return b, err
+		return mapi.valFuncs.marshal(b, val, mapi.valWiretag, opts)
 	} else {
 		key := mapi.conv.keyConv.PBValueOf(keyrv).MapKey()
 		val := pointerOfValue(valrv)
@@ -265,12 +259,7 @@ func appendMapItem(b []byte, keyrv, valrv reflect.Value, mapi *mapInfo, f *coder
 		}
 		b = protowire.AppendVarint(b, mapi.valWiretag)
 		b = protowire.AppendVarint(b, uint64(valSize))
-		before := len(b)
-		b, err = f.mi.marshalAppendPointer(b, val, opts)
-		if measuredSize := len(b) - before; valSize != measuredSize && err == nil {
-			return nil, errors.MismatchedSizeCalculation(valSize, measuredSize)
-		}
-		return b, err
+		return f.mi.marshalAppendPointer(b, val, opts)
 	}
 }
 

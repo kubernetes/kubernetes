@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package metric // import "go.opentelemetry.io/otel/metric"
 
@@ -39,7 +50,7 @@ type Float64ObservableCounter interface {
 }
 
 // Float64ObservableCounterConfig contains options for asynchronous counter
-// instruments that record float64 values.
+// instruments that record int64 values.
 type Float64ObservableCounterConfig struct {
 	description string
 	unit        string
@@ -97,7 +108,7 @@ type Float64ObservableUpDownCounter interface {
 }
 
 // Float64ObservableUpDownCounterConfig contains options for asynchronous
-// counter instruments that record float64 values.
+// counter instruments that record int64 values.
 type Float64ObservableUpDownCounterConfig struct {
 	description string
 	unit        string
@@ -154,7 +165,7 @@ type Float64ObservableGauge interface {
 }
 
 // Float64ObservableGaugeConfig contains options for asynchronous counter
-// instruments that record float64 values.
+// instruments that record int64 values.
 type Float64ObservableGaugeConfig struct {
 	description string
 	unit        string
