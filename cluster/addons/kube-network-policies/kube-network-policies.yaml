@@ -27,7 +27,7 @@ spec:
       serviceAccountName: kube-network-policies
       containers:
       - name: kube-network-policies
-        image: registry.k8s.io/networking/kube-network-policies:v0.3.0
+        image: registry.k8s.io/networking/kube-network-policies:v0.4.0
         command:
         - /bin/sh
         - -c
@@ -45,11 +45,6 @@ spec:
         - mountPath: /lib/modules
           name: lib-modules
           readOnly: true
-        env:
-        - name: MY_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
       volumes:
       - name: varlog
         hostPath:
