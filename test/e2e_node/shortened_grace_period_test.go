@@ -19,7 +19,6 @@ package e2enode
 import (
 	"bytes"
 	"context"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,8 +78,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				}
 				podLogs := buf.String()
 				// Verify the number of SIGINT
-				gomega.Expect(strings.Count("SIGINT 1", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
-				gomega.Expect(strings.Count("SIGINT 2", podLogs)).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
+				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
+				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
 				return expectedWatchEvents
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
@@ -120,7 +119,7 @@ term() {
   COUNT=$((COUNT + 1))
 }
 COUNT=0
-trap term SIGINT
+trap term SIGKILL SIGTERM
 while true; do
   sleep 1
 done
