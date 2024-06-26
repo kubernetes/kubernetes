@@ -2984,6 +2984,9 @@ func buildIngressString(ingress []corev1.LoadBalancerIngress) string {
 		}
 		if ingress[i].IP != "" {
 			buffer.WriteString(ingress[i].IP)
+			if ingress[i].IPMode != nil {
+				buffer.WriteString(fmt.Sprintf(" (%s)", *ingress[i].IPMode))
+			}
 		} else {
 			buffer.WriteString(ingress[i].Hostname)
 		}
@@ -3027,7 +3030,7 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 			w.Write(LEVEL_0, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
 		}
 		if service.Spec.LoadBalancerIP != "" {
-			w.Write(LEVEL_0, "IP:\t%s\n", service.Spec.LoadBalancerIP)
+			w.Write(LEVEL_0, "Desired LoadBalancer IP:\t%s\n", service.Spec.LoadBalancerIP)
 		}
 		if service.Spec.ExternalName != "" {
 			w.Write(LEVEL_0, "External Name:\t%s\n", service.Spec.ExternalName)
@@ -3057,6 +3060,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 		w.Write(LEVEL_0, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if service.Spec.ExternalTrafficPolicy != "" {
 			w.Write(LEVEL_0, "External Traffic Policy:\t%s\n", service.Spec.ExternalTrafficPolicy)
+		}
+		if service.Spec.InternalTrafficPolicy != nil {
+			w.Write(LEVEL_0, "Internal Traffic Policy:\t%s\n", *service.Spec.InternalTrafficPolicy)
 		}
 		if service.Spec.HealthCheckNodePort != 0 {
 			w.Write(LEVEL_0, "HealthCheck NodePort:\t%d\n", service.Spec.HealthCheckNodePort)
