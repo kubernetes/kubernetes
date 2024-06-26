@@ -18,17 +18,11 @@ package capabilities
 
 import (
 	"reflect"
-	"sync"
 	"testing"
 )
 
 func TestGet(t *testing.T) {
-	defer func() {
-		capInstance.lock.Lock()
-		defer capInstance.lock.Unlock()
-		capInstance.capabilities = nil
-		capInstance.once = sync.Once{}
-	}()
+	defer ResetForTest(nil)
 	defaultCap := Capabilities{
 		AllowPrivileged: false,
 		PrivilegedSources: PrivilegedSources{
@@ -48,10 +42,57 @@ func TestGet(t *testing.T) {
 			HostNetworkSources: []string{"A", "B"},
 		},
 	}
-	SetForTests(cap)
+	ResetForTest(&cap)
 
 	res = Get()
 	if !reflect.DeepEqual(cap, res) {
 		t.Fatalf("expected Capabilities: %#v , got a different: %#v", cap, res)
 	}
+}
+func TestSetup(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		allowPrivileged          bool
+		perConnectionBytesPerSec int64
+		expectedCapabilities     Capabilities
+	}{
+		{
+			name:                     "AllowPrivileged true with bandwidth limit",
+			allowPrivileged:          true,
+			perConnectionBytesPerSec: 1024,
+			expectedCapabilities: Capabilities{
+				AllowPrivileged:                        true,
+				PerConnectionBandwidthLimitBytesPerSec: 1024,
+			},
+		},
+		{
+			name:                     "AllowPrivileged false with higher bandwidth limit",
+			allowPrivileged:          false,
+			perConnectionBytesPerSec: 2048,
+			expectedCapabilities: Capabilities{
+				AllowPrivileged:                        false,
+				PerConnectionBandwidthLimitBytesPerSec: 2048,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer ResetForTest(nil)
+
+			Setup(tc.allowPrivileged, tc.perConnectionBytesPerSec)
+			res := Get()
+			if !compareCapabilities(tc.expectedCapabilities, res) {
+				t.Fatalf("expected Capabilities: %#v, got: %#v", tc.expectedCapabilities, res)
+			}
+		})
+	}
+}
+
+// compareCapabilities compares two Capabilities instances
+func compareCapabilities(a, b Capabilities) bool {
+	if a.AllowPrivileged != b.AllowPrivileged {
+		return false
+	}
+	return a.PerConnectionBandwidthLimitBytesPerSec == b.PerConnectionBandwidthLimitBytesPerSec
 }
