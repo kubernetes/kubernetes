@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -796,6 +797,54 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, template, pod)
 
 			b.testPod(ctx, f.ClientSet, pod)
+		})
+
+		ginkgo.It("supports count/resourceclaim.resource ResourceQuota", func(ctx context.Context) {
+			claim := &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-0",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: resourceapi.ResourceClaimSpec{
+					Requests: []resourceapi.Request{{
+						Name: "req-0",
+						RequestDetail: &resourceapi.RequestDetail{
+							Device: &resourceapi.DeviceRequest{
+								DeviceClassName: "my-class",
+							},
+						},
+					}},
+				},
+			}
+			_, err := f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create first claim")
+
+			resourceName := "count/resourceclaims.resource.k8s.io"
+			quota := &v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "object-count",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
+				},
+			}
+			quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create resource quota")
+
+			// Eventually the quota status should consider the existing claim.
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
+				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(v1.ResourceQuotaStatus{
+						Hard: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
+						Used: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
+					})})))
+
+			// Now creating another claim should fail.
+			claim2 := claim.DeepCopy()
+			claim2.Name = "claim-1"
+			_, err = f.ClientSet.ResourceV1alpha3().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
+			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
 	})
 
