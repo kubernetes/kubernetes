@@ -36,7 +36,8 @@ import (
 )
 
 // Underlier is the additional interface implemented by the per-test LogSink
-// behind [TContext.Logger].
+// behind [TContext.Logger]. Together with [initoption.BufferLogs] it can be
+// used to capture log output in memory to check it in tests.
 type Underlier = ktesting.Underlier
 
 // CleanupGracePeriod is the time that a [TContext] gets canceled before the
@@ -245,6 +246,7 @@ func Init(tb TB, opts ...InitOption) TContext {
 			}),
 			ktesting.VerbosityFlagName("v"),
 			ktesting.VModuleFlagName("vmodule"),
+			ktesting.BufferLogs(c.BufferLogs),
 		)
 
 		// Copy klog settings instead of making the ktesting logger

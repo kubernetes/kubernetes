@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,9 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 func TestNewResource(t *testing.T) {
@@ -1655,5 +1658,19 @@ func TestCloudEvent_Match(t *testing.T) {
 				t.Fatalf("unexpected result")
 			}
 		})
+	}
+}
+
+func TestNodeInfoKMetadata(t *testing.T) {
+	tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+	logger := tCtx.Logger()
+	logger.Info("Some NodeInfo slice", "nodes", klog.KObjSlice([]*NodeInfo{nil, {}, {node: &v1.Node{}}, {node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "worker"}}}}))
+
+	output := logger.GetSink().(ktesting.Underlier).GetBuffer().String()
+
+	// The initial nil entry gets turned into empty ObjectRef by klog,
+	// which becomes an empty string during output formatting.
+	if !strings.Contains(output, `Some NodeInfo slice nodes=["","<no node>","","worker"]`) {
+		tCtx.Fatalf("unexpected output:\n%s", output)
 	}
 }
