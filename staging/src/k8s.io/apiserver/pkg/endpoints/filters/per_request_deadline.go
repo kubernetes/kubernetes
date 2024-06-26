@@ -17,8 +17,14 @@ limitations under the License.
 package filters
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"sync"
 
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -99,6 +105,85 @@ func WithPerRequestDeadline(handler http.Handler) http.Handler {
 			return
 		}
 
+		w = responsewriter.WrapForHTTP1Or2(&timeoutWriter{ResponseWriter: w})
+		req = req.Clone(req.Context())
+		req.Body = &timeoutReader{ReadCloser: req.Body}
+
 		handler.ServeHTTP(w, req)
 	})
+}
+
+type TimeoutError struct {
+	innerErr error
+}
+
+func (e TimeoutError) Error() string {
+	return fmt.Sprintf("the request timed out: %v", e.innerErr)
+}
+
+func (e TimeoutError) Unwrap() error {
+	return e.innerErr
+}
+
+var _ http.ResponseWriter = &timeoutWriter{}
+var _ responsewriter.UserProvidedDecorator = &timeoutWriter{}
+
+type timeoutWriter struct {
+	http.ResponseWriter
+
+	lock sync.Mutex
+	err  error
+}
+
+func (tw *timeoutWriter) Unwrap() http.ResponseWriter {
+	return tw.ResponseWriter
+}
+
+func (tw *timeoutWriter) Write(p []byte) (int, error) {
+	tw.lock.Lock()
+	defer tw.lock.Unlock()
+
+	if tw.err != nil {
+		return 0, tw.err
+	}
+
+	n, err := tw.ResponseWriter.Write(p)
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		tw.err = &TimeoutError{innerErr: err}
+		return n, tw.err
+	}
+	return n, err
+}
+
+func (tw *timeoutWriter) Flush() {
+	tw.lock.Lock()
+	defer tw.lock.Unlock()
+
+	if tw.err != nil {
+		return
+	}
+	tw.ResponseWriter.(http.Flusher).Flush()
+}
+
+type timeoutReader struct {
+	io.ReadCloser
+
+	lock sync.Mutex
+	err  error
+}
+
+func (tr *timeoutReader) Read(p []byte) (int, error) {
+	tr.lock.Lock()
+	defer tr.lock.Unlock()
+
+	if tr.err != nil {
+		return 0, tr.err
+	}
+
+	n, err := tr.ReadCloser.Read(p)
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		tr.err = &TimeoutError{innerErr: err}
+		return n, tr.err
+	}
+	return n, err
 }
