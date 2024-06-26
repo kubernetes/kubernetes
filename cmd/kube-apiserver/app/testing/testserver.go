@@ -87,7 +87,8 @@ type TestServerInstanceOptions struct {
 	// Useful for testing server configurations expected to prevent /healthz from completing.
 	SkipHealthzCheck bool
 	// Enable cert-auth for the kube-apiserver
-	EnableCertAuth bool
+	EnableCertAuth                  bool
+	RequestHeaderUIDHeadersOverride []string
 	// Wrap the storage version interface of the created server's generic server.
 	StorageVersionWrapFunc func(storageversion.Manager) storageversion.Manager
 	// CA file used for requestheader authn during communication between:
@@ -192,6 +193,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		// set up default headers for request header auth
 		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
 		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
+		if instanceOptions.RequestHeaderUIDHeadersOverride != nil {
+			s.Authentication.RequestHeader.UIDHeaders = instanceOptions.RequestHeaderUIDHeadersOverride
+		}
 
 		var proxySigningKey *rsa.PrivateKey
 		var proxySigningCert *x509.Certificate
