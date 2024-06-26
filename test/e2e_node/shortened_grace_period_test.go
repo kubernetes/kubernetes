@@ -54,7 +54,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		})
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			expectedWatchEvents := []watch.Event{
-				{Type: watch.Deleted},
+				{Type: watch.Modified},
 			}
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
@@ -120,7 +120,7 @@ term() {
   COUNT=$((COUNT + 1))
 }
 COUNT=0
-trap term SIGKILL SIGTERM
+trap term SIGTERM
 while true; do
   sleep 1
 done
