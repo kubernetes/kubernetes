@@ -242,7 +242,7 @@ EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 KUBELET_RESOLV_CONF=${KUBELET_RESOLV_CONF:-"/etc/resolv.conf"}
 # By default only allow CORS for requests on localhost
-API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
+API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-//127.0.0.1(:[0-9]+)?$,//localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 # By default we use 0(close it) for it's insecure
 KUBELET_READ_ONLY_PORT=${KUBELET_READ_ONLY_PORT:-0}
