@@ -941,6 +941,12 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *v1.ObjectFieldSelector, pod 
 		return podIP, nil
 	case "status.podIPs":
 		return strings.Join(podIPs, ","), nil
+	case "spec.terminationGracePeriodSeconds":
+		t := pod.Spec.TerminationGracePeriodSeconds
+		if t == nil {
+			return "30", nil
+		}
+		return strconv.Itoa(int(*t)), nil
 	}
 	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }

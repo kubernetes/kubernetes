@@ -703,6 +703,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 						},
 					},
 					{
+						Name: "TERMINATION_GRACE_PERIOD",
+						ValueFrom: &v1.EnvVarSource{
+							FieldRef: &v1.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "spec.terminationGracePeriodSeconds",
+							},
+						},
+					},
+					{
 						Name: "HOST_IP",
 						ValueFrom: &v1.EnvVarSource{
 							FieldRef: &v1.ObjectFieldSelector{
@@ -731,6 +740,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "POD_SERVICE_ACCOUNT_NAME", Value: "special"},
 				{Name: "POD_IP", Value: "1.2.3.4"},
 				{Name: "POD_IPS", Value: "1.2.3.4,fd00::6"},
+				{Name: "TERMINATION_GRACE_PERIOD", Value: "31"},
 				{Name: "HOST_IP", Value: testKubeletHostIP},
 				{Name: "HOST_IPS", Value: testKubeletHostIP + "," + testKubeletHostIPv6},
 			},
@@ -2021,9 +2031,10 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 				Spec: v1.PodSpec{
-					ServiceAccountName: "special",
-					NodeName:           "node-name",
-					EnableServiceLinks: tc.enableServiceLinks,
+					ServiceAccountName:            "special",
+					NodeName:                      "node-name",
+					EnableServiceLinks:            tc.enableServiceLinks,
+					TerminationGracePeriodSeconds: ptr.To(int64(31)),
 				},
 			}
 			podIP := ""

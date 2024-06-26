@@ -1378,7 +1378,7 @@ message EnvVar {
 // EnvVarSource represents a source for the value of an EnvVar.
 message EnvVarSource {
   // Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
-  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+  // spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs, spec.terminationGracePeriodSeconds.
   // +optional
   optional ObjectFieldSelector fieldRef = 1;
 

@@ -2608,6 +2608,7 @@ var validEnvDownwardAPIFieldPathExpressions = sets.New(
 	"status.hostIPs",
 	"status.podIP",
 	"status.podIPs",
+	"spec.terminationGracePeriodSeconds",
 )
 
 var validContainerResourceFieldPathExpressions = sets.New(

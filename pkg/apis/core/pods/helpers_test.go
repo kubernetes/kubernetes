@@ -217,6 +217,13 @@ func TestConvertDownwardAPIFieldLabel(t *testing.T) {
 			expectedLabel: "status.hostIPs",
 			expectedValue: "10.244.0.6",
 		},
+		{
+			version:       "v1",
+			label:         "spec.terminationGracePeriodSeconds",
+			value:         "10",
+			expectedLabel: "spec.terminationGracePeriodSeconds",
+			expectedValue: "10",
+		},
 	}
 	for _, tc := range testCases {
 		label, value, err := ConvertDownwardAPIFieldLabel(tc.version, tc.label, tc.value)
