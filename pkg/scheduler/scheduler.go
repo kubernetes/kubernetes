@@ -326,7 +326,7 @@ func New(ctx context.Context,
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
 	for profileName, profile := range profiles {
 		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
-		queueingHintsPerProfile[profileName] = buildQueueingHintMap(profile.EnqueueExtensions())
+		queueingHintsPerProfile[profileName] = buildQueueingHintMap(logger, profile.EnqueueExtensions())
 	}
 
 	podQueue := internalqueue.NewSchedulingQueue(
@@ -379,15 +379,13 @@ var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fr
 	return framework.Queue, nil
 }
 
-func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
+func buildQueueingHintMap(logger klog.Logger, es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
 	queueingHintMap := make(internalqueue.QueueingHintMap)
 	for _, e := range es {
 		events := e.EventsToRegister()
 
-		// This will happen when plugin registers with empty events, it's usually the case a pod
-		// will become reschedulable only for self-update, e.g. schedulingGates plugin, the pod
-		// will enter into the activeQ via priorityQueue.Update().
 		if len(events) == 0 {
+			logger.V(2).Info("Warning: no event registered, which may lead to Pod stuck in unschedulePods", "plugin", e.Name())
 			continue
 		}
 
