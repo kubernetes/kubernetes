@@ -45,11 +45,6 @@ func TestDecode(t *testing.T) {
 		into          interface{} // prototype for concrete destination type. if nil, decode into empty interface value.
 		want          interface{}
 		assertOnError func(t *testing.T, e error)
-
-		// TODO: Some failing test cases are included for completeness. The next library
-		// minor version should allow them all to be fixed. In the meantime, this field
-		// explains the behavior reason for a particular failure.
-		fixme string
 	}
 
 	// Test cases are grouped by the kind of the CBOR data item being decoded, as enumerated in
@@ -70,13 +65,6 @@ func TestDecode(t *testing.T) {
 						}
 
 						t.Run(fmt.Sprintf("%s/mode=%s", test.name, modeName), func(t *testing.T) {
-							if test.fixme != "" {
-								// TODO: Remove this along with the
-								// fixme field when the last skipped
-								// test case is passing.
-								t.Skip(test.fixme)
-							}
-
 							var dst reflect.Value
 							if test.into == nil {
 								var i interface{}
