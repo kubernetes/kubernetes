@@ -70,8 +70,7 @@ type LeaseSpec struct {
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
 	// Strategy indicates the strategy for picking the leader for coordinated leader election
 	// +optional
-	// +default="NoCoordination"
-	Strategy *CoordinatedStrategy `json:"strategy,omitempty" protobuf:"bytes,8,opt,name=strategy"`
+	Strategy *CoordinatedStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

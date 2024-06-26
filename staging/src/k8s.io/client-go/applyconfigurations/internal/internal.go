@@ -4362,7 +4362,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
-      default: NoCoordination
 - name: io.k8s.api.coordination.v1alpha1.LeaseCandidate
   map:
     fields:
@@ -4436,7 +4435,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
-      default: NoCoordination
 - name: io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource
   map:
     fields:

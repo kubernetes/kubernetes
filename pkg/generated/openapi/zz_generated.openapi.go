@@ -18758,7 +18758,6 @@ func schema_k8sio_api_coordination_v1_LeaseSpec(ref common.ReferenceCallback) co
 					"strategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Strategy indicates the strategy for picking the leader for coordinated leader election",
-							Default:     "NoCoordination",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18775,7 +18774,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "LeaseCandidate defines a candidate for a lease object.",
+				Description: "LeaseCandidate defines a candidate for a lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -18888,7 +18887,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 					},
 					"targetLease": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TargetLease is a name/namespace pair of the lease that the candidate can lead",
+							Description: "TargetLease is the name of the lease that the candidate can lead",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -18902,7 +18901,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 					},
 					"renewTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "renewTime is a time when the current holder of a lease has last updated the lease.",
+							Description: "renewTime is the time that the LeaseCandidate was last updated. Unlike Lease objects, candidates are not refreshed frequently. Any time a Lease needs to do leader election, an annotation is sent to all the candidates to renew their candidacy and update the renewTime here.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"),
 						},
 					},
@@ -19051,7 +19050,6 @@ func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallbac
 					"strategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Strategy indicates the strategy for picking the leader for coordinated leader election",
-							Default:     "NoCoordination",
 							Type:        []string{"string"},
 							Format:      "",
 						},

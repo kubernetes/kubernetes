@@ -22,7 +22,6 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/coordination/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -30,21 +29,5 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&v1.Lease{}, func(obj interface{}) { SetObjectDefaults_Lease(obj.(*v1.Lease)) })
-	scheme.AddTypeDefaultingFunc(&v1.LeaseList{}, func(obj interface{}) { SetObjectDefaults_LeaseList(obj.(*v1.LeaseList)) })
 	return nil
-}
-
-func SetObjectDefaults_Lease(in *v1.Lease) {
-	if in.Spec.Strategy == nil {
-		var ptrVar1 v1.CoordinatedStrategy = "NoCoordination"
-		in.Spec.Strategy = &ptrVar1
-	}
-}
-
-func SetObjectDefaults_LeaseList(in *v1.LeaseList) {
-	for i := range in.Items {
-		a := &in.Items[i]
-		SetObjectDefaults_Lease(a)
-	}
 }

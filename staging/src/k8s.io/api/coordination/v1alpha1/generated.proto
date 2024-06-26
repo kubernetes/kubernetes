@@ -29,6 +29,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/coordination/v1alpha1";
 
 // LeaseCandidate defines a candidate for a lease object.
+// Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 message LeaseCandidate {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
@@ -59,7 +60,7 @@ message LeaseCandidateSpec {
   // CompatibilityVersion is the compatibility version
   optional string compatiblityVersion = 6;
 
-  // TargetLease is a name/namespace pair of the lease that the candidate can lead
+  // TargetLease is the name of the lease that the candidate can lead
   optional string targetLease = 7;
 
   // leaseDurationSeconds is a duration that candidates for a lease need
@@ -68,8 +69,11 @@ message LeaseCandidateSpec {
   // +optional
   optional int32 leaseDurationSeconds = 2;
 
-  // renewTime is a time when the current holder of a lease has last
-  // updated the lease.
+  // renewTime is the time that the LeaseCandidate was last updated.
+  // Unlike Lease objects, candidates are not refreshed frequently.
+  // Any time a Lease needs to do leader election, an annotation is sent
+  // to all the candidates to renew their candidacy and update the
+  // renewTime here.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime renewTime = 4;
 }

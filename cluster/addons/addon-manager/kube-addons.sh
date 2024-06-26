@@ -281,7 +281,7 @@ function is_leader() {
     return 1
     ;;
 
-  "${HOSTNAME}"_*)
+  "${HOSTNAME}"-*)
     log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
     return 0
     ;;
