@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 
@@ -53,46 +64,12 @@ func WithInsecure() Option {
 	return wrappedOption{otlpconfig.WithInsecure()}
 }
 
-// WithEndpoint sets the target endpoint (host and port) the Exporter will
-// connect to. The provided endpoint should resemble "example.com:4317" (no
-// scheme or path).
-//
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
-//
-// If both this option and WithEndpointURL are used, the last used option will
-// take precedence.
-//
-// By default, if an environment variable is not set, and this option is not
-// passed, "localhost:4317" will be used.
+// WithEndpoint sets the target endpoint the exporter will connect to. If
+// unset, localhost:4317 will be used as a default.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpoint(endpoint string) Option {
 	return wrappedOption{otlpconfig.WithEndpoint(endpoint)}
-}
-
-// WithEndpointURL sets the target endpoint URL (scheme, host, port, path)
-// the Exporter will connect to. The provided endpoint URL should resemble
-// "https://example.com:4318/v1/traces".
-//
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
-//
-// If both this option and WithEndpoint are used, the last used option will
-// take precedence.
-//
-// If an invalid URL is provided, the default value will be kept.
-//
-// By default, if an environment variable is not set, and this option is not
-// passed, "https://localhost:4317/v1/traces" will be used.
-//
-// This option has no effect if WithGRPCConn is used.
-func WithEndpointURL(u string) Option {
-	return wrappedOption{otlpconfig.WithEndpointURL(u)}
 }
 
 // WithReconnectionPeriod set the minimum amount of time between connection
@@ -154,8 +131,6 @@ func WithServiceConfig(serviceConfig string) Option {
 // connection. The options here are appended to the internal grpc.DialOptions
 // used so they will take precedence over any other internal grpc.DialOptions
 // they might conflict with.
-// The [grpc.WithBlock], [grpc.WithTimeout], and [grpc.WithReturnConnectionError]
-// grpc.DialOptions are ignored.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithDialOption(opts ...grpc.DialOption) Option {

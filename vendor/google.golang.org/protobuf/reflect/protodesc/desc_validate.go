@@ -45,11 +45,11 @@ func validateEnumDeclarations(es []filedesc.Enum, eds []*descriptorpb.EnumDescri
 		if allowAlias && !foundAlias {
 			return errors.New("enum %q allows aliases, but none were found", e.FullName())
 		}
-		if !e.IsClosed() {
+		if e.Syntax() == protoreflect.Proto3 {
 			if v := e.Values().Get(0); v.Number() != 0 {
-				return errors.New("enum %q using open semantics must have zero number for the first value", v.FullName())
+				return errors.New("enum %q using proto3 semantics must have zero number for the first value", v.FullName())
 			}
-			// Verify that value names in open enums do not conflict if the
+			// Verify that value names in proto3 do not conflict if the
 			// case-insensitive prefix is removed.
 			// See protoc v3.8.0: src/google/protobuf/descriptor.cc:4991-5055
 			names := map[string]protoreflect.EnumValueDescriptor{}
@@ -58,7 +58,7 @@ func validateEnumDeclarations(es []filedesc.Enum, eds []*descriptorpb.EnumDescri
 				v1 := e.Values().Get(i)
 				s := strs.EnumValueName(strs.TrimEnumPrefix(string(v1.Name()), prefix))
 				if v2, ok := names[s]; ok && v1.Number() != v2.Number() {
-					return errors.New("enum %q using open semantics has conflict: %q with %q", e.FullName(), v1.Name(), v2.Name())
+					return errors.New("enum %q using proto3 semantics has conflict: %q with %q", e.FullName(), v1.Name(), v2.Name())
 				}
 				names[s] = v1
 			}
@@ -80,9 +80,7 @@ func validateEnumDeclarations(es []filedesc.Enum, eds []*descriptorpb.EnumDescri
 	return nil
 }
 
-func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds []*descriptorpb.DescriptorProto) error {
-	// There are a few limited exceptions only for proto3
-	isProto3 := file.L1.Edition == fromEditionProto(descriptorpb.Edition_EDITION_PROTO3)
+func validateMessageDeclarations(ms []filedesc.Message, mds []*descriptorpb.DescriptorProto) error {
 	for i, md := range mds {
 		m := &ms[i]
 
@@ -109,10 +107,10 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 		if isMessageSet && !flags.ProtoLegacy {
 			return errors.New("message %q is a MessageSet, which is a legacy proto1 feature that is no longer supported", m.FullName())
 		}
-		if isMessageSet && (isProto3 || m.Fields().Len() > 0 || m.ExtensionRanges().Len() == 0) {
+		if isMessageSet && (m.Syntax() == protoreflect.Proto3 || m.Fields().Len() > 0 || m.ExtensionRanges().Len() == 0) {
 			return errors.New("message %q is an invalid proto1 MessageSet", m.FullName())
 		}
-		if isProto3 {
+		if m.Syntax() == protoreflect.Proto3 {
 			if m.ExtensionRanges().Len() > 0 {
 				return errors.New("message %q using proto3 semantics cannot have extension ranges", m.FullName())
 			}
@@ -151,7 +149,7 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 				return errors.New("message field %q may not have extendee: %q", f.FullName(), fd.GetExtendee())
 			}
 			if f.L1.IsProto3Optional {
-				if !isProto3 {
+				if f.Syntax() != protoreflect.Proto3 {
 					return errors.New("message field %q under proto3 optional semantics must be specified in the proto3 syntax", f.FullName())
 				}
 				if f.Cardinality() != protoreflect.Optional {
@@ -164,28 +162,25 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 			if f.IsWeak() && !flags.ProtoLegacy {
 				return errors.New("message field %q is a weak field, which is a legacy proto1 feature that is no longer supported", f.FullName())
 			}
-			if f.IsWeak() && (!f.HasPresence() || !isOptionalMessage(f) || f.ContainingOneof() != nil) {
+			if f.IsWeak() && (f.Syntax() != protoreflect.Proto2 || !isOptionalMessage(f) || f.ContainingOneof() != nil) {
 				return errors.New("message field %q may only be weak for an optional message", f.FullName())
 			}
 			if f.IsPacked() && !isPackable(f) {
 				return errors.New("message field %q is not packable", f.FullName())
 			}
-			if err := checkValidGroup(file, f); err != nil {
+			if err := checkValidGroup(f); err != nil {
 				return errors.New("message field %q is an invalid group: %v", f.FullName(), err)
 			}
 			if err := checkValidMap(f); err != nil {
 				return errors.New("message field %q is an invalid map: %v", f.FullName(), err)
 			}
-			if isProto3 {
+			if f.Syntax() == protoreflect.Proto3 {
 				if f.Cardinality() == protoreflect.Required {
 					return errors.New("message field %q using proto3 semantics cannot be required", f.FullName())
 				}
-				if f.Enum() != nil && !f.Enum().IsPlaceholder() && f.Enum().IsClosed() {
-					return errors.New("message field %q using proto3 semantics may only depend on open enums", f.FullName())
+				if f.Enum() != nil && !f.Enum().IsPlaceholder() && f.Enum().Syntax() != protoreflect.Proto3 {
+					return errors.New("message field %q using proto3 semantics may only depend on a proto3 enum", f.FullName())
 				}
-			}
-			if f.Cardinality() == protoreflect.Optional && !f.HasPresence() && f.Enum() != nil && !f.Enum().IsPlaceholder() && f.Enum().IsClosed() {
-				return errors.New("message field %q with implicit presence may only use open enums", f.FullName())
 			}
 		}
 		seenSynthetic := false // synthetic oneofs for proto3 optional must come after real oneofs
@@ -220,17 +215,17 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 		if err := validateEnumDeclarations(m.L1.Enums.List, md.GetEnumType()); err != nil {
 			return err
 		}
-		if err := validateMessageDeclarations(file, m.L1.Messages.List, md.GetNestedType()); err != nil {
+		if err := validateMessageDeclarations(m.L1.Messages.List, md.GetNestedType()); err != nil {
 			return err
 		}
-		if err := validateExtensionDeclarations(file, m.L1.Extensions.List, md.GetExtension()); err != nil {
+		if err := validateExtensionDeclarations(m.L1.Extensions.List, md.GetExtension()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateExtensionDeclarations(f *filedesc.File, xs []filedesc.Extension, xds []*descriptorpb.FieldDescriptorProto) error {
+func validateExtensionDeclarations(xs []filedesc.Extension, xds []*descriptorpb.FieldDescriptorProto) error {
 	for i, xd := range xds {
 		x := &xs[i]
 		// NOTE: Avoid using the IsValid method since extensions to MessageSet
@@ -272,13 +267,13 @@ func validateExtensionDeclarations(f *filedesc.File, xs []filedesc.Extension, xd
 		if x.IsPacked() && !isPackable(x) {
 			return errors.New("extension field %q is not packable", x.FullName())
 		}
-		if err := checkValidGroup(f, x); err != nil {
+		if err := checkValidGroup(x); err != nil {
 			return errors.New("extension field %q is an invalid group: %v", x.FullName(), err)
 		}
 		if md := x.Message(); md != nil && md.IsMapEntry() {
 			return errors.New("extension field %q cannot be a map entry", x.FullName())
 		}
-		if f.L1.Edition == fromEditionProto(descriptorpb.Edition_EDITION_PROTO3) {
+		if x.Syntax() == protoreflect.Proto3 {
 			switch x.ContainingMessage().FullName() {
 			case (*descriptorpb.FileOptions)(nil).ProtoReflect().Descriptor().FullName():
 			case (*descriptorpb.EnumOptions)(nil).ProtoReflect().Descriptor().FullName():
@@ -314,25 +309,21 @@ func isPackable(fd protoreflect.FieldDescriptor) bool {
 
 // checkValidGroup reports whether fd is a valid group according to the same
 // rules that protoc imposes.
-func checkValidGroup(f *filedesc.File, fd protoreflect.FieldDescriptor) error {
+func checkValidGroup(fd protoreflect.FieldDescriptor) error {
 	md := fd.Message()
 	switch {
 	case fd.Kind() != protoreflect.GroupKind:
 		return nil
-	case f.L1.Edition == fromEditionProto(descriptorpb.Edition_EDITION_PROTO3):
+	case fd.Syntax() == protoreflect.Proto3:
 		return errors.New("invalid under proto3 semantics")
 	case md == nil || md.IsPlaceholder():
 		return errors.New("message must be resolvable")
-	}
-	if f.L1.Edition < fromEditionProto(descriptorpb.Edition_EDITION_2023) {
-		switch {
-		case fd.FullName().Parent() != md.FullName().Parent():
-			return errors.New("message and field must be declared in the same scope")
-		case !unicode.IsUpper(rune(md.Name()[0])):
-			return errors.New("message name must start with an uppercase")
-		case fd.Name() != protoreflect.Name(strings.ToLower(string(md.Name()))):
-			return errors.New("field name must be lowercased form of the message name")
-		}
+	case fd.FullName().Parent() != md.FullName().Parent():
+		return errors.New("message and field must be declared in the same scope")
+	case !unicode.IsUpper(rune(md.Name()[0])):
+		return errors.New("message name must start with an uppercase")
+	case fd.Name() != protoreflect.Name(strings.ToLower(string(md.Name()))):
+		return errors.New("field name must be lowercased form of the message name")
 	}
 	return nil
 }

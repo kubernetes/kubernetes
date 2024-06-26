@@ -10,7 +10,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 )
 
-const File_google_protobuf_go_features_proto = "google/protobuf/go_features.proto"
+const File_reflect_protodesc_proto_go_features_proto = "reflect/protodesc/proto/go_features.proto"
 
 // Names for google.protobuf.GoFeatures.
 const (

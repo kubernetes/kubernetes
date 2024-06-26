@@ -73,16 +73,6 @@ func ToFileDescriptorProto(file protoreflect.FileDescriptor) *descriptorpb.FileD
 	if syntax := file.Syntax(); syntax != protoreflect.Proto2 && syntax.IsValid() {
 		p.Syntax = proto.String(file.Syntax().String())
 	}
-	if file.Syntax() == protoreflect.Editions {
-		desc := file
-		if fileImportDesc, ok := file.(protoreflect.FileImport); ok {
-			desc = fileImportDesc.FileDescriptor
-		}
-
-		if editionsInterface, ok := desc.(interface{ Edition() int32 }); ok {
-			p.Edition = descriptorpb.Edition(editionsInterface.Edition()).Enum()
-		}
-	}
 	return p
 }
 
@@ -162,18 +152,6 @@ func ToFieldDescriptorProto(field protoreflect.FieldDescriptor) *descriptorpb.Fi
 	}
 	if field.Syntax() == protoreflect.Proto3 && field.HasOptionalKeyword() {
 		p.Proto3Optional = proto.Bool(true)
-	}
-	if field.Syntax() == protoreflect.Editions {
-		// Editions have no group keyword, this type is only set so that downstream users continue
-		// treating this as delimited encoding.
-		if p.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
-			p.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
-		}
-		// Editions have no required keyword, this label is only set so that downstream users continue
-		// treating it as required.
-		if p.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
-			p.Label = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
-		}
 	}
 	if field.HasDefault() {
 		def, err := defval.Marshal(field.Default(), field.DefaultEnumValue(), field.Kind(), defval.Descriptor)

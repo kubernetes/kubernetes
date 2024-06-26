@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package propagation // import "go.opentelemetry.io/otel/propagation"
 
@@ -7,7 +18,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
+	"regexp"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -17,7 +28,6 @@ const (
 	maxVersion        = 254
 	traceparentHeader = "traceparent"
 	tracestateHeader  = "tracestate"
-	delimiter         = "-"
 )
 
 // TraceContext is a propagator that supports the W3C Trace Context format
@@ -31,11 +41,11 @@ const (
 type TraceContext struct{}
 
 var (
-	_           TextMapPropagator = TraceContext{}
-	versionPart                   = fmt.Sprintf("%.2X", supportedVersion)
+	_              TextMapPropagator = TraceContext{}
+	traceCtxRegExp                   = regexp.MustCompile("^(?P<version>[0-9a-f]{2})-(?P<traceID>[a-f0-9]{32})-(?P<spanID>[a-f0-9]{16})-(?P<traceFlags>[a-f0-9]{2})(?:-.*)?$")
 )
 
-// Inject injects the trace context from ctx into carrier.
+// Inject set tracecontext from the Context into the carrier.
 func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 	sc := trace.SpanContextFromContext(ctx)
 	if !sc.IsValid() {
@@ -49,19 +59,12 @@ func (tc TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 	// Clear all flags other than the trace-context supported sampling bit.
 	flags := sc.TraceFlags() & trace.FlagsSampled
 
-	var sb strings.Builder
-	sb.Grow(2 + 32 + 16 + 2 + 3)
-	_, _ = sb.WriteString(versionPart)
-	traceID := sc.TraceID()
-	spanID := sc.SpanID()
-	flagByte := [1]byte{byte(flags)}
-	var buf [32]byte
-	for _, src := range [][]byte{traceID[:], spanID[:], flagByte[:]} {
-		_ = sb.WriteByte(delimiter[0])
-		n := hex.Encode(buf[:], src)
-		_, _ = sb.Write(buf[:n])
-	}
-	carrier.Set(traceparentHeader, sb.String())
+	h := fmt.Sprintf("%.2x-%s-%s-%s",
+		supportedVersion,
+		sc.TraceID(),
+		sc.SpanID(),
+		flags)
+	carrier.Set(traceparentHeader, h)
 }
 
 // Extract reads tracecontext from the carrier into a returned Context.
@@ -83,8 +86,21 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 		return trace.SpanContext{}
 	}
 
-	var ver [1]byte
-	if !extractPart(ver[:], &h, 2) {
+	matches := traceCtxRegExp.FindStringSubmatch(h)
+
+	if len(matches) == 0 {
+		return trace.SpanContext{}
+	}
+
+	if len(matches) < 5 { // four subgroups plus the overall match
+		return trace.SpanContext{}
+	}
+
+	if len(matches[1]) != 2 {
+		return trace.SpanContext{}
+	}
+	ver, err := hex.DecodeString(matches[1])
+	if err != nil {
 		return trace.SpanContext{}
 	}
 	version := int(ver[0])
@@ -92,24 +108,36 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 		return trace.SpanContext{}
 	}
 
+	if version == 0 && len(matches) != 5 { // four subgroups plus the overall match
+		return trace.SpanContext{}
+	}
+
+	if len(matches[2]) != 32 {
+		return trace.SpanContext{}
+	}
+
 	var scc trace.SpanContextConfig
-	if !extractPart(scc.TraceID[:], &h, 32) {
-		return trace.SpanContext{}
-	}
-	if !extractPart(scc.SpanID[:], &h, 16) {
+
+	scc.TraceID, err = trace.TraceIDFromHex(matches[2][:32])
+	if err != nil {
 		return trace.SpanContext{}
 	}
 
-	var opts [1]byte
-	if !extractPart(opts[:], &h, 2) {
+	if len(matches[3]) != 16 {
 		return trace.SpanContext{}
 	}
-	if version == 0 && (h != "" || opts[0] > 2) {
-		// version 0 not allow extra
-		// version 0 not allow other flag
+	scc.SpanID, err = trace.SpanIDFromHex(matches[3])
+	if err != nil {
 		return trace.SpanContext{}
 	}
 
+	if len(matches[4]) != 2 {
+		return trace.SpanContext{}
+	}
+	opts, err := hex.DecodeString(matches[4])
+	if err != nil || len(opts) < 1 || (version == 0 && opts[0] > 2) {
+		return trace.SpanContext{}
+	}
 	// Clear all flags other than the trace-context supported sampling bit.
 	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled
 
@@ -125,29 +153,6 @@ func (tc TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	}
 
 	return sc
-}
-
-// upperHex detect hex is upper case Unicode characters.
-func upperHex(v string) bool {
-	for _, c := range v {
-		if c >= 'A' && c <= 'F' {
-			return true
-		}
-	}
-	return false
-}
-
-func extractPart(dst []byte, h *string, n int) bool {
-	part, left, _ := strings.Cut(*h, delimiter)
-	*h = left
-	// hex.Decode decodes unsupported upper-case characters, so exclude explicitly.
-	if len(part) != n || upperHex(part) {
-		return false
-	}
-	if p, err := hex.Decode(dst, []byte(part)); err != nil || p != n/2 {
-		return false
-	}
-	return true
 }
 
 // Fields returns the keys who's values are set with Inject.

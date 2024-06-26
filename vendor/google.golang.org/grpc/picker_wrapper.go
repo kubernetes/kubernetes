@@ -20,7 +20,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
 
@@ -38,6 +37,7 @@ import (
 type pickerWrapper struct {
 	mu            sync.Mutex
 	done          bool
+	idle          bool
 	blockingCh    chan struct{}
 	picker        balancer.Picker
 	statsHandlers []stats.Handler // to record blocking picker calls
@@ -53,7 +53,11 @@ func newPickerWrapper(statsHandlers []stats.Handler) *pickerWrapper {
 // updatePicker is called by UpdateBalancerState. It unblocks all blocked pick.
 func (pw *pickerWrapper) updatePicker(p balancer.Picker) {
 	pw.mu.Lock()
-	if pw.done {
+	if pw.done || pw.idle {
+		// There is a small window where a picker update from the LB policy can
+		// race with the channel going to idle mode. If the picker is idle here,
+		// it is because the channel asked it to do so, and therefore it is sage
+		// to ignore the update from the LB policy.
 		pw.mu.Unlock()
 		return
 	}
@@ -118,7 +122,7 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 				if lastPickErr != nil {
 					errStr = "latest balancer error: " + lastPickErr.Error()
 				} else {
-					errStr = fmt.Sprintf("received context error while waiting for new LB policy update: %s", ctx.Err().Error())
+					errStr = ctx.Err().Error()
 				}
 				switch ctx.Err() {
 				case context.DeadlineExceeded:
@@ -206,15 +210,23 @@ func (pw *pickerWrapper) close() {
 	close(pw.blockingCh)
 }
 
-// reset clears the pickerWrapper and prepares it for being used again when idle
-// mode is exited.
-func (pw *pickerWrapper) reset() {
+func (pw *pickerWrapper) enterIdleMode() {
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	if pw.done {
+		return
+	}
+	pw.idle = true
+}
+
+func (pw *pickerWrapper) exitIdleMode() {
 	pw.mu.Lock()
 	defer pw.mu.Unlock()
 	if pw.done {
 		return
 	}
 	pw.blockingCh = make(chan struct{})
+	pw.idle = false
 }
 
 // dropError is a wrapper error that indicates the LB policy wishes to drop the

@@ -118,7 +118,7 @@ func (xi *ExtensionInfo) initFromLegacy() {
 	xd.L1.Number = protoreflect.FieldNumber(xi.Field)
 	xd.L1.Cardinality = fd.L1.Cardinality
 	xd.L1.Kind = fd.L1.Kind
-	xd.L1.EditionFeatures = fd.L1.EditionFeatures
+	xd.L2.IsPacked = fd.L1.IsPacked
 	xd.L2.Default = fd.L1.Default
 	xd.L1.Extendee = Export{}.MessageDescriptorOf(xi.ExtendedType)
 	xd.L2.Enum = ed

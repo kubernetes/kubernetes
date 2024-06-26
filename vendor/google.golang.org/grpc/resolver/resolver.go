@@ -29,7 +29,6 @@ import (
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/serviceconfig"
 )
 
@@ -64,18 +63,16 @@ func Get(scheme string) Builder {
 }
 
 // SetDefaultScheme sets the default scheme that will be used. The default
-// scheme is initially set to "passthrough".
+// default scheme is "passthrough".
 //
 // NOTE: this function must only be called during initialization time (i.e. in
 // an init() function), and is not thread-safe. The scheme set last overrides
 // previously set values.
 func SetDefaultScheme(scheme string) {
 	defaultScheme = scheme
-	internal.UserSetDefaultScheme = true
 }
 
-// GetDefaultScheme gets the default scheme that will be used by grpc.Dial.  If
-// SetDefaultScheme is never called, the default scheme used by grpc.NewClient is "dns" instead.
+// GetDefaultScheme gets the default scheme that will be used.
 func GetDefaultScheme() string {
 	return defaultScheme
 }
@@ -171,9 +168,6 @@ type BuildOptions struct {
 	// field. In most cases though, it is not appropriate, and this field may
 	// be ignored.
 	Dialer func(context.Context, string) (net.Conn, error)
-	// Authority is the effective authority of the clientconn for which the
-	// resolver is built.
-	Authority string
 }
 
 // An Endpoint is one network endpoint, or server, which may have multiple
@@ -246,6 +240,11 @@ type ClientConn interface {
 	//
 	// Deprecated: Use UpdateState instead.
 	NewAddress(addresses []Address)
+	// NewServiceConfig is called by resolver to notify ClientConn a new
+	// service config. The service config should be provided as a json string.
+	//
+	// Deprecated: Use UpdateState instead.
+	NewServiceConfig(serviceConfig string)
 	// ParseServiceConfig parses the provided service config and returns an
 	// object that provides the parsed config.
 	ParseServiceConfig(serviceConfigJSON string) *serviceconfig.ParseResult
@@ -287,11 +286,6 @@ func (t Target) Endpoint() string {
 	return strings.TrimPrefix(endpoint, "/")
 }
 
-// String returns the canonical string representation of Target.
-func (t Target) String() string {
-	return t.URL.Scheme + "://" + t.URL.Host + "/" + t.Endpoint()
-}
-
 // Builder creates a resolver that will be used to watch name resolution updates.
 type Builder interface {
 	// Build creates a new resolver for the given target.
@@ -319,14 +313,4 @@ type Resolver interface {
 	ResolveNow(ResolveNowOptions)
 	// Close closes the resolver.
 	Close()
-}
-
-// AuthorityOverrider is implemented by Builders that wish to override the
-// default authority for the ClientConn.
-// By default, the authority used is target.Endpoint().
-type AuthorityOverrider interface {
-	// OverrideAuthority returns the authority to use for a ClientConn with the
-	// given target. The implementation must generate it without blocking,
-	// typically in line, and must keep it unchanged.
-	OverrideAuthority(Target) string
 }

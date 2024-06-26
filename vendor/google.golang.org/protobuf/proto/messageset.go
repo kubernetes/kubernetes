@@ -47,15 +47,10 @@ func (o MarshalOptions) marshalMessageSet(b []byte, m protoreflect.Message) ([]b
 func (o MarshalOptions) marshalMessageSetField(b []byte, fd protoreflect.FieldDescriptor, value protoreflect.Value) ([]byte, error) {
 	b = messageset.AppendFieldStart(b, fd.Number())
 	b = protowire.AppendTag(b, messageset.FieldMessage, protowire.BytesType)
-	calculatedSize := o.Size(value.Message().Interface())
-	b = protowire.AppendVarint(b, uint64(calculatedSize))
-	before := len(b)
+	b = protowire.AppendVarint(b, uint64(o.Size(value.Message().Interface())))
 	b, err := o.marshalMessage(b, value.Message())
 	if err != nil {
 		return b, err
-	}
-	if measuredSize := len(b) - before; calculatedSize != measuredSize {
-		return nil, errors.MismatchedSizeCalculation(calculatedSize, measuredSize)
 	}
 	b = messageset.AppendFieldEnd(b)
 	return b, nil

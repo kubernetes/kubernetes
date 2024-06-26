@@ -27,7 +27,7 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 	var root interface{}
 
 	if err := json.NewDecoder(r).Decode(&root); err != nil {
-		if errors.Is(err, io.EOF) {
+		if err == io.EOF {
 			return fm, nil
 		}
 		return nil, err
@@ -41,7 +41,7 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 
 		m, ok := item.node.(map[string]interface{})
 		switch {
-		case ok && len(m) > 0:
+		case ok:
 			// if the item is an object, then enqueue all of its children
 			for k, v := range m {
 				if item.msg == nil {
@@ -96,8 +96,6 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 					queue = append(queue, child)
 				}
 			}
-		case ok && len(m) == 0:
-			fallthrough
 		case len(item.path) > 0:
 			// otherwise, it's a leaf node so print its path
 			fm.Paths = append(fm.Paths, item.path)

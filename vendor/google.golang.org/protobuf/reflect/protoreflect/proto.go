@@ -161,7 +161,7 @@ const (
 // IsValid reports whether the syntax is valid.
 func (s Syntax) IsValid() bool {
 	switch s {
-	case Proto2, Proto3, Editions:
+	case Proto2, Proto3:
 		return true
 	default:
 		return false
