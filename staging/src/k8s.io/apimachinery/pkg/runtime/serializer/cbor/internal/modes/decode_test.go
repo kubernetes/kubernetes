@@ -29,6 +29,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+type int64BinaryUnmarshaler int64
+
+func (i *int64BinaryUnmarshaler) UnmarshalBinary(_ []byte) error {
+	return nil
+}
+
 func TestDecode(t *testing.T) {
 	hex := func(h string) []byte {
 		b, err := hex.DecodeString(h)
@@ -202,6 +208,20 @@ func TestDecode(t *testing.T) {
 			in:            hex("d64401020304"), // 22(h'01020304')
 			want:          "AQIDBA==",
 			assertOnError: assertNilError,
+		},
+		{
+			name: "into non-string type implementing BinaryUnmarshaler",
+			in:   hex("40"), // ''
+			into: int64BinaryUnmarshaler(7),
+			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.UnmarshalTypeError) {
+				want := &cbor.UnmarshalTypeError{
+					CBORType: "byte string",
+					GoType:   reflect.TypeFor[int64BinaryUnmarshaler]().String(),
+				}
+				if e.CBORType != want.CBORType || e.GoType != want.GoType {
+					t.Errorf("expected %q, got %q", want, e)
+				}
+			}),
 		},
 	})
 
