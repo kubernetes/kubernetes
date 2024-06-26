@@ -422,7 +422,7 @@ github.com/mitchellh/go-wordwrap
 # github.com/moby/ipvs v1.1.0
 ## explicit; go 1.17
 github.com/moby/ipvs
-# github.com/moby/spdystream v0.2.0
+# github.com/moby/spdystream v0.3.0
 ## explicit; go 1.13
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
