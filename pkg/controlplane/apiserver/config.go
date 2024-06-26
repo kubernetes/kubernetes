@@ -25,6 +25,7 @@ import (
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -142,7 +143,13 @@ func BuildGenericConfig(
 		lastErr = fmt.Errorf("failed to create real external clientset: %w", err)
 		return
 	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
