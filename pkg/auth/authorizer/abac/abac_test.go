@@ -18,6 +18,7 @@ package abac
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -1265,5 +1266,294 @@ func TestPolicy(t *testing.T) {
 			t.Errorf("%s: expected: %t, saw: %t", test.name, test.matches, matches)
 			continue
 		}
+	}
+}
+
+func TestPolicyLoadError(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		line     int
+		data     []byte
+		err      error
+		expected string
+	}{
+		{
+			name:     "File not found",
+			path:     "/nonexistent/path",
+			line:     -1,
+			err:      os.ErrNotExist,
+			expected: "error reading policy file /nonexistent/path: file does not exist",
+		},
+		{
+			name:     "Invalid policy data",
+			path:     "test_policy.json",
+			line:     5,
+			data:     []byte(`{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy", "spec": {`),
+			err:      fmt.Errorf("unexpected end of JSON input"),
+			expected: "error reading policy file test_policy.json, line 5: {\"apiVersion\": \"abac.authorization.kubernetes.io/v1beta1\", \"kind\": \"Policy\", \"spec\": {: unexpected end of JSON input",
+		},
+		{
+			name:     "Missing required fields",
+			path:     "test_policy.json",
+			line:     10,
+			data:     []byte(`{"apiVersion": "abac.authorization.kubernetes.io/v1beta1", "kind": "Policy"}`),
+			err:      fmt.Errorf("spec is required"),
+			expected: "error reading policy file test_policy.json, line 10: {\"apiVersion\": \"abac.authorization.kubernetes.io/v1beta1\", \"kind\": \"Policy\"}: spec is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ple := policyLoadError{
+				path: tt.path,
+				line: tt.line,
+				data: tt.data,
+				err:  tt.err,
+			}
+			if got := ple.Error(); got != tt.expected {
+				t.Errorf("policyLoadError.Error() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMatches(t *testing.T) {
+	tests := []struct {
+		name     string
+		policy   abac.Policy
+		attr     authorizer.Attributes
+		expected bool
+	}{
+		{
+			name: "Full match",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					User:     "alice",
+					Resource: "pods",
+				},
+			},
+			attr: &authorizer.AttributesRecord{
+				User:            &user.DefaultInfo{Name: "alice"},
+				Resource:        "pods",
+				ResourceRequest: true,
+			},
+			expected: true,
+		},
+		{
+			name: "Partial match - user only",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					User:     "alice",
+					Resource: "pods",
+				},
+			},
+			attr: &authorizer.AttributesRecord{
+				User:            &user.DefaultInfo{Name: "alice"},
+				Resource:        "services",
+				ResourceRequest: true,
+			},
+			expected: false,
+		},
+		{
+			name: "Partial match - resource only",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					User:     "alice",
+					Resource: "pods",
+				},
+			},
+			attr: &authorizer.AttributesRecord{
+				User:            &user.DefaultInfo{Name: "bob"},
+				Resource:        "pods",
+				ResourceRequest: true,
+			},
+			expected: false,
+		},
+		{
+			name: "No match",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					User:     "alice",
+					Resource: "pods",
+				},
+			},
+			attr: &authorizer.AttributesRecord{
+				User:            &user.DefaultInfo{Name: "bob"},
+				Resource:        "services",
+				ResourceRequest: true,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := matches(tt.policy, tt.attr); got != tt.expected {
+				t.Errorf("matches() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNewFromFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		filepath string
+		wantErr  bool
+		errType  interface{}
+	}{
+		{
+			name:     "File open error",
+			filepath: "/nonexistent/path/to/file.json",
+			wantErr:  true,
+			errType:  &os.PathError{},
+		},
+		{
+			name:    "Decode error",
+			content: `{"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"alice"`,
+			wantErr: true,
+			errType: policyLoadError{},
+		},
+		{
+			name:    "Unrecognized object error",
+			content: `{"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"UnknownKind","spec":{}}`,
+			wantErr: true,
+			errType: policyLoadError{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var filepath string
+			if tt.filepath != "" {
+				filepath = tt.filepath
+			} else {
+				tmpfile, err := os.CreateTemp("", "test-policy-*.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if err := os.Remove(tmpfile.Name()); err != nil {
+						t.Fatalf("Failed to teardown: %s", err)
+					}
+				}()
+
+				if _, err := tmpfile.Write([]byte(tt.content)); err != nil {
+					t.Fatal(err)
+				}
+				if err := tmpfile.Close(); err != nil {
+					t.Fatal(err)
+				}
+				filepath = tmpfile.Name()
+			}
+
+			_, err := NewFromFile(filepath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewFromFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err != nil && tt.errType != nil {
+				if reflect.TypeOf(err) != reflect.TypeOf(tt.errType) {
+					t.Errorf("NewFromFile() error type = %v, want %v", reflect.TypeOf(err), reflect.TypeOf(tt.errType))
+				}
+			}
+		})
+	}
+}
+
+func TestSubjectMatchesWildcards(t *testing.T) {
+	tests := []struct {
+		name   string
+		policy abac.Policy
+		user   user.Info
+		want   bool
+	}{
+		{
+			name: "Wildcard user match",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					User: "*",
+				},
+			},
+			user: &user.DefaultInfo{Name: "alice"},
+			want: true,
+		},
+		{
+			name: "Wildcard group match",
+			policy: abac.Policy{
+				Spec: abac.PolicySpec{
+					Group: "*",
+				},
+			},
+			user: &user.DefaultInfo{Name: "bob", Groups: []string{"group1"}},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := subjectMatches(tt.policy, tt.user); got != tt.want {
+				t.Errorf("subjectMatches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPolicyList_Authorize(t *testing.T) {
+	tests := []struct {
+		name         string
+		policies     PolicyList
+		attributes   authorizer.Attributes
+		wantDecision authorizer.Decision
+		wantReason   string
+	}{
+		{
+			name: "No matching policy",
+			policies: PolicyList{
+				&abac.Policy{
+					Spec: abac.PolicySpec{
+						User: "alice",
+					},
+				},
+			},
+			attributes: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "bob"},
+			},
+			wantDecision: authorizer.DecisionNoOpinion,
+			wantReason:   "No policy matched.",
+		},
+		{
+			name: "Matching policy",
+			policies: PolicyList{
+				&abac.Policy{
+					Spec: abac.PolicySpec{
+						User: "alice",
+					},
+				},
+			},
+			attributes: authorizer.AttributesRecord{
+				User: &user.DefaultInfo{Name: "alice"},
+			},
+			wantDecision: authorizer.DecisionAllow,
+			wantReason:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDecision, gotReason, err := tt.policies.Authorize(context.Background(), tt.attributes)
+			if err != nil {
+				t.Errorf("PolicyList.Authorize() error = %v", err)
+				return
+			}
+			if gotDecision != tt.wantDecision {
+				t.Errorf("PolicyList.Authorize() gotDecision = %v, want %v", gotDecision, tt.wantDecision)
+			}
+			if gotReason != tt.wantReason {
+				t.Errorf("PolicyList.Authorize() gotReason = %v, want %v", gotReason, tt.wantReason)
+			}
+		})
 	}
 }
