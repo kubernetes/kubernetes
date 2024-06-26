@@ -673,7 +673,7 @@ func applyWaitingForSchedulingGatesCondition(pod *api.Pod) {
 		}
 	}
 
-	pod.Status.Conditions = append(pod.Status.Conditions, api.PodCondition{
+	podutil.UpdatePodCondition(&pod.Status, &api.PodCondition{
 		Type:    api.PodScheduled,
 		Status:  api.ConditionFalse,
 		Reason:  api.PodReasonSchedulingGated,
