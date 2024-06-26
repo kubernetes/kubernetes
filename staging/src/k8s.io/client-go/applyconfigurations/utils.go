@@ -1542,8 +1542,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.AllocationConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("AllocationResult"):
 		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
-	case v1alpha3.SchemeGroupVersion.WithKind("Amount"):
-		return &resourcev1alpha3.AmountApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("CELSelector"):
 		return &resourcev1alpha3.CELSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ClaimConfiguration"):

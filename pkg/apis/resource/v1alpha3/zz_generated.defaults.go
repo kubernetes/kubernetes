@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	v1alpha3 "k8s.io/api/resource/v1alpha3"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,5 +30,47 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&v1alpha3.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*v1alpha3.ResourceClaim)) })
+	scheme.AddTypeDefaultingFunc(&v1alpha3.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*v1alpha3.ResourceClaimList)) })
+	scheme.AddTypeDefaultingFunc(&v1alpha3.ResourceClaimTemplate{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimTemplate(obj.(*v1alpha3.ResourceClaimTemplate)) })
+	scheme.AddTypeDefaultingFunc(&v1alpha3.ResourceClaimTemplateList{}, func(obj interface{}) {
+		SetObjectDefaults_ResourceClaimTemplateList(obj.(*v1alpha3.ResourceClaimTemplateList))
+	})
 	return nil
+}
+
+func SetObjectDefaults_ResourceClaim(in *v1alpha3.ResourceClaim) {
+	for i := range in.Spec.Requests {
+		a := &in.Spec.Requests[i]
+		if a.RequestDetail != nil {
+			if a.RequestDetail.Device != nil {
+				SetDefaults_DeviceRequest(a.RequestDetail.Device)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_ResourceClaimList(in *v1alpha3.ResourceClaimList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourceClaim(a)
+	}
+}
+
+func SetObjectDefaults_ResourceClaimTemplate(in *v1alpha3.ResourceClaimTemplate) {
+	for i := range in.Spec.Spec.Requests {
+		a := &in.Spec.Spec.Requests[i]
+		if a.RequestDetail != nil {
+			if a.RequestDetail.Device != nil {
+				SetDefaults_DeviceRequest(a.RequestDetail.Device)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_ResourceClaimTemplateList(in *v1alpha3.ResourceClaimTemplateList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourceClaimTemplate(a)
+	}
 }

@@ -17,9 +17,21 @@ limitations under the License.
 package v1alpha3
 
 import (
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
+	if obj.CountMode == "" {
+		obj.CountMode = resourceapi.CountModeExact
+	}
+
+	if obj.CountMode == resourceapi.CountModeExact && obj.Count == nil {
+		obj.Count = ptr.To(int64(1))
+	}
 }

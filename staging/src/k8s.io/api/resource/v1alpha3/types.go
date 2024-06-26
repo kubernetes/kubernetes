@@ -406,11 +406,27 @@ type DeviceRequest struct {
 	// +listType=atomic
 	Selectors []Selector `json:"selectors,omitempty" protobuf:"bytes,2,name=selectors"`
 
-	// Amount determines how many devices to allocate for the request.
-	// The default if unset is exactly one device.
+	// The count mode together with, for some modes, additional fields
+	// determines how many devices to allocate for the request.
+	//
+	// The default if unset is exactly one device:
+	//     countMode: Exact
+	//     count: 1
+	//
+	// "countMode: All" asks for all devices matching the selectors.
+	// Allocation fails if not all of them are available, unless admin
+	// access is requested. Admin access is granted also for
+	// devices which are in use.
+	//
+	// More modes may get added in the future.
+	//
+	// +default
+	CountMode string `json:"countMode,omitempty" protobuf:"bytes,3,opt,name=countMode"`
+
+	// Count is used only when the count mode is "Exact". Must be larger than zero.
 	//
 	// +optional
-	Amount *Amount `json:"amount,omitempty" protobuf:"bytes,3,opt,name=amount"`
+	Count *int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
 
 	// AdminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -422,8 +438,14 @@ type DeviceRequest struct {
 	// Default is false.
 	//
 	// +optional
-	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,4,opt,name=adminAccess"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 }
+
+// Valid [DeviceRequest.CountMode] values.
+const (
+	CountModeExact = "Exact"
+	CountModeAll   = "All"
+)
 
 // Exactly one field must be set.
 type Selector struct {
@@ -484,26 +506,6 @@ type CELSelector struct {
 	//
 	// +required
 	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
-}
-
-// Exactly one field must be set.
-type Amount struct {
-	// All, if set, asks for all devices matching the selectors.
-	// Allocation fails if not all of them are available, unless admin
-	// access is requested. Admin access is granted also for
-	// devices which are in use.
-	//
-	// May only be set to true.
-	//
-	// +optional
-	All *bool `json:"all,omitempty" protobuf:"bytes,1,opt,name=all"`
-
-	// A fixed number of devices matching the selectors.
-	//
-	// Must be greater than 0.
-	//
-	// +optional
-	ExactCount *int64 `json:"exactCount,omitempty" protobuf:"bytes,2,opt,name=exactCount"`
 }
 
 // Besides the request name slice, constraint must have exactly one field set.

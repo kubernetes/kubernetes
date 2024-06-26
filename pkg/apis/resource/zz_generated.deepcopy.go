@@ -406,10 +406,10 @@ func (in *DeviceRequest) DeepCopyInto(out *DeviceRequest) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Amount != nil {
-		in, out := &in.Amount, &out.Amount
-		*out = new(Amount)
-		(*in).DeepCopyInto(*out)
+	if in.Count != nil {
+		in, out := &in.Count, &out.Count
+		*out = new(int64)
+		**out = **in
 	}
 	if in.AdminAccess != nil {
 		in, out := &in.AdminAccess, &out.AdminAccess

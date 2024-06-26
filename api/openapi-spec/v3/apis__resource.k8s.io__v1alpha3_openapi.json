@@ -160,21 +160,6 @@
         },
         "type": "object"
       },
-      "io.k8s.api.resource.v1alpha3.Amount": {
-        "description": "Exactly one field must be set.",
-        "properties": {
-          "all": {
-            "description": "All, if set, asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMay only be set to true.",
-            "type": "boolean"
-          },
-          "exactCount": {
-            "description": "A fixed number of devices matching the selectors.\n\nMust be greater than 0.",
-            "format": "int64",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "io.k8s.api.resource.v1alpha3.CELSelector": {
         "description": "CELSelector contains a CEL expression for selecting a device.",
         "properties": {
@@ -481,13 +466,14 @@
             "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations. Ability to request this kind of access is controlled via ResourceQuota in the resource.k8s.io API.\n\nDefault is false.",
             "type": "boolean"
           },
-          "amount": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.Amount"
-              }
-            ],
-            "description": "Amount determines how many devices to allocate for the request. The default if unset is exactly one device."
+          "count": {
+            "description": "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "countMode": {
+            "description": "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
+            "type": "string"
           },
           "deviceClassName": {
             "default": "",

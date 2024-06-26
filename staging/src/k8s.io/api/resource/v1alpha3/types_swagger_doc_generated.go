@@ -49,16 +49,6 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 	return map_AllocationResult
 }
 
-var map_Amount = map[string]string{
-	"":           "Exactly one field must be set.",
-	"all":        "All, if set, asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMay only be set to true.",
-	"exactCount": "A fixed number of devices matching the selectors.\n\nMust be greater than 0.",
-}
-
-func (Amount) SwaggerDoc() map[string]string {
-	return map_Amount
-}
-
 var map_CELSelector = map[string]string{
 	"":           "CELSelector contains a CEL expression for selecting a device.",
 	"expression": "This CEL expression must evaluate to true if a device is suitable. This covers qualitative aspects of device selection.\n\nThe language is as defined in https://kubernetes.io/docs/reference/using-api/cel/ with several additions that are specific to device selectors.\n\nAttributes of a device are made available through a nested `device.attributes` map with the domain part of the attribute name as key in the outer map and the identifier as key in the inner map. All identifiers can be used in a field lookup:\n\n   device.attributes[\"dra.example.com\"].driverVersion\n\nThe type of each entry varies, depending on the attribute that is being looked up. The domain lookup returns an empty map if there is no attribute with that domain. However, unknown identifiers then trigger a runtime error.\n\nThe `cel.bind` function is enabled and can be used to simplify expressions that access multiple attributes with the same domain:\n\n   cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nCapacities associated with a device are made available through a nested `device.capacities` map the same way as attributes.\n\nThe `device.driverName` string variable can be used to check for a specific driver explicitly in a filter that is meant to work for devices from different vendors. It is provided by Kubernetes and matches the `driverName` from the ResourceSlice which provides the device.\n\nThe CEL expression is applied to *all* available devices from any driver. The expression has to check for existence of an attribute when it is not certain that it is provided because runtime errors are not automatically treated as \"don't select device\". Instead, device selection fails completely and reports the error.\n\nSome more examples:\n\n   \"memory\" in device.capacities[\"dra.example.com\"] && # Is the capacity available?\n      device.capacities[\"dra.example.com\"].memory.isGreaterThan(quantity(\"1Gi\")) # >= 1Gi\n\n   device.attributes[\"dra.example.com\"].driverVersion.isGreaterThan(semver(\"1.0.0\")) # >= v1.0.0, runtime error if not available\n\n   device.driverName == \"dra.example.com\" # any device from that driver",
@@ -172,7 +162,8 @@ var map_DeviceRequest = map[string]string{
 	"":                "DeviceRequest is currently the only permitted alternative in RequestDetail.",
 	"deviceClassName": "By referencing a DeviceClass, a request inherits additional configuration parameters and selectors.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then an empty class called \"none\" can get created to permit `deviceClassName: none`.",
 	"selectors":       "Each selector must be satisfied by a device which is requested.",
-	"amount":          "Amount determines how many devices to allocate for the request. The default if unset is exactly one device.",
+	"countMode":       "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
+	"count":           "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
 	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations. Ability to request this kind of access is controlled via ResourceQuota in the resource.k8s.io API.\n\nDefault is false.",
 }
 

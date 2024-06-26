@@ -875,7 +875,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/rbac/v1beta1.Subject":                                                                       schema_k8sio_api_rbac_v1beta1_Subject(ref),
 		"k8s.io/api/resource/v1alpha3.AllocationConfiguration":                                                  schema_k8sio_api_resource_v1alpha3_AllocationConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha3_AllocationResult(ref),
-		"k8s.io/api/resource/v1alpha3.Amount":                                                                   schema_k8sio_api_resource_v1alpha3_Amount(ref),
 		"k8s.io/api/resource/v1alpha3.CELSelector":                                                              schema_k8sio_api_resource_v1alpha3_CELSelector(ref),
 		"k8s.io/api/resource/v1alpha3.ClaimConfiguration":                                                       schema_k8sio_api_resource_v1alpha3_ClaimConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.ClassConfiguration":                                                       schema_k8sio_api_resource_v1alpha3_ClassConfiguration(ref),
@@ -45099,33 +45098,6 @@ func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha3_Amount(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "Exactly one field must be set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"all": {
-						SchemaProps: spec.SchemaProps{
-							Description: "All, if set, asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMay only be set to true.",
-							Type:        []string{"boolean"},
-							Format:      "",
-						},
-					},
-					"exactCount": {
-						SchemaProps: spec.SchemaProps{
-							Description: "A fixed number of devices matching the selectors.\n\nMust be greater than 0.",
-							Type:        []string{"integer"},
-							Format:      "int64",
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func schema_k8sio_api_resource_v1alpha3_CELSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -45604,10 +45576,18 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 							},
 						},
 					},
-					"amount": {
+					"countMode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Amount determines how many devices to allocate for the request. The default if unset is exactly one device.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.Amount"),
+							Description: "The count mode together with, for some modes, additional fields determines how many devices to allocate for the request.\n\nThe default if unset is exactly one device:\n    countMode: Exact\n    count: 1\n\n\"countMode: All\" asks for all devices matching the selectors. Allocation fails if not all of them are available, unless admin access is requested. Admin access is granted also for devices which are in use.\n\nMore modes may get added in the future.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"count": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Count is used only when the count mode is \"Exact\". Must be larger than zero.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 					"adminAccess": {
@@ -45622,7 +45602,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.Amount", "k8s.io/api/resource/v1alpha3.Selector"},
+			"k8s.io/api/resource/v1alpha3.Selector"},
 	}
 }
 

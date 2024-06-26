@@ -172,16 +172,15 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 				requestData.class = class
 			}
 
-			switch {
-			case request.Device.Amount == nil:
-				requestData.numDevices = 1
-			case request.Device.Amount.ExactCount != nil:
-				if *request.Device.Amount.ExactCount > math.MaxInt {
+			switch request.Device.CountMode {
+			case resourceapi.CountModeExact:
+				numDevices := ptr.Deref(request.Device.Count, 1)
+				if numDevices > math.MaxInt {
 					// Allowed by API validation, but doesn't make sense.
-					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, deviceRequest.DeviceClassName, *request.Device.Amount.ExactCount)
+					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, deviceRequest.DeviceClassName, numDevices)
 				}
-				requestData.numDevices = int(*request.Device.Amount.ExactCount)
-			case ptr.Deref(request.Device.Amount.All, false):
+				requestData.numDevices = int(numDevices)
+			case resourceapi.CountModeAll:
 				requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
 				for _, pool := range pools {
 					if pool.IsIncomplete {
@@ -501,7 +500,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 	}
 
 	request := &alloc.claimsToAllocate[r.claimIndex].Spec.Requests[r.requestIndex]
-	doAllDevices := request.Device.Amount != nil && ptr.Deref(request.Device.Amount.All, false)
+	doAllDevices := request.Device.CountMode == resourceapi.CountModeAll
 	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", ptr.Deref(request.Device.AdminAccess, false))
 
 	if doAllDevices {

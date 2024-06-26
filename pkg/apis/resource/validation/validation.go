@@ -327,14 +327,29 @@ func validateResourceSliceSpecUpdate(spec, oldSpec *resource.ResourceSliceSpec, 
 
 func validateResourceRequests(requests []resource.Request, fldPath *field.Path, opts Options) field.ErrorList {
 	var allErrs field.ErrorList
-	// for i, request := range requests {
-	// 	idxPath := fldPath.Index(i)
-	// 	allErrs = append(allErrs, validateResourceRequestModel(&request.ResourceRequestModel, idxPath, requestStored)...)
-	// }
+	for i := range requests {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validateRequest(&requests[i], idxPath, opts)...)
+	}
 	if len(requests) == 0 {
 		// We could allow this ("null claim"), but it also could be a user mistake, so we flag it as an error.
 		allErrs = append(allErrs, field.Required(fldPath, "a claim must have at least one request"))
 	}
+	return allErrs
+}
+
+func validateRequest(request *resource.Request, fldPath *field.Path, opts Options) field.ErrorList {
+	allErrs := corevalidation.ValidateDNS1123Label(request.Name, fldPath.Child("name"))
+	allErrs = append(allErrs, validateDeviceRequest(request.Device, fldPath.Child("device"), opts)...)
+	return allErrs
+}
+
+func validateDeviceRequest(deviceRequest *resource.DeviceRequest, fldPath *field.Path, opts Options) field.ErrorList {
+	if deviceRequest == nil {
+		return field.ErrorList{field.Required(fldPath, "")}
+	}
+	var allErrs field.ErrorList
+	// TODO
 	return allErrs
 }
 
@@ -365,11 +380,11 @@ func validateOpaqueConfiguration(parameters []resource.OpaqueConfiguration, fldP
 }
 
 type Options struct {
-	// StoredExpressions must be true if and only if validating CEL
-	// expressions that were already stored persistently. This makes
+	// Stored must be true if and only if validating CEL
+	// expressions and fields that were already stored persistently. This makes
 	// validation more permissive by enabling CEL definitions that are not
-	// valid yet for new expressions.
-	StoredExpressions bool
+	// valid yet for new expressions and allowing unknown enums for fields.
+	Stored bool
 }
 
 func validateDevices(devices []resource.Device, fldPath *field.Path) field.ErrorList {
@@ -496,7 +511,7 @@ func validateCELSelector(celSelector *resource.CELSelector, fldPath *field.Path,
 		return allErrs
 	}
 	envType := environment.NewExpressions
-	if opts.StoredExpressions {
+	if opts.Stored {
 		envType = environment.StoredExpressions
 	}
 	result := dracel.Compiler.CompileCELExpression(celSelector.Expression, envType)

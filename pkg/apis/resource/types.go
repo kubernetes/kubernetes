@@ -392,11 +392,27 @@ type DeviceRequest struct {
 	// +listType=atomic
 	Selectors []Selector
 
-	// Amount determines how many devices to allocate for the request.
-	// The default if unset is exactly one device.
+	// The count mode together with, for some modes, additional fields
+	// determines how many devices to allocate for the request.
+	//
+	// The default if unset is exactly one device:
+	//     countMode: Exact
+	//     count: 1
+	//
+	// "countMode: All" asks for all devices matching the selectors.
+	// Allocation fails if not all of them are available, unless admin
+	// access is requested. Admin access is granted also for
+	// devices which are in use.
+	//
+	// More modes may get added in the future.
+	//
+	// +default
+	CountMode string
+
+	// Count is used only when the count mode is "Exact". Must be larger than zero.
 	//
 	// +optional
-	Amount *Amount
+	Count *int64
 
 	// AdminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -410,6 +426,12 @@ type DeviceRequest struct {
 	// +optional
 	AdminAccess *bool
 }
+
+// Valid [DeviceRequest.CountMode] values.
+const (
+	CountModeExact = "Exact"
+	CountModeAll   = "All"
+)
 
 // Exactly one field must be set.
 type Selector struct {

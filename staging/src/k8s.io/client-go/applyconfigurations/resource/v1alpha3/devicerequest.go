@@ -23,7 +23,8 @@ package v1alpha3
 type DeviceRequestApplyConfiguration struct {
 	DeviceClassName *string                      `json:"deviceClassName,omitempty"`
 	Selectors       []SelectorApplyConfiguration `json:"selectors,omitempty"`
-	Amount          *AmountApplyConfiguration    `json:"amount,omitempty"`
+	CountMode       *string                      `json:"countMode,omitempty"`
+	Count           *int64                       `json:"count,omitempty"`
 	AdminAccess     *bool                        `json:"adminAccess,omitempty"`
 }
 
@@ -54,11 +55,19 @@ func (b *DeviceRequestApplyConfiguration) WithSelectors(values ...*SelectorApply
 	return b
 }
 
-// WithAmount sets the Amount field in the declarative configuration to the given value
+// WithCountMode sets the CountMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Amount field is set to the value of the last call.
-func (b *DeviceRequestApplyConfiguration) WithAmount(value *AmountApplyConfiguration) *DeviceRequestApplyConfiguration {
-	b.Amount = value
+// If called multiple times, the CountMode field is set to the value of the last call.
+func (b *DeviceRequestApplyConfiguration) WithCountMode(value string) *DeviceRequestApplyConfiguration {
+	b.CountMode = &value
+	return b
+}
+
+// WithCount sets the Count field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Count field is set to the value of the last call.
+func (b *DeviceRequestApplyConfiguration) WithCount(value int64) *DeviceRequestApplyConfiguration {
+	b.Count = &value
 	return b
 }
 

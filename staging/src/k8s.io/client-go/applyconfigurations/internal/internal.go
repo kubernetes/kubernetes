@@ -12071,15 +12071,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.RequestAllocationResult
           elementRelationship: atomic
-- name: io.k8s.api.resource.v1alpha3.Amount
-  map:
-    fields:
-    - name: all
-      type:
-        scalar: boolean
-    - name: exactCount
-      type:
-        scalar: numeric
 - name: io.k8s.api.resource.v1alpha3.CELSelector
   map:
     fields:
@@ -12206,9 +12197,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
-    - name: amount
+    - name: count
       type:
-        namedType: io.k8s.api.resource.v1alpha3.Amount
+        scalar: numeric
+    - name: countMode
+      type:
+        scalar: string
     - name: deviceClassName
       type:
         scalar: string
