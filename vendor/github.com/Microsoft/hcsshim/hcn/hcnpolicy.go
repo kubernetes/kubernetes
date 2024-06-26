@@ -48,6 +48,7 @@ const (
 	VxlanPort           NetworkPolicyType = "VxlanPort"
 	HostRoute           NetworkPolicyType = "HostRoute"
 	SetPolicy           NetworkPolicyType = "SetPolicy"
+	ModifyPolicy        NetworkPolicyType = "ModifyPolicy"
 	NetworkL4Proxy      NetworkPolicyType = "L4Proxy"
 	LayerConstraint     NetworkPolicyType = "LayerConstraint"
 )
