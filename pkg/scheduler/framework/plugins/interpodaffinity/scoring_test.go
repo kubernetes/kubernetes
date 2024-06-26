@@ -18,7 +18,6 @@ package interpodaffinity
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -34,14 +33,16 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 )
 
-var nsLabelT1 = map[string]string{"team": "team1"}
-var nsLabelT2 = map[string]string{"team": "team2"}
-var namespaces = []runtime.Object{
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team1", Labels: nsLabelT1}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team1", Labels: nsLabelT1}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team2", Labels: nsLabelT2}},
-	&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team2", Labels: nsLabelT2}},
-}
+var (
+	nsLabelT1  = map[string]string{"team": "team1"}
+	nsLabelT2  = map[string]string{"team": "team2"}
+	namespaces = []runtime.Object{
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team1", Labels: nsLabelT1}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team1", Labels: nsLabelT1}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam1.team2", Labels: nsLabelT2}},
+		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "subteam2.team2", Labels: nsLabelT2}},
+	}
+)
 
 func TestPreferredAffinity(t *testing.T) {
 	labelRgChina := map[string]string{
@@ -975,8 +976,8 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				t.Errorf("unexpected error: %v", status)
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("node score list doesn't match (-want,+got): \n %s", diff)
 			}
 		})
 	}

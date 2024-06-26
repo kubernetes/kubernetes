@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -319,7 +318,6 @@ func (env *testEnv) initVolumes(cachedPVs []*v1.PersistentVolume, apiPVs []*v1.P
 	for _, pv := range apiPVs {
 		env.reactor.AddVolume(pv)
 	}
-
 }
 
 func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolume) error {
@@ -517,8 +515,8 @@ func (env *testEnv) validateBind(
 	t *testing.T,
 	pod *v1.Pod,
 	expectedPVs []*v1.PersistentVolume,
-	expectedAPIPVs []*v1.PersistentVolume) {
-
+	expectedAPIPVs []*v1.PersistentVolume,
+) {
 	// Check pv cache
 	pvCache := env.internalBinder.pvCache
 	for _, pv := range expectedPVs {
@@ -544,8 +542,8 @@ func (env *testEnv) validateProvision(
 	t *testing.T,
 	pod *v1.Pod,
 	expectedPVCs []*v1.PersistentVolumeClaim,
-	expectedAPIPVCs []*v1.PersistentVolumeClaim) {
-
+	expectedAPIPVCs []*v1.PersistentVolumeClaim,
+) {
 	// Check pvc cache
 	pvcCache := env.internalBinder.pvcCache
 	for _, pvc := range expectedPVCs {
@@ -2438,14 +2436,8 @@ func TestGetEligibleNodes(t *testing.T) {
 		eligibleNodes := testEnv.binder.GetEligibleNodes(logger, scenario.pvcs)
 
 		// Validate
-		if reflect.DeepEqual(scenario.eligibleNodes, eligibleNodes) {
-			fmt.Println("foo")
-		}
-
-		if compDiff := cmp.Diff(scenario.eligibleNodes, eligibleNodes, cmp.Comparer(func(a, b sets.Set[string]) bool {
-			return reflect.DeepEqual(a, b)
-		})); compDiff != "" {
-			t.Errorf("Unexpected eligible nodes (-want +got):\n%s", compDiff)
+		if diff := cmp.Diff(scenario.eligibleNodes, eligibleNodes); diff != "" {
+			t.Errorf("Unexpected eligible nodes: %s", diff)
 		}
 	}
 
