@@ -163,6 +163,46 @@ func TestDecode(t *testing.T) {
 			want:          "",
 			assertOnError: assertNilError,
 		},
+		{
+			name:          "byte string into []byte assumes base64",
+			in:            []byte("\x48AQIDBA=="), // 'AQIDBA=='
+			into:          []byte{},
+			want:          []byte{0x01, 0x02, 0x03, 0x04},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "byte string into []byte errors on invalid base64",
+			in:            hex("41ff"), // h'ff'
+			into:          []byte{},
+			assertOnError: assertErrorMessage("cbor: failed to decode base64 from byte string: illegal base64 data at input byte 0"),
+		},
+		{
+			name:          "empty byte string into []byte assumes base64",
+			in:            hex("40"), // ''
+			into:          []byte{},
+			want:          []byte{},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "byte string with expected encoding tag into []byte does not convert",
+			in:            hex("d64401020304"), // 22(h'01020304')
+			into:          []byte{},
+			want:          []byte{0x01, 0x02, 0x03, 0x04},
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "byte string with expected encoding tag into string converts",
+			in:            hex("d64401020304"), // 22(h'01020304')
+			into:          "",
+			want:          "AQIDBA==",
+			assertOnError: assertNilError,
+		},
+		{
+			name:          "byte string with expected encoding tag into interface{} converts",
+			in:            hex("d64401020304"), // 22(h'01020304')
+			want:          "AQIDBA==",
+			assertOnError: assertNilError,
+		},
 	})
 
 	group(t, "text string", []test{

@@ -17,6 +17,7 @@ limitations under the License.
 package modes_test
 
 import (
+	"encoding/base64"
 	"fmt"
 	"math"
 	"reflect"
@@ -335,6 +336,80 @@ func TestRoundtrip(t *testing.T) {
 					if diff := cmp.Diff(original, finalViaIface.Elem().Interface()); diff != "" {
 						t.Errorf("unexpected difference on roundtrip from original to interface{} to original:\n%s", diff)
 					}
+				}
+			})
+		}
+	}
+}
+
+// TestRoundtripTextEncoding exercises roundtrips between []byte and string.
+func TestRoundtripTextEncoding(t *testing.T) {
+	for _, encMode := range allEncModes {
+		for _, decMode := range allDecModes {
+			t.Run(fmt.Sprintf("enc=%s/dec=%s/byte slice", encModeNames[encMode], decModeNames[decMode]), func(t *testing.T) {
+				original := []byte("foo")
+
+				c, err := encMode.Marshal(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var unstructured interface{}
+				if err := decMode.Unmarshal(c, &unstructured); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(base64.StdEncoding.EncodeToString(original), unstructured); diff != "" {
+					t.Errorf("[]byte to interface{}: unexpected diff:\n%s", diff)
+				}
+
+				var s string
+				if err := decMode.Unmarshal(c, &s); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(base64.StdEncoding.EncodeToString(original), s); diff != "" {
+					t.Errorf("[]byte to string: unexpected diff:\n%s", diff)
+				}
+
+				var final []byte
+				if err := decMode.Unmarshal(c, &final); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(original, final); diff != "" {
+					t.Errorf("[]byte to []byte: unexpected diff:\n%s", diff)
+				}
+			})
+
+			t.Run(fmt.Sprintf("enc=%s/dec=%s/string", encModeNames[encMode], decModeNames[decMode]), func(t *testing.T) {
+				decoded := "foo"
+				original := base64.StdEncoding.EncodeToString([]byte(decoded)) // "Zm9v"
+
+				c, err := encMode.Marshal(original)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var unstructured interface{}
+				if err := decMode.Unmarshal(c, &unstructured); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(original, unstructured); diff != "" {
+					t.Errorf("string to interface{}: unexpected diff:\n%s", diff)
+				}
+
+				var b []byte
+				if err := decMode.Unmarshal(c, &b); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff([]byte(decoded), b); diff != "" {
+					t.Errorf("string to []byte: unexpected diff:\n%s", diff)
+				}
+
+				var final string
+				if err := decMode.Unmarshal(c, &final); err != nil {
+					t.Fatal(err)
+				}
+				if diff := cmp.Diff(original, final); diff != "" {
+					t.Errorf("string to string: unexpected diff:\n%s", diff)
 				}
 			})
 		}
