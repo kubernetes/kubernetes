@@ -768,26 +768,12 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
 	// Watch cache doesn't support continuations, so serve them from etcd.
 	hasContinuation := len(pred.Continue) > 0
+	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
+	hasLimit := pred.Limit > 0 && resourceVersion != "0"
 	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	isLegacyExactMatch := opts.Predicate.Limit > 0 && match == "" && len(resourceVersion) > 0 && resourceVersion != "0"
-	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan || isLegacyExactMatch
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
 
-	return consistentReadFromStorage || hasContinuation || unsupportedMatch
-}
-
-// computeListLimit determines whether the cacher should
-// apply a limit to an incoming LIST request and returns its value.
-//
-// note that this function doesn't check RVM nor the Continuation token.
-// these parameters are validated by the shouldDelegateList function.
-//
-// as of today, the limit is ignored for requests that set RV == 0
-func computeListLimit(opts storage.ListOptions) int64 {
-	if opts.Predicate.Limit <= 0 || opts.ResourceVersion == "0" {
-		return 0
-	}
-	return opts.Predicate.Limit
+	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
 }
 
 func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
@@ -897,21 +883,13 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 	//   so we try to delay this action as much as possible
 	var selectedObjects []runtime.Object
-	var lastSelectedObjectKey string
-	var hasMoreListItems bool
-	limit := computeListLimit(opts)
-	for i, obj := range objs {
+	for _, obj := range objs {
 		elem, ok := obj.(*storeElement)
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
-			lastSelectedObjectKey = elem.Key
-		}
-		if limit > 0 && int64(len(selectedObjects)) >= limit {
-			hasMoreListItems = i < len(objs)-1
-			break
 		}
 	}
 	if len(selectedObjects) == 0 {
@@ -927,12 +905,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(readResourceVersion), int64(len(objs)), hasMoreListItems, opts)
-		if err != nil {
-			return err
-		}
-
-		if err = c.versioner.UpdateList(listObj, readResourceVersion, continueValue, remainingItemCount); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
 			return err
 		}
 	}
