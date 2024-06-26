@@ -24,7 +24,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -57,7 +57,7 @@ var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 		lastFailure := ""
 
 		// the admission controller may take a few seconds to observe the ingress classes
-		if err := wait.PollWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			lastFailure = ""
 
 			ingress, err := createBasicIngress(ctx, cs, f.Namespace.Name)
@@ -94,7 +94,7 @@ var _ = common.SIGDescribe("IngressClass", feature.Ingress, func() {
 		lastFailure := ""
 
 		// the admission controller may take a few seconds to observe the ingress classes
-		if err := wait.PollWithContext(ctx, time.Second, time.Minute, func(ctx context.Context) (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
 			lastFailure = ""
 
 			ingress, err := createBasicIngress(ctx, cs, f.Namespace.Name)

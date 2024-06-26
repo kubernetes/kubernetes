@@ -162,7 +162,7 @@ func (c *PodClient) CreateBatch(ctx context.Context, pods []*v1.Pod) []*v1.Pod {
 // there is any other apierrors. name is the pod name, updateFn is the function updating the
 // pod object.
 func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *v1.Pod)) {
-	framework.ExpectNoError(wait.PollWithContext(ctx, time.Millisecond*500, time.Second*30, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*30, false, func(ctx context.Context) (bool, error) {
 		pod, err := c.PodInterface.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %w", name, err)
@@ -309,7 +309,7 @@ func (c *PodClient) WaitForFinish(ctx context.Context, name string, timeout time
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(ctx context.Context, pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %w", err)

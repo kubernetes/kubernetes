@@ -30,7 +30,7 @@ import (
 
 // WaitForReadyReplicaSet waits until the replicaset has all of its replicas ready.
 func WaitForReadyReplicaSet(ctx context.Context, c clientset.Interface, ns, name string) error {
-	err := wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 		rs, err := c.AppsV1().ReplicaSets(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
