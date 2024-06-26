@@ -72,6 +72,7 @@ import (
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/uuid"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 
@@ -266,7 +267,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	// id = id + "-" + string(uuid.NewUUID())
+	id = id + "-" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
@@ -290,15 +291,14 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-
 		// TODO: This should be a shared informer factory
 		kubeInformerFactory := informers.NewSharedInformerFactory(c.Client, time.Second*30)
 		// Start component identity lease management
 		leaseCandidate := &leaderelection.LeaseCandidate{
 			LeaseClient:            c.Client.CoordinationV1alpha1().LeaseCandidates("kube-system"),
 			LeaseCandidateInformer: kubeInformerFactory.Coordination().V1alpha1().LeaseCandidates(),
-			LeaseName:              "kube-controller-manager-" + id, // TODO: safely append uids
-			LeaseNamespace:         "kube-system",                   // TODO: put this in kube-system once RBAC is set up for that
+			LeaseName:              id,            // TODO: safely append uids
+			LeaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
 			LeaseDurationSeconds:   10,
 			Clock:                  clock.RealClock{},
 			TargetLease:            "kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.

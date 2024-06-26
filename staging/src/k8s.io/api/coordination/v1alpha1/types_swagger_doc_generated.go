@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_LeaseCandidate = map[string]string{
-	"":         "LeaseCandidate defines a candidate for a lease object.",
+	"":         "LeaseCandidate defines a candidate for a lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
 	"metadata": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
@@ -51,9 +51,9 @@ var map_LeaseCandidateSpec = map[string]string{
 	"":                     "LeaseSpec is a specification of a Lease.",
 	"binaryVersion":        "BinaryVersion is the binary version",
 	"compatibilityVersion": "CompatibilityVersion is the compatibility version",
-	"targetLease":          "TargetLease is a name/namespace pair of the lease that the candidate can lead",
+	"targetLease":          "TargetLease is the name of the lease that the candidate can lead",
 	"leaseDurationSeconds": "leaseDurationSeconds is a duration that candidates for a lease need to wait to force acquire it. This is measure against time of last observed renewTime.",
-	"renewTime":            "renewTime is a time when the current holder of a lease has last updated the lease.",
+	"renewTime":            "renewTime is the time that the LeaseCandidate was last updated. Unlike Lease objects, candidates are not refreshed frequently. Any time a Lease needs to do leader election, an annotation is sent to all the candidates to renew their candidacy and update the renewTime here.",
 }
 
 func (LeaseCandidateSpec) SwaggerDoc() map[string]string {

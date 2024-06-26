@@ -24,8 +24,16 @@ type CoordinatedStrategy string
 
 // CoordinatedLeaseStrategy defines the strategy for picking the leader for coordinated leader election.
 const (
+	// OldestCompatibilityVersion picks the oldest compatibility version
+	// by first picking the lowest binary version, and then selecting the
+	// lowest compatibility version if binary versions match.
+	// If there are multiple with the same version, then the
+	// leader with the lowest lexicographical comparison result based on the name
+	// will be selected.
 	OldestCompatibilityVersion CoordinatedStrategy = "OldestCompatibilityVersion"
-	NoCoordination             CoordinatedStrategy = "NoCoordination"
+	// NoCoordination opts out of coordinated leader election
+	// and allows leader election to run without a centralized manager.
+	NoCoordination CoordinatedStrategy = "NoCoordination"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -81,7 +89,8 @@ type LeaseList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// LeaseCandidate defines an identity lease concept.
+// LeaseCandidate defines a candidate for a lease object.
+// Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidate struct {
 	metav1.TypeMeta
 	// +optional
@@ -95,7 +104,7 @@ type LeaseCandidateSpec struct {
 	BinaryVersion string
 	// CompatibilityVersion is the compatibility version
 	CompatibilityVersion string
-	// TargetLease is a name/namespace pair of the lease that the candidate can lead
+	// TargetLease is the name of the lease that the candidate can lead
 	TargetLease string
 
 	// leaseDurationSeconds is a duration that candidates for a lease need

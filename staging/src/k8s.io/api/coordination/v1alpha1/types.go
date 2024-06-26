@@ -25,6 +25,7 @@ import (
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
 
 // LeaseCandidate defines a candidate for a lease object.
+// Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.
 type LeaseCandidate struct {
 	metav1.TypeMeta `json:",inline"`
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -43,7 +44,7 @@ type LeaseCandidateSpec struct {
 	BinaryVersion string `json:"binaryVersion,omitempty" protobuf:"bytes,5,opt,name=binaryVersion"`
 	// CompatibilityVersion is the compatibility version
 	CompatibilityVersion string `json:"compatibilityVersion,omitempty" protobuf:"bytes,6,opt,name=compatiblityVersion"`
-	// TargetLease is a name/namespace pair of the lease that the candidate can lead
+	// TargetLease is the name of the lease that the candidate can lead
 	TargetLease string `json:"targetLease,omitempty" protobuf:"bytes,7,opt,name=targetLease"`
 
 	// leaseDurationSeconds is a duration that candidates for a lease need
@@ -51,8 +52,11 @@ type LeaseCandidateSpec struct {
 	// observed renewTime.
 	// +optional
 	LeaseDurationSeconds *int32 `json:"leaseDurationSeconds,omitempty" protobuf:"varint,2,opt,name=leaseDurationSeconds"`
-	// renewTime is a time when the current holder of a lease has last
-	// updated the lease.
+	// renewTime is the time that the LeaseCandidate was last updated.
+	// Unlike Lease objects, candidates are not refreshed frequently.
+	// Any time a Lease needs to do leader election, an annotation is sent
+	// to all the candidates to renew their candidacy and update the
+	// renewTime here.
 	// +optional
 	RenewTime *metav1.MicroTime `json:"renewTime,omitempty" protobuf:"bytes,4,opt,name=renewTime"`
 }

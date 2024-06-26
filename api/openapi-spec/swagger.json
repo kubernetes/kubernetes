@@ -5386,7 +5386,7 @@
       "type": "object"
     },
     "io.k8s.api.coordination.v1alpha1.LeaseCandidate": {
-      "description": "LeaseCandidate defines a candidate for a lease object.",
+      "description": "LeaseCandidate defines a candidate for a lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
       "properties": {
         "apiVersion": {
           "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -5467,10 +5467,10 @@
         },
         "renewTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime",
-          "description": "renewTime is a time when the current holder of a lease has last updated the lease."
+          "description": "renewTime is the time that the LeaseCandidate was last updated. Unlike Lease objects, candidates are not refreshed frequently. Any time a Lease needs to do leader election, an annotation is sent to all the candidates to renew their candidacy and update the renewTime here."
         },
         "targetLease": {
-          "description": "TargetLease is a name/namespace pair of the lease that the candidate can lead",
+          "description": "TargetLease is the name of the lease that the candidate can lead",
           "type": "string"
         }
       },

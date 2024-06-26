@@ -24,8 +24,16 @@ type CoordinatedStrategy string
 
 // CoordinatedLeaseStrategy defines the strategy for picking the leader for coordinated leader election.
 const (
+	// OldestCompatibilityVersion picks the oldest compatibility version
+	// by first picking the lowest binary version, and then selecting the
+	// lowest compatibility version if binary versions match.
+	// If there are multiple with the same version, then the
+	// leader with the lowest lexicographical comparison result based on the name
+	// will be selected.
 	OldestCompatibilityVersion CoordinatedStrategy = "OldestCompatibilityVersion"
-	NoCoordination             CoordinatedStrategy = "NoCoordination"
+	// NoCoordination opts out of coordinated leader election
+	// and allows leader election to run without a centralized manager.
+	NoCoordination CoordinatedStrategy = "NoCoordination"
 )
 
 // +genclient
@@ -68,7 +76,6 @@ type LeaseSpec struct {
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
 	// Strategy indicates the strategy for picking the leader for coordinated leader election
 	// +optional
-	// +default="NoCoordination"
 	Strategy *CoordinatedStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
 }
 
