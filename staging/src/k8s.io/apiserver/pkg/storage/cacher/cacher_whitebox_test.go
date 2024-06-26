@@ -2543,7 +2543,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 				defer cacher.watchCache.RUnlock()
 				return cacher.watchCache.resourceVersion
 			}
-			waitContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			waitContext, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 			defer cancel()
 			waitForEtcdBookmark := watchAndWaitForBookmark(t, waitContext, cacher.storage)
 
@@ -2568,13 +2568,13 @@ func TestWatchStreamSeparation(t *testing.T) {
 				contextMetadata = cacher.watchCache.waitingUntilFresh.contextMetadata
 			}
 			// For the first 100ms from watch creation, watch progress requests are ignored.
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(125 * time.Millisecond)
 			err = cacher.storage.RequestWatchProgress(metadata.NewOutgoingContext(context.Background(), contextMetadata))
 			if err != nil {
 				t.Fatal(err)
 			}
 			// Give time for bookmark to arrive
-			time.Sleep(time.Second)
+			time.Sleep(25 * time.Millisecond)
 
 			etcdWatchResourceVersion := waitForEtcdBookmark()
 			gotEtcdWatchBookmark := etcdWatchResourceVersion == lastResourceVersion
