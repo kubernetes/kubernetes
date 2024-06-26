@@ -2,15 +2,24 @@
 // source: internal/shared/otlp/otlptrace/otlpconfig/options.go.tmpl
 
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package otlpconfig // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig"
 
 import (
 	"crypto/tls"
 	"fmt"
-	"net/http"
-	"net/url"
 	"path"
 	"strings"
 	"time"
@@ -23,7 +32,6 @@ import (
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry"
-	"go.opentelemetry.io/otel/internal/global"
 )
 
 const (
@@ -36,10 +44,6 @@ const (
 )
 
 type (
-	// HTTPTransportProxyFunc is a function that resolves which URL to use as proxy for a given request.
-	// This type is compatible with `http.Transport.Proxy` and can be used to set a custom proxy function to the OTLP HTTP client.
-	HTTPTransportProxyFunc func(*http.Request) (*url.URL, error)
-
 	SignalConfig struct {
 		Endpoint    string
 		Insecure    bool
@@ -51,8 +55,6 @@ type (
 
 		// gRPC configurations
 		GRPCCredentials credentials.TransportCredentials
-
-		Proxy HTTPTransportProxyFunc
 	}
 
 	Config struct {
@@ -256,32 +258,9 @@ func NewGRPCOption(fn func(cfg Config) Config) GRPCOption {
 
 // Generic Options
 
-// WithEndpoint configures the trace host and port only; endpoint should
-// resemble "example.com" or "localhost:4317". To configure the scheme and path,
-// use WithEndpointURL.
 func WithEndpoint(endpoint string) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		cfg.Traces.Endpoint = endpoint
-		return cfg
-	})
-}
-
-// WithEndpointURL configures the trace scheme, host, port, and path; the
-// provided value should resemble "https://example.com:4318/v1/traces".
-func WithEndpointURL(v string) GenericOption {
-	return newGenericOption(func(cfg Config) Config {
-		u, err := url.Parse(v)
-		if err != nil {
-			global.Error(err, "otlptrace: parse endpoint url", "url", v)
-			return cfg
-		}
-
-		cfg.Traces.Endpoint = u.Host
-		cfg.Traces.URLPath = u.Path
-		if u.Scheme != "https" {
-			cfg.Traces.Insecure = true
-		}
-
 		return cfg
 	})
 }
@@ -341,13 +320,6 @@ func WithHeaders(headers map[string]string) GenericOption {
 func WithTimeout(duration time.Duration) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		cfg.Traces.Timeout = duration
-		return cfg
-	})
-}
-
-func WithProxy(pf HTTPTransportProxyFunc) GenericOption {
-	return newGenericOption(func(cfg Config) Config {
-		cfg.Traces.Proxy = pf
 		return cfg
 	})
 }

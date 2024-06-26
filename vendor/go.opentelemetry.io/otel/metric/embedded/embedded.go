@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // Package embedded provides interfaces embedded within the [OpenTelemetry
 // metric API].
@@ -102,16 +113,6 @@ type Float64Counter interface{ float64Counter() }
 // the API package).
 type Float64Histogram interface{ float64Histogram() }
 
-// Float64Gauge is embedded in [go.opentelemetry.io/otel/metric.Float64Gauge].
-//
-// Embed this interface in your implementation of the
-// [go.opentelemetry.io/otel/metric.Float64Gauge] if you want users to
-// experience a compilation error, signaling they need to update to your latest
-// implementation, when the [go.opentelemetry.io/otel/metric.Float64Gauge]
-// interface is extended (which is something that can happen without a major
-// version bump of the API package).
-type Float64Gauge interface{ float64Gauge() }
-
 // Float64ObservableCounter is embedded in
 // [go.opentelemetry.io/otel/metric.Float64ObservableCounter].
 //
@@ -183,16 +184,6 @@ type Int64Counter interface{ int64Counter() }
 // extended (which is something that can happen without a major version bump of
 // the API package).
 type Int64Histogram interface{ int64Histogram() }
-
-// Int64Gauge is embedded in [go.opentelemetry.io/otel/metric.Int64Gauge].
-//
-// Embed this interface in your implementation of the
-// [go.opentelemetry.io/otel/metric.Int64Gauge] if you want users to experience
-// a compilation error, signaling they need to update to your latest
-// implementation, when the [go.opentelemetry.io/otel/metric.Int64Gauge]
-// interface is extended (which is something that can happen without a major
-// version bump of the API package).
-type Int64Gauge interface{ int64Gauge() }
 
 // Int64ObservableCounter is embedded in
 // [go.opentelemetry.io/otel/metric.Int64ObservableCounter].

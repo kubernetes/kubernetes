@@ -90,10 +90,6 @@ git push <YOUR_FORK> <YOUR_BRANCH_NAME>
 Open a pull request against the main `opentelemetry-go` repo. Be sure to add the pull
 request ID to the entry you added to `CHANGELOG.md`.
 
-Avoid rebasing and force-pushing to your branch to facilitate reviewing the pull request.
-Rewriting Git history makes it difficult to keep track of iterations during code review.
-All pull requests are squashed to a single commit upon merge to `main`.
-
 ### How to Receive Comments
 
 * If the PR is not ready for review, please put `[WIP]` in the title,
@@ -200,16 +196,6 @@ You can install and run a "local Go Doc site" in the following way:
 
 [`go.opentelemetry.io/otel/metric`](https://pkg.go.dev/go.opentelemetry.io/otel/metric)
 is an example of a very well-documented package.
-
-### README files
-
-Each (non-internal, non-test, non-documentation) package must contain a
-`README.md` file containing at least a title, and a `pkg.go.dev` badge.
-
-The README should not be a repetition of Go doc comments.
-
-You can verify the presence of all README files with the `make verify-readmes`
-command.
 
 ## Style Guide
 
@@ -570,9 +556,6 @@ functionality should be added, each one will need their own super-set
 interfaces and will duplicate the pattern. For this reason, the simple targeted
 interface that defines the specific functionality should be preferred.
 
-See also:
-[Keeping Your Modules Compatible: Working with interfaces](https://go.dev/blog/module-compatibility#working-with-interfaces).
-
 ### Testing
 
 The tests should never leak goroutines.
@@ -604,48 +587,27 @@ this.
 
 [^3]: https://github.com/open-telemetry/opentelemetry-go/issues/3548
 
-### Ignoring context cancellation
-
-OpenTelemetry API implementations need to ignore the cancellation of the context that are
-passed when recording a value (e.g. starting a span, recording a measurement, emitting a log).
-Recording methods should not return an error describing the cancellation state of the context
-when they complete, nor should they abort any work.
-
-This rule may not apply if the OpenTelemetry specification defines a timeout mechanism for
-the method. In that case the context cancellation can be used for the timeout with the
-restriction that this behavior is documented for the method. Otherwise, timeouts
-are expected to be handled by the user calling the API, not the implementation.
-
-Stoppage of the telemetry pipeline is handled by calling the appropriate `Shutdown` method
-of a provider. It is assumed the context passed from a user is not used for this purpose.
-
-Outside of the direct recording of telemetry from the API (e.g. exporting telemetry,
-force flushing telemetry, shutting down a signal provider) the context cancellation
-should be honored. This means all work done on behalf of the user provided context
-should be canceled.
-
 ## Approvers and Maintainers
 
 ### Approvers
 
 - [Evan Torrie](https://github.com/evantorrie), Verizon Media
 - [Sam Xie](https://github.com/XSAM), Cisco/AppDynamics
+- [David Ashpole](https://github.com/dashpole), Google
 - [Chester Cheung](https://github.com/hanyuancheung), Tencent
 - [Damien Mathieu](https://github.com/dmathieu), Elastic
+- [Anthony Mirabella](https://github.com/Aneurysm9), AWS
 
 ### Maintainers
 
-- [David Ashpole](https://github.com/dashpole), Google
 - [Aaron Clawson](https://github.com/MadVikingGod), LightStep
 - [Robert Pająk](https://github.com/pellared), Splunk
 - [Tyler Yahn](https://github.com/MrAlias), Splunk
 
 ### Emeritus
 
-- [Liz Fong-Jones](https://github.com/lizthegrey), Honeycomb
 - [Gustavo Silva Paiva](https://github.com/paivagustavo), LightStep
 - [Josh MacDonald](https://github.com/jmacd), LightStep
-- [Anthony Mirabella](https://github.com/Aneurysm9), AWS
 
 ### Become an Approver or a Maintainer
 

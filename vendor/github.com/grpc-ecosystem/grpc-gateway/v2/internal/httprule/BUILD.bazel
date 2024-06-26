@@ -24,7 +24,7 @@ go_test(
     embed = [":httprule"],
     deps = [
         "//utilities",
-        "@org_golang_google_grpc//grpclog",
+        "@com_github_golang_glog//:glog",
     ],
 )
 

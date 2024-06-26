@@ -15,7 +15,7 @@ import (
 const SignatureSeparator = "_"
 
 // URLValuesSliceKeySuffix is the character that is used to
-// specify a suffix for slices parsed by URLValues.
+// specify a suffic for slices parsed by URLValues.
 // If the suffix is set to "[i]", then the index of the slice
 // is used in place of i
 // Ex: Suffix "[]" would have the form a[]=b&a[]=c
@@ -30,7 +30,7 @@ const (
 )
 
 // SetURLValuesSliceKeySuffix sets the character that is used to
-// specify a suffix for slices parsed by URLValues.
+// specify a suffic for slices parsed by URLValues.
 // If the suffix is set to "[i]", then the index of the slice
 // is used in place of i
 // Ex: Suffix "[]" would have the form a[]=b&a[]=c

@@ -7,8 +7,8 @@ http.Handlers.
 Doing this requires non-trivial wrapping of the http.ResponseWriter interface,
 which is also exposed for users interested in a more low-level API.
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/felixge/httpsnoop.svg)](https://pkg.go.dev/github.com/felixge/httpsnoop)
-[![Build Status](https://github.com/felixge/httpsnoop/actions/workflows/main.yaml/badge.svg)](https://github.com/felixge/httpsnoop/actions/workflows/main.yaml)
+[![GoDoc](https://godoc.org/github.com/felixge/httpsnoop?status.svg)](https://godoc.org/github.com/felixge/httpsnoop)
+[![Build Status](https://travis-ci.org/felixge/httpsnoop.svg?branch=master)](https://travis-ci.org/felixge/httpsnoop)
 
 ## Usage Example
 

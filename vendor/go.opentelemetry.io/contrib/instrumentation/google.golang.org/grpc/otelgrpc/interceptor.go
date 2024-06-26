@@ -1,5 +1,16 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
@@ -48,7 +59,7 @@ var (
 )
 
 // UnaryClientInterceptor returns a grpc.UnaryClientInterceptor suitable
-// for use in a grpc.NewClient call.
+// for use in a grpc.Dial call.
 //
 // Deprecated: Use [NewClientHandler] instead.
 func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
@@ -70,7 +81,7 @@ func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 			Method: method,
 			Type:   UnaryClient,
 		}
-		if cfg.InterceptorFilter != nil && !cfg.InterceptorFilter(i) {
+		if cfg.Filter != nil && !cfg.Filter(i) {
 			return invoker(ctx, method, req, reply, cc, callOpts...)
 		}
 
@@ -114,13 +125,27 @@ func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
 	}
 }
 
+type streamEventType int
+
+type streamEvent struct {
+	Type streamEventType
+	Err  error
+}
+
+const (
+	receiveEndEvent streamEventType = iota
+	errorEvent
+)
+
 // clientStream  wraps around the embedded grpc.ClientStream, and intercepts the RecvMsg and
 // SendMsg method call.
 type clientStream struct {
 	grpc.ClientStream
-	desc *grpc.StreamDesc
 
-	span trace.Span
+	desc       *grpc.StreamDesc
+	events     chan streamEvent
+	eventsDone chan struct{}
+	finished   chan error
 
 	receivedEvent bool
 	sentEvent     bool
@@ -135,11 +160,11 @@ func (w *clientStream) RecvMsg(m interface{}) error {
 	err := w.ClientStream.RecvMsg(m)
 
 	if err == nil && !w.desc.ServerStreams {
-		w.endSpan(nil)
+		w.sendStreamEvent(receiveEndEvent, nil)
 	} else if err == io.EOF {
-		w.endSpan(nil)
+		w.sendStreamEvent(receiveEndEvent, nil)
 	} else if err != nil {
-		w.endSpan(err)
+		w.sendStreamEvent(errorEvent, err)
 	} else {
 		w.receivedMessageID++
 
@@ -161,7 +186,7 @@ func (w *clientStream) SendMsg(m interface{}) error {
 	}
 
 	if err != nil {
-		w.endSpan(err)
+		w.sendStreamEvent(errorEvent, err)
 	}
 
 	return err
@@ -170,7 +195,7 @@ func (w *clientStream) SendMsg(m interface{}) error {
 func (w *clientStream) Header() (metadata.MD, error) {
 	md, err := w.ClientStream.Header()
 	if err != nil {
-		w.endSpan(err)
+		w.sendStreamEvent(errorEvent, err)
 	}
 
 	return md, err
@@ -179,36 +204,58 @@ func (w *clientStream) Header() (metadata.MD, error) {
 func (w *clientStream) CloseSend() error {
 	err := w.ClientStream.CloseSend()
 	if err != nil {
-		w.endSpan(err)
+		w.sendStreamEvent(errorEvent, err)
 	}
 
 	return err
 }
 
-func wrapClientStream(s grpc.ClientStream, desc *grpc.StreamDesc, span trace.Span, cfg *config) *clientStream {
+func wrapClientStream(ctx context.Context, s grpc.ClientStream, desc *grpc.StreamDesc, cfg *config) *clientStream {
+	events := make(chan streamEvent)
+	eventsDone := make(chan struct{})
+	finished := make(chan error)
+
+	go func() {
+		defer close(eventsDone)
+
+		for {
+			select {
+			case event := <-events:
+				switch event.Type {
+				case receiveEndEvent:
+					finished <- nil
+					return
+				case errorEvent:
+					finished <- event.Err
+					return
+				}
+			case <-ctx.Done():
+				finished <- ctx.Err()
+				return
+			}
+		}
+	}()
+
 	return &clientStream{
 		ClientStream:  s,
-		span:          span,
 		desc:          desc,
+		events:        events,
+		eventsDone:    eventsDone,
+		finished:      finished,
 		receivedEvent: cfg.ReceivedEvent,
 		sentEvent:     cfg.SentEvent,
 	}
 }
 
-func (w *clientStream) endSpan(err error) {
-	if err != nil {
-		s, _ := status.FromError(err)
-		w.span.SetStatus(codes.Error, s.Message())
-		w.span.SetAttributes(statusCodeAttr(s.Code()))
-	} else {
-		w.span.SetAttributes(statusCodeAttr(grpc_codes.OK))
+func (w *clientStream) sendStreamEvent(eventType streamEventType, err error) {
+	select {
+	case <-w.eventsDone:
+	case w.events <- streamEvent{Type: eventType, Err: err}:
 	}
-
-	w.span.End()
 }
 
 // StreamClientInterceptor returns a grpc.StreamClientInterceptor suitable
-// for use in a grpc.NewClient call.
+// for use in a grpc.Dial call.
 //
 // Deprecated: Use [NewClientHandler] instead.
 func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
@@ -230,7 +277,7 @@ func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 			Method: method,
 			Type:   StreamClient,
 		}
-		if cfg.InterceptorFilter != nil && !cfg.InterceptorFilter(i) {
+		if cfg.Filter != nil && !cfg.Filter(i) {
 			return streamer(ctx, desc, cc, method, callOpts...)
 		}
 
@@ -259,7 +306,22 @@ func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 			span.End()
 			return s, err
 		}
-		stream := wrapClientStream(s, desc, span, cfg)
+		stream := wrapClientStream(ctx, s, desc, cfg)
+
+		go func() {
+			err := <-stream.finished
+
+			if err != nil {
+				s, _ := status.FromError(err)
+				span.SetStatus(codes.Error, s.Message())
+				span.SetAttributes(statusCodeAttr(s.Code()))
+			} else {
+				span.SetAttributes(statusCodeAttr(grpc_codes.OK))
+			}
+
+			span.End()
+		}()
+
 		return stream, nil
 	}
 }
@@ -285,7 +347,7 @@ func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
 			UnaryServerInfo: info,
 			Type:            UnaryServer,
 		}
-		if cfg.InterceptorFilter != nil && !cfg.InterceptorFilter(i) {
+		if cfg.Filter != nil && !cfg.Filter(i) {
 			return handler(ctx, req)
 		}
 
@@ -329,11 +391,9 @@ func UnaryServerInterceptor(opts ...Option) grpc.UnaryServerInterceptor {
 		grpcStatusCodeAttr := statusCodeAttr(s.Code())
 		span.SetAttributes(grpcStatusCodeAttr)
 
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedTime := float64(time.Since(before)) / float64(time.Millisecond)
-
+		elapsedTime := time.Since(before).Milliseconds()
 		metricAttrs = append(metricAttrs, grpcStatusCodeAttr)
-		cfg.rpcDuration.Record(ctx, elapsedTime, metric.WithAttributes(metricAttrs...))
+		cfg.rpcDuration.Record(ctx, float64(elapsedTime), metric.WithAttributes(metricAttrs...))
 
 		return resp, err
 	}
@@ -411,7 +471,7 @@ func StreamServerInterceptor(opts ...Option) grpc.StreamServerInterceptor {
 			StreamServerInfo: info,
 			Type:             StreamServer,
 		}
-		if cfg.InterceptorFilter != nil && !cfg.InterceptorFilter(i) {
+		if cfg.Filter != nil && !cfg.Filter(i) {
 			return handler(srv, wrapServerStream(ctx, ss, cfg))
 		}
 

@@ -17,6 +17,11 @@ import (
 	gofeaturespb "google.golang.org/protobuf/types/gofeaturespb"
 )
 
+const (
+	SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO2
+	SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2023
+)
+
 var defaults = &descriptorpb.FeatureSetDefaults{}
 var defaultsCacheMu sync.Mutex
 var defaultsCache = make(map[filedesc.Edition]*descriptorpb.FeatureSet)
@@ -62,20 +67,18 @@ func getFeatureSetFor(ed filedesc.Edition) *descriptorpb.FeatureSet {
 		fmt.Fprintf(os.Stderr, "internal error: unsupported edition %v (did you forget to update the embedded defaults (i.e. the bootstrap descriptor proto)?)\n", edpb)
 		os.Exit(1)
 	}
-	fsed := defaults.GetDefaults()[0]
+	fs := defaults.GetDefaults()[0].GetFeatures()
 	// Using a linear search for now.
 	// Editions are guaranteed to be sorted and thus we could use a binary search.
 	// Given that there are only a handful of editions (with one more per year)
 	// there is not much reason to use a binary search.
 	for _, def := range defaults.GetDefaults() {
 		if def.GetEdition() <= edpb {
-			fsed = def
+			fs = def.GetFeatures()
 		} else {
 			break
 		}
 	}
-	fs := proto.Clone(fsed.GetFixedFeatures()).(*descriptorpb.FeatureSet)
-	proto.Merge(fs, fsed.GetOverridableFeatures())
 	defaultsCache[ed] = fs
 	return fs
 }

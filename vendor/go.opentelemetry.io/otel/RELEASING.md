@@ -27,12 +27,6 @@ You can run `make gorelease` that runs [gorelease](https://pkg.go.dev/golang.org
 
 You can check/report problems with `gorelease` [here](https://golang.org/issues/26420).
 
-## Verify changes for contrib repository
-
-If the changes in the main repository are going to affect the contrib repository, it is important to verify that the changes are compatible with the contrib repository.
-
-Follow [the steps](https://github.com/open-telemetry/opentelemetry-go-contrib/blob/main/RELEASING.md#verify-otel-changes) in the contrib repository to verify OTel changes.
-
 ## Pre-Release
 
 First, decide which module sets will be released and update their versions
@@ -129,12 +123,12 @@ Once verified be sure to [make a release for the `contrib` repository](https://g
 
 ### Website Documentation
 
-Update the [Go instrumentation documentation] in the OpenTelemetry website under [content/en/docs/languages/go].
+Update the [Go instrumentation documentation] in the OpenTelemetry website under [content/en/docs/instrumentation/go].
 Importantly, bump any package versions referenced to be the latest one you just released and ensure all code examples still compile and are accurate.
 
 [OpenTelemetry Semantic Conventions]: https://github.com/open-telemetry/semantic-conventions
-[Go instrumentation documentation]: https://opentelemetry.io/docs/languages/go/
-[content/en/docs/languages/go]: https://github.com/open-telemetry/opentelemetry.io/tree/main/content/en/docs/languages/go
+[Go instrumentation documentation]: https://opentelemetry.io/docs/instrumentation/go/
+[content/en/docs/instrumentation/go]: https://github.com/open-telemetry/opentelemetry.io/tree/main/content/en/docs/instrumentation/go
 
 ### Demo Repository
 

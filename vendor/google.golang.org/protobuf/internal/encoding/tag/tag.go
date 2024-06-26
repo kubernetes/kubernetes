@@ -32,7 +32,6 @@ var byteType = reflect.TypeOf(byte(0))
 func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescriptors) protoreflect.FieldDescriptor {
 	f := new(filedesc.Field)
 	f.L0.ParentFile = filedesc.SurrogateProto2
-	f.L1.EditionFeatures = f.L0.ParentFile.L1.EditionFeatures
 	for len(tag) > 0 {
 		i := strings.IndexByte(tag, ',')
 		if i < 0 {
@@ -108,7 +107,8 @@ func Unmarshal(tag string, goType reflect.Type, evs protoreflect.EnumValueDescri
 				f.L1.StringName.InitJSON(jsonName)
 			}
 		case s == "packed":
-			f.L1.EditionFeatures.IsPacked = true
+			f.L1.HasPacked = true
+			f.L1.IsPacked = true
 		case strings.HasPrefix(s, "weak="):
 			f.L1.IsWeak = true
 			f.L1.Message = filedesc.PlaceholderMessage(protoreflect.FullName(s[len("weak="):]))

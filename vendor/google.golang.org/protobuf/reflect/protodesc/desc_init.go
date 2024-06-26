@@ -69,7 +69,9 @@ func (r descsByName) initMessagesDeclarations(mds []*descriptorpb.DescriptorProt
 		if m.L0, err = r.makeBase(m, parent, md.GetName(), i, sb); err != nil {
 			return nil, err
 		}
-		m.L1.EditionFeatures = mergeEditionFeatures(parent, md.GetOptions().GetFeatures())
+		if m.Base.L0.ParentFile.Syntax() == protoreflect.Editions {
+			m.L1.EditionFeatures = mergeEditionFeatures(parent, md.GetOptions().GetFeatures())
+		}
 		if opts := md.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.MessageOptions)
 			m.L2.Options = func() protoreflect.ProtoMessage { return opts }
@@ -144,15 +146,13 @@ func (r descsByName) initFieldsFromDescriptorProto(fds []*descriptorpb.FieldDesc
 		if f.L0, err = r.makeBase(f, parent, fd.GetName(), i, sb); err != nil {
 			return nil, err
 		}
-		f.L1.EditionFeatures = mergeEditionFeatures(parent, fd.GetOptions().GetFeatures())
 		f.L1.IsProto3Optional = fd.GetProto3Optional()
 		if opts := fd.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.FieldOptions)
 			f.L1.Options = func() protoreflect.ProtoMessage { return opts }
 			f.L1.IsWeak = opts.GetWeak()
-			if opts.Packed != nil {
-				f.L1.EditionFeatures.IsPacked = opts.GetPacked()
-			}
+			f.L1.HasPacked = opts.Packed != nil
+			f.L1.IsPacked = opts.GetPacked()
 		}
 		f.L1.Number = protoreflect.FieldNumber(fd.GetNumber())
 		f.L1.Cardinality = protoreflect.Cardinality(fd.GetLabel())
@@ -163,12 +163,32 @@ func (r descsByName) initFieldsFromDescriptorProto(fds []*descriptorpb.FieldDesc
 			f.L1.StringName.InitJSON(fd.GetJsonName())
 		}
 
-		if f.L1.EditionFeatures.IsLegacyRequired {
-			f.L1.Cardinality = protoreflect.Required
-		}
+		if f.Base.L0.ParentFile.Syntax() == protoreflect.Editions {
+			f.L1.EditionFeatures = mergeEditionFeatures(parent, fd.GetOptions().GetFeatures())
 
-		if f.L1.Kind == protoreflect.MessageKind && f.L1.EditionFeatures.IsDelimitedEncoded {
-			f.L1.Kind = protoreflect.GroupKind
+			if f.L1.EditionFeatures.IsLegacyRequired {
+				f.L1.Cardinality = protoreflect.Required
+			}
+			// We reuse the existing field because the old option `[packed =
+			// true]` is mutually exclusive with the editions feature.
+			if canBePacked(fd) {
+				f.L1.HasPacked = true
+				f.L1.IsPacked = f.L1.EditionFeatures.IsPacked
+			}
+
+			// We pretend this option is always explicitly set because the only
+			// use of HasEnforceUTF8 is to determine whether to use EnforceUTF8
+			// or to return the appropriate default.
+			// When using editions we either parse the option or resolve the
+			// appropriate default here (instead of later when this option is
+			// requested from the descriptor).
+			// In proto2/proto3 syntax HasEnforceUTF8 might be false.
+			f.L1.HasEnforceUTF8 = true
+			f.L1.EnforceUTF8 = f.L1.EditionFeatures.IsUTF8Validated
+
+			if f.L1.Kind == protoreflect.MessageKind && f.L1.EditionFeatures.IsDelimitedEncoded {
+				f.L1.Kind = protoreflect.GroupKind
+			}
 		}
 	}
 	return fs, nil
@@ -181,10 +201,12 @@ func (r descsByName) initOneofsFromDescriptorProto(ods []*descriptorpb.OneofDesc
 		if o.L0, err = r.makeBase(o, parent, od.GetName(), i, sb); err != nil {
 			return nil, err
 		}
-		o.L1.EditionFeatures = mergeEditionFeatures(parent, od.GetOptions().GetFeatures())
 		if opts := od.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.OneofOptions)
 			o.L1.Options = func() protoreflect.ProtoMessage { return opts }
+			if parent.Syntax() == protoreflect.Editions {
+				o.L1.EditionFeatures = mergeEditionFeatures(parent, opts.GetFeatures())
+			}
 		}
 	}
 	return os, nil
@@ -198,13 +220,10 @@ func (r descsByName) initExtensionDeclarations(xds []*descriptorpb.FieldDescript
 		if x.L0, err = r.makeBase(x, parent, xd.GetName(), i, sb); err != nil {
 			return nil, err
 		}
-		x.L1.EditionFeatures = mergeEditionFeatures(parent, xd.GetOptions().GetFeatures())
 		if opts := xd.GetOptions(); opts != nil {
 			opts = proto.Clone(opts).(*descriptorpb.FieldOptions)
 			x.L2.Options = func() protoreflect.ProtoMessage { return opts }
-			if opts.Packed != nil {
-				x.L1.EditionFeatures.IsPacked = opts.GetPacked()
-			}
+			x.L2.IsPacked = opts.GetPacked()
 		}
 		x.L1.Number = protoreflect.FieldNumber(xd.GetNumber())
 		x.L1.Cardinality = protoreflect.Cardinality(xd.GetLabel())

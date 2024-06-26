@@ -52,13 +52,13 @@ type Pattern struct {
 // It returns an error if the given definition is invalid.
 func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, error) {
 	if version != 1 {
-		grpclog.Errorf("unsupported version: %d", version)
+		grpclog.Infof("unsupported version: %d", version)
 		return Pattern{}, ErrInvalidPattern
 	}
 
 	l := len(ops)
 	if l%2 != 0 {
-		grpclog.Errorf("odd number of ops codes: %d", l)
+		grpclog.Infof("odd number of ops codes: %d", l)
 		return Pattern{}, ErrInvalidPattern
 	}
 
@@ -81,14 +81,14 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			stack++
 		case utilities.OpPushM:
 			if pushMSeen {
-				grpclog.Error("pushM appears twice")
+				grpclog.Infof("pushM appears twice")
 				return Pattern{}, ErrInvalidPattern
 			}
 			pushMSeen = true
 			stack++
 		case utilities.OpLitPush:
 			if op.operand < 0 || len(pool) <= op.operand {
-				grpclog.Errorf("negative literal index: %d", op.operand)
+				grpclog.Infof("negative literal index: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			if pushMSeen {
@@ -97,18 +97,18 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			stack++
 		case utilities.OpConcatN:
 			if op.operand <= 0 {
-				grpclog.Errorf("negative concat size: %d", op.operand)
+				grpclog.Infof("negative concat size: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			stack -= op.operand
 			if stack < 0 {
-				grpclog.Error("stack underflow")
+				grpclog.Info("stack underflow")
 				return Pattern{}, ErrInvalidPattern
 			}
 			stack++
 		case utilities.OpCapture:
 			if op.operand < 0 || len(pool) <= op.operand {
-				grpclog.Errorf("variable name index out of bound: %d", op.operand)
+				grpclog.Infof("variable name index out of bound: %d", op.operand)
 				return Pattern{}, ErrInvalidPattern
 			}
 			v := pool[op.operand]
@@ -116,11 +116,11 @@ func NewPattern(version int, ops []int, pool []string, verb string) (Pattern, er
 			vars = append(vars, v)
 			stack--
 			if stack < 0 {
-				grpclog.Error("stack underflow")
+				grpclog.Infof("stack underflow")
 				return Pattern{}, ErrInvalidPattern
 			}
 		default:
-			grpclog.Errorf("invalid opcode: %d", op.code)
+			grpclog.Infof("invalid opcode: %d", op.code)
 			return Pattern{}, ErrInvalidPattern
 		}
 
