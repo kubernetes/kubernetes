@@ -452,3 +452,99 @@ func TestHighestSupportedVersion(t *testing.T) {
 		}
 	}
 }
+
+func TestOffsetMinor(t *testing.T) {
+	var tests = []struct {
+		version            string
+		diff               int
+		expectedComponents []uint
+	}{
+		{
+			version:            "1.0.2",
+			diff:               -3,
+			expectedComponents: []uint{1, 0},
+		},
+		{
+			version:            "1.3.2-alpha+001",
+			diff:               -2,
+			expectedComponents: []uint{1, 1},
+		},
+		{
+			version:            "1.3.2-alpha+001",
+			diff:               -3,
+			expectedComponents: []uint{1, 0},
+		},
+		{
+			version:            "1.20",
+			diff:               -5,
+			expectedComponents: []uint{1, 15},
+		},
+		{
+			version:            "1.20",
+			diff:               5,
+			expectedComponents: []uint{1, 25},
+		},
+	}
+
+	for _, test := range tests {
+		version, _ := ParseGeneric(test.version)
+		if !reflect.DeepEqual(test.expectedComponents, version.OffsetMinor(test.diff).Components()) {
+			t.Error("parse returned un'expected components")
+		}
+	}
+}
+
+func TestParse(t *testing.T) {
+
+	var tests = []struct {
+		version               string
+		expectErr             bool
+		expectedComponents    []uint
+		expectedPreRelease    string
+		expectedBuildMetadata string
+	}{
+		{
+			version:            "1.0.2",
+			expectedComponents: []uint{1, 0, 2},
+		},
+		{
+			version:               "1.0.2-alpha+001",
+			expectedComponents:    []uint{1, 0, 2},
+			expectedPreRelease:    "alpha",
+			expectedBuildMetadata: "001",
+		},
+		{
+			version:            "1.2",
+			expectedComponents: []uint{1, 2},
+		},
+		{
+			version:               "1.0.2-beta+exp.sha.5114f85",
+			expectedComponents:    []uint{1, 0, 2},
+			expectedPreRelease:    "beta",
+			expectedBuildMetadata: "exp.sha.5114f85",
+		},
+		{
+			version:   "a.b.c",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		version, err := Parse(test.version)
+		if test.expectErr {
+			if err == nil {
+				t.Fatalf("got no err, expected err")
+			}
+			continue
+		}
+		if !reflect.DeepEqual(test.expectedComponents, version.Components()) {
+			t.Error("parse returned un'expected components")
+		}
+		if test.expectedPreRelease != version.PreRelease() {
+			t.Errorf("parse returned version.PreRelease %s, expected %s", test.expectedPreRelease, version.PreRelease())
+		}
+		if test.expectedBuildMetadata != version.BuildMetadata() {
+			t.Errorf("parse returned version.BuildMetadata %s, expected %s", test.expectedBuildMetadata, version.BuildMetadata())
+		}
+	}
+}

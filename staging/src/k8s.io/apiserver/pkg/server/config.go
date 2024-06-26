@@ -42,8 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
-	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -70,8 +70,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -147,8 +149,11 @@ type Config struct {
 	// done values in this values for this map are ignored.
 	PostStartHooks map[string]PostStartHookConfigEntry
 
-	// Version will enable the /version endpoint if non-nil
-	Version *version.Info
+	// EffectiveVersion determines which apis and features are available
+	// based on when the api/feature lifecyle.
+	EffectiveVersion utilversion.EffectiveVersion
+	// FeatureGate is a way to plumb feature gate through if you have them.
+	FeatureGate featuregate.FeatureGate
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
 	// AuditPolicyRuleEvaluator makes the decision of whether and how to audit log a request.
@@ -585,7 +590,7 @@ func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	}
 }
 
-func completeOpenAPI(config *openapicommon.Config, version *version.Info) {
+func completeOpenAPI(config *openapicommon.Config, version *version.Version) {
 	if config == nil {
 		return
 	}
@@ -624,7 +629,7 @@ func completeOpenAPI(config *openapicommon.Config, version *version.Info) {
 	}
 }
 
-func completeOpenAPIV3(config *openapicommon.OpenAPIV3Config, version *version.Info) {
+func completeOpenAPIV3(config *openapicommon.OpenAPIV3Config, version *version.Version) {
 	if config == nil {
 		return
 	}
@@ -676,6 +681,9 @@ func (c *Config) ShutdownInitiatedNotify() <-chan struct{} {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+	if c.FeatureGate == nil {
+		c.FeatureGate = utilfeature.DefaultFeatureGate
+	}
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		c.ExternalAddress = c.PublicAddress.String()
 	}
@@ -691,9 +699,8 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		}
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
-
-	completeOpenAPI(c.OpenAPIConfig, c.Version)
-	completeOpenAPIV3(c.OpenAPIV3Config, c.Version)
+	completeOpenAPI(c.OpenAPIConfig, c.EffectiveVersion.EmulationVersion())
+	completeOpenAPIV3(c.OpenAPIV3Config, c.EffectiveVersion.EmulationVersion())
 
 	if c.DiscoveryAddresses == nil {
 		c.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: c.ExternalAddress}
@@ -711,7 +718,7 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		} else {
 			c.EquivalentResourceRegistry = runtime.NewEquivalentResourceRegistryWithIdentity(func(groupResource schema.GroupResource) string {
 				// use the storage prefix as the key if possible
-				if opts, err := c.RESTOptionsGetter.GetRESTOptions(groupResource); err == nil {
+				if opts, err := c.RESTOptionsGetter.GetRESTOptions(groupResource, nil); err == nil {
 					return opts.ResourcePrefix
 				}
 				// otherwise return "" to use the default key (parent GV name)
@@ -819,12 +826,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
 
-		Version: c.Version,
+		EffectiveVersion: c.EffectiveVersion,
+		FeatureGate:      c.FeatureGate,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
 			manager = discoveryendpoint.NewResourceManager("apis")
@@ -1039,14 +1047,14 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
 	}
 	handler = genericfilters.WithHTTPLogging(handler)
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
+	if c.FeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	}
 	handler = genericapifilters.WithLatencyTrackers(handler)
 	// WithRoutine will execute future handlers in a separate goroutine and serving
 	// handler in current goroutine to minimize the stack memory usage. It must be
 	// after WithPanicRecover() to be protected from panics.
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServingWithRoutine) {
+	if c.FeatureGate.Enabled(genericfeatures.APIServingWithRoutine) {
 		handler = genericfilters.WithRoutine(handler, c.LongRunningFunc)
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
@@ -1087,10 +1095,10 @@ func installAPI(s *GenericAPIServer, c *Config) {
 		}
 	}
 
-	routes.Version{Version: c.Version}.Install(s.Handler.GoRestfulContainer)
+	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 			wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
 			s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 		} else {

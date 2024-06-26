@@ -27,11 +27,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -53,6 +57,16 @@ type WardleServerOptions struct {
 	StdErr                io.Writer
 
 	AlternateDNS []string
+}
+
+func wardleEmulationVersionToKubeEmulationVersion(ver *version.Version) *version.Version {
+	if ver.Major() != 1 {
+		return nil
+	}
+	kubeVer := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
+	// "1.1" maps to kubeVer
+	offset := int(ver.Minor()) - 1
+	return kubeVer.OffsetMinor(offset)
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions
@@ -77,6 +91,9 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 	cmd := &cobra.Command{
 		Short: "Launch a wardle API server",
 		Long:  "Launch a wardle API server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -94,7 +111,21 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
-	utilfeature.DefaultMutableFeatureGate.AddFlag(flags)
+
+	wardleEffectiveVersion := utilversion.NewEffectiveVersion("1.2")
+	wardleFeatureGate := utilfeature.DefaultFeatureGate.CopyKnownFeatures()
+	utilruntime.Must(wardleFeatureGate.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+		"BanFlunder": {
+			{Version: version.MustParse("1.2"), Default: true, PreRelease: featuregate.GA},
+			{Version: version.MustParse("1.1"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.Alpha},
+		},
+	}))
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(apiserver.WardleComponentName, wardleEffectiveVersion, wardleFeatureGate))
+	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		utilversion.DefaultKubeComponent, utilversion.DefaultKubeEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.SetEmulationVersionMapping(apiserver.WardleComponentName, utilversion.DefaultKubeComponent, wardleEmulationVersionToKubeEmulationVersion))
+	utilversion.DefaultComponentGlobalsRegistry.AddFlags(flags)
 
 	return cmd
 }
@@ -103,17 +134,19 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 func (o WardleServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, utilversion.DefaultComponentGlobalsRegistry.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
 
 // Complete fills in fields required to have valid data
 func (o *WardleServerOptions) Complete() error {
-	// register admission plugins
-	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
+	if utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(apiserver.WardleComponentName).Enabled("BanFlunder") {
+		// register admission plugins
+		banflunder.Register(o.RecommendedOptions.Admission.Plugins)
 
-	// add admission plugins to the RecommendedPluginOrder
-	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
-
+		// add admission plugins to the RecommendedPluginOrder
+		o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
+	}
 	return nil
 }
 
@@ -143,6 +176,9 @@ func (o *WardleServerOptions) Config() (*apiserver.Config, error) {
 	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(sampleopenapi.GetOpenAPIDefinitions, openapi.NewDefinitionNamer(apiserver.Scheme))
 	serverConfig.OpenAPIV3Config.Info.Title = "Wardle"
 	serverConfig.OpenAPIV3Config.Info.Version = "0.1"
+
+	serverConfig.FeatureGate = utilversion.DefaultComponentGlobalsRegistry.FeatureGateFor(apiserver.WardleComponentName)
+	serverConfig.EffectiveVersion = utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(apiserver.WardleComponentName)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err

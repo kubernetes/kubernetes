@@ -226,6 +226,18 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 }
 
 func TestAggregatedAPIServer(t *testing.T) {
+	t.Run("WithoutWardleFeatureGateAtV1.2", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, "1.2")
+	})
+	t.Run("WithoutWardleFeatureGateAtV1.1", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, "1.1")
+	})
+	t.Run("WithWardleFeatureGateAtV1.1", func(t *testing.T) {
+		testAggregatedAPIServer(t, true, "1.1")
+	})
+}
+
+func testAggregatedAPIServer(t *testing.T, enableWardleFeatureGate bool, emulationVersion string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
@@ -240,7 +252,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// endpoints cannot have loopback IPs so we need to override the resolver itself
 	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true}, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: "1.32"}, nil, framework.SharedEtcd())
 	defer testServer.TearDownFn()
 	kubeClientConfig := rest.CopyConfig(testServer.ClientConfig)
 	// force json because everything speaks it
@@ -286,13 +298,18 @@ func TestAggregatedAPIServer(t *testing.T) {
 		o.RecommendedOptions.SecureServing.Listener = listener
 		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, o)
-		wardleCmd.SetArgs([]string{
+		args := []string{
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,
 			"--authorization-kubeconfig", wardleToKASKubeConfigFile,
 			"--etcd-servers", framework.GetEtcdURL(),
 			"--cert-dir", wardleCertDir,
 			"--kubeconfig", wardleToKASKubeConfigFile,
-		})
+			"--emulated-version", fmt.Sprintf("wardle=%s", emulationVersion),
+		}
+		if enableWardleFeatureGate {
+			args = append(args, "--feature-gates", "wardle:BanFlunder=true")
+		}
+		wardleCmd.SetArgs(args)
 		if err := wardleCmd.Execute(); err != nil {
 			t.Error(err)
 		}
@@ -386,10 +403,13 @@ func TestAggregatedAPIServer(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
+		DisallowedFlunders: []string{"badname"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// clean up data after test is done
+	defer wardleClient.Fischers().Delete(ctx, "panda", metav1.DeleteOptions{})
 	fischersList, err := wardleClient.Fischers().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -403,15 +423,39 @@ func TestAggregatedAPIServer(t *testing.T) {
 
 	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
 		ObjectMeta: metav1.ObjectMeta{
+			Name: "badname",
+		},
+	}, metav1.CreateOptions{})
+	banFlunder := enableWardleFeatureGate || emulationVersion == "1.2"
+	if banFlunder && err == nil {
+		t.Fatal("expect flunder:badname not admitted when wardle feature gates are specified")
+	}
+	if !banFlunder {
+		if err != nil {
+			t.Fatal("expect flunder:badname admitted when wardle feature gates are not specified")
+		} else {
+			defer wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "badname", metav1.DeleteOptions{})
+		}
+	}
+	_, err = wardleClient.Flunders(metav1.NamespaceSystem).Create(ctx, &wardlev1alpha1.Flunder{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "panda",
 		},
 	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wardleClient.Flunders(metav1.NamespaceSystem).Delete(ctx, "panda", metav1.DeleteOptions{})
 	flunderList, err := wardleClient.Flunders(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(flunderList.Items) != 1 {
-		t.Errorf("expected one flunder: %#v", flunderList.Items)
+	expectedFlunderCount := 2
+	if banFlunder {
+		expectedFlunderCount = 1
+	}
+	if len(flunderList.Items) != expectedFlunderCount {
+		t.Errorf("expected %d flunder: %#v", expectedFlunderCount, flunderList.Items)
 	}
 	if len(flunderList.ResourceVersion) == 0 {
 		t.Error("expected non-empty resource version for flunder list")

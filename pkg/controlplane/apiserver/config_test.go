@@ -66,7 +66,7 @@ func TestBuildGenericConfig(t *testing.T) {
 		t.Errorf("There are different StorageObjectCountTracker in genericConfig and storageFactory")
 	}
 
-	restOptions, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""})
+	restOptions, err := genericConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

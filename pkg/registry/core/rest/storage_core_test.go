@@ -19,6 +19,7 @@ package rest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -40,7 +41,7 @@ func TestGetServersToValidate(t *testing.T) {
 
 type fakeStorageFactory struct{}
 
-func (f fakeStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
+func (f fakeStorageFactory) NewConfig(groupResource schema.GroupResource, example runtime.Object) (*storagebackend.ConfigForResource, error) {
 	return nil, nil
 }
 

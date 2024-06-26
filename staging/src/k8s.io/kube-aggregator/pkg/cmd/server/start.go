@@ -31,6 +31,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -61,6 +62,9 @@ func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions)
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -117,7 +121,7 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // RunAggregator runs the API Aggregator.

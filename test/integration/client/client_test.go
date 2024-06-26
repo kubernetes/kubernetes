@@ -48,6 +48,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -65,7 +66,12 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
+	expectedInfo := version.Get()
+	kubeVersion := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
+	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
+	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())
+
+	if e, a := expectedInfo, *info; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 

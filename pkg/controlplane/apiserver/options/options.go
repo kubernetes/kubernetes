@@ -202,6 +202,10 @@ func (o *Options) Complete(alternateDNS []string, alternateIPs []net.IP) (Comple
 		Options: *o,
 	}
 
+	if err := completed.GenericServerRunOptions.Complete(); err != nil {
+		return CompletedOptions{}, err
+	}
+
 	// set defaults
 	if err := completed.GenericServerRunOptions.DefaultAdvertiseAddress(completed.SecureServing.SecureServingOptions); err != nil {
 		return CompletedOptions{}, err

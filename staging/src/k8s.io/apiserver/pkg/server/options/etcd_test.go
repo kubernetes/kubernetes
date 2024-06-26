@@ -437,7 +437,7 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 		t.Fatalf("Failed to apply etcd options error: %v", err)
 	}
-	restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""})
+	restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
