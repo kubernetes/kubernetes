@@ -241,7 +241,7 @@ func (c *ExampleController) allocateOneByOne(ctx context.Context, claimAllocatio
 	for _, ca := range claimAllocations {
 		allocationResult, err := c.allocateOne(ctx, ca.Claim, ca.ClaimParameters, ca.Class, ca.ClassParameters, selectedNode)
 		if err != nil {
-			ca.Error = fmt.Errorf("failed allocating claim %v", ca.Claim.UID)
+			ca.Error = err
 			continue
 		}
 		ca.Allocation = allocationResult
