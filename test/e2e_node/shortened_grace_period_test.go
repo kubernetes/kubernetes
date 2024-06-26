@@ -23,10 +23,15 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"strings"
+	"time"
 )
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
@@ -34,41 +39,102 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("When repeatedly deleting pods", func() {
 		var podClient *e2epod.PodClient
+		var dc dynamic.Interface
+		var ns string
 		var podName = "test"
 		var ctx = context.Background()
+		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
 			gracePeriod      = 100
 			gracePeriodShort = 20
 		)
 		ginkgo.BeforeEach(func() {
+			ns = f.Namespace.Name
+			dc = f.DynamicClient
 			podClient = e2epod.NewPodClient(f)
-			podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
 		})
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
-			err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
-			framework.ExpectNoError(err, "Failed to delete the pod: %q", podName)
-			err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
-			framework.ExpectNoError(err, "Failed to delete the pod: %q", podName)
-			// Get pod logs.
-			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
-			pod, err := e2epod.NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
-			containerStatus := pod.Status.ContainerStatuses[0]
-			gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
-			framework.ExpectNoError(err, "failed to get pod logs")
-			defer func() {
-				if err := logs.Close(); err != nil {
-					framework.ExpectNoError(err, "failed to log close")
-				}
-			}()
-			buf := new(bytes.Buffer)
-			_, err = buf.ReadFrom(logs)
-			if err != nil {
-				framework.ExpectNoError(err, "failed to read from")
+			expectedWatchEvents := []watch.Event{
+				{Type: watch.Added},
+				{Type: watch.Deleted},
+				{Type: watch.Deleted},
 			}
-			podLogs := buf.String()
-			// Verify the number of SIGINT
-			gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
-			gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
+			eventFound := false
+			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
+				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
+				ctxUntil, cancel := context.WithTimeout(ctx, 60*time.Second)
+				defer cancel()
+				_, err := watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+					if watchEvent.Type != watch.Added {
+						return false, nil
+					}
+					actualWatchEvents = append(actualWatchEvents, watchEvent)
+					eventFound = true
+					return true, nil
+				})
+				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+				if !eventFound {
+					framework.Failf("failed to find %v event", watch.Added)
+				}
+				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
+					framework.ExpectNoError(err, "failed to delete pod")
+				}
+				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
+				defer cancel()
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+					if watchEvent.Type != watch.Deleted {
+						return false, nil
+					}
+					actualWatchEvents = append(actualWatchEvents, watchEvent)
+					eventFound = true
+					return true, nil
+				})
+				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+				if !eventFound {
+					framework.Failf("failed to find %v event", watch.Deleted)
+				}
+				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort)); err != nil {
+					framework.ExpectNoError(err, "failed to delete pod")
+				}
+				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
+				defer cancel()
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+					if watchEvent.Type != watch.Deleted {
+						return false, nil
+					}
+					actualWatchEvents = append(actualWatchEvents, watchEvent)
+					eventFound = true
+					return true, nil
+				})
+				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+				if !eventFound {
+					framework.Failf("failed to find %v event", watch.Deleted)
+				}
+				// Get pod logs.
+				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
+				framework.ExpectNoError(err, "failed to get pod logs")
+				defer func() {
+					if err := logs.Close(); err != nil {
+						framework.ExpectNoError(err, "failed to log close")
+					}
+				}()
+				pod, err := e2epod.NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
+				containerStatus := pod.Status.ContainerStatuses[0]
+				gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
+				buf := new(bytes.Buffer)
+				_, err = buf.ReadFrom(logs)
+				if err != nil {
+					framework.ExpectNoError(err, "failed to read from")
+				}
+				podLogs := buf.String()
+				// Verify the number of SIGINT
+				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
+				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
+				return expectedWatchEvents
+			}
+			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
+				return err
+			})
 		})
 	})
 })
