@@ -2471,6 +2471,25 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 }
 
 func TestWatchStreamSeparation(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	t.Cleanup(func() {
+		server.Terminate(t)
+	})
+	setupOpts := &setupOptions{}
+	withDefaults(setupOpts)
+	config := Config{
+		Storage:        etcdStorage,
+		Versioner:      storage.APIObjectVersioner{},
+		GroupResource:  schema.GroupResource{Resource: "pods"},
+		ResourcePrefix: setupOpts.resourcePrefix,
+		KeyFunc:        setupOpts.keyFunc,
+		GetAttrsFunc:   GetPodAttrs,
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
+		IndexerFuncs:   setupOpts.indexerFuncs,
+		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          setupOpts.clock,
+	}
 	tcs := []struct {
 		name                         string
 		separateCacheWatchRPC        bool
@@ -2508,8 +2527,10 @@ func TestWatchStreamSeparation(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SeparateCacheWatchRPC, tc.separateCacheWatchRPC)
-			_, cacher, _, terminate := testSetupWithEtcdServer(t)
-			t.Cleanup(terminate)
+			cacher, err := NewCacherFromConfig(config)
+			if err != nil {
+				t.Fatalf("Failed to initialize cacher: %v", err)
+			}
 
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 				if err := cacher.ready.wait(context.TODO()); err != nil {
@@ -2527,7 +2548,11 @@ func TestWatchStreamSeparation(t *testing.T) {
 			waitForEtcdBookmark := watchAndWaitForBookmark(t, waitContext, cacher.storage)
 
 			var out example.Pod
-			err := cacher.Create(context.Background(), "foo", &example.Pod{}, &out, 0)
+			err = cacher.Create(context.Background(), "foo", &example.Pod{}, &out, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = cacher.Delete(context.Background(), "foo", &out, nil, storage.ValidateAllObjectFunc, &example.Pod{})
 			if err != nil {
 				t.Fatal(err)
 			}
