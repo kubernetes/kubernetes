@@ -261,6 +261,23 @@ type monitorCollector struct {
 
 	mutex         sync.Mutex
 	monitorGetter func() ([]Monitor, error)
+	monitors      *[]Monitor
+
+	// get storage metric monitor is protected by mutex
+	monitorMutex sync.Mutex
+}
+
+func (m *monitorCollector) getMonitors() ([]Monitor, error) {
+	m.monitorMutex.Lock()
+	defer m.monitorMutex.Unlock()
+	if m.monitors == nil {
+		getters, err := m.monitorGetter()
+		if err != nil {
+			return nil, err
+		}
+		m.monitors = &getters
+	}
+	return *m.monitors, nil
 }
 
 func (m *monitorCollector) setGetter(monitorGetter func() ([]Monitor, error)) {
@@ -282,7 +299,7 @@ func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc
 
 // CollectWithStability implements compbasemetrics.StableColletor
 func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric) {
-	monitors, err := c.getGetter()()
+	monitors, err := c.getMonitors()
 	if err != nil {
 		return
 	}
@@ -294,7 +311,6 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		metrics, err := m.Monitor(ctx)
 		cancel()
-		m.Close()
 		if err != nil {
 			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
 			continue
