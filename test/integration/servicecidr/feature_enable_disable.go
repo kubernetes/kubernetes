@@ -110,7 +110,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 
 	// shutdown apiserver with the feature enabled
 	s2.TearDownFn()
-	// start an apiserver without the deature enabled
+	// start an apiserver with the feature disabled
 	s3 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
 			"--runtime-config=networking.k8s.io/v1alpha1=false",
