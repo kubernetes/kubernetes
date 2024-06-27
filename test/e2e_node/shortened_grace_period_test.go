@@ -62,10 +62,12 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			eventFound := false
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
+				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
+				framework.ExpectNoError(err, "failed to watch")
 				podClient.Create(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
 				ctxUntil, cancel := context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
-				_, err := watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Added {
 						return false, nil
 					}
@@ -77,6 +79,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Added)
 				}
+				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
+				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
 				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
@@ -93,12 +97,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Deleted)
 				}
+				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
+				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
 
 				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
-				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
 						return false, nil
 					}
