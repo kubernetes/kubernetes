@@ -541,7 +541,7 @@ func TestSyncHandler(t *testing.T) {
 				}
 			}
 
-			err = ec.syncHandler(context.TODO(), tc.key)
+			err = ec.syncHandler(ctx, tc.key)
 			if err != nil && !tc.expectedError {
 				t.Fatalf("unexpected error while running handler: %v", err)
 			}
