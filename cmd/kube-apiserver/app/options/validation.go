@@ -24,9 +24,9 @@ import (
 
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	netutils "k8s.io/utils/net"
 
-	"k8s.io/apimachinery/pkg/util/version"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/features"
@@ -142,13 +142,10 @@ func (s CompletedOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
 
-	// TODO: remove in 1.32
-	// emulationVersion is introduced in 1.31, so it is only allowed to be equal to the binary version at 1.31.
+	// TODO(#125980): remove in 1.32
 	effectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor(s.GenericServerRunOptions.ComponentName)
-	binaryVersion := version.MajorMinor(effectiveVersion.BinaryVersion().Major(), effectiveVersion.BinaryVersion().Minor())
-	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) && !effectiveVersion.EmulationVersion().EqualTo(binaryVersion) {
-		errs = append(errs, fmt.Errorf("emulation version needs to be equal to binary version(%s) in compatibility-version alpha, got %s",
-			binaryVersion.String(), effectiveVersion.EmulationVersion().String()))
+	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
+		errs = append(errs, err)
 	}
 
 	return errs
