@@ -725,7 +725,9 @@ type KubeletConfiguration struct {
 	// +optional
 	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the
-	// shutdown and total grace period for pod termination during a node shutdown.
+	// shutdown and total grace period for pod termination during a node shutdown. If
+	// this value is 0 and no other shutdown config is provided, the kubelet will exit
+	// immediately without terminating pods or updating pod status.
 	// Default: "0s"
 	// +featureGate=GracefulNodeShutdown
 	// +optional
