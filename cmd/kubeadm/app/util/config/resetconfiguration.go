@@ -110,7 +110,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 		}
 
 		// check if this version is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, allowExperimental); err != nil {
+		if err := validateSupportedVersion(gvk, allowDeprecated, allowExperimental); err != nil {
 			return nil, err
 		}
 
