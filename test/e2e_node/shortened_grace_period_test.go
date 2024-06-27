@@ -45,7 +45,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
-			gracePeriod      = 1000
+			gracePeriod      = 10000
 			gracePeriodShort = 30
 		)
 		ginkgo.BeforeEach(func() {
@@ -84,7 +84,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 				framework.ExpectNoError(err, "failed to delete pod")
-				ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
+				ctxUntil, cancel = context.WithTimeout(ctx, 20*time.Second)
 				defer cancel()
 				eventFound := false
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
@@ -99,15 +99,15 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Modified)
 				}
-				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
-				framework.ExpectNoError(err, "failed to watch")
-				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
-				framework.ExpectNoError(err, "failed to delete pod")
-
 				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				containerStatus := pod.Status.ContainerStatuses[0]
 				gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
+
+				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
+				framework.ExpectNoError(err, "failed to watch")
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
+				framework.ExpectNoError(err, "failed to delete pod")
 
 				ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 				defer cancel()
