@@ -31,6 +31,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"strings"
+	"time"
 )
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
@@ -40,7 +41,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var podClient *e2epod.PodClient
 		var dc dynamic.Interface
 		var ns string
-		var podName = "test"
+		var podName = "test-shortened-grace"
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
@@ -53,6 +54,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			podClient = e2epod.NewPodClient(f)
 		})
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
+			testRcNamespace := ns
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Added},
 				{Type: watch.Deleted},
@@ -60,8 +62,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			eventFound := false
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
-				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
-				ctxUntil, cancel := context.WithCancel(ctx)
+				podClient.Create(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
+				ctxUntil, cancel := context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
 				_, err := watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Added {
@@ -75,10 +77,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Added)
 				}
-				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
-					framework.ExpectNoError(err, "failed to delete pod")
-				}
-				ctxUntil, cancel = context.WithCancel(ctx)
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
+				framework.ExpectNoError(err, "failed to delete pod")
+				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
@@ -92,10 +93,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Deleted)
 				}
-				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort)); err != nil {
-					framework.ExpectNoError(err, "failed to delete pod")
-				}
-				ctxUntil, cancel = context.WithCancel(ctx)
+				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
+				framework.ExpectNoError(err, "failed to delete pod")
+
+				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
@@ -118,6 +119,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 					}
 				}()
 				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
 				containerStatus := pod.Status.ContainerStatuses[0]
 				gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
 				buf := new(bytes.Buffer)
@@ -131,14 +133,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
 				return expectedWatchEvents
 			}
-			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test=true"}, expectedWatchEvents, callback, func() (err error) {
+			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test-shortened-grace=true"}, expectedWatchEvents, callback, func() (err error) {
 				return err
 			})
 		})
 	})
 })
 
-func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
+func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -147,8 +149,9 @@ func getGracePeriodTestPod(name string, gracePeriod int64) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				"test": "true",
+				"test-shortened-grace": "true",
 			},
+			Namespace: testRcNamespace,
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
