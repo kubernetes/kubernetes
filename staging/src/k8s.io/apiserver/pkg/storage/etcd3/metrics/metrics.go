@@ -286,12 +286,6 @@ func (m *monitorCollector) setGetter(monitorGetter func() ([]Monitor, error)) {
 	m.monitorGetter = monitorGetter
 }
 
-func (m *monitorCollector) getGetter() func() ([]Monitor, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return m.monitorGetter
-}
-
 // DescribeWithStability implements compbasemetrics.StableColletor
 func (c *monitorCollector) DescribeWithStability(ch chan<- *compbasemetrics.Desc) {
 	ch <- storageSizeDescription
