@@ -31,7 +31,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"strings"
-	"time"
 )
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
@@ -62,7 +61,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			eventFound := false
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
 				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, gracePeriod))
-				ctxUntil, cancel := context.WithTimeout(ctx, 60*time.Second)
+				ctxUntil, cancel := context.WithCancel(ctx)
 				defer cancel()
 				_, err := watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Added {
@@ -79,7 +78,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod)); err != nil {
 					framework.ExpectNoError(err, "failed to delete pod")
 				}
-				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
+				ctxUntil, cancel = context.WithCancel(ctx)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
@@ -96,7 +95,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort)); err != nil {
 					framework.ExpectNoError(err, "failed to delete pod")
 				}
-				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
+				ctxUntil, cancel = context.WithCancel(ctx)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
@@ -118,7 +117,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 						framework.ExpectNoError(err, "failed to log close")
 					}
 				}()
-				pod, err := e2epod.NewPodClient(f).Get(context.TODO(), podName, metav1.GetOptions{})
+				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 				containerStatus := pod.Status.ContainerStatuses[0]
 				gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
 				buf := new(bytes.Buffer)
