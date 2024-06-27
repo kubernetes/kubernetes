@@ -126,20 +126,24 @@ message AzureDiskVolumeSource {
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
   // +optional
+  // +default=ref(AzureDataDiskCachingReadWrite)
   optional string cachingMode = 3;
 
   // fsType is Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
+  // +default="ext4"
   optional string fsType = 4;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
+  // +default=false
   optional bool readOnly = 5;
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+  // +default=ref(AzureSharedBlobDisk)
   optional string kind = 6;
 }
 
@@ -2045,6 +2049,7 @@ message ISCSIPersistentVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2102,6 +2107,7 @@ message ISCSIVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -4729,18 +4735,21 @@ message RBDPersistentVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4781,18 +4790,21 @@ message RBDVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -5102,6 +5114,7 @@ message ScaleIOPersistentVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5113,6 +5126,7 @@ message ScaleIOPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5148,6 +5162,7 @@ message ScaleIOVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5159,6 +5174,7 @@ message ScaleIOVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
