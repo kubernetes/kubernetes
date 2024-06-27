@@ -65,6 +65,9 @@ CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"ab38507efe50c34bc224
 CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"5eea6e7033a337fd98df00fa8a72a8ca8d2d2c69f6637555828515de94158cab"}
 CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"3d1b56d8b357ee593866cd9342a61fc797852da9ff75ae5ed7b5de125a30b253"}
 
+# enable testing of graceful shutdown locally
+KUBELET_GRACEFUL_NODE_SHUTDOWN_PERIOD=${KUBELET_GRACEFUL_NODE_SHUTDOWN_PERIOD:-"0"}
+
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
 EVICTION_SOFT=${EVICTION_SOFT:-""}
@@ -871,6 +874,7 @@ rotateCertificates: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
+shutdownGracePeriod: ${KUBELET_GRACEFUL_NODE_SHUTDOWN_PERIOD}
 EOF
 
   if [[ "$ENABLE_TRACING" = true ]]; then
