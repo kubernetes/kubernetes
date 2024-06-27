@@ -332,7 +332,7 @@ func file_google_protobuf_timestamp_proto_rawDescGZIP() []byte {
 }
 
 var file_google_protobuf_timestamp_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
-var file_google_protobuf_timestamp_proto_goTypes = []interface{}{
+var file_google_protobuf_timestamp_proto_goTypes = []any{
 	(*Timestamp)(nil), // 0: google.protobuf.Timestamp
 }
 var file_google_protobuf_timestamp_proto_depIdxs = []int32{
@@ -349,7 +349,7 @@ func file_google_protobuf_timestamp_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_timestamp_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_timestamp_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*Timestamp); i {
 			case 0:
 				return &v.state

@@ -194,7 +194,7 @@ func parseCPUInfoARM(info []byte) ([]CPUInfo, error) {
 	firstLine := firstNonEmptyLine(scanner)
 	match, err := regexp.MatchString("^[Pp]rocessor", firstLine)
 	if !match || !strings.Contains(firstLine, ":") {
-		return nil, fmt.Errorf("%s: Cannot parse line: %q: %w", ErrFileParse, firstLine, err)
+		return nil, fmt.Errorf("%w: Cannot parse line: %q: %w", ErrFileParse, firstLine, err)
 
 	}
 	field := strings.SplitN(firstLine, ": ", 2)
@@ -386,7 +386,7 @@ func parseCPUInfoLoong(info []byte) ([]CPUInfo, error) {
 	// find the first "processor" line
 	firstLine := firstNonEmptyLine(scanner)
 	if !strings.HasPrefix(firstLine, "system type") || !strings.Contains(firstLine, ":") {
-		return nil, errors.New("invalid cpuinfo file: " + firstLine)
+		return nil, fmt.Errorf("%w: %q", ErrFileParse, firstLine)
 	}
 	field := strings.SplitN(firstLine, ": ", 2)
 	cpuinfo := []CPUInfo{}

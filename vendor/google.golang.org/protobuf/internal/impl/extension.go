@@ -53,7 +53,7 @@ type ExtensionInfo struct {
 	// type returned by InterfaceOf may not be identical.
 	//
 	// Deprecated: Use InterfaceOf(xt.Zero()) instead.
-	ExtensionType interface{}
+	ExtensionType any
 
 	// Field is the field number of the extension.
 	//
@@ -95,16 +95,16 @@ func (xi *ExtensionInfo) New() protoreflect.Value {
 func (xi *ExtensionInfo) Zero() protoreflect.Value {
 	return xi.lazyInit().Zero()
 }
-func (xi *ExtensionInfo) ValueOf(v interface{}) protoreflect.Value {
+func (xi *ExtensionInfo) ValueOf(v any) protoreflect.Value {
 	return xi.lazyInit().PBValueOf(reflect.ValueOf(v))
 }
-func (xi *ExtensionInfo) InterfaceOf(v protoreflect.Value) interface{} {
+func (xi *ExtensionInfo) InterfaceOf(v protoreflect.Value) any {
 	return xi.lazyInit().GoValueOf(v).Interface()
 }
 func (xi *ExtensionInfo) IsValidValue(v protoreflect.Value) bool {
 	return xi.lazyInit().IsValidPB(v)
 }
-func (xi *ExtensionInfo) IsValidInterface(v interface{}) bool {
+func (xi *ExtensionInfo) IsValidInterface(v any) bool {
 	return xi.lazyInit().IsValidGo(reflect.ValueOf(v))
 }
 func (xi *ExtensionInfo) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {

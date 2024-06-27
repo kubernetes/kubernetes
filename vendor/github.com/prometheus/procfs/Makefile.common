@@ -49,23 +49,23 @@ endif
 GOTEST := $(GO) test
 GOTEST_DIR :=
 ifneq ($(CIRCLE_JOB),)
-ifneq ($(shell command -v gotestsum > /dev/null),)
+ifneq ($(shell command -v gotestsum 2> /dev/null),)
 	GOTEST_DIR := test-results
 	GOTEST := gotestsum --junitfile $(GOTEST_DIR)/unit-tests.xml --
 endif
 endif
 
-PROMU_VERSION ?= 0.15.0
+PROMU_VERSION ?= 0.17.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.54.2
-# golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
+GOLANGCI_LINT_VERSION ?= v1.59.0
+# golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
-	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386))
+	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386 arm64))
 		# If we're in CI and there is an Actions file, that means the linter
 		# is being run in Actions, so we don't need to run it here.
 		ifneq (,$(SKIP_GOLANGCI_LINT))
@@ -169,16 +169,20 @@ common-vet:
 common-lint: $(GOLANGCI_LINT)
 ifdef GOLANGCI_LINT
 	@echo ">> running golangci-lint"
-# 'go list' needs to be executed before staticcheck to prepopulate the modules cache.
-# Otherwise staticcheck might fail randomly for some reason not yet explained.
-	$(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
 	$(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
+endif
+
+.PHONY: common-lint-fix
+common-lint-fix: $(GOLANGCI_LINT)
+ifdef GOLANGCI_LINT
+	@echo ">> running golangci-lint fix"
+	$(GOLANGCI_LINT) run --fix $(GOLANGCI_LINT_OPTS) $(pkgs)
 endif
 
 .PHONY: common-yamllint
 common-yamllint:
 	@echo ">> running yamllint on all YAML files in the repository"
-ifeq (, $(shell command -v yamllint > /dev/null))
+ifeq (, $(shell command -v yamllint 2> /dev/null))
 	@echo "yamllint not installed so skipping"
 else
 	yamllint .
@@ -203,6 +207,10 @@ common-build: promu
 common-tarball: promu
 	@echo ">> building release tarball"
 	$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
+
+.PHONY: common-docker-repo-name
+common-docker-repo-name:
+	@echo "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)"
 
 .PHONY: common-docker $(BUILD_DOCKER_ARCHS)
 common-docker: $(BUILD_DOCKER_ARCHS)
