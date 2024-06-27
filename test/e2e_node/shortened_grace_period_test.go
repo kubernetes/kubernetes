@@ -182,9 +182,11 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:    name,
-					Image:   busyboxImage,
-					Command: []string{"sh", "-c"},
+					Name:                     name,
+					Image:                    busyboxImage,
+					TerminationMessagePath:   "/dev/termination-log",
+					TerminationMessagePolicy: "File",
+					Command:                  []string{"sh", "-c"},
 					Args: []string{`
 term() {
   if [ "$COUNT" -eq 0 ]; then
