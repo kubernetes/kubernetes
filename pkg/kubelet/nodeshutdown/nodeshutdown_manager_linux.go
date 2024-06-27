@@ -98,6 +98,7 @@ type managerImpl struct {
 func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
+		conf.Logger.Info("Node graceful shutdown feature is disabled, node shutdown will be immediate")
 		return m, m
 	}
 
@@ -111,6 +112,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 	// Disable if the configuration is empty
 	if len(shutdownGracePeriodByPodPriority) == 0 {
 		m := managerStub{}
+		conf.Logger.Info("No graceful configuration specified, node shutdown will be immediate")
 		return m, m
 	}
 
