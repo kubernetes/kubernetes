@@ -819,7 +819,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
-func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
+func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
 
 	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
@@ -1000,6 +1000,11 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			reason = reasonStartupProbe
 		} else if isInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
+			// overcome slow reconcile ( range of 1-3 minutes ) when reverting resize patch quickly,
+			// before container is started from previous resize patch
+			// it will still wait for kubelet's next reconcile loop (interval is 1 minute), issue 123940
+			key := getStableKey(pod, &container)
+			backOff.Reset(key)
 			continue
 		} else {
 			// Keep the container.
@@ -1048,7 +1053,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 //  8. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
-	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
+	podContainerChanges := m.computePodActions(ctx, pod, podStatus, backOff)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
