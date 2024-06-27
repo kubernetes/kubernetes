@@ -310,7 +310,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Start the main lock
-	go leaderElectAndRun(ctx, c, "kube-controller-manager-"+id, electionChecker,
+	go leaderElectAndRun(ctx, c, id, electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
