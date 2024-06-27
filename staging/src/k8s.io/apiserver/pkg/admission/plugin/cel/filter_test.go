@@ -20,12 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"reflect"
 	"strings"
 	"testing"
@@ -34,19 +28,25 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/utils/pointer"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/pointer"
 )
 
 type condition struct {
@@ -182,6 +182,9 @@ func TestFilter(t *testing.T) {
 		},
 	}
 
+	v130 := version.MajorMinor(1, 30)
+	v131 := version.MajorMinor(1, 31)
+
 	var nilUnstructured *unstructured.Unstructured
 	cases := []struct {
 		name             string
@@ -195,6 +198,8 @@ func TestFilter(t *testing.T) {
 		namespaceObject  *corev1.Namespace
 		strictCost       bool
 		enableSelectors  bool
+
+		compatibilityVersion *version.Version
 	}{
 		{
 			name: "valid syntax for object",
@@ -495,6 +500,38 @@ func TestFilter(t *testing.T) {
 			}),
 		},
 		{
+			name: "test authorizer error using fieldSelector with 1.30 compatibility",
+			validations: []ExpressionAccessor{
+				&condition{
+					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					Error: fmt.Errorf("fieldSelector"),
+				},
+			},
+			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
+				ResourceRequest: true,
+				APIGroup:        "apps",
+				Resource:        "deployments",
+				Subresource:     "status",
+				Namespace:       "test",
+				Name:            "backend",
+				Verb:            "create",
+				APIVersion:      "*",
+				FieldSelectorRequirements: fields.Requirements{
+					{Operator: "=", Field: "foo", Value: "bar"},
+				},
+				LabelSelectorRequirements: labels.Requirements{
+					*simpleLabelSelector,
+				},
+			}),
+			enableSelectors:      true,
+			compatibilityVersion: v130,
+		},
+		{
 			name: "test authorizer allow resource check with all fields",
 			validations: []ExpressionAccessor{
 				&condition{
@@ -523,7 +560,8 @@ func TestFilter(t *testing.T) {
 					*simpleLabelSelector,
 				},
 			}),
-			enableSelectors: true,
+			enableSelectors:      true,
+			compatibilityVersion: v131,
 		},
 		{
 			name: "test authorizer allow resource check with parse failures",
@@ -550,7 +588,8 @@ func TestFilter(t *testing.T) {
 				FieldSelectorParsingErr: errors.New("invalid selector: 'foo badoperator bar'; can't understand 'foo badoperator bar'"),
 				LabelSelectorParsingErr: errors.New("unable to parse requirement: found 'badoperator', expected: in, notin, =, ==, !=, gt, lt"),
 			}),
-			enableSelectors: true,
+			enableSelectors:      true,
+			compatibilityVersion: v131,
 		},
 		{
 			name: "test authorizer allow resource check with all fields, without gate",
@@ -575,6 +614,7 @@ func TestFilter(t *testing.T) {
 				Verb:            "create",
 				APIVersion:      "*",
 			}),
+			compatibilityVersion: v131,
 		},
 		{
 			name: "test authorizer not allowed resource check one incorrect field",
@@ -837,9 +877,13 @@ func TestFilter(t *testing.T) {
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit
 			}
-			env, err := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), tc.strictCost).Extend(
+			compatibilityVersion := tc.compatibilityVersion
+			if compatibilityVersion == nil {
+				compatibilityVersion = environment.DefaultCompatibilityVersion()
+			}
+			env, err := environment.MustBaseEnvSet(compatibilityVersion, tc.strictCost).Extend(
 				environment.VersionedOptions{
-					IntroducedVersion: environment.DefaultCompatibilityVersion(),
+					IntroducedVersion: compatibilityVersion,
 					ProgramOptions:    []celgo.ProgramOption{celgo.CostLimit(tc.testPerCallLimit)},
 				},
 			)
@@ -868,11 +912,15 @@ func TestFilter(t *testing.T) {
 			}
 			require.Equal(t, len(evalResults), len(tc.results))
 			for i, result := range tc.results {
-				if result.EvalResult != evalResults[i].EvalResult {
-					t.Errorf("Expected result '%v' but got '%v'", result.EvalResult, evalResults[i].EvalResult)
-				}
 				if result.Error != nil && !strings.Contains(evalResults[i].Error.Error(), result.Error.Error()) {
 					t.Errorf("Expected result '%v' but got '%v'", result.Error, evalResults[i].Error)
+				}
+				if result.Error == nil && evalResults[i].Error != nil {
+					t.Errorf("Expected result '%v' but got error '%v'", result.EvalResult, evalResults[i].Error)
+					continue
+				}
+				if result.EvalResult != evalResults[i].EvalResult {
+					t.Errorf("Expected result '%v' but got '%v'", result.EvalResult, evalResults[i].EvalResult)
 				}
 			}
 		})

@@ -19,12 +19,13 @@ package library
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"reflect"
-	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -198,6 +199,30 @@ import (
 // Examples:
 //
 //	authorizer.group('').resource('pods').namespace('default').check('create').error()
+//
+// fieldSelector
+//
+// Takes a string field selector, parses it to field selector requirements, and includes it in the authorization check.
+// If the field selector does not parse successfully, no field selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+, Authz library version 1.
+//
+//	<ResourceCheck>.fieldSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').fieldSelector('spec.nodeName=mynode').check('list').allowed()
+//
+// labelSelector (added in v1, Kubernetes 1.31+)
+//
+// Takes a string label selector, parses it to label selector requirements, and includes it in the authorization check.
+// If the label selector does not parse successfully, no label selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+, Authz library version 1.
+//
+//	<ResourceCheck>.labelSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').labelSelector('app=example').check('list').allowed()
 func Authz() cel.EnvOption {
 	return cel.Lib(authzLib)
 }
@@ -226,12 +251,6 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"subresource": {
 		cel.MemberOverload("resourcecheck_subresource", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckSubresource))},
-	"fieldSelector": {
-		cel.MemberOverload("authorizer_fieldselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
-			cel.BinaryBinding(resourceCheckFieldSelector))},
-	"labelSelector": {
-		cel.MemberOverload("authorizer_labelselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
-			cel.BinaryBinding(resourceCheckLabelSelector))},
 	"namespace": {
 		cel.MemberOverload("resourcecheck_namespace", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckNamespace))},
@@ -266,6 +285,66 @@ func (*authz) CompileOptions() []cel.EnvOption {
 }
 
 func (*authz) ProgramOptions() []cel.ProgramOption {
+	return []cel.ProgramOption{}
+}
+
+// AuthzSelectors provides a CEL function library extension for adding fieldSelector and
+// labelSelector filters to authorization checks. This requires the Authz library.
+// See documentation of the Authz library for use and availability of the authorizer variable.
+//
+// fieldSelector
+//
+// Takes a string field selector, parses it to field selector requirements, and includes it in the authorization check.
+// If the field selector does not parse successfully, no field selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+.
+//
+//	<ResourceCheck>.fieldSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').fieldSelector('spec.nodeName=mynode').check('list').allowed()
+//
+// labelSelector
+//
+// Takes a string label selector, parses it to label selector requirements, and includes it in the authorization check.
+// If the label selector does not parse successfully, no label selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+.
+//
+//	<ResourceCheck>.labelSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').labelSelector('app=example').check('list').allowed()
+func AuthzSelectors() cel.EnvOption {
+	return cel.Lib(authzSelectorsLib)
+}
+
+var authzSelectorsLib = &authzSelectors{}
+
+type authzSelectors struct{}
+
+func (*authzSelectors) LibraryName() string {
+	return "k8s.authzSelectors"
+}
+
+var authzSelectorsLibraryDecls = map[string][]cel.FunctionOpt{
+	"fieldSelector": {
+		cel.MemberOverload("authorizer_fieldselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckFieldSelector))},
+	"labelSelector": {
+		cel.MemberOverload("authorizer_labelselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckLabelSelector))},
+}
+
+func (*authzSelectors) CompileOptions() []cel.EnvOption {
+	options := make([]cel.EnvOption, 0, len(authzSelectorsLibraryDecls))
+	for name, overloads := range authzSelectorsLibraryDecls {
+		options = append(options, cel.Function(name, overloads...))
+	}
+	return options
+}
+
+func (*authzSelectors) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{}
 }
 
