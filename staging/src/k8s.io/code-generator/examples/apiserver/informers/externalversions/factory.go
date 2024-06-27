@@ -28,6 +28,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	versioned "k8s.io/code-generator/examples/apiserver/clientset/versioned"
+	core "k8s.io/code-generator/examples/apiserver/informers/externalversions/core"
 	example "k8s.io/code-generator/examples/apiserver/informers/externalversions/example"
 	example2 "k8s.io/code-generator/examples/apiserver/informers/externalversions/example2"
 	example3io "k8s.io/code-generator/examples/apiserver/informers/externalversions/example3.io"
@@ -255,9 +256,14 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
+	Core() core.Interface
 	Example() example.Interface
 	SecondExample() example2.Interface
 	ThirdExample() example3io.Interface
+}
+
+func (f *sharedInformerFactory) Core() core.Interface {
+	return core.New(f, f.namespace, f.tweakListOptions)
 }
 
 func (f *sharedInformerFactory) Example() example.Interface {

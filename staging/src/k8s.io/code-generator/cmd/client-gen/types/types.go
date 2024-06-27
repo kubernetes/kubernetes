@@ -42,7 +42,7 @@ func (g Group) String() string {
 }
 
 func (g Group) NonEmpty() string {
-	if g == "api" {
+	if g == "" {
 		return "core"
 	}
 	return string(g)
@@ -76,7 +76,7 @@ type GroupVersionKind struct {
 }
 
 func (gv GroupVersion) ToAPIVersion() string {
-	if len(gv.Group) > 0 && gv.Group.NonEmpty() != "core" {
+	if len(gv.Group) > 0 && gv.Group != "" {
 		return gv.Group.String() + "/" + gv.Version.String()
 	} else {
 		return gv.Version.String()
