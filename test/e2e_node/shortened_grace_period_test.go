@@ -45,8 +45,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var ctx = context.Background()
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
-			gracePeriod      = 10000
-			gracePeriodShort = 60
+			gracePeriod      = 1000
+			gracePeriodShort = 30
 		)
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
@@ -57,7 +57,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			testRcNamespace := ns
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Added},
-				{Type: watch.Deleted},
+				{Type: watch.Modified},
 				{Type: watch.Deleted},
 			}
 			eventFound := false
@@ -83,10 +83,10 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 				framework.ExpectNoError(err, "failed to delete pod")
-				ctxUntil, cancel = context.WithTimeout(ctx, 15*time.Second)
+				ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
-					if watchEvent.Type != watch.Deleted {
+					if watchEvent.Type != watch.Modified {
 						return false, nil
 					}
 					actualWatchEvents = append(actualWatchEvents, watchEvent)
@@ -95,14 +95,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				})
 				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
 				if !eventFound {
-					framework.Failf("failed to find %v event", watch.Deleted)
+					framework.Failf("failed to find %v event", watch.Modified)
 				}
 				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
 
-				ctxUntil, cancel = context.WithTimeout(ctx, 15*time.Second)
+				ctxUntil, cancel = context.WithTimeout(ctx, 50*time.Second)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
@@ -171,7 +171,7 @@ term() {
     echo "SIGINT 1" >> /dev/termination-log
   elif [ "$COUNT" -eq 1 ]; then
     echo "SIGINT 2" >> /dev/termination-log
-    sleep 50
+    sleep 20
     exit 0
   fi
   COUNT=$((COUNT + 1))
