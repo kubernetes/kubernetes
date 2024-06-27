@@ -74,6 +74,14 @@ const (
 	// beta: v1.30
 	AppArmorFields featuregate.Feature = "AppArmorFields"
 
+	// owner: @liggitt
+	// kep:
+	// alpha: v1.31
+	//
+	// Make the Node authorizer use fine-grained selector authorization.
+	// Requires AuthorizeWithSelectors to be enabled.
+	AuthorizeNodeWithSelectors featuregate.Feature = "AuthorizeNodeWithSelectors"
+
 	// owner: @danwinship
 	// alpha: v1.27
 	// beta: v1.29
@@ -1007,6 +1015,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
 	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
+
+	AuthorizeNodeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
