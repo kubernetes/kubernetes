@@ -536,8 +536,9 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 }
 
 func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
-	nnn := pod.Status.NominatedNodeName
-	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
+	// Retrieve the nominated node from the pod's status
+	nominatedNodeName := pod.Status.NominatedNodeName
+	nodeInfo, err := sched.nodeInfoSnapshot.Get(nominatedNodeName)
 	if err != nil {
 		return nil, err
 	}
