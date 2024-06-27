@@ -198,7 +198,7 @@ func (c *Controller) runWorker(ctx context.Context) {
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the syncHandler.
 func (c *Controller) processNextWorkItem(ctx context.Context) bool {
-	item, shutdown := c.workqueue.Get()
+	objRef, shutdown := c.workqueue.Get()
 	logger := klog.FromContext(ctx)
 
 	if shutdown {
@@ -211,29 +211,27 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	// not call Forget if a transient error occurs, instead the item is
 	// put back on the workqueue and attempted again after a back-off
 	// period.
-	defer c.workqueue.Done(item)
+	defer c.workqueue.Done(objRef)
 
-	// We wrap this block in a func so we can defer c.workqueue.Done.
-	err := func(objectRef cache.ObjectName) error {
-		// Run the syncHandler, passing it the namespace/name string of the
-		// Foo resource to be synced.
-		if err := c.syncHandler(ctx, objectRef); err != nil {
-			// Put the item back on the workqueue to handle any transient errors.
-			c.workqueue.AddRateLimited(objectRef)
-			return fmt.Errorf("error syncing '%#v': %s, requeuing", objectRef, err.Error())
-		}
-		// Finally, if no error occurs we Forget this item so it does not
+	// Run the syncHandler, passing it the structured reference to the object to be synced.
+	err := c.syncHandler(ctx, objRef)
+	if err == nil {
+		// If no error occurs then we Forget this item so it does not
 		// get queued again until another change happens.
-		c.workqueue.Forget(objectRef)
-		logger.Info("Successfully synced", "objectName", objectRef)
-		return nil
-	}(item)
-
-	if err != nil {
-		utilruntime.HandleError(err)
+		c.workqueue.Forget(objRef)
+		logger.Info("Successfully synced", "objectName", objRef)
 		return true
 	}
-
+	// there was a failure so be sure to report it.  This method allows for
+	// pluggable error handling which can be used for things like
+	// cluster-monitoring.
+	utilruntime.HandleError(fmt.Errorf("error syncing '%#v': %s, requeuing", objRef, err.Error()))
+	// since we failed, we should requeue the item to work on later.  This
+	// method will add a backoff to avoid hotlooping on particular items
+	// (they're probably still not going to work right away) and overall
+	// controller protection (everything I've done is broken, this controller
+	// needs to calm down or it can starve other useful work) cases.
+	c.workqueue.AddRateLimited(objRef)
 	return true
 }
 
@@ -241,7 +239,6 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // converge the two. It then updates the Status block of the Foo resource
 // with the current status of the resource.
 func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName) error {
-	// Convert the namespace/name string into a distinct namespace and name
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "objectRef", objectRef)
 
 	// Get the Foo resource with this namespace/name
