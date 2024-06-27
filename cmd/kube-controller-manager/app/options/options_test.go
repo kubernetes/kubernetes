@@ -1353,8 +1353,8 @@ func TestWatchListClientFlagChange(t *testing.T) {
 
 func assertWatchListClientFeatureDefaultValue(t *testing.T) {
 	watchListClientDefaultValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if watchListClientDefaultValue {
-		t.Fatalf("expected %q feature gate to be disabled for KCM", clientgofeaturegate.WatchListClient)
+	if !watchListClientDefaultValue {
+		t.Fatalf("expected %q feature gate to be enabled for KCM", clientgofeaturegate.WatchListClient)
 	}
 }
 
@@ -1365,7 +1365,7 @@ func assertWatchListCommandLineDefaultValue(t *testing.T, fs *pflag.FlagSet) {
 		t.Fatalf("didn't find %q flag", fgFlagName)
 	}
 
-	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=false)"
+	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=true)"
 	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
 		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
 	}
