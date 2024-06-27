@@ -67,7 +67,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				podClient.Create(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
 				ctxUntil, cancel := context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
-				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Added {
 						return false, nil
 					}
@@ -85,7 +85,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				framework.ExpectNoError(err, "failed to delete pod")
 				ctxUntil, cancel = context.WithTimeout(ctx, 60*time.Second)
 				defer cancel()
-				_, err = watchtools.UntilWithoutRetry(ctxUntil, retryWatcher, func(watchEvent watch.Event) (bool, error) {
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Deleted {
 						return false, nil
 					}
