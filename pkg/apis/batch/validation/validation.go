@@ -838,13 +838,7 @@ func ValidateJobTemplateSpec(spec *batch.JobTemplateSpec, fldPath *field.Path, o
 }
 
 func validateCompletions(spec, oldSpec batch.JobSpec, fldPath *field.Path, opts JobValidationOptions) field.ErrorList {
-	if !opts.AllowElasticIndexedJobs {
-		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
-	}
-
-	// Completions is immutable for non-indexed jobs.
-	// For Indexed Jobs, if ElasticIndexedJob feature gate is not enabled,
-	// fall back to validating that spec.Completions is always immutable.
+	// Completions is immutable for non-indexed jobs, but mutable for Indexed Jobs.
 	isIndexedJob := spec.CompletionMode != nil && *spec.CompletionMode == batch.IndexedCompletion
 	if !isIndexedJob {
 		return apivalidation.ValidateImmutableField(spec.Completions, oldSpec.Completions, fldPath)
@@ -998,8 +992,6 @@ type JobValidationOptions struct {
 	apivalidation.PodValidationOptions
 	// Allow mutable node affinity, selector and tolerations of the template
 	AllowMutableSchedulingDirectives bool
-	// Allow elastic indexed jobs
-	AllowElasticIndexedJobs bool
 	// Require Job to have the label on batch.kubernetes.io/job-name and batch.kubernetes.io/controller-uid
 	RequirePrefixedLabels bool
 }
