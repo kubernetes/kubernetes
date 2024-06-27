@@ -47,17 +47,16 @@ func New(data interface{}) Map {
 //
 // The arguments follow a key, value pattern.
 //
-//
 // Returns nil if any key argument is non-string or if there are an odd number of arguments.
 //
-// Example
+// # Example
 //
 // To easily create Maps:
 //
-//     m := objx.MSI("name", "Mat", "age", 29, "subobj", objx.MSI("active", true))
+//	m := objx.MSI("name", "Mat", "age", 29, "subobj", objx.MSI("active", true))
 //
-//     // creates an Map equivalent to
-//     m := objx.Map{"name": "Mat", "age": 29, "subobj": objx.Map{"active": true}}
+//	// creates an Map equivalent to
+//	m := objx.Map{"name": "Mat", "age": 29, "subobj": objx.Map{"active": true}}
 func MSI(keyAndValuePairs ...interface{}) Map {
 	newMap := Map{}
 	keyAndValuePairsLen := len(keyAndValuePairs)

@@ -7,8 +7,8 @@ go 1.22.0
 require (
 	github.com/moby/sys/mountinfo v0.7.1
 	github.com/opencontainers/runc v1.1.13
-	github.com/stretchr/testify v1.8.4
-	golang.org/x/sys v0.20.0
+	github.com/stretchr/testify v1.9.0
+	golang.org/x/sys v0.21.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )

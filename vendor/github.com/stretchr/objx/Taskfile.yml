@@ -1,7 +1,4 @@
-version: '2'
-
-env:
-  GOFLAGS: -mod=vendor
+version: '3'
 
 tasks:
   default:

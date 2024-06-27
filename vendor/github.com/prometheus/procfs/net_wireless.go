@@ -68,7 +68,7 @@ func (fs FS) Wireless() ([]*Wireless, error) {
 
 	m, err := parseWireless(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("%s: wireless: %w", ErrFileParse, err)
+		return nil, fmt.Errorf("%w: wireless: %w", ErrFileParse, err)
 	}
 
 	return m, nil
@@ -114,47 +114,47 @@ func parseWireless(r io.Reader) ([]*Wireless, error) {
 
 		qlink, err := strconv.Atoi(strings.TrimSuffix(stats[1], "."))
 		if err != nil {
-			return nil, fmt.Errorf("%s: parse Quality:link as integer %q: %w", ErrFileParse, qlink, err)
+			return nil, fmt.Errorf("%w: parse Quality:link as integer %q: %w", ErrFileParse, qlink, err)
 		}
 
 		qlevel, err := strconv.Atoi(strings.TrimSuffix(stats[2], "."))
 		if err != nil {
-			return nil, fmt.Errorf("%s: Quality:level as integer %q: %w", ErrFileParse, qlevel, err)
+			return nil, fmt.Errorf("%w: Quality:level as integer %q: %w", ErrFileParse, qlevel, err)
 		}
 
 		qnoise, err := strconv.Atoi(strings.TrimSuffix(stats[3], "."))
 		if err != nil {
-			return nil, fmt.Errorf("%s: Quality:noise as integer %q: %w", ErrFileParse, qnoise, err)
+			return nil, fmt.Errorf("%w: Quality:noise as integer %q: %w", ErrFileParse, qnoise, err)
 		}
 
 		dnwid, err := strconv.Atoi(stats[4])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Discarded:nwid as integer %q: %w", ErrFileParse, dnwid, err)
+			return nil, fmt.Errorf("%w: Discarded:nwid as integer %q: %w", ErrFileParse, dnwid, err)
 		}
 
 		dcrypt, err := strconv.Atoi(stats[5])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Discarded:crypt as integer %q: %w", ErrFileParse, dcrypt, err)
+			return nil, fmt.Errorf("%w: Discarded:crypt as integer %q: %w", ErrFileParse, dcrypt, err)
 		}
 
 		dfrag, err := strconv.Atoi(stats[6])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Discarded:frag as integer %q: %w", ErrFileParse, dfrag, err)
+			return nil, fmt.Errorf("%w: Discarded:frag as integer %q: %w", ErrFileParse, dfrag, err)
 		}
 
 		dretry, err := strconv.Atoi(stats[7])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Discarded:retry as integer %q: %w", ErrFileParse, dretry, err)
+			return nil, fmt.Errorf("%w: Discarded:retry as integer %q: %w", ErrFileParse, dretry, err)
 		}
 
 		dmisc, err := strconv.Atoi(stats[8])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Discarded:misc as integer %q: %w", ErrFileParse, dmisc, err)
+			return nil, fmt.Errorf("%w: Discarded:misc as integer %q: %w", ErrFileParse, dmisc, err)
 		}
 
 		mbeacon, err := strconv.Atoi(stats[9])
 		if err != nil {
-			return nil, fmt.Errorf("%s: Missed:beacon as integer %q: %w", ErrFileParse, mbeacon, err)
+			return nil, fmt.Errorf("%w: Missed:beacon as integer %q: %w", ErrFileParse, mbeacon, err)
 		}
 
 		w := &Wireless{
@@ -175,7 +175,7 @@ func parseWireless(r io.Reader) ([]*Wireless, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("%s: Failed to scan /proc/net/wireless: %w", ErrFileRead, err)
+		return nil, fmt.Errorf("%w: Failed to scan /proc/net/wireless: %w", ErrFileRead, err)
 	}
 
 	return interfaces, nil

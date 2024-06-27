@@ -95,7 +95,7 @@ type Files struct {
 	// multiple files. Only top-level declarations are registered.
 	// Note that enum values are in the top-level since that are in the same
 	// scope as the parent enum.
-	descsByName map[protoreflect.FullName]interface{}
+	descsByName map[protoreflect.FullName]any
 	filesByPath map[string][]protoreflect.FileDescriptor
 	numFiles    int
 }
@@ -117,7 +117,7 @@ func (r *Files) RegisterFile(file protoreflect.FileDescriptor) error {
 		defer globalMutex.Unlock()
 	}
 	if r.descsByName == nil {
-		r.descsByName = map[protoreflect.FullName]interface{}{
+		r.descsByName = map[protoreflect.FullName]any{
 			"": &packageDescriptor{},
 		}
 		r.filesByPath = make(map[string][]protoreflect.FileDescriptor)
@@ -485,7 +485,7 @@ type Types struct {
 }
 
 type (
-	typesByName         map[protoreflect.FullName]interface{}
+	typesByName         map[protoreflect.FullName]any
 	extensionsByMessage map[protoreflect.FullName]extensionsByNumber
 	extensionsByNumber  map[protoreflect.FieldNumber]protoreflect.ExtensionType
 )
@@ -570,7 +570,7 @@ func (r *Types) RegisterExtension(xt protoreflect.ExtensionType) error {
 	return nil
 }
 
-func (r *Types) register(kind string, desc protoreflect.Descriptor, typ interface{}) error {
+func (r *Types) register(kind string, desc protoreflect.Descriptor, typ any) error {
 	name := desc.FullName()
 	prev := r.typesByName[name]
 	if prev != nil {
@@ -841,7 +841,7 @@ func (r *Types) RangeExtensionsByMessage(message protoreflect.FullName, f func(p
 	}
 }
 
-func typeName(t interface{}) string {
+func typeName(t any) string {
 	switch t.(type) {
 	case protoreflect.EnumType:
 		return "enum"
@@ -854,7 +854,7 @@ func typeName(t interface{}) string {
 	}
 }
 
-func amendErrorWithCaller(err error, prev, curr interface{}) error {
+func amendErrorWithCaller(err error, prev, curr any) error {
 	prevPkg := goPackage(prev)
 	currPkg := goPackage(curr)
 	if prevPkg == "" || currPkg == "" || prevPkg == currPkg {
@@ -863,7 +863,7 @@ func amendErrorWithCaller(err error, prev, curr interface{}) error {
 	return errors.New("%s\n\tpreviously from: %q\n\tcurrently from:  %q", err, prevPkg, currPkg)
 }
 
-func goPackage(v interface{}) string {
+func goPackage(v any) string {
 	switch d := v.(type) {
 	case protoreflect.EnumType:
 		v = d.Descriptor()

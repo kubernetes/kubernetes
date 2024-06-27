@@ -26,6 +26,15 @@ func sizeMessageSet(mi *MessageInfo, p pointer, opts marshalOptions) (size int) 
 		}
 		num, _ := protowire.DecodeTag(xi.wiretag)
 		size += messageset.SizeField(num)
+		if fullyLazyExtensions(opts) {
+			// Don't expand the extension, instead use the buffer to calculate size
+			if lb := x.lazyBuffer(); lb != nil {
+				// We got hold of the buffer, so it's still lazy.
+				// Don't count the tag size in the extension buffer, it's already added.
+				size += protowire.SizeTag(messageset.FieldMessage) + len(lb) - xi.tagsize
+				continue
+			}
+		}
 		size += xi.funcs.size(x.Value(), protowire.SizeTag(messageset.FieldMessage), opts)
 	}
 
@@ -85,6 +94,19 @@ func marshalMessageSetField(mi *MessageInfo, b []byte, x ExtensionField, opts ma
 	xi := getExtensionFieldInfo(x.Type())
 	num, _ := protowire.DecodeTag(xi.wiretag)
 	b = messageset.AppendFieldStart(b, num)
+
+	if fullyLazyExtensions(opts) {
+		// Don't expand the extension if it's still in wire format, instead use the buffer content.
+		if lb := x.lazyBuffer(); lb != nil {
+			// The tag inside the lazy buffer is a different tag (the extension
+			// number), but what we need here is the tag for FieldMessage:
+			b = protowire.AppendVarint(b, protowire.EncodeTag(messageset.FieldMessage, protowire.BytesType))
+			b = append(b, lb[xi.tagsize:]...)
+			b = messageset.AppendFieldEnd(b)
+			return b, nil
+		}
+	}
+
 	b, err := xi.funcs.marshal(b, x.Value(), protowire.EncodeTag(messageset.FieldMessage, protowire.BytesType), opts)
 	if err != nil {
 		return b, err

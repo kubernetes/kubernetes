@@ -7,7 +7,7 @@ package impl
 import (
 	"bytes"
 	"compress/gzip"
-	"io/ioutil"
+	"io"
 	"sync"
 
 	"google.golang.org/protobuf/internal/filedesc"
@@ -51,7 +51,7 @@ func legacyLoadFileDesc(b []byte) protoreflect.FileDescriptor {
 	if err != nil {
 		panic(err)
 	}
-	b2, err := ioutil.ReadAll(zr)
+	b2, err := io.ReadAll(zr)
 	if err != nil {
 		panic(err)
 	}

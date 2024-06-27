@@ -49,11 +49,11 @@
 // The standard Go "encoding/json" package has functionality to serialize
 // arbitrary types to a large degree. The Value.AsInterface, Struct.AsMap, and
 // ListValue.AsSlice methods can convert the protobuf message representation into
-// a form represented by interface{}, map[string]interface{}, and []interface{}.
+// a form represented by any, map[string]any, and []any.
 // This form can be used with other packages that operate on such data structures
 // and also directly with the standard json package.
 //
-// In order to convert the interface{}, map[string]interface{}, and []interface{}
+// In order to convert the any, map[string]any, and []any
 // forms back as Value, Struct, and ListValue messages, use the NewStruct,
 // NewList, and NewValue constructor functions.
 //
@@ -88,28 +88,28 @@
 //
 // To construct a Value message representing the above JSON object:
 //
-//	m, err := structpb.NewValue(map[string]interface{}{
+//	m, err := structpb.NewValue(map[string]any{
 //		"firstName": "John",
 //		"lastName":  "Smith",
 //		"isAlive":   true,
 //		"age":       27,
-//		"address": map[string]interface{}{
+//		"address": map[string]any{
 //			"streetAddress": "21 2nd Street",
 //			"city":          "New York",
 //			"state":         "NY",
 //			"postalCode":    "10021-3100",
 //		},
-//		"phoneNumbers": []interface{}{
-//			map[string]interface{}{
+//		"phoneNumbers": []any{
+//			map[string]any{
 //				"type":   "home",
 //				"number": "212 555-1234",
 //			},
-//			map[string]interface{}{
+//			map[string]any{
 //				"type":   "office",
 //				"number": "646 555-4567",
 //			},
 //		},
-//		"children": []interface{}{},
+//		"children": []any{},
 //		"spouse":   nil,
 //	})
 //	if err != nil {
@@ -197,7 +197,7 @@ type Struct struct {
 // NewStruct constructs a Struct from a general-purpose Go map.
 // The map keys must be valid UTF-8.
 // The map values are converted using NewValue.
-func NewStruct(v map[string]interface{}) (*Struct, error) {
+func NewStruct(v map[string]any) (*Struct, error) {
 	x := &Struct{Fields: make(map[string]*Value, len(v))}
 	for k, v := range v {
 		if !utf8.ValidString(k) {
@@ -214,9 +214,9 @@ func NewStruct(v map[string]interface{}) (*Struct, error) {
 
 // AsMap converts x to a general-purpose Go map.
 // The map values are converted by calling Value.AsInterface.
-func (x *Struct) AsMap() map[string]interface{} {
+func (x *Struct) AsMap() map[string]any {
 	f := x.GetFields()
-	vs := make(map[string]interface{}, len(f))
+	vs := make(map[string]any, len(f))
 	for k, v := range f {
 		vs[k] = v.AsInterface()
 	}
@@ -306,13 +306,13 @@ type Value struct {
 //	║ float32, float64       │ stored as NumberValue                      ║
 //	║ string                 │ stored as StringValue; must be valid UTF-8 ║
 //	║ []byte                 │ stored as StringValue; base64-encoded      ║
-//	║ map[string]interface{} │ stored as StructValue                      ║
-//	║ []interface{}          │ stored as ListValue                        ║
+//	║ map[string]any         │ stored as StructValue                      ║
+//	║ []any                  │ stored as ListValue                        ║
 //	╚════════════════════════╧════════════════════════════════════════════╝
 //
 // When converting an int64 or uint64 to a NumberValue, numeric precision loss
 // is possible since they are stored as a float64.
-func NewValue(v interface{}) (*Value, error) {
+func NewValue(v any) (*Value, error) {
 	switch v := v.(type) {
 	case nil:
 		return NewNullValue(), nil
@@ -342,13 +342,13 @@ func NewValue(v interface{}) (*Value, error) {
 	case []byte:
 		s := base64.StdEncoding.EncodeToString(v)
 		return NewStringValue(s), nil
-	case map[string]interface{}:
+	case map[string]any:
 		v2, err := NewStruct(v)
 		if err != nil {
 			return nil, err
 		}
 		return NewStructValue(v2), nil
-	case []interface{}:
+	case []any:
 		v2, err := NewList(v)
 		if err != nil {
 			return nil, err
@@ -396,7 +396,7 @@ func NewListValue(v *ListValue) *Value {
 //
 // Floating-point values (i.e., "NaN", "Infinity", and "-Infinity") are
 // converted as strings to remain compatible with MarshalJSON.
-func (x *Value) AsInterface() interface{} {
+func (x *Value) AsInterface() any {
 	switch v := x.GetKind().(type) {
 	case *Value_NumberValue:
 		if v != nil {
@@ -580,7 +580,7 @@ type ListValue struct {
 
 // NewList constructs a ListValue from a general-purpose Go slice.
 // The slice elements are converted using NewValue.
-func NewList(v []interface{}) (*ListValue, error) {
+func NewList(v []any) (*ListValue, error) {
 	x := &ListValue{Values: make([]*Value, len(v))}
 	for i, v := range v {
 		var err error
@@ -594,9 +594,9 @@ func NewList(v []interface{}) (*ListValue, error) {
 
 // AsSlice converts x to a general-purpose Go slice.
 // The slice elements are converted by calling Value.AsInterface.
-func (x *ListValue) AsSlice() []interface{} {
+func (x *ListValue) AsSlice() []any {
 	vals := x.GetValues()
-	vs := make([]interface{}, len(vals))
+	vs := make([]any, len(vals))
 	for i, v := range vals {
 		vs[i] = v.AsInterface()
 	}
@@ -716,7 +716,7 @@ func file_google_protobuf_struct_proto_rawDescGZIP() []byte {
 
 var file_google_protobuf_struct_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_google_protobuf_struct_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_google_protobuf_struct_proto_goTypes = []interface{}{
+var file_google_protobuf_struct_proto_goTypes = []any{
 	(NullValue)(0),    // 0: google.protobuf.NullValue
 	(*Struct)(nil),    // 1: google.protobuf.Struct
 	(*Value)(nil),     // 2: google.protobuf.Value
@@ -743,7 +743,7 @@ func file_google_protobuf_struct_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_struct_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_struct_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*Struct); i {
 			case 0:
 				return &v.state
@@ -755,7 +755,7 @@ func file_google_protobuf_struct_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_struct_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_struct_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*Value); i {
 			case 0:
 				return &v.state
@@ -767,7 +767,7 @@ func file_google_protobuf_struct_proto_init() {
 				return nil
 			}
 		}
-		file_google_protobuf_struct_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_google_protobuf_struct_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*ListValue); i {
 			case 0:
 				return &v.state
@@ -780,7 +780,7 @@ func file_google_protobuf_struct_proto_init() {
 			}
 		}
 	}
-	file_google_protobuf_struct_proto_msgTypes[1].OneofWrappers = []interface{}{
+	file_google_protobuf_struct_proto_msgTypes[1].OneofWrappers = []any{
 		(*Value_NullValue)(nil),
 		(*Value_NumberValue)(nil),
 		(*Value_StringValue)(nil),
