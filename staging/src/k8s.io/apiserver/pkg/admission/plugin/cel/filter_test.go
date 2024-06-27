@@ -28,6 +28,8 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
+	pointer "k8s.io/utils/ptr"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,7 +48,6 @@ import (
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
 )
 
 type condition struct {
@@ -996,7 +997,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			params:                   configMapParams,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 10,
-			expectRemainingBudget:    pointer.Int64(4), // 10 - 6
+			expectRemainingBudget:    pointer.To(int64(4)), // 10 - 6
 		},
 		{
 			name: "test RuntimeCELCostBudge exactly covers",
@@ -1013,7 +1014,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			params:                   configMapParams,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 6,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "test RuntimeCELCostBudge exactly covers then constant",
@@ -1033,7 +1034,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			params:                   configMapParams,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 6,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: authz check",
@@ -1046,7 +1047,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 6,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 			authorizer:               denyAll,
 		},
 		{
@@ -1060,7 +1061,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 1,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: url",
@@ -1073,7 +1074,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 2,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: split",
@@ -1086,7 +1087,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 3,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: join",
@@ -1099,7 +1100,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 3,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: find",
@@ -1112,7 +1113,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 3,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "Extended library cost: quantity",
@@ -1125,7 +1126,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:             false,
 			exceedBudget:             false,
 			testRuntimeCELCostBudget: 6,
-			expectRemainingBudget:    pointer.Int64(0),
+			expectRemainingBudget:    pointer.To(int64(0)),
 		},
 		{
 			name: "With StrictCostEnforcementForVAP enabled: expression exceed RuntimeCELCostBudget at fist expression",
@@ -1176,7 +1177,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			params:                      configMapParams,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    700011,
-			expectRemainingBudget:       pointer.Int64(1), // 700011 - 700010
+			expectRemainingBudget:       pointer.To(int64(1)), // 700011 - 700010
 			authorizer:                  denyAll,
 			enableStrictCostEnforcement: true,
 		},
@@ -1195,7 +1196,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			params:                      configMapParams,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    700010,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			authorizer:                  denyAll,
 			enableStrictCostEnforcement: true,
 		},
@@ -1225,7 +1226,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 		{
@@ -1239,7 +1240,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 		{
@@ -1253,7 +1254,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    5,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 		{
@@ -1267,7 +1268,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    7,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 		{
@@ -1281,7 +1282,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    4,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 		{
@@ -1295,7 +1296,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 			hasParamKind:                false,
 			exceedBudget:                false,
 			testRuntimeCELCostBudget:    6,
-			expectRemainingBudget:       pointer.Int64(0),
+			expectRemainingBudget:       pointer.To(int64(0)),
 			enableStrictCostEnforcement: true,
 		},
 	}
