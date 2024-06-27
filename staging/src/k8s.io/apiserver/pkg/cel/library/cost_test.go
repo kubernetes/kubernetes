@@ -1053,6 +1053,10 @@ func TestSetsCost(t *testing.T) {
 }
 
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
 		ext.Strings(ext.StringsVersion(2)),
@@ -1168,6 +1172,11 @@ func TestSize(t *testing.T) {
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
 		},
 	}
+
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
