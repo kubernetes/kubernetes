@@ -249,3 +249,154 @@ func TestSetMetaDataLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestFieldsV1MarshalJSON(t *testing.T) {
+	for _, tc := range []struct {
+		FieldsV1 FieldsV1
+		Want     []byte
+	}{
+		{
+			FieldsV1: FieldsV1{},
+			Want:     []byte(`null`),
+		},
+		{
+			FieldsV1: FieldsV1{Raw: []byte(`###`)},
+			Want:     []byte(`###`),
+		},
+	} {
+		got, err := tc.FieldsV1.MarshalJSON()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(tc.Want, got); diff != "" {
+			t.Errorf("unexpected diff:\n%s", diff)
+		}
+	}
+}
+
+func TestFieldsV1MarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		FieldsV1 FieldsV1
+		Want     []byte
+		Error    string
+	}{
+		{
+			FieldsV1: FieldsV1{},
+			Want:     []byte{0xf6},
+		},
+		{
+			FieldsV1: FieldsV1{Raw: []byte(`###`)},
+			Error:    "unable to transcode FieldsV1 to cbor: invalid character '#' looking for beginning of value",
+		},
+		{
+			FieldsV1: FieldsV1{Raw: []byte(`{"foo":"bar"}`)},
+			Want:     []byte{0xa1, 0x43, 'f', 'o', 'o', 0x43, 'b', 'a', 'r'},
+		},
+	} {
+		got, err := tc.FieldsV1.MarshalCBOR()
+		if err != nil {
+			if tc.Error == "" {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if msg := err.Error(); msg != tc.Error {
+				t.Fatalf("expected error %q, got %q", tc.Error, msg)
+			}
+		} else if tc.Error != "" {
+			t.Fatalf("expected error %q, got nil", tc.Error)
+		}
+
+		if diff := cmp.Diff(tc.Want, got); diff != "" {
+			t.Errorf("unexpected diff:\n%s", diff)
+		}
+	}
+}
+
+func TestFieldsV1UnmarshalJSON(t *testing.T) {
+	for _, tc := range []struct {
+		JSON  []byte
+		Into  *FieldsV1
+		Want  *FieldsV1
+		Error string
+	}{
+		{
+			Into:  nil,
+			Error: "metav1.FieldsV1: UnmarshalJSON on nil pointer",
+		},
+		{
+			JSON: []byte(`null`),
+			Into: &FieldsV1{Raw: []byte(`unmodified`)},
+			Want: &FieldsV1{Raw: []byte(`unmodified`)},
+		},
+		{
+			JSON: []byte("{\"foo\":\"bar\"} \t\r\n"),
+			Into: &FieldsV1{},
+			Want: &FieldsV1{Raw: []byte("{\"foo\":\"bar\"} \t\r\n")},
+		},
+	} {
+		got := tc.Into.DeepCopy()
+		err := got.UnmarshalJSON(tc.JSON)
+		if err != nil {
+			if tc.Error == "" {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if msg := err.Error(); msg != tc.Error {
+				t.Fatalf("expected error %q, got %q", tc.Error, msg)
+			}
+		} else if tc.Error != "" {
+			t.Fatalf("expected error %q, got nil", tc.Error)
+		}
+
+		if diff := cmp.Diff(tc.Want, got); diff != "" {
+			t.Errorf("unexpected diff:\n%s", diff)
+		}
+	}
+}
+
+func TestFieldsV1UnmarshalCBOR(t *testing.T) {
+	for _, tc := range []struct {
+		CBOR  []byte
+		Into  *FieldsV1
+		Want  *FieldsV1
+		Error string
+	}{
+		{
+			Into:  nil,
+			Want:  nil,
+			Error: "metav1.FieldsV1: UnmarshalCBOR on nil pointer",
+		},
+		{
+			CBOR: []byte{0xf6},
+			Into: &FieldsV1{Raw: []byte(`unmodified`)},
+			Want: &FieldsV1{Raw: []byte(`unmodified`)},
+		},
+		{
+			CBOR:  []byte{0xff}, // UnmarshalCBOR should never be called with malformed input, testing anyway.
+			Into:  &FieldsV1{},
+			Want:  &FieldsV1{},
+			Error: `cbor: unexpected "break" code`,
+		},
+		{
+			CBOR: []byte{0xa1, 0x43, 'f', 'o', 'o', 0x43, 'b', 'a', 'r'},
+			Into: &FieldsV1{},
+			Want: &FieldsV1{Raw: []byte(`{"foo":"bar"}`)},
+		},
+	} {
+		got := tc.Into.DeepCopy()
+		err := got.UnmarshalCBOR(tc.CBOR)
+		if err != nil {
+			if tc.Error == "" {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if msg := err.Error(); msg != tc.Error {
+				t.Fatalf("expected error %q, got %q", tc.Error, msg)
+			}
+		} else if tc.Error != "" {
+			t.Fatalf("expected error %q, got nil", tc.Error)
+		}
+
+		if diff := cmp.Diff(tc.Want, got); diff != "" {
+			t.Errorf("unexpected diff:\n%s", diff)
+			panic(fmt.Sprintf("%#v", tc.CBOR))
+		}
+	}
+}

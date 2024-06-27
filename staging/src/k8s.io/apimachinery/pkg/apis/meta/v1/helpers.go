@@ -24,8 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -286,7 +288,7 @@ func (f FieldsV1) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements json.Unmarshaler
 func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	if f == nil {
-		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
+		return errors.New("metav1.FieldsV1: UnmarshalJSON on nil pointer")
 	}
 	if !bytes.Equal(b, []byte("null")) {
 		f.Raw = append(f.Raw[0:0], b...)
@@ -296,3 +298,34 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 
 var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
+
+func (f FieldsV1) MarshalCBOR() ([]byte, error) {
+	if f.Raw == nil {
+		return cbor.Marshal(nil)
+	}
+	var u interface{}
+	if err := utiljson.Unmarshal(f.Raw, &u); err != nil {
+		return nil, fmt.Errorf("unable to transcode FieldsV1 to cbor: %w", err)
+	}
+	return cbor.Marshal(u)
+}
+
+func (f *FieldsV1) UnmarshalCBOR(b []byte) error {
+	if f == nil {
+		return errors.New("metav1.FieldsV1: UnmarshalCBOR on nil pointer")
+	}
+	var u interface{}
+	if err := cbor.Unmarshal(b, &u); err != nil {
+		return err
+	}
+	if u == nil {
+		return nil
+	}
+	j, err := utiljson.Marshal(u)
+	if err != nil {
+		// Should be impossible unless there's a bug.
+		return err
+	}
+	f.Raw = j
+	return nil
+}
