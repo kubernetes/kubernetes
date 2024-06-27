@@ -740,16 +740,14 @@ func (s *Connection) shutdown(closeTimeout time.Duration) {
 
 	if err != nil {
 		duration := 10 * time.Minute
-		time.AfterFunc(duration, func() {
-			select {
-			case err, ok := <-s.shutdownChan:
-				if ok {
-					debugMessage("Unhandled close error after %s: %s", duration, err)
-				}
-			default:
-			}
-		})
-		s.shutdownChan <- err
+		timer := time.NewTimer(duration)
+		defer timer.Stop()
+		select {
+		case s.shutdownChan <- err:
+			// error was handled
+		case <-timer.C:
+			debugMessage("Unhandled close error after %s: %s", duration, err)
+		}
 	}
 	close(s.shutdownChan)
 }

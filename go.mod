@@ -173,7 +173,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
-	github.com/moby/spdystream v0.3.0 // indirect
+	github.com/moby/spdystream v0.4.0 // indirect
 	github.com/moby/sys/mountinfo v0.7.1 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
