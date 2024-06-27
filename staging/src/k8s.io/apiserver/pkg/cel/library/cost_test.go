@@ -19,6 +19,7 @@ package library
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/google/cel-go/cel"
@@ -630,6 +631,18 @@ func TestAuthzLibrary(t *testing.T) {
 			expectRuntimeCost:   6,
 		},
 		{
+			name:                "fieldSelector",
+			expr:                "authorizer.group('').resource('pods').fieldSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com').check('list').allowed()",
+			expectEstimatedCost: checker.CostEstimate{Min: 351822, Max: 351822},
+			expectRuntimeCost:   351822, // check(35000) + authorizer(1) + group(1) + resource(1) + allowed(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
+			name:                "labelSelector",
+			expr:                "authorizer.group('').resource('pods').labelSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com').check('list').allowed()",
+			expectEstimatedCost: checker.CostEstimate{Min: 351822, Max: 351822},
+			expectRuntimeCost:   351822, // check(35000) + authorizer(1) + group(1) + resource(1) + allowed(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
 			name:                "path check allowed",
 			expr:                "authorizer.path('/healthz').check('get').allowed()",
 			expectEstimatedCost: checker.CostEstimate{Min: 350003, Max: 350003},
@@ -1063,7 +1076,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		URLs(),
 		Regex(),
 		Lists(),
-		Authz(),
+		Authz(math.MaxUint32),
 		Quantity(),
 		ext.Sets(),
 		IP(),

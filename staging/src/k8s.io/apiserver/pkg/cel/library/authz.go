@@ -19,12 +19,13 @@ package library
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"reflect"
-	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -198,19 +199,43 @@ import (
 // Examples:
 //
 //	authorizer.group('').resource('pods').namespace('default').check('create').error()
-func Authz() cel.EnvOption {
-	return cel.Lib(authzLib)
+//
+// fieldSelector
+//
+// Takes a string field selector, parses it to field selector requirements, and includes it in the authorization check.
+// If the field selector does not parse successfully, no field selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+, Authz library version 1.
+//
+//	<ResourceCheck>.fieldSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').fieldSelector('spec.nodeName=mynode').check('list').allowed()
+//
+// labelSelector (added in v1, Kubernetes 1.31+)
+//
+// Takes a string label selector, parses it to label selector requirements, and includes it in the authorization check.
+// If the label selector does not parse successfully, no label selector requirements are included in the authorization check.
+// Added in Kubernetes 1.31+, Authz library version 1.
+//
+//	<ResourceCheck>.labelSelector(<string>) <ResourceCheck>
+//
+// Examples:
+//
+//	authorizer.group('').resource('pods').labelSelector('app=example').check('list').allowed()
+func Authz(version uint32) cel.EnvOption {
+	return cel.Lib(&authz{version: version})
 }
 
-var authzLib = &authz{}
-
-type authz struct{}
+type authz struct {
+	version uint32
+}
 
 func (*authz) LibraryName() string {
 	return "k8s.authz"
 }
 
-var authzLibraryDecls = map[string][]cel.FunctionOpt{
+var authzLibraryDeclsV0 = map[string][]cel.FunctionOpt{
 	"path": {
 		cel.MemberOverload("authorizer_path", []*cel.Type{AuthorizerType, cel.StringType}, PathCheckType,
 			cel.BinaryBinding(authorizerPath))},
@@ -226,12 +251,6 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"subresource": {
 		cel.MemberOverload("resourcecheck_subresource", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckSubresource))},
-	"fieldSelector": {
-		cel.MemberOverload("authorizer_fieldselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
-			cel.BinaryBinding(resourceCheckFieldSelector))},
-	"labelSelector": {
-		cel.MemberOverload("authorizer_labelselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
-			cel.BinaryBinding(resourceCheckLabelSelector))},
 	"namespace": {
 		cel.MemberOverload("resourcecheck_namespace", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
 			cel.BinaryBinding(resourceCheckNamespace))},
@@ -256,11 +275,25 @@ var authzLibraryDecls = map[string][]cel.FunctionOpt{
 		cel.MemberOverload("decision_reason", []*cel.Type{DecisionType}, cel.StringType,
 			cel.UnaryBinding(decisionReason))},
 }
+var authzLibraryDeclsV1 = map[string][]cel.FunctionOpt{
+	"fieldSelector": {
+		cel.MemberOverload("authorizer_fieldselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckFieldSelector))},
+	"labelSelector": {
+		cel.MemberOverload("authorizer_labelselector", []*cel.Type{ResourceCheckType, cel.StringType}, ResourceCheckType,
+			cel.BinaryBinding(resourceCheckLabelSelector))},
+}
 
-func (*authz) CompileOptions() []cel.EnvOption {
-	options := make([]cel.EnvOption, 0, len(authzLibraryDecls))
-	for name, overloads := range authzLibraryDecls {
+func (a *authz) CompileOptions() []cel.EnvOption {
+	options := make([]cel.EnvOption, 0, len(authzLibraryDeclsV0))
+	for name, overloads := range authzLibraryDeclsV0 {
 		options = append(options, cel.Function(name, overloads...))
+	}
+	if a.version >= 1 {
+		// TODO(liggitt): only allow expressions with these to be persisted when AuthorizeWithSelectors feature is enabled?
+		for name, overloads := range authzLibraryDeclsV1 {
+			options = append(options, cel.Function(name, overloads...))
+		}
 	}
 	return options
 }

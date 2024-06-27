@@ -55,6 +55,18 @@ type CostEstimator struct {
 	SizeEstimator checker.CostEstimator
 }
 
+const (
+	// shortest repeatable selector requirement that allocates a values slice is 2 characters: k,
+	shortestRequirement = float64(2)
+	costPerRequirement  = common.ListCreateBaseCost + common.StructCreateBaseCost
+)
+
+func selectorCostEstimate(selectorLength float64) uint64 {
+	parseCost := uint64(math.Ceil(selectorLength * common.StringTraversalCostFactor))
+	maxRequirements := uint64(math.Ceil(selectorLength / shortestRequirement))
+	return parseCost + common.ListCreateBaseCost + costPerRequirement*maxRequirements
+}
+
 func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, result ref.Val) *uint64 {
 	switch function {
 	case "check":
@@ -66,6 +78,13 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// All authorization builder and accessor functions have a nominal cost
 		cost := uint64(1)
 		return &cost
+	case "fieldSelector", "labelSelector":
+		// field and label selector parse is a string parse into a structured set of requirements
+		if len(args) >= 2 {
+			selectorLength := float64(actualSize(args[1]))
+			cost := selectorCostEstimate(selectorLength)
+			return &cost
+		}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
 		var cost uint64
 		if len(args) > 0 {
@@ -227,6 +246,15 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "serviceAccount", "path", "group", "resource", "subresource", "namespace", "name", "allowed", "reason", "error", "errored":
 		// All authorization builder and accessor functions have a nominal cost
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+	case "fieldSelector", "labelSelector":
+		// field and label selector parse is a string parse into a structured set of requirements
+		if len(args) == 1 {
+			selectorSize := l.sizeEstimate(args[0])
+			return &checker.CallEstimate{CostEstimate: checker.CostEstimate{
+				Min: selectorCostEstimate(float64(selectorSize.Min)),
+				Max: selectorCostEstimate(float64(selectorSize.Max)),
+			}}
+		}
 	case "isSorted", "sum", "max", "min", "indexOf", "lastIndexOf":
 		if target != nil {
 			// Charge 1 cost for comparing each element in the list
