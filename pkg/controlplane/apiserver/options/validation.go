@@ -70,6 +70,13 @@ func validateAPIPriorityAndFairness(options *Options) []error {
 	return nil
 }
 
+func validateNodeSelectorAuthorizationFeature() []error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeNodeWithSelectors) && !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		return []error{fmt.Errorf("AuthorizeNodeWithSelectors feature requires AuthorizeWithSelectors feature to be enabled")}
+	}
+	return nil
+}
+
 func validateUnknownVersionInteroperabilityProxyFeature() []error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
@@ -113,6 +120,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
+	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
 
 	return errs
 }
