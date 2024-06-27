@@ -530,7 +530,7 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 
 }
 
-// isIPOutOfRange returns false if the IP is not contained in any of the ServiceCIDRs
+// isIPOutOfRange returns true if the IP is not contained in any of the ServiceCIDRs
 func (r *RepairIPAddress) isIPOutOfRange(ip net.IP) bool {
 	return len(servicecidr.ContainsIP(r.serviceCIDRLister, ip)) == 0
 }
