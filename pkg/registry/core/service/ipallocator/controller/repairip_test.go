@@ -349,8 +349,7 @@ func TestRepairServiceIP(t *testing.T) {
 				}
 			}
 
-			err := r.runOnce()
-			if err != nil {
+			if err := r.runOnce(); err != nil {
 				t.Fatal(err)
 			}
 
