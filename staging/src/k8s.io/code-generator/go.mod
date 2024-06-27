@@ -16,7 +16,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
+	k8s.io/kube-openapi v0.0.0-20240620174524-b456828f718b
 )
 
 require (
@@ -31,7 +31,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/onsi/gomega v1.33.1 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/tools v0.21.0 // indirect
