@@ -30,13 +30,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -48,16 +48,16 @@ const (
 )
 
 type fakeDRADriverGRPCServer struct {
-	drapbv1.UnimplementedNodeServer
+	drapb.UnimplementedNodeServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
 	unprepareResourceCalls     atomic.Uint32
-	prepareResourcesResponse   *drapbv1.NodePrepareResourcesResponse
-	unprepareResourcesResponse *drapbv1.NodeUnprepareResourcesResponse
+	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
+	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
 }
 
-func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
 	s.prepareResourceCalls.Add(1)
 
 	if s.timeout != nil {
@@ -67,8 +67,8 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	if s.prepareResourcesResponse == nil {
 		deviceName := "claim-" + req.Claims[0].Uid
 		result := s.driverName + "/" + driverClassName + "=" + deviceName
-		return &drapbv1.NodePrepareResourcesResponse{
-			Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+		return &drapb.NodePrepareResourcesResponse{
+			Claims: map[string]*drapb.NodePrepareResourceResponse{
 				req.Claims[0].Uid: {
 					CDIDevices: []string{result},
 				},
@@ -79,7 +79,7 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	return s.prepareResourcesResponse, nil
 }
 
-func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
+func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
 	s.unprepareResourceCalls.Add(1)
 
 	if s.timeout != nil {
@@ -87,8 +87,8 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	}
 
 	if s.unprepareResourcesResponse == nil {
-		return &drapbv1.NodeUnprepareResourcesResponse{
-			Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{
+		return &drapb.NodeUnprepareResourcesResponse{
+			Claims: map[string]*drapb.NodeUnprepareResourceResponse{
 				req.Claims[0].Uid: {},
 			},
 		}, nil
@@ -108,7 +108,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapbv1.NodePrepareResourcesResponse, unprepareResourcesResponse *drapbv1.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -147,7 +147,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drapbv1.RegisterNodeServer(s, fakeDRADriverGRPCServer)
+	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
 
 	go func() {
 		go s.Serve(l)
@@ -224,8 +224,8 @@ func TestGetResources(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "test-pod-claim-1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -268,8 +268,8 @@ func TestGetResources(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "test-pod-claim-1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -344,8 +344,8 @@ func TestPrepareResources(t *testing.T) {
 		driverName           string
 		pod                  *v1.Pod
 		claimInfo            *ClaimInfo
-		resourceClaim        *resourcev1alpha2.ResourceClaim
-		resp                 *drapbv1.NodePrepareResourcesResponse
+		resourceClaim        *resourceapi.ResourceClaim
+		resp                 *drapb.NodePrepareResourcesResponse
 		wantErr              bool
 		wantTimeout          bool
 		wantResourceSkipped  bool
@@ -365,12 +365,11 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-0",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-0"
-									return &s
-								}(),
-							},
+
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-0"
+								return &s
+							}(),
 						},
 					},
 				},
@@ -390,12 +389,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-1",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-1"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-1"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -411,23 +408,23 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-1",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
@@ -447,12 +444,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-nil",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-nil"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-nil"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -468,28 +463,28 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-nil",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
 			},
-			resp:                 &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"test-reserved": nil}},
+			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"test-reserved": nil}},
 			expectedCDIDevices:   []string{},
 			ExpectedPrepareCalls: 1,
 		},
@@ -506,12 +501,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-empty",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-empty"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-empty"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -527,28 +520,28 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-empty",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
 			},
-			resp:                 &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"test-reserved": nil}},
+			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"test-reserved": nil}},
 			expectedCDIDevices:   []string{},
 			ExpectedPrepareCalls: 1,
 		},
@@ -565,29 +558,27 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-2",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-2"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-2"
+								return &s
+							}(),
 						},
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-2",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
@@ -608,31 +599,31 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-3",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-3"
 								return &s
-							}()},
+							}(),
 						},
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-3",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
@@ -652,10 +643,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-4",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-4"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -680,23 +671,23 @@ func TestPrepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-4",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
@@ -717,10 +708,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-5",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-5"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -736,29 +727,29 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-5",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -779,10 +770,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-6",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-6"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -798,29 +789,29 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim-6",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -840,10 +831,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -861,40 +852,38 @@ func TestPrepareResources(t *testing.T) {
 			},
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName:      driverName,
-					ClassName:       "test-class",
 					ClaimName:       "test-pod-claim",
 					ClaimUID:        "test-reserved",
 					Namespace:       "test-namespace",
 					PodUIDs:         sets.Set[string]{"test-reserved": sets.Empty{}},
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{{Data: "test-data", DriverName: driverName}},
+					ResourceHandles: []resourceapi.ResourceHandle{{Data: "test-data", DriverName: driverName}},
 				},
 				annotations: make(map[string][]kubecontainer.Annotation),
 				prepared:    false,
 			},
-			resourceClaim: &resourcev1alpha2.ResourceClaim{
+			resourceClaim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod-claim",
 					Namespace: "test-namespace",
 					UID:       "test-reserved",
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: "test-reserved"},
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -914,7 +903,7 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			if test.resourceClaim != nil {
-				if _, err := fakeKubeClient.ResourceV1alpha2().ResourceClaims(test.pod.Namespace).Create(context.Background(), test.resourceClaim, metav1.CreateOptions{}); err != nil {
+				if _, err := fakeKubeClient.ResourceV1alpha3().ResourceClaims(test.pod.Namespace).Create(context.Background(), test.resourceClaim, metav1.CreateOptions{}); err != nil {
 					t.Fatalf("failed to create ResourceClaim %s: %+v", test.resourceClaim.Name, err)
 				}
 			}
@@ -963,12 +952,6 @@ func TestPrepareResources(t *testing.T) {
 			if !ok {
 				t.Fatalf("claimInfo not found in cache for claim %s", *claimName)
 			}
-			if claimInfo.DriverName != test.resourceClaim.Status.DriverName {
-				t.Fatalf("driverName mismatch: expected %s, got %s", test.resourceClaim.Status.DriverName, claimInfo.DriverName)
-			}
-			if claimInfo.ClassName != test.resourceClaim.Spec.ResourceClassName {
-				t.Fatalf("resourceClassName mismatch: expected %s, got %s", test.resourceClaim.Spec.ResourceClassName, claimInfo.ClassName)
-			}
 			if len(claimInfo.PodUIDs) != 1 || !claimInfo.PodUIDs.Has(string(test.pod.UID)) {
 				t.Fatalf("podUIDs mismatch: expected [%s], got %v", test.pod.UID, claimInfo.PodUIDs)
 			}
@@ -986,7 +969,7 @@ func TestUnprepareResources(t *testing.T) {
 		driverName             string
 		pod                    *v1.Pod
 		claimInfo              *ClaimInfo
-		resp                   *drapbv1.NodeUnprepareResourcesResponse
+		resp                   *drapb.NodeUnprepareResourcesResponse
 		wantErr                bool
 		wantTimeout            bool
 		wantResourceSkipped    bool
@@ -1005,12 +988,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "another-claim-test",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "another-claim-test"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "another-claim-test"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1031,7 +1012,7 @@ func TestUnprepareResources(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "another-claim-test",
 					Namespace:  "test-namespace",
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: driverName,
 							Data:       "test data",
@@ -1054,10 +1035,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-1"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1096,10 +1077,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-2",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-2"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1120,7 +1101,7 @@ func TestUnprepareResources(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "test-pod-claim-2",
 					Namespace:  "test-namespace",
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: driverName,
 							Data:       "test data",
@@ -1128,7 +1109,7 @@ func TestUnprepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"test-reserved": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"test-reserved": {}}},
 			wantErr:                true,
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
@@ -1146,10 +1127,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-3",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-3"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1170,7 +1151,7 @@ func TestUnprepareResources(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "test-pod-claim-3",
 					Namespace:  "test-namespace",
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: driverName,
 							Data:       "test data",
@@ -1179,7 +1160,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"": {}}},
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -1195,10 +1176,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1219,7 +1200,7 @@ func TestUnprepareResources(t *testing.T) {
 					DriverName: driverName,
 					ClaimName:  "test-pod-claim",
 					Namespace:  "test-namespace",
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: driverName,
 							Data:       "test data",
@@ -1228,7 +1209,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: false,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"": {}}},
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -1244,12 +1225,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-nil",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-nil"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-nil"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1271,7 +1250,7 @@ func TestUnprepareResources(t *testing.T) {
 					ClaimName:  "test-pod-claim-nil",
 					Namespace:  "test-namespace",
 					ClaimUID:   "test-reserved",
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{
 							DriverName: driverName,
 							Data:       "test data",
@@ -1280,7 +1259,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"test-reserved": nil}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"test-reserved": nil}},
 			expectedUnprepareCalls: 1,
 		},
 	} {
@@ -1395,8 +1374,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "claim1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "claim1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -1418,8 +1397,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "claim2",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName2},
+							Name:              "claim2",
+							ResourceClaimName: &resourceClaimName2,
 						},
 					},
 				},
@@ -1502,10 +1481,10 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: claimName,
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := claimName
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1521,29 +1500,29 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 					},
 				},
 			}
-			resourceClaim := &resourcev1alpha2.ResourceClaim{
+			resourceClaim := &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      claimName,
 					Namespace: nameSpace,
 					UID:       types.UID(fmt.Sprintf("claim-%d", goRoutineNum)),
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: "test-class",
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{
 							{Data: "test-data", DriverName: driverName},
 						},
 					},
-					ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+					ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 						{UID: podUID},
 					},
 				},
 			}
 
-			if _, err = fakeKubeClient.ResourceV1alpha2().ResourceClaims(pod.Namespace).Create(context.Background(), resourceClaim, metav1.CreateOptions{}); err != nil {
+			if _, err = fakeKubeClient.ResourceV1alpha3().ResourceClaims(pod.Namespace).Create(context.Background(), resourceClaim, metav1.CreateOptions{}); err != nil {
 				t.Errorf("failed to create ResourceClaim %s: %+v", resourceClaim.Name, err)
 				return
 			}

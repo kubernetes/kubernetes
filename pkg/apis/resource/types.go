@@ -17,16 +17,263 @@ limitations under the License.
 package resource
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ResourceClaim describes which resources are needed by a resource consumer.
-// Its status tracks whether the resource has been allocated and what the
+// One or more slices represent a pool of devices managed by a given driver.
+// How many slices the driver uses to publish that pool is driver-specific.
+// Each device in a given pool must have a unique name.
+//
+// The slice in which a device gets published may change over time. The unique identifier
+// for a device is the tuple `<driver name>/<pool name>/<device name>`. Driver name
+// and device name don't contain slashes, so it is okay to concatenate them
+// like this in a string with a slash as separator. The pool name itself may contain
+// additional slashes.
+//
+// Whenever a driver needs to update a pool, it bumps the pool generation number
+// and updates all slices with that new number and any new device definitions. A consumer
+// must only use device definitions from slices with the highest generation number
+// and ignore all others.
+//
+// If necessary, a consumer can check the number of total devices in a pool (included
+// in each slice) to determine whether its view of a pool is complete.
+//
+// For devices that are not local to a node, the node name is not set. Instead,
+// the driver may use a node selector to specify where the devices are available.
+type ResourceSlice struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Contains the information published by the driver.
+	//
+	// Changing the spec bumps up the generation number.
+	Spec ResourceSliceSpec
+
+	// Future extension: status.
+}
+
+// ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
+type ResourceSliceSpec struct {
+	// DriverName identifies the DRA driver providing the capacity information.
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain driver name.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
+	DriverName string
+
+	// PoolName is used to identify devices. For node-local devices, this
+	// is often the node name, but this is not required.
+	//
+	// It must not be longer than 253 and must consist of one or more DNS sub-domains
+	// separated by slashes.
+	//
+	// +required
+	PoolName string
+
+	// NodeName identifies the node which provides the devices.
+	// A field selector can be used to list only ResourceSlice
+	// objects belonging to a certain node.
+	//
+	// This field can be used to limit access from nodes to slices with
+	// the same node name. It also indicates to autoscalers that adding
+	// new nodes of the same type as some old node might also make new
+	// devices available.
+	//
+	// NodeName and NodeSelector are mutually exclusive. One of them
+	// must be set.
+	//
+	// +optional
+	NodeName *string
+
+	// Defines which nodes have access to the devices in the pool.
+	// If the node selector is empty, all nodes have access.
+	//
+	// NodeName and NodeSelector are mutually exclusive. One of them
+	// must be set.
+	//
+	// +optional
+	NodeSelector *core.NodeSelector
+
+	// The generation gets bumped in all slices of a pool whenever device
+	// definitions change. A consumer must only use device definitions from slices
+	// with the highest generation number and ignore all others.
+	PoolGeneration int64
+
+	// The total number of slices in the pool.
+	// Consumers can use this to check whether they have
+	// seen all slices.
+	PoolSliceCount int64
+
+	// Devices lists all available devices in this pool.
+	//
+	// Must not have more than 128 entries.
+	//
+	// +required
+	// +listType=atomic
+	Devices []Device
+
+	// FUTURE EXTENSION: some other kind of list, should we ever need it.
+	// Old clients seeing an empty Devices field can safely ignore the (to
+	// them) empty pool.
+}
+
+const ResourceSliceMaxSharedCapacity = 128
+const ResourceSliceMaxDevices = 128
+const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+
+// Device represents one individual hardware instance that can be selected based
+// on its attributes.
+type Device struct {
+	// Name is unique identifier among all devices managed by
+	// the driver in the pool. It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// Attributes defines the set of attributes for this device.
+	// The name of each attribute must be unique in that set.
+	//
+	// The maximum number of attributes and capacities is 32.
+	//
+	// +optional
+	// +listType=atomic
+	Attributes []DeviceAttribute
+
+	// Capacities defines the set of capacities for this device.
+	// The name of each capacity must be unique in that set.
+	//
+	// The maximum number of attributes and capacities is 32.
+	//
+	// +optional
+	// +listType=atomic
+	Capacities []DeviceCapacity
+}
+
+// Limit for the sum of the number of entries in both slices.
+const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
+
+// DeviceAttribute is a combination of an attribute name and its value.
+// Exactly one value must be set.
+type DeviceAttribute struct {
+	// Name is a unique identifier for this attribute, which will be
+	// referenced when selecting devices.
+	//
+	// Attributes are defined either by the owner of the specific driver
+	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+	// project). Because attributes are sometimes compared across devices,
+	// a given name is expected to mean the same thing and have the same
+	// type on all devices.
+	//
+	// Attribute names must be either a C identifier
+	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+	// followed by a C identifier
+	// (e.g. "example.com/theName"). Attributes whose name do not
+	// include the domain prefix are assumed to be part of the driver's
+	// domain. Attributes defined by 3rd parties must include the domain
+	// prefix.
+	//
+	// The maximum length for the DNS subdomain is 63 characters (same as
+	// for driver names) and the maximum length of the C identifier
+	// is 32.
+	//
+	// +required
+	Name string
+
+	// The Go field names below have a Value suffix to avoid a conflict between the
+	// field "String" and the corresponding method. That method is required.
+	// The Kubernetes API is defined without that suffix to keep it more natural.
+
+	// IntValue is a number.
+	//
+	// +optional
+	IntValue *int64
+
+	// BoolValue is a true/false value.
+	//
+	// +optional
+	BoolValue *bool
+
+	// StringValue is a string. Must not be longer than 64 characters.
+	//
+	// +optional
+	StringValue *string
+
+	// VersionValue is a semantic version according to semver.org spec 2.0.0.
+	// Must not be longer than 64 characters.
+	//
+	// +optional
+	VersionValue *string
+}
+
+// DeviceCapacity is a combination of a capacity name and its value.
+// Exactly one value must be set.
+type DeviceCapacity struct {
+	// Name is a unique identifier for this capacity, which will be
+	// referenced when selecting devices.
+	//
+	// Capacities are defined either by the owner of the specific driver
+	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+	// project). Because capacities are sometimes compared across devices,
+	// a given name is expected to mean the same thing and have the same
+	// type on all devices.
+	//
+	// Capacity names must be either a C identifier
+	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+	// followed by a C identifier
+	// (e.g. "example.com/theName"). Capacities whose name do not
+	// include the domain prefix are assumed to be part of the driver's
+	// domain. Capacities defined by 3rd parties must include the domain
+	// prefix.
+	//
+	// The maximum length for the DNS subdomain is 63 characters (same as
+	// for driver names) and the maximum length of the C identifier
+	// is 32.
+	//
+	// +required
+	Name string
+
+	// Quantity determines the size of the capacity.
+	//
+	// +required
+	Quantity *resource.Quantity
+}
+
+// DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
+const DeviceMaxIDLength = 32
+
+// DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
+const DeviceAttributeMaxValueLength = 64
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSliceList is a collection of slices.
+type ResourceSliceList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of resource slices.
+	Items []ResourceSlice
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceClaim describes which resources (typically one or more devices)
+// are needed by a claim consumer.
+// Its status tracks whether the claim has been allocated and what the
 // resulting attributes are.
 //
 // This is an alpha type and requires enabling the DynamicResourceAllocation
@@ -37,90 +284,361 @@ type ResourceClaim struct {
 	// +optional
 	metav1.ObjectMeta
 
-	// Spec describes the desired attributes of a resource that then needs
-	// to be allocated. It can only be set once when creating the
-	// ResourceClaim.
+	// Spec defines what to allocated and how to configure it.
+	// The spec is immutable.
 	Spec ResourceClaimSpec
 
-	// Status describes whether the resource is available and with which
-	// attributes.
+	// Status describes whether the claim is ready for use.
 	// +optional
 	Status ResourceClaimStatus
 }
 
 // ResourceClaimSpec defines how a resource is to be allocated.
 type ResourceClaimSpec struct {
-	// ResourceClassName references the driver and additional parameters
-	// via the name of a ResourceClass that was created as part of the
-	// driver deployment.
-	ResourceClassName string
-
-	// ParametersRef references a separate object with arbitrary parameters
-	// that will be used by the driver when allocating a resource for the
-	// claim.
+	// Requests are individual requests for separate resources for the claim.
+	// An empty list is valid and means that the claim can always be allocated
+	// without needing anything. A class can be referenced to use the default
+	// requests from that class.
 	//
-	// The object must be in the same namespace as the ResourceClaim.
-	// +optional
-	ParametersRef *ResourceClaimParametersReference
+	// +required
+	// +listType=atomic
+	Requests []Request
 
-	// Allocation can start immediately or when a Pod wants to use the
-	// resource. "WaitForFirstConsumer" is the default.
+	// These constraints must be satisfied by the set of devices that get
+	// allocated for the claim.
+	//
 	// +optional
-	AllocationMode AllocationMode
+	// +listType=atomic
+	Constraints []Constraint
+
+	// This field holds configuration for multiple potential drivers which
+	// could satisfy requests in this claim. It is ignored while allocating
+	// the claim.
+	//
+	// +optional
+	// +listType=atomic
+	Config []ClaimConfiguration
+
+	// ControllerName defines the name of the DRA driver that is meant
+	// to handle allocation of this claim. If empty, allocation is handled
+	// by the scheduler while scheduling a pod.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
+	// +optional
+	ControllerName *string
+
+	// Future extension, ignored by older schedulers. This is fine because
+	// scoring allows users to define a preference, without making it a
+	// hard requirement.
+	//
+	// Score *SomeScoringStruct
 }
 
-// AllocationMode describes whether a ResourceClaim gets allocated immediately
-// when it gets created (AllocationModeImmediate) or whether allocation is
-// delayed until it is needed for a Pod
-// (AllocationModeWaitForFirstConsumer). Other modes might get added in the
-// future.
-type AllocationMode string
+// Request is a request for one of many resources required for a claim.
+// This is typically a request for a single resource like a device, but can
+// also ask for several identical devices. It might get extended to support
+// asking for one of several different alternatives.
+type Request struct {
+	// The name can be used to reference this request in a pod.spec.containers[].resources.claims
+	// entry and in a constraint of the claim.
+	//
+	// Must be a DNS label.
+	Name string
 
+	*RequestDetail
+
+	// FUTURE EXTENSION:
+	//
+	// OneOf contains a list of requests, only one of which must be satisfied.
+	// Requests are listed in order of priority.
+	//
+	// +optional
+	// +listType=atomic
+	// OneOf []RequestDetail
+}
+
+// RequestDetail is embedded inside Request. Exactly one field must be set.
+type RequestDetail struct {
+	// Device requests one or more devices.
+	//
+	// +required
+	Device *DeviceRequest
+}
+
+// DeviceRequest is currently the only permitted alternative in RequestDetail.
+type DeviceRequest struct {
+	// By referencing a DeviceClass, a request inherits additional
+	// configuration parameters and selectors.
+	//
+	// A class is required. Which classes are available depends on the cluster.
+	//
+	// Administrators may use this to restrict which devices may get
+	// requested by only installing classes with selectors for permitted
+	// devices. If users are free to request anything without restrictions,
+	// then an empty class called "none" can get created to permit
+	// `deviceClassName: none`.
+	//
+	// +required
+	DeviceClassName string
+
+	// Each selector must be satisfied by a device which is requested.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []Selector
+
+	// The count mode together with, for some modes, additional fields
+	// determines how many devices to allocate for the request.
+	//
+	// The default if unset is exactly one device:
+	//     countMode: Exact
+	//     count: 1
+	//
+	// "countMode: All" asks for all devices matching the selectors.
+	// Allocation fails if not all of them are available, unless admin
+	// access is requested. Admin access is granted also for
+	// devices which are in use.
+	//
+	// More modes may get added in the future.
+	//
+	// +default
+	CountMode string
+
+	// Count is used only when the count mode is "Exact". Must be larger than zero.
+	//
+	// +optional
+	Count *int64
+
+	// AdminAccess indicates that this is a claim for administrative access
+	// to the device(s). Claims with AdminAccess are expected to be used for
+	// monitoring or other management services for a device.  They ignore
+	// all ordinary claims to the device with respect to access modes and
+	// any resource allocations. Ability to request this kind of access is
+	// controlled via ResourceQuota in the resource.k8s.io API.
+	//
+	// Default is false.
+	//
+	// +optional
+	AdminAccess *bool
+}
+
+// Valid [DeviceRequest.CountMode] values.
 const (
-	// When a ResourceClaim has AllocationModeWaitForFirstConsumer, allocation is
-	// delayed until a Pod gets scheduled that needs the ResourceClaim. The
-	// scheduler will consider all resource requirements of that Pod and
-	// trigger allocation for a node that fits the Pod.
-	AllocationModeWaitForFirstConsumer AllocationMode = "WaitForFirstConsumer"
-
-	// When a ResourceClaim has AllocationModeImmediate, allocation starts
-	// as soon as the ResourceClaim gets created. This is done without
-	// considering the needs of Pods that will use the ResourceClaim
-	// because those Pods are not known yet.
-	AllocationModeImmediate AllocationMode = "Immediate"
+	CountModeExact = "Exact"
+	CountModeAll   = "All"
 )
 
-// ResourceClaimStatus tracks whether the resource has been allocated and what
-// the resulting attributes are.
-type ResourceClaimStatus struct {
-	// DriverName is a copy of the driver name from the ResourceClass at
-	// the time when allocation started.
+// Exactly one field must be set.
+type Selector struct {
+	// CEL contains a CEL expression for selecting a device.
+	//
+	// +required
+	CEL *CELSelector
+}
+
+// CELSelector contains a CEL expression for selecting a device.
+type CELSelector struct {
+	// This CEL expression must evaluate to true if a device is suitable.
+	// This covers qualitative aspects of device selection.
+	//
+	// The language is as defined in
+	// https://kubernetes.io/docs/reference/using-api/cel/
+	// with several additions that are specific to device selectors.
+	//
+	// Attributes of a device are made available through a nested
+	// `device.attributes` map with the domain part of the attribute name
+	// as key in the outer map and the identifier as key in the inner
+	// map. All identifiers can be used in a field lookup:
+	//
+	//    device.attributes["dra.example.com"].driverVersion
+	//
+	// The type of each entry varies, depending on the attribute
+	// that is being looked up. The domain lookup returns an empty
+	// map if there is no attribute with that domain. However,
+	// unknown identifiers then trigger a runtime error.
+	//
+	// The `cel.bind` function is enabled and can be used to simplify
+	// expressions that access multiple attributes with the same domain:
+	//
+	//    cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
+	//
+	// Capacities associated with a device are made available through a
+	// nested `device.capacities` map the same way as attributes.
+	//
+	// The `device.driverName` string variable can be used to check for a specific
+	// driver explicitly in a filter that is meant to work for devices from
+	// different vendors. It is provided by Kubernetes and matches the
+	// `driverName` from the ResourceSlice which provides the device.
+	//
+	// The CEL expression is applied to *all* available devices from any driver.
+	// The expression has to check for existence of an attribute when it is not
+	// certain that it is provided because runtime errors are not automatically
+	// treated as "don't select device". Instead, device selection fails completely
+	// and reports the error.
+	//
+	// Some more examples:
+	//
+	//    "memory" in device.capacities["dra.example.com"] && # Is the capacity available?
+	//       device.capacities["dra.example.com"].memory.isGreaterThan(quantity("1Gi")) # >= 1Gi
+	//
+	//    device.attributes["dra.example.com"].driverVersion.isGreaterThan(semver("1.0.0")) # >= v1.0.0, runtime error if not available
+	//
+	//    device.driverName == "dra.example.com" # any device from that driver
+	//
+	// +required
+	Expression string
+}
+
+// Exactly one field must be set.
+type Amount struct {
+	// All, if set, asks for all devices matching the selectors.
+	// Allocation fails if not all of them are available, unless admin
+	// access is requested. Admin access is granted also for
+	// devices which are in use.
+	//
+	// May only be set to true.
+	//
 	// +optional
+	All *bool
+
+	// A fixed number of devices matching the selectors.
+	//
+	// Must be greater than 0.
+	//
+	// +optional
+	ExactCount *int64
+}
+
+// Besides the request name slice, constraint must have exactly one field set.
+type Constraint struct {
+	// The constraint applies to devices in these requests. A single entry is okay
+	// and used when that request is for multiple devices.
+	//
+	// If empty, the constrain applies to all devices in the claim.
+	//
+	// +optional
+	// +listType=atomic
+	RequestNames []string
+
+	// The devices must have this attribute and its value must be the same.
+	//
+	// For example, if you specified "dra.example.com/numa" (a hypothetical example!),
+	// then only devices in the same NUMA node will be chosen.
+	//
+	// +required
+	MatchAttribute *string
+
+	// TODO (?)
+	// MatchQuantity *string
+
+	// Future extension, not part of the current design:
+	// A CEL expression which compares different devices and returns
+	// true if they match.
+	//
+	// Because it would be part of a one-of, old schedulers will not
+	// accidentally ignore this additional, for them unknown match
+	// criteria.
+	//
+	// matcher string
+}
+
+// ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.
+type ClaimConfiguration struct {
+	// The configuration applies to devices in these requests.
+	//
+	// If empty, the configuration applies to all devices in the claim.
+	//
+	// +optional
+	// +listType=atomic
+	RequestNames []string
+
+	Configuration // inline
+}
+
+// Configuration must have exactly one field set. It gets embedded
+// inline in some other structs which have other fields, so field names must
+// not conflict with those.
+type Configuration struct {
+	// Opaque provides driver-specific configuration parameters.
+	//
+	// +required
+	Opaque *OpaqueConfiguration
+}
+
+// OpaqueConfiguration contains configuration parameters for a driver
+// in a format defined by the driver vendor.
+type OpaqueConfiguration struct {
+	// DriverName is used to determine which kubelet plugin needs
+	// to be passed these configuration parameters.
+	//
+	// An admission webhook provided by the driver developer could use this
+	// to decide whether it needs to validate them.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
 	DriverName string
 
-	// Allocation is set by the resource driver once a resource or set of
-	// resources has been allocated successfully. If this is not specified, the
-	// resources have not been allocated yet.
+	// Parameters can contain arbitrary data. It is the responsibility of
+	// the driver developer to handle validation and versioning. Typically this
+	// includes self-identification and a version ("kind" + "apiVersion" for
+	// Kubernetes types), with conversion between different versions.
+	//
+	// +required
+	Parameters runtime.RawExtension
+}
+
+// ResourceClaimStatus tracks whether the resource has been allocated and what
+// the result of that was.
+type ResourceClaimStatus struct {
+	// Allocation is set once the claim has been allocated successfully.
+	//
 	// +optional
 	Allocation *AllocationResult
 
 	// ReservedFor indicates which entities are currently allowed to use
 	// the claim. A Pod which references a ResourceClaim which is not
-	// reserved for that Pod will not be started.
+	// reserved for that Pod will not be started. A claim that is in
+	// use or might be in use because it has been reserved must not get
+	// deallocated.
+	//
+	// In a cluster with multiple scheduler instances, two pods might get
+	// scheduled concurrently by different schedulers. When they reference
+	// the same ResourceClaim which already has reached its maximum number
+	// of consumers, only one pod can be scheduled.
+	//
+	// Both schedulers try to add their pod to the claim.status.reservedFor
+	// field, but only the update that reaches the API server first gets
+	// stored. The other one fails with an error and the scheduler
+	// which issued it knows that it must put the pod back into the queue,
+	// waiting for the ResourceClaim to become usable again.
 	//
 	// There can be at most 32 such reservations. This may get increased in
 	// the future, but not reduced.
+	//
 	// +optional
+	// +listType=map
+	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
 	ReservedFor []ResourceClaimConsumerReference
 
-	// DeallocationRequested indicates that a ResourceClaim is to be
-	// deallocated.
+	// Indicates that a claim is to be deallocated. While this is set,
+	// no new consumers may be added to ReservedFor.
 	//
-	// The driver then must deallocate this claim and reset the field
+	// This is only used if the claim needs to be deallocated by a DRA driver.
+	// That driver then must deallocate this claim and reset the field
 	// together with clearing the Allocation field.
 	//
-	// While DeallocationRequested is set, no new consumers may be added to
-	// ReservedFor.
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
 	// +optional
 	DeallocationRequested bool
 }
@@ -129,104 +647,118 @@ type ResourceClaimStatus struct {
 // claim.status.reservedFor.
 const ResourceClaimReservedForMaxSize = 32
 
+// ResourceClaimConsumerReference contains enough information to let you
+// locate the consumer of a ResourceClaim. The user must be a resource in the same
+// namespace as the ResourceClaim.
+type ResourceClaimConsumerReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	// +optional
+	APIGroup string
+	// Resource is the type of resource being referenced, for example "pods".
+	Resource string
+	// Name is the name of resource being referenced.
+	Name string
+	// UID identifies exactly one incarnation of the resource.
+	UID types.UID
+}
+
 // AllocationResult contains attributes of an allocated resource.
 type AllocationResult struct {
-	// ResourceHandles contain the state associated with an allocation that
-	// should be maintained throughout the lifetime of a claim. Each
-	// ResourceHandle contains data that should be passed to a specific kubelet
-	// plugin once it lands on a node. This data is returned by the driver
-	// after a successful allocation and is opaque to Kubernetes. Driver
-	// documentation may explain to users how to interpret this data if needed.
+	// Results lists all allocated devices.
 	//
-	// Setting this field is optional. It has a maximum size of 32 entries.
-	// If null (or empty), it is assumed this allocation will be processed by a
-	// single kubelet plugin with no ResourceHandle data attached. The name of
-	// the kubelet plugin invoked will match the DriverName set in the
-	// ResourceClaimStatus this AllocationResult is embedded in.
-	//
-	// +listType=atomic
 	// +optional
-	ResourceHandles []ResourceHandle
+	// +listType=atomic
+	Results []RequestAllocationResult
 
-	// This field will get set by the resource driver after it has allocated
-	// the resource to inform the scheduler where it can schedule Pods using
-	// the ResourceClaim.
+	// This field is a combination of all the claim and class configuration parameters.
+	// Drivers can distinguish between those based on a flag.
 	//
-	// Setting this field is optional. If null, the resource is available
-	// everywhere.
+	// This includes configuration parameters for drivers which have no allocated
+	// devices in the result because it is up to the drivers which configuration
+	// parameters they support. They can silently ignore unknown configuration
+	// parameters.
+	//
+	// +optional
+	// +listType=atomic
+	Config []AllocationConfiguration
+
+	// Setting this field is optional. If unset, the allocated devices are available everywhere.
+	//
 	// +optional
 	AvailableOnNodes *core.NodeSelector
 
-	// Shareable determines whether the resource supports more
-	// than one consumer at a time.
+	// ControllerName is the name of the DRA driver which handled the
+	// allocation. That driver is also responsible for deallocating the
+	// claim. It is empty when the claim can be deallocated without
+	// involving a driver.
+	//
+	// A driver may allocate devices provided by other drivers, so this
+	// driver name here can be different from the driver names listed for
+	// the results.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
 	// +optional
-	Shareable bool
+	ControllerName *string
 }
 
-// AllocationResultResourceHandlesMaxSize represents the maximum number of
-// entries in allocation.resourceHandles.
-const AllocationResultResourceHandlesMaxSize = 32
+// AllocationResultsMaxSize represents the maximum number of
+// entries in allocation.results.
+const AllocationResultsMaxSize = 32
 
-// ResourceHandle holds opaque resource data for processing by a specific kubelet plugin.
-type ResourceHandle struct {
-	// DriverName specifies the name of the resource driver whose kubelet
-	// plugin should be invoked to process this ResourceHandle's data once it
-	// lands on a node. This may differ from the DriverName set in
-	// ResourceClaimStatus this ResourceHandle is embedded in.
+// RequestAllocationResult contains the allocation result for one request.
+type RequestAllocationResult struct {
+	// RequestName identifies the request in the claim which caused this
+	// device to be allocated. Multiple devices may have been allocated
+	// per request.
+	//
+	// +required
+	RequestName string
+
+	// DriverName specifies the name of the DRA driver whose kubelet
+	// plugin should be invoked to process the allocation once the claim is
+	// needed on a node.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
 	DriverName string
 
-	// Data contains the opaque data associated with this ResourceHandle. It is
-	// set by the controller component of the resource driver whose name
-	// matches the DriverName set in the ResourceClaimStatus this
-	// ResourceHandle is embedded in. It is set at allocation time and is
-	// intended for processing by the kubelet plugin whose name matches
-	// the DriverName set in this ResourceHandle.
+	// This name together with the driver name and the device name field
+	// identify which device was allocated (`<driver name>/<pool name>/<device name>`).
 	//
-	// The maximum size of this field is 16KiB. This may get increased in the
-	// future, but not reduced.
+	// Must not be longer than 253 characters and may contain one or more
+	// DNS sub-domains separated by slashes.
+	//
+	// +required
+	PoolName string
+
+	// DeviceName references one device instance via its name in the driver's
+	// resource pool. It must be a DNS label.
+	//
+	// +required
+	DeviceName string
+}
+
+// AllocationConfiguration gets embedded in an AllocationResult.
+type AllocationConfiguration struct {
+	// Admins is true if the source of the configuration was a class and thus
+	// not something that a normal user would have been able to set.
+	Admin bool
+
+	// The configuration applies to devices in these requests.
+	//
+	// If empty, the configuration applies to all devices in the claim.
+	//
 	// +optional
-	Data string
+	// +listType=atomic
+	RequestNames []string
 
-	// If StructuredData is set, then it needs to be used instead of Data.
-	StructuredData *StructuredResourceHandle
-}
-
-// ResourceHandleDataMaxSize represents the maximum size of resourceHandle.data.
-const ResourceHandleDataMaxSize = 16 * 1024
-
-// StructuredResourceHandle is the in-tree representation of the allocation result.
-type StructuredResourceHandle struct {
-	// VendorClassParameters are the per-claim configuration parameters
-	// from the resource class at the time that the claim was allocated.
-	VendorClassParameters runtime.Object
-
-	// VendorClaimParameters are the per-claim configuration parameters
-	// from the resource claim parameters at the time that the claim was
-	// allocated.
-	VendorClaimParameters runtime.Object
-
-	// NodeName is the name of the node providing the necessary resources
-	// if the resources are local to a node.
-	NodeName string
-
-	// Results lists all allocated driver resources.
-	Results []DriverAllocationResult
-}
-
-// DriverAllocationResult contains vendor parameters and the allocation result for
-// one request.
-type DriverAllocationResult struct {
-	// VendorRequestParameters are the per-request configuration parameters
-	// from the time that the claim was allocated.
-	VendorRequestParameters runtime.Object
-
-	AllocationResultModel
-}
-
-// AllocationResultModel must have one and only one field set.
-type AllocationResultModel struct {
-	// NamedResources describes the allocation result when using the named resources model.
-	NamedResources *NamedResourcesAllocationResult
+	Configuration // inline
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -260,6 +792,8 @@ type PodSchedulingContext struct {
 	Spec PodSchedulingContextSpec
 
 	// Status describes where resources for the Pod can be allocated.
+	//
+	// +optional
 	Status PodSchedulingContextStatus
 }
 
@@ -268,6 +802,8 @@ type PodSchedulingContextSpec struct {
 	// SelectedNode is the node for which allocation of ResourceClaims that
 	// are referenced by the Pod and that use "WaitForFirstConsumer"
 	// allocation is to be attempted.
+	//
+	// +optional
 	SelectedNode string
 
 	// PotentialNodes lists nodes where the Pod might be able to run.
@@ -276,7 +812,9 @@ type PodSchedulingContextSpec struct {
 	// many clusters. Larger clusters may need more attempts to find a node
 	// that suits all pending resources. This may get increased in the
 	// future, but not reduced.
+	//
 	// +optional
+	// +listType=atomic
 	PotentialNodes []string
 }
 
@@ -285,6 +823,9 @@ type PodSchedulingContextStatus struct {
 	// ResourceClaims describes resource availability for each
 	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
 	// uses "WaitForFirstConsumer" allocation mode.
+	//
+	// +listType=map
+	// +listMapKey=name
 	// +optional
 	ResourceClaims []ResourceClaimSchedulingStatus
 
@@ -297,6 +838,8 @@ type PodSchedulingContextStatus struct {
 // ResourceClaim with "WaitForFirstConsumer" allocation mode.
 type ResourceClaimSchedulingStatus struct {
 	// Name matches the pod.spec.resourceClaims[*].Name field.
+	//
+	// +required
 	Name string
 
 	// UnsuitableNodes lists nodes that the ResourceClaim cannot be
@@ -305,7 +848,9 @@ type ResourceClaimSchedulingStatus struct {
 	// The size of this field is limited to 128, the same as for
 	// PodSchedulingSpec.PotentialNodes. This may get increased in the
 	// future, but not reduced.
+	//
 	// +optional
+	// +listType=atomic
 	UnsuitableNodes []string
 }
 
@@ -329,109 +874,76 @@ type PodSchedulingContextList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ResourceClass is used by administrators to influence how resources
-// are allocated.
-//
-// This is an alpha type and requires enabling the DynamicResourceAllocation
-// feature gate.
-type ResourceClass struct {
+// DeviceClass is a vendor or admin-provided resource that contains
+// device configuration and selectors. It can be referenced in
+// the device requests of a claim to apply these presets.
+// Cluster scoped.
+type DeviceClass struct {
 	metav1.TypeMeta
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta
 
-	// DriverName defines the name of the dynamic resource driver that is
-	// used for allocation of a ResourceClaim that uses this class.
+	// Spec defines what can be allocated and how to configure it.
 	//
-	// Resource drivers have a unique name in forward domain order
-	// (acme.example.com).
-	DriverName string
+	// This is mutable. Consumers have to be prepared for classes changing
+	// at any time, either because they get updated or replaced. Claim
+	// allocations are done once based on whatever was set in classes at
+	// the time of allocation.
+	//
+	// Changing the spec bumps up the generation number.
+	Spec DeviceClassSpec
+}
 
-	// ParametersRef references an arbitrary separate object that may hold
-	// parameters that will be used by the driver when allocating a
-	// resource that uses this class. A dynamic resource driver can
-	// distinguish between parameters stored here and and those stored in
-	// ResourceClaimSpec.
+type DeviceClassSpec struct {
+	// Each selector must be satisfied by a device which is claimed via this class.
+	//
 	// +optional
-	ParametersRef *ResourceClassParametersReference
+	// +listType=atomic
+	Selectors []Selector
+
+	// Config defines configuration parameters that apply to each device that is claimed via this class.
+	// Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor
+	// configuration applies to exactly one driver.
+	//
+	// They are passed to the driver, but are not considered while allocating the claim.
+	//
+	// +optional
+	// +listType=atomic
+	Config []ClassConfiguration
 
 	// Only nodes matching the selector will be considered by the scheduler
 	// when trying to find a Node that fits a Pod when that Pod uses
-	// a ResourceClaim that has not been allocated yet.
+	// a claim that has not been allocated yet *and* that claim
+	// gets allocated through a control plane controller. It is ignored
+	// when the claim does not use a control plane controller
+	// for allocation.
 	//
-	// Setting this field is optional. If null, all nodes are candidates.
+	// Setting this field is optional. If unset, all Nodes are candidates.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
 	// +optional
 	SuitableNodes *core.NodeSelector
+}
 
-	// If and only if allocation of claims using this class is handled
-	// via structured parameters, then StructuredParameters must be set to true.
-	StructuredParameters *bool
+// ClassConfiguration is used in DeviceClass.
+type ClassConfiguration struct {
+	Configuration // inline
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ResourceClassList is a collection of classes.
-type ResourceClassList struct {
+// DeviceClassList is a collection of classes.
+type DeviceClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta
 
 	// Items is the list of resource classes.
-	Items []ResourceClass
-}
-
-// ResourceClassParametersReference contains enough information to let you
-// locate the parameters for a ResourceClass.
-type ResourceClassParametersReference struct {
-	// APIGroup is the group for the resource being referenced. It is
-	// empty for the core API. This matches the group in the APIVersion
-	// that is used when creating the resources.
-	// +optional
-	APIGroup string
-	// Kind is the type of resource being referenced. This is the same
-	// value as in the parameter object's metadata.
-	Kind string
-	// Name is the name of resource being referenced.
-	Name string
-	// Namespace that contains the referenced resource. Must be empty
-	// for cluster-scoped resources and non-empty for namespaced
-	// resources.
-	// +optional
-	Namespace string
-}
-
-// ResourceClaimParametersReference contains enough information to let you
-// locate the parameters for a ResourceClaim. The object must be in the same
-// namespace as the ResourceClaim.
-type ResourceClaimParametersReference struct {
-	// APIGroup is the group for the resource being referenced. It is
-	// empty for the core API. This matches the group in the APIVersion
-	// that is used when creating the resources.
-	// +optional
-	APIGroup string
-	// Kind is the type of resource being referenced. This is the same
-	// value as in the parameter object's metadata, for example "ConfigMap".
-	Kind string
-	// Name is the name of resource being referenced.
-	Name string
-}
-
-// ResourceClaimConsumerReference contains enough information to let you
-// locate the consumer of a ResourceClaim. The user must be a resource in the same
-// namespace as the ResourceClaim.
-type ResourceClaimConsumerReference struct {
-	// APIGroup is the group for the resource being referenced. It is
-	// empty for the core API. This matches the group in the APIVersion
-	// that is used when creating the resources.
-	// +optional
-	APIGroup string
-	// Resource is the type of resource being referenced, for example "pods".
-	Resource string
-	// Name is the name of resource being referenced.
-	Name string
-	// UID identifies exactly one incarnation of the resource.
-	UID types.UID
+	Items []DeviceClass
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -476,174 +988,4 @@ type ResourceClaimTemplateList struct {
 
 	// Items is the list of resource claim templates.
 	Items []ResourceClaimTemplate
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceSlice provides information about available
-// resources on individual nodes.
-type ResourceSlice struct {
-	metav1.TypeMeta
-	// Standard object metadata
-	metav1.ObjectMeta
-
-	// NodeName identifies the node which provides the resources
-	// if they are local to a node.
-	//
-	// A field selector can be used to list only ResourceSlice
-	// objects with a certain node name.
-	NodeName string
-
-	// DriverName identifies the DRA driver providing the capacity information.
-	// A field selector can be used to list only ResourceSlice
-	// objects with a certain driver name.
-	DriverName string
-
-	ResourceModel
-}
-
-// ResourceModel must have one and only one field set.
-type ResourceModel struct {
-	// NamedResources describes available resources using the named resources model.
-	NamedResources *NamedResourcesResources
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceSliceList is a collection of ResourceSlices.
-type ResourceSliceList struct {
-	metav1.TypeMeta
-	// Standard list metadata
-	metav1.ListMeta
-
-	// Items is the list of node resource capacity objects.
-	Items []ResourceSlice
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceClaimParameters defines resource requests for a ResourceClaim in an
-// in-tree format understood by Kubernetes.
-type ResourceClaimParameters struct {
-	metav1.TypeMeta
-	// Standard object metadata
-	metav1.ObjectMeta
-
-	// If this object was created from some other resource, then this links
-	// back to that resource. This field is used to find the in-tree representation
-	// of the claim parameters when the parameter reference of the claim refers
-	// to some unknown type.
-	GeneratedFrom *ResourceClaimParametersReference
-
-	// Shareable indicates whether the allocated claim is meant to be shareable
-	// by multiple consumers at the same time.
-	Shareable bool
-
-	// DriverRequests describes all resources that are needed for the
-	// allocated claim. A single claim may use resources coming from
-	// different drivers. For each driver, this array has at most one
-	// entry which then may have one or more per-driver requests.
-	//
-	// May be empty, in which case the claim can always be allocated.
-	DriverRequests []DriverRequests
-}
-
-// DriverRequests describes all resources that are needed from one particular driver.
-type DriverRequests struct {
-	// DriverName is the name used by the DRA driver kubelet plugin.
-	DriverName string
-
-	// VendorParameters are arbitrary setup parameters for all requests of the
-	// claim. They are ignored while allocating the claim.
-	VendorParameters runtime.Object
-
-	// Requests describes all resources that are needed from the driver.
-	Requests []ResourceRequest
-}
-
-// ResourceRequest is a request for resources from one particular driver.
-type ResourceRequest struct {
-	// VendorParameters are arbitrary setup parameters for the requested
-	// resource. They are ignored while allocating a claim.
-	VendorParameters runtime.Object
-
-	ResourceRequestModel
-}
-
-// ResourceRequestModel must have one and only one field set.
-type ResourceRequestModel struct {
-	// NamedResources describes a request for resources with the named resources model.
-	NamedResources *NamedResourcesRequest
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceClaimParametersList is a collection of ResourceClaimParameters.
-type ResourceClaimParametersList struct {
-	metav1.TypeMeta
-	// Standard list metadata
-	metav1.ListMeta
-
-	// Items is the list of node resource capacity objects.
-	Items []ResourceClaimParameters
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceClassParameters defines resource requests for a ResourceClass in an
-// in-tree format understood by Kubernetes.
-type ResourceClassParameters struct {
-	metav1.TypeMeta
-	// Standard object metadata
-	metav1.ObjectMeta
-
-	// If this object was created from some other resource, then this links
-	// back to that resource. This field is used to find the in-tree representation
-	// of the class parameters when the parameter reference of the class refers
-	// to some unknown type.
-	GeneratedFrom *ResourceClassParametersReference
-
-	// VendorParameters are arbitrary setup parameters for all claims using
-	// this class. They are ignored while allocating the claim. There must
-	// not be more than one entry per driver.
-	VendorParameters []VendorParameters
-
-	// Filters describes additional contraints that must be met when using the class.
-	Filters []ResourceFilter
-}
-
-// ResourceFilter is a filter for resources from one particular driver.
-type ResourceFilter struct {
-	// DriverName is the name used by the DRA driver kubelet plugin.
-	DriverName string
-
-	ResourceFilterModel
-}
-
-// ResourceFilterModel must have one and only one field set.
-type ResourceFilterModel struct {
-	// NamedResources describes a resource filter using the named resources model.
-	NamedResources *NamedResourcesFilter
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ResourceClassParametersList is a collection of ResourceClassParameters.
-type ResourceClassParametersList struct {
-	metav1.TypeMeta
-	// Standard list metadata
-	metav1.ListMeta
-
-	// Items is the list of node resource capacity objects.
-	Items []ResourceClassParameters
-}
-
-// VendorParameters are opaque parameters for one particular driver.
-type VendorParameters struct {
-	// DriverName is the name used by the DRA driver kubelet plugin.
-	DriverName string
-
-	// Parameters can be arbitrary setup parameters. They are ignored while
-	// allocating a claim.
-	Parameters runtime.Object
 }

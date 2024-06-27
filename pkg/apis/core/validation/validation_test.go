@@ -1930,6 +1930,17 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				},
 			}),
 		},
+		"resource-claims-not-valid-in-volume-resource-requirements": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{"ReadWriteOncePod", "ReadWriteMany"},
+				Resources: core.VolumeResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceClaims): resource.MustParse("1"),
+					},
+				},
+			}),
+		},
 		"invalid-claim-zero-capacity": {
 			isExpectedFailure: true,
 			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
@@ -8970,6 +8981,21 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		}},
 		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
+	}, {
+		"Invalid resourceclaims in container",
+		line(),
+		[]core.Container{{
+			Name:  "abc-123",
+			Image: "image",
+			Resources: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceClaims: resource.MustParse("1"),
+				},
+			},
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+		}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests[resourceclaims]"} /* must be a standard resource type or fully qualified */, {Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests[resourceclaims]" /*  must be a standard resource for containers */}},
 	}, {
 		"Invalid env from",
 		line(),
@@ -21346,6 +21372,30 @@ func TestValidateResourceQuota(t *testing.T) {
 		},
 	}
 
+	resourceClaimsSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceClaims: resource.MustParse("1"),
+		},
+	}
+
+	resourceClaimsPerClassSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+		},
+	}
+
+	invalidResourceClaimsSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceClaims: resource.MustParse("1m"),
+		},
+	}
+
+	invalidResourceClaimsPerClassSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.deviceclass.resource.k8s.io/devices": resource.MustParse("1m"),
+		},
+	}
+
 	terminatingSpec := core.ResourceQuotaSpec{
 		Hard: core.ResourceList{
 			core.ResourceCPU:       resource.MustParse("100"),
@@ -21460,6 +21510,8 @@ func TestValidateResourceQuota(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
+		resourceClaimsEnabled bool
+
 		rq        core.ResourceQuota
 		errDetail string
 		errField  string
@@ -21580,9 +21632,36 @@ func TestValidateResourceQuota(t *testing.T) {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
 			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
 		},
+		"resource-claims": {
+			resourceClaimsEnabled: true,
+			rq:                    core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+		},
+		"resource-claims-per-class": {
+			resourceClaimsEnabled: true,
+			rq:                    core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+		},
+		"invalid-resource-claims": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"invalid-resource-claims-per-class": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"invalid-resource-claims-count": {
+			resourceClaimsEnabled: true,
+			rq:                    core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidResourceClaimsSpec},
+			errDetail:             "must be an integer",
+		},
+		"invalid-resource-claims-per-class-count": {
+			resourceClaimsEnabled: true,
+			rq:                    core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidResourceClaimsPerClassSpec},
+			errDetail:             "must be an integer",
+		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.resourceClaimsEnabled)
 			errs := ValidateResourceQuota(&tc.rq)
 			if len(tc.errDetail) == 0 && len(tc.errField) == 0 && len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
@@ -21595,6 +21674,223 @@ func TestValidateResourceQuota(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestValidateResourceQuotaUpdate(t *testing.T) {
+	resourceClaimsSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceClaims: resource.MustParse("1"),
+		},
+	}
+
+	resourceClaimsPerClassSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+		},
+	}
+
+	testCases := map[string]struct {
+		resourceClaimsEnabled bool
+		rq                    core.ResourceQuota
+		update                func(rq *core.ResourceQuota)
+		errDetail             string
+	}{
+		"resource-claims": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+		},
+		"resource-claims-per-class": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+		},
+		"resource-claims-existing-entry": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+		},
+		"resource-claims-per-class-existing-entry": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+		},
+		"invalid-add-resource-claims": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Spec = resourceClaimsPerClassSpec
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"invalid-add-resource-claims-per-class": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Spec = resourceClaimsPerClassSpec
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.resourceClaimsEnabled)
+			rq := tc.rq.DeepCopy()
+			rq.ResourceVersion = "1"
+			if tc.update != nil {
+				tc.update(rq)
+			}
+			errs := ValidateResourceQuotaUpdate(rq, &tc.rq)
+			if len(tc.errDetail) == 0 && len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			} else if len(tc.errDetail) != 0 && len(errs) == 0 {
+				t.Errorf("expected failure")
+			} else {
+				for i := range errs {
+					if !strings.Contains(errs[i].Detail, tc.errDetail) {
+						t.Errorf("expected error detail either empty or %s, got %s", tc.errDetail, errs[i].Detail)
+					}
+				}
+			}
+
+		})
+	}
+}
+
+func TestValidateResourceQuotaStatusUpdate(t *testing.T) {
+	resourceClaimsSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			core.ResourceClaims: resource.MustParse("1"),
+		},
+	}
+
+	resourcePerClass := core.ResourceName("foo.deviceclass.resource.k8s.io/devices")
+	resourceClaimsPerClassSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			resourcePerClass: resource.MustParse("1"),
+		},
+	}
+
+	testCases := map[string]struct {
+		resourceClaimsEnabled bool
+		rq                    core.ResourceQuota
+		update                func(rq *core.ResourceQuota)
+		errDetail             string
+	}{
+		"resource-claims": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+		},
+		"resource-claims-per-class": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+		},
+		"add-hard-resource-claims": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard = resourceClaimsSpec.Hard
+			},
+		},
+		"add-hard-resource-claims-per-class": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard = resourceClaimsSpec.Hard
+			},
+		},
+		"invalid-add-hard-resource-claims": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard = resourceClaimsSpec.Hard
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"invalid-add-hard-resource-claims-per-class": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard = resourceClaimsPerClassSpec.Hard
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"update-hard-resource-claims": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec, Status: core.ResourceQuotaStatus{Hard: resourceClaimsSpec.Hard}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard[core.ResourceClaims] = resource.MustParse("2")
+			},
+		},
+		"update-hard-resource-claims-per-class": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec, Status: core.ResourceQuotaStatus{Hard: resourceClaimsPerClassSpec.Hard}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Hard[resourcePerClass] = resource.MustParse("2")
+			},
+		},
+		"add-used-resource-claims": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used = resourceClaimsSpec.Hard
+			},
+		},
+		"add-used-resource-claims-per-class": {
+			resourceClaimsEnabled: true,
+
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used = resourceClaimsSpec.Hard
+			},
+		},
+		"invalid-add-used-resource-claims": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used = resourceClaimsSpec.Hard
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"invalid-add-used-resource-claims-per-class": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used = resourceClaimsPerClassSpec.Hard
+			},
+			errDetail: "DynamicResourceAllocation feature not enabled",
+		},
+		"update-used-resource-claims": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsSpec, Status: core.ResourceQuotaStatus{Used: resourceClaimsSpec.Hard}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used[core.ResourceClaims] = resource.MustParse("2")
+			},
+		},
+		"update-used-resource-claims-per-class": {
+			rq: core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: resourceClaimsPerClassSpec, Status: core.ResourceQuotaStatus{Used: resourceClaimsPerClassSpec.Hard}},
+			update: func(rq *core.ResourceQuota) {
+				rq.Status.Used[resourcePerClass] = resource.MustParse("2")
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tc.resourceClaimsEnabled)
+			rq := tc.rq.DeepCopy()
+			rq.ResourceVersion = "1"
+			if tc.update != nil {
+				tc.update(rq)
+			}
+			errs := ValidateResourceQuotaStatusUpdate(rq, &tc.rq)
+			if len(tc.errDetail) == 0 && len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			} else if len(tc.errDetail) != 0 && len(errs) == 0 {
+				t.Errorf("expected failure")
+			} else {
+				for i := range errs {
+					if !strings.Contains(errs[i].Detail, tc.errDetail) {
+						t.Errorf("expected error detail either empty or %s, got %s", tc.errDetail, errs[i].Detail)
+					}
+				}
+			}
+
 		})
 	}
 }
@@ -22650,8 +22946,8 @@ func TestValidateOSFields(t *testing.T) {
 		"PriorityClassName",
 		"ReadinessGates",
 		"ResourceClaims[*].Name",
-		"ResourceClaims[*].Source.ResourceClaimName",
-		"ResourceClaims[*].Source.ResourceClaimTemplateName",
+		"ResourceClaims[*].ResourceClaimName",
+		"ResourceClaims[*].ResourceClaimTemplateName",
 		"RestartPolicy",
 		"RuntimeClassName",
 		"SchedulerName",
@@ -25857,9 +26153,6 @@ func TestValidatePVSecretReference(t *testing.T) {
 func TestValidateDynamicResourceAllocation(t *testing.T) {
 	externalClaimName := "some-claim"
 	externalClaimTemplateName := "some-claim-template"
-	goodClaimSource := core.ClaimSource{
-		ResourceClaimName: &externalClaimName,
-	}
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
@@ -25871,10 +26164,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		RestartPolicy: core.RestartPolicyAlways,
 		DNSPolicy:     core.DNSClusterFirst,
 		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-template",
-			Source: core.ClaimSource{
-				ResourceClaimTemplateName: &externalClaimTemplateName,
-			},
+			Name:                      "my-claim-template",
+			ResourceClaimTemplateName: &externalClaimTemplateName,
 		}},
 	}
 	goodClaimReference := core.PodSpec{
@@ -25882,10 +26173,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		RestartPolicy: core.RestartPolicyAlways,
 		DNSPolicy:     core.DNSClusterFirst,
 		ResourceClaims: []core.PodResourceClaim{{
-			Name: "my-claim-reference",
-			Source: core.ClaimSource{
-				ResourceClaimName: &externalClaimName,
-			},
+			Name:              "my-claim-reference",
+			ResourceClaimName: &externalClaimName,
 		}},
 	}
 
@@ -25897,11 +26186,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "another-claim",
-				Source: goodClaimSource,
+				Name:              "another-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"init container": {
@@ -25910,8 +26199,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy:  core.RestartPolicyAlways,
 			DNSPolicy:      core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 	}
@@ -25929,8 +26218,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "../my-claim",
-				Source: goodClaimSource,
+				Name:              "../my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name with path": {
@@ -25938,8 +26227,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my/claim",
-				Source: goodClaimSource,
+				Name:              "my/claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name empty": {
@@ -25947,8 +26236,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "",
-				Source: goodClaimSource,
+				Name:              "",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"duplicate pod claim entries": {
@@ -25956,11 +26245,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"resource claim source empty": {
@@ -25968,8 +26257,7 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: core.ClaimSource{},
+				Name: "my-claim",
 			}},
 		},
 		"resource claim reference and template": {
@@ -25977,11 +26265,9 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name: "my-claim",
-				Source: core.ClaimSource{
-					ResourceClaimName:         &externalClaimName,
-					ResourceClaimTemplateName: &externalClaimTemplateName,
-				},
+				Name:                      "my-claim",
+				ResourceClaimName:         &externalClaimName,
+				ResourceClaimTemplateName: &externalClaimTemplateName,
 			}},
 		},
 		"claim not found": {
@@ -25989,8 +26275,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"claim name empty": {
@@ -25998,8 +26284,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"pod claim name duplicates": {
@@ -26007,8 +26293,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"no claims defined": {
@@ -26021,11 +26307,11 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy: core.RestartPolicyAlways,
 			DNSPolicy:     core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}, {
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"ephemeral container don't support resource requirements": {
@@ -26034,20 +26320,20 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			RestartPolicy:       core.RestartPolicyAlways,
 			DNSPolicy:           core.DNSClusterFirst,
 			ResourceClaims: []core.PodResourceClaim{{
-				Name:   "my-claim",
-				Source: goodClaimSource,
+				Name:              "my-claim",
+				ResourceClaimName: &externalClaimName,
 			}},
 		},
 		"invalid claim template name": func() core.PodSpec {
 			spec := goodClaimTemplate.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimTemplateName = &notLabel
+			spec.ResourceClaims[0].ResourceClaimTemplateName = &notLabel
 			return *spec
 		}(),
 		"invalid claim reference name": func() core.PodSpec {
 			spec := goodClaimReference.DeepCopy()
 			notLabel := ".foo_bar"
-			spec.ResourceClaims[0].Source.ResourceClaimName = &notLabel
+			spec.ResourceClaims[0].ResourceClaimName = &notLabel
 			return *spec
 		}(),
 	}

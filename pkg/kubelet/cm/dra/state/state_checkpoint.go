@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -38,12 +37,6 @@ type CheckpointState interface {
 // ClaimInfoState is used to store claim info state in a checkpoint
 // +k8s:deepcopy-gen=true
 type ClaimInfoState struct {
-	// Name of the DRA driver
-	DriverName string
-
-	// ClassName is a resource class of the claim
-	ClassName string
-
 	// ClaimUID is an UID of the resource claim
 	ClaimUID types.UID
 
@@ -56,23 +49,22 @@ type ClaimInfoState struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
-	// ResourceHandles is a list of opaque resource data for processing by a specific kubelet plugin
-	ResourceHandles []resourcev1alpha2.ResourceHandle
+	// Drivers contains information about all drivers which have allocation
+	// results in the claim.
+	Drivers map[string]DriverState
+}
 
-	// CDIDevices is a map of DriverName --> CDI devices returned by the
-	// GRPC API call NodePrepareResource
+// DriverState is used to store per-device claim info state in a checkpoint
+// +k8s:deepcopy-gen=true
+type DriverState struct {
+	// CDIDevices is a map of request name --> CDI devices returned by the
+	// GRPC API call NodePrepareResources
 	CDIDevices map[string][]string
 }
 
 // ClaimInfoStateWithoutResourceHandles is an old implementation of the ClaimInfoState
 // TODO: remove in Beta
 type ClaimInfoStateWithoutResourceHandles struct {
-	// Name of the DRA driver
-	DriverName string
-
-	// ClassName is a resource class of the claim
-	ClassName string
-
 	// ClaimUID is an UID of the resource claim
 	ClaimUID types.UID
 
@@ -85,9 +77,9 @@ type ClaimInfoStateWithoutResourceHandles struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
-	// CDIDevices is a map of DriverName --> CDI devices returned by the
-	// GRPC API call NodePrepareResource
-	CDIDevices map[string][]string
+	// Drivers contains information about all drivers which have allocation
+	// results in the claim.
+	Drivers map[string]DriverState
 }
 
 type stateCheckpoint struct {

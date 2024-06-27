@@ -28,7 +28,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -37,6 +37,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
+	"k8s.io/utils/ptr"
 )
 
 func TestAuthorizer(t *testing.T) {
@@ -56,7 +57,7 @@ func TestAuthorizer(t *testing.T) {
 		uniqueResourceClaimsPerPod:         1,
 		uniqueResourceClaimTemplatesPerPod: 1,
 		uniqueResourceClaimTemplatesWithClaimPerPod: 1,
-		nodeResourceCapacitiesPerNode:               2,
+		nodeResourceSlicesPerNode:                   2,
 	}
 	nodes, pods, pvs, attachments, slices := generate(opts)
 	populate(g, nodes, pods, pvs, attachments, slices)
@@ -561,7 +562,7 @@ type sampleDataOpts struct {
 	uniqueResourceClaimTemplatesPerPod          int
 	uniqueResourceClaimTemplatesWithClaimPerPod int
 
-	nodeResourceCapacitiesPerNode int
+	nodeResourceSlicesPerNode int
 }
 
 func BenchmarkPopulationAllocation(b *testing.B) {
@@ -831,7 +832,7 @@ func BenchmarkAuthorization(b *testing.B) {
 	}
 }
 
-func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourcev1alpha2.ResourceSlice) {
+func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*corev1.PersistentVolume, attachments []*storagev1.VolumeAttachment, slices []*resourceapi.ResourceSlice) {
 	p := &graphPopulator{}
 	p.graph = graph
 	for _, pod := range pods {
@@ -859,12 +860,12 @@ func randomSubset(a, b int) []int {
 // the secret/configmap/pvc/node references in the pod and pv objects are named to indicate the connections between the objects.
 // for example, secret0-pod0-node0 is a secret referenced by pod0 which is bound to node0.
 // when populated into the graph, the node authorizer should allow node0 to access that secret, but not node1.
-func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourcev1alpha2.ResourceSlice) {
+func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.PersistentVolume, []*storagev1.VolumeAttachment, []*resourceapi.ResourceSlice) {
 	nodes := make([]*corev1.Node, 0, opts.nodes)
 	pods := make([]*corev1.Pod, 0, opts.nodes*opts.podsPerNode)
 	pvs := make([]*corev1.PersistentVolume, 0, (opts.nodes*opts.podsPerNode*opts.uniquePVCsPerPod)+(opts.sharedPVCsPerPod*opts.namespaces))
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
-	slices := make([]*resourcev1alpha2.ResourceSlice, 0, opts.nodes*opts.nodeResourceCapacitiesPerNode)
+	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
 
 	rand.Seed(12345)
 
@@ -891,11 +892,13 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			Spec:       corev1.NodeSpec{},
 		})
 
-		for p := 0; p <= opts.nodeResourceCapacitiesPerNode; p++ {
+		for p := 0; p <= opts.nodeResourceSlicesPerNode; p++ {
 			name := fmt.Sprintf("slice%d-%s", p, nodeName)
-			slice := &resourcev1alpha2.ResourceSlice{
+			slice := &resourceapi.ResourceSlice{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
-				NodeName:   nodeName,
+				Spec: resourceapi.ResourceSliceSpec{
+					NodeName: ptr.To(nodeName),
+				},
 			}
 			slices = append(slices, slice)
 		}
@@ -952,20 +955,16 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	for i := 0; i < opts.uniqueResourceClaimsPerPod; i++ {
 		claimName := fmt.Sprintf("claim%d-%s-%s", i, pod.Name, pod.Namespace)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: fmt.Sprintf("claim%d", i),
-			Source: corev1.ClaimSource{
-				ResourceClaimName: &claimName,
-			},
+			Name:              fmt.Sprintf("claim%d", i),
+			ResourceClaimName: &claimName,
 		})
 	}
 	for i := 0; i < opts.uniqueResourceClaimTemplatesPerPod; i++ {
 		claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, pod.Name, pod.Namespace)
 		podClaimName := fmt.Sprintf("claimtemplate%d", i)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: podClaimName,
-			Source: corev1.ClaimSource{
-				ResourceClaimTemplateName: &claimTemplateName,
-			},
+			Name:                      podClaimName,
+			ResourceClaimTemplateName: &claimTemplateName,
 		})
 	}
 	for i := 0; i < opts.uniqueResourceClaimTemplatesWithClaimPerPod; i++ {
@@ -973,10 +972,8 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		podClaimName := fmt.Sprintf("claimtemplate-with-claim%d", i)
 		claimName := fmt.Sprintf("generated-claim-%s-%s-%d", pod.Name, pod.Namespace, i)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: podClaimName,
-			Source: corev1.ClaimSource{
-				ResourceClaimTemplateName: &claimTemplateName,
-			},
+			Name:                      podClaimName,
+			ResourceClaimTemplateName: &claimTemplateName,
 		})
 		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
 			Name:              podClaimName,

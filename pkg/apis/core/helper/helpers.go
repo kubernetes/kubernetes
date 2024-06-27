@@ -59,6 +59,12 @@ func IsQuotaHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix) || strings.HasPrefix(string(name), core.ResourceRequestsHugePagesPrefix)
 }
 
+// IsResourceClaimsResourceName returns true of the resource name is counting
+// ResourceClaims.
+func IsResourceClaimsResourceName(name core.ResourceName) bool {
+	return name == core.ResourceClaims || strings.HasSuffix(string(name), core.ResourceClaimsPerClass)
+}
+
 // HugePageResourceName returns a ResourceName with the canonical hugepage
 // prefix prepended for the specified page size.  The page size is converted
 // to its canonical representation.
@@ -227,10 +233,12 @@ var standardQuotaResources = sets.New(
 	core.ResourceConfigMaps,
 	core.ResourceServicesNodePorts,
 	core.ResourceServicesLoadBalancers,
+	core.ResourceClaims, // only valid in ResourceQuota, not in Pod
 )
 
 // IsStandardQuotaResourceName returns true if the resource is known to
-// the quota tracking system
+// the quota tracking system. This includes resources that are feature gated.
+// The caller has to check separately whether those should be allowed.
 func IsStandardQuotaResourceName(name core.ResourceName) bool {
 	return standardQuotaResources.Has(name) || IsQuotaHugePageResourceName(name)
 }
@@ -277,7 +285,7 @@ var integerResources = sets.New(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(name core.ResourceName) bool {
-	return integerResources.Has(name) || IsExtendedResourceName(name)
+	return integerResources.Has(name) || IsExtendedResourceName(name) || IsResourceClaimsResourceName(name)
 }
 
 // IsServiceIPSet aims to check if the service's ClusterIP is set or not

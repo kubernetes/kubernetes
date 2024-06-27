@@ -55,7 +55,6 @@ func validNewClaimTemplate(name string) *resource.ResourceClaimTemplate {
 		Spec: resource.ResourceClaimTemplateSpec{
 			Spec: resource.ResourceClaimSpec{
 				ResourceClassName: "valid-class",
-				AllocationMode:    resource.AllocationModeImmediate,
 			},
 		},
 	}

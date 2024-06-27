@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/utils/ptr"
 )
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
@@ -46,6 +48,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 }
 
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	slice.Generation = 1
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -65,6 +69,13 @@ func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	slice := obj.(*resource.ResourceSlice)
+	oldSlice := old.(*resource.ResourceSlice)
+
+	// Any changes to the spec increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
+		slice.Generation = oldSlice.Generation + 1
+	}
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -86,7 +97,7 @@ var TriggerFunc = map[string]storage.IndexerFunc{
 }
 
 func nodeNameTriggerFunc(obj runtime.Object) string {
-	return obj.(*resource.ResourceSlice).NodeName
+	return ptr.Deref(obj.(*resource.ResourceSlice).Spec.NodeName, "")
 }
 
 // Indexers returns the indexers for ResourceSlice.
@@ -101,7 +112,7 @@ func nodeNameIndexFunc(obj interface{}) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("not a ResourceSlice")
 	}
-	return []string{slice.NodeName}, nil
+	return []string{ptr.Deref(slice.Spec.NodeName, "")}, nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
@@ -131,8 +142,8 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 	// field here or the number of object-meta related fields changes, this should
 	// be adjusted.
 	fields := make(fields.Set, 3)
-	fields["nodeName"] = slice.NodeName
-	fields["driverName"] = slice.DriverName
+	fields["nodeName"] = ptr.Deref(slice.Spec.NodeName, "")
+	fields["driverName"] = slice.Spec.DriverName
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)

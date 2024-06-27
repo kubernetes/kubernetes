@@ -48,6 +48,7 @@ import (
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.Pod) {
@@ -1607,70 +1608,153 @@ func TestAdmitResourceSlice(t *testing.T) {
 	apiResource := resourceapi.SchemeGroupVersion.WithResource("resourceslices")
 	nodename := "mynode"
 	mynode := &user.DefaultInfo{Name: "system:node:" + nodename, Groups: []string{"system:nodes"}}
-	err := "can only create ResourceSlice with the same NodeName as the requesting node"
+	createErr := "can only create ResourceSlice with the same NodeName as the requesting node"
+	deleteErr := "can only delete ResourceSlice with the same NodeName as the requesting node"
 
 	sliceNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename,
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: ptr.To(nodename),
+		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "something",
 		},
-		NodeName: nodename + "-other",
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: ptr.To(nodename + "-other"),
+		},
+	}
+	sliceNoNode := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "something",
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nil,
+		},
 	}
 
 	tests := map[string]struct {
 		operation      admission.Operation
-		obj            runtime.Object
+		options        runtime.Object
+		obj, oldObj    runtime.Object
 		featureEnabled bool
 		expectError    string
 	}{
 		"create allowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"create disallowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
-			expectError:    err,
+			expectError:    createErr,
+		},
+		"create disallowed, no node name, enabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    createErr,
 		},
 		"create allowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: false,
 			expectError:    "",
 		},
 		"create disallowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: false,
-			expectError:    err,
+			expectError:    createErr,
+		},
+		"create disallowed, no node name, disabled": {
+			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: false,
+			expectError:    createErr,
 		},
 		"update allowed, same node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"update allowed, other node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
 			expectError:    "",
+		},
+		"update allowed, no node": {
+			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
+			obj:            sliceNoNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
+		"delete allowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
+		"delete disallowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
+		"delete disallowed, no node name, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
+		"delete allowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: false,
+			expectError:    "",
+		},
+		"delete disallowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
+		},
+		"delete disallowed, no node name, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNoNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
-				test.obj, nil, schema.GroupVersionKind{},
-				"", "foo", apiResource, "", test.operation, &metav1.CreateOptions{}, false, mynode)
+				test.obj, test.oldObj, schema.GroupVersionKind{},
+				"", "foo", apiResource, "", test.operation, test.options, false, mynode)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, test.featureEnabled)
 			a := &admitTestCase{
 				name:       name,

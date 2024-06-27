@@ -2441,6 +2441,11 @@ type ResourceClaim struct {
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.
 	Name string
+
+	// A name set in claim.spec.requests[].name.
+	//
+	// +optional
+	RequestName *string
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -3476,17 +3481,11 @@ type PodResourceClaim struct {
 	// This must be a DNS_LABEL.
 	Name string
 
-	// Source describes where to find the ResourceClaim.
-	Source ClaimSource
-}
-
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-type ClaimSource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimName *string
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -3501,6 +3500,9 @@ type ClaimSource struct {
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimTemplateName *string
 }
 
@@ -5764,6 +5766,10 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+	// resource.k8s.io ResourceClaims, number
+	ResourceClaims ResourceName = "resourceclaims"
+	// resource.k8s.io devices requested with a certain DeviceClass, number
+	ResourceClaimsPerClass string = ".deviceclass.resource.k8s.io/devices"
 )
 
 // The following identify resource prefix for Kubernetes object types

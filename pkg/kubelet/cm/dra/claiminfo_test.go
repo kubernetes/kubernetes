@@ -21,16 +21,14 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // ClaimInfo test cases
@@ -44,36 +42,34 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 
 	for _, test := range []struct {
 		description    string
-		claim          *resourcev1alpha2.ResourceClaim
+		claim          *resourceapi.ResourceClaim
 		expectedResult *ClaimInfo
 	}{
 		{
 			description: "successfully created object",
-			claim: &resourcev1alpha2.ResourceClaim{
+			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       claimUID,
 					Name:      claimName,
 					Namespace: namespace,
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{
-						ResourceHandles: []resourcev1alpha2.ResourceHandle{},
+					Allocation: &resourceapi.AllocationResult{
+						ResourceHandles: []resourceapi.ResourceHandle{},
 					},
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: className,
 				},
 			},
 			expectedResult: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
-					ClassName:  className,
-					ClaimUID:   claimUID,
-					ClaimName:  claimName,
-					Namespace:  claimName,
-					PodUIDs:    sets.New[string](),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ClaimUID:  claimUID,
+					ClaimName: claimName,
+					Namespace: claimName,
+					PodUIDs:   sets.New[string](),
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{},
 					},
 					CDIDevices: make(map[string][]string),
@@ -82,29 +78,27 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 		},
 		{
 			description: "successfully created object with empty allocation",
-			claim: &resourcev1alpha2.ResourceClaim{
+			claim: &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					UID:       claimUID,
 					Name:      claimName,
 					Namespace: namespace,
 				},
-				Status: resourcev1alpha2.ResourceClaimStatus{
+				Status: resourceapi.ResourceClaimStatus{
 					DriverName: driverName,
-					Allocation: &resourcev1alpha2.AllocationResult{},
+					Allocation: &resourceapi.AllocationResult{},
 				},
-				Spec: resourcev1alpha2.ResourceClaimSpec{
+				Spec: resourceapi.ResourceClaimSpec{
 					ResourceClassName: className,
 				},
 			},
 			expectedResult: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: driverName,
-					ClassName:  className,
-					ClaimUID:   claimUID,
-					ClaimName:  claimName,
-					Namespace:  claimName,
-					PodUIDs:    sets.New[string](),
-					ResourceHandles: []resourcev1alpha2.ResourceHandle{
+					ClaimUID:  claimUID,
+					ClaimName: claimName,
+					Namespace: claimName,
+					PodUIDs:   sets.New[string](),
+					ResourceHandles: []resourceapi.ResourceHandle{
 						{},
 					},
 					CDIDevices: make(map[string][]string),
@@ -130,13 +124,11 @@ func TestNewClaimInfoFromState(t *testing.T) {
 		{
 			description: "successfully created object",
 			state: &state.ClaimInfoState{
-				DriverName:      "test-driver",
-				ClassName:       "test-class",
 				ClaimUID:        "test-uid",
 				ClaimName:       "test-claim",
 				Namespace:       "test-namespace",
 				PodUIDs:         sets.New[string]("test-pod-uid"),
-				ResourceHandles: []resourcev1alpha2.ResourceHandle{},
+				ResourceHandles: []resourceapi.ResourceHandle{},
 				CDIDevices:      map[string][]string{},
 			},
 		},
@@ -153,205 +145,45 @@ func TestNewClaimInfoFromState(t *testing.T) {
 func TestClaimInfoSetCDIDevices(t *testing.T) {
 	claimUID := types.UID("claim-uid")
 	pluginName := "test-plugin"
+	requestName := "my-request"
 	device := "vendor.com/device=device1"
 	annotationName := fmt.Sprintf("cdi.k8s.io/%s_%s", pluginName, claimUID)
 	for _, test := range []struct {
-		description         string
-		claimInfo           *ClaimInfo
-		devices             []string
-		expectedCDIDevices  map[string][]string
-		expectedAnnotations map[string][]kubecontainer.Annotation
-		wantErr             bool
+		description        string
+		claimInfo          *ClaimInfo
+		devices            []string
+		expectedCDIDevices map[string][]string
 	}{
 		{
 			description: "successfully add one device",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: pluginName,
-					ClaimUID:   claimUID,
+					ClaimUID: claimUID,
 				},
 			},
 			devices: []string{device},
 			expectedCDIDevices: map[string][]string{
 				pluginName: {device},
 			},
-			expectedAnnotations: map[string][]kubecontainer.Annotation{
-				pluginName: {
-					{
-						Name:  annotationName,
-						Value: device,
-					},
-				},
-			},
 		},
 		{
 			description: "empty list of devices",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					DriverName: pluginName,
-					ClaimUID:   claimUID,
+					ClaimUID: claimUID,
 				},
 			},
-			devices:             []string{},
-			expectedCDIDevices:  map[string][]string{pluginName: {}},
-			expectedAnnotations: map[string][]kubecontainer.Annotation{pluginName: nil},
-		},
-		{
-			description: "incorrect device format",
-			claimInfo: &ClaimInfo{
-				ClaimInfoState: state.ClaimInfoState{
-					DriverName: pluginName,
-					ClaimUID:   claimUID,
-				},
-			},
-			devices: []string{"incorrect"},
-			wantErr: true,
+			devices:            []string{},
+			expectedCDIDevices: map[string][]string{pluginName: {}},
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			err := test.claimInfo.setCDIDevices(pluginName, test.devices)
-			if test.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
+			test.claimInfo.setCDIDevices(pluginName, requestName, test.devices)
 			assert.Equal(t, test.expectedCDIDevices, test.claimInfo.CDIDevices)
-			assert.Equal(t, test.expectedAnnotations, test.claimInfo.annotations)
 		})
 	}
 }
 
-func TestClaimInfoAnnotationsAsList(t *testing.T) {
-	for _, test := range []struct {
-		description    string
-		claimInfo      *ClaimInfo
-		expectedResult []kubecontainer.Annotation
-	}{
-		{
-			description: "empty annotations",
-			claimInfo: &ClaimInfo{
-				annotations: map[string][]kubecontainer.Annotation{},
-			},
-		},
-		{
-			description: "nil annotations",
-			claimInfo:   &ClaimInfo{},
-		},
-		{
-			description: "valid annotations",
-			claimInfo: &ClaimInfo{
-				annotations: map[string][]kubecontainer.Annotation{
-					"test-plugin1": {
-						{
-							Name:  "cdi.k8s.io/test-plugin1_claim-uid1",
-							Value: "vendor.com/device=device1",
-						},
-						{
-							Name:  "cdi.k8s.io/test-plugin1_claim-uid2",
-							Value: "vendor.com/device=device2",
-						},
-					},
-					"test-plugin2": {
-						{
-							Name:  "cdi.k8s.io/test-plugin2_claim-uid1",
-							Value: "vendor.com/device=device1",
-						},
-						{
-							Name:  "cdi.k8s.io/test-plugin2_claim-uid2",
-							Value: "vendor.com/device=device2",
-						},
-					},
-				},
-			},
-			expectedResult: []kubecontainer.Annotation{
-				{
-					Name:  "cdi.k8s.io/test-plugin1_claim-uid1",
-					Value: "vendor.com/device=device1",
-				},
-				{
-					Name:  "cdi.k8s.io/test-plugin1_claim-uid2",
-					Value: "vendor.com/device=device2",
-				},
-				{
-					Name:  "cdi.k8s.io/test-plugin2_claim-uid1",
-					Value: "vendor.com/device=device1",
-				},
-				{
-					Name:  "cdi.k8s.io/test-plugin2_claim-uid2",
-					Value: "vendor.com/device=device2",
-				},
-			},
-		},
-	} {
-		t.Run(test.description, func(t *testing.T) {
-			result := test.claimInfo.annotationsAsList()
-			sort.Slice(result, func(i, j int) bool {
-				return result[i].Name < result[j].Name
-			})
-			assert.Equal(t, test.expectedResult, result)
-		})
-	}
-}
-
-func TestClaimInfoCDIdevicesAsList(t *testing.T) {
-	for _, test := range []struct {
-		description    string
-		claimInfo      *ClaimInfo
-		expectedResult []kubecontainer.CDIDevice
-	}{
-		{
-			description: "empty CDI devices",
-			claimInfo: &ClaimInfo{
-				ClaimInfoState: state.ClaimInfoState{
-					CDIDevices: map[string][]string{},
-				},
-			},
-		},
-		{
-			description: "nil CDI devices",
-			claimInfo:   &ClaimInfo{},
-		},
-		{
-			description: "valid CDI devices",
-			claimInfo: &ClaimInfo{
-				ClaimInfoState: state.ClaimInfoState{
-					CDIDevices: map[string][]string{
-						"test-plugin1": {
-							"vendor.com/device=device1",
-							"vendor.com/device=device2",
-						},
-						"test-plugin2": {
-							"vendor.com/device=device1",
-							"vendor.com/device=device2",
-						},
-					},
-				},
-			},
-			expectedResult: []kubecontainer.CDIDevice{
-				{
-					Name: "vendor.com/device=device1",
-				},
-				{
-					Name: "vendor.com/device=device1",
-				},
-				{
-					Name: "vendor.com/device=device2",
-				},
-				{
-					Name: "vendor.com/device=device2",
-				},
-			},
-		},
-	} {
-		t.Run(test.description, func(t *testing.T) {
-			result := test.claimInfo.cdiDevicesAsList()
-			sort.Slice(result, func(i, j int) bool {
-				return result[i].Name < result[j].Name
-			})
-			assert.Equal(t, test.expectedResult, result)
-		})
-	}
-}
 func TestClaimInfoAddPodReference(t *testing.T) {
 	podUID := types.UID("pod-uid")
 	for _, test := range []struct {

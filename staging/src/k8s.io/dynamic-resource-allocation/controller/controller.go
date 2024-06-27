@@ -28,7 +28,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,12 +37,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1types "k8s.io/client-go/kubernetes/typed/core/v1"
-	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
+	resourcelisters "k8s.io/client-go/listers/resource/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 )
 
 // Controller watches ResourceClaims and triggers allocation and deallocation
@@ -62,20 +63,6 @@ type Controller interface {
 
 // Driver provides the actual allocation and deallocation operations.
 type Driver interface {
-	// GetClassParameters is called to retrieve the parameter object
-	// referenced by a class. The content should be validated now if
-	// possible. class.Parameters may be nil.
-	//
-	// The caller wraps the error to include the parameter reference.
-	GetClassParameters(ctx context.Context, class *resourcev1alpha2.ResourceClass) (interface{}, error)
-
-	// GetClaimParameters is called to retrieve the parameter object
-	// referenced by a claim. The content should be validated now if
-	// possible. claim.Spec.Parameters may be nil.
-	//
-	// The caller wraps the error to include the parameter reference.
-	GetClaimParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, classParameters interface{}) (interface{}, error)
-
 	// Allocate is called when all same-driver ResourceClaims for Pod are ready
 	// to be allocated. The selectedNode is empty for ResourceClaims with immediate
 	// allocation, in which case the resource driver decides itself where
@@ -111,7 +98,7 @@ type Driver interface {
 	// Deallocate may be called when a previous allocation got
 	// interrupted. Deallocate must then stop any on-going allocation
 	// activity and free resources before returning without an error.
-	Deallocate(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error
+	Deallocate(ctx context.Context, claim *resourceapi.ResourceClaim) error
 
 	// UnsuitableNodes checks all pending claims with delayed allocation
 	// for a pod. All claims are ready for allocation by the driver
@@ -136,11 +123,9 @@ type Driver interface {
 // ClaimAllocation represents information about one particular
 // pod.Spec.ResourceClaim entry.
 type ClaimAllocation struct {
-	PodClaimName    string
-	Claim           *resourcev1alpha2.ResourceClaim
-	Class           *resourcev1alpha2.ResourceClass
-	ClaimParameters interface{}
-	ClassParameters interface{}
+	PodClaimName  string
+	Claim         *resourceapi.ResourceClaim
+	DeviceClasses map[string]*resourceapi.DeviceClass
 
 	// UnsuitableNodes needs to be filled in by the driver when
 	// Driver.UnsuitableNodes gets called.
@@ -148,7 +133,7 @@ type ClaimAllocation struct {
 
 	// Driver must populate this field with resources that were
 	// allocated for the claim in case of successful allocation.
-	Allocation *resourcev1alpha2.AllocationResult
+	Allocation *resourceapi.AllocationResult
 	// In case of error allocating particular claim, driver must
 	// populate this field.
 	Error error
@@ -165,12 +150,10 @@ type controller struct {
 	claimNameLookup     *resourceclaim.Lookup
 	queue               workqueue.TypedRateLimitingInterface[string]
 	eventRecorder       record.EventRecorder
-	rcLister            resourcev1alpha2listers.ResourceClassLister
-	rcSynced            cache.InformerSynced
+	dcLister            resourcelisters.DeviceClassLister
 	claimCache          cache.MutationCache
-	schedulingCtxLister resourcev1alpha2listers.PodSchedulingContextLister
-	claimSynced         cache.InformerSynced
-	schedulingCtxSynced cache.InformerSynced
+	schedulingCtxLister resourcelisters.PodSchedulingContextLister
+	synced              []cache.InformerSynced
 }
 
 // TODO: make it configurable
@@ -184,9 +167,9 @@ func New(
 	kubeClient kubernetes.Interface,
 	informerFactory informers.SharedInformerFactory) Controller {
 	logger := klog.LoggerWithName(klog.FromContext(ctx), "resource controller")
-	rcInformer := informerFactory.Resource().V1alpha2().ResourceClasses()
-	claimInformer := informerFactory.Resource().V1alpha2().ResourceClaims()
-	schedulingCtxInformer := informerFactory.Resource().V1alpha2().PodSchedulingContexts()
+	dcInformer := informerFactory.Resource().V1alpha3().DeviceClasses()
+	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
+	schedulingCtxInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
 	claimNameLookup := resourceclaim.NewNameLookup(kubeClient)
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -229,14 +212,16 @@ func New(
 		setReservedFor:      true,
 		kubeClient:          kubeClient,
 		claimNameLookup:     claimNameLookup,
-		rcLister:            rcInformer.Lister(),
-		rcSynced:            rcInformer.Informer().HasSynced,
+		dcLister:            dcInformer.Lister(),
 		claimCache:          claimCache,
-		claimSynced:         claimInformer.Informer().HasSynced,
 		schedulingCtxLister: schedulingCtxInformer.Lister(),
-		schedulingCtxSynced: schedulingCtxInformer.Informer().HasSynced,
 		queue:               queue,
 		eventRecorder:       eventRecorder,
+		synced: []cache.InformerSynced{
+			dcInformer.Informer().HasSynced,
+			claimInformer.Informer().HasSynced,
+			schedulingCtxInformer.Informer().HasSynced,
+		},
 	}
 
 	loggerV6 := logger.V(6)
@@ -321,9 +306,9 @@ func getKey(obj interface{}) (string, error) {
 	}
 	prefix := ""
 	switch obj.(type) {
-	case *resourcev1alpha2.ResourceClaim:
+	case *resourceapi.ResourceClaim:
 		prefix = claimKeyPrefix
-	case *resourcev1alpha2.PodSchedulingContext:
+	case *resourceapi.PodSchedulingContext:
 		prefix = schedulingCtxKeyPrefix
 	default:
 		return "", fmt.Errorf("unexpected object: %T", obj)
@@ -341,7 +326,7 @@ func (ctrl *controller) Run(workers int) {
 
 	stopCh := ctrl.ctx.Done()
 
-	if !cache.WaitForCacheSync(stopCh, ctrl.rcSynced, ctrl.claimSynced, ctrl.schedulingCtxSynced) {
+	if !cache.WaitForCacheSync(stopCh, ctrl.synced...) {
 		ctrl.logger.Error(nil, "Cannot sync caches")
 		return
 	}
@@ -427,7 +412,7 @@ func (ctrl *controller) syncKey(ctx context.Context, key string) (obj runtime.Ob
 	return
 }
 
-func (ctrl *controller) getCachedClaim(ctx context.Context, key string) (*resourcev1alpha2.ResourceClaim, error) {
+func (ctrl *controller) getCachedClaim(ctx context.Context, key string) (*resourceapi.ResourceClaim, error) {
 	claimObj, exists, err := ctrl.claimCache.GetByKey(key)
 	if !exists || k8serrors.IsNotFound(err) {
 		klog.FromContext(ctx).V(5).Info("ResourceClaim not found, no need to process it")
@@ -436,16 +421,16 @@ func (ctrl *controller) getCachedClaim(ctx context.Context, key string) (*resour
 	if err != nil {
 		return nil, err
 	}
-	claim, ok := claimObj.(*resourcev1alpha2.ResourceClaim)
+	claim, ok := claimObj.(*resourceapi.ResourceClaim)
 	if !ok {
-		return nil, fmt.Errorf("internal error: got %T instead of *resourcev1alpha2.ResourceClaim from claim cache", claimObj)
+		return nil, fmt.Errorf("internal error: got %T instead of *resourceapi.ResourceClaim from claim cache", claimObj)
 	}
 	return claim, nil
 }
 
 // syncClaim determines which next action may be needed for a ResourceClaim
 // and does it.
-func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.ResourceClaim) error {
+func (ctrl *controller) syncClaim(ctx context.Context, claim *resourceapi.ResourceClaim) error {
 	var err error
 	logger := klog.FromContext(ctx)
 
@@ -474,9 +459,8 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 					return fmt.Errorf("deallocate: %v", err)
 				}
 				claim.Status.Allocation = nil
-				claim.Status.DriverName = ""
 				claim.Status.DeallocationRequested = false
-				claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+				claim, err = ctrl.kubeClient.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("remove allocation: %v", err)
 				}
@@ -491,7 +475,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 			if claim.Status.DeallocationRequested {
 				// Still need to remove it.
 				claim.Status.DeallocationRequested = false
-				claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+				claim, err = ctrl.kubeClient.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 				if err != nil {
 					return fmt.Errorf("remove deallocation: %v", err)
 				}
@@ -499,7 +483,7 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 			}
 
 			claim.Finalizers = ctrl.removeFinalizer(claim.Finalizers)
-			claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+			claim, err = ctrl.kubeClient.ResourceV1alpha3().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 			if err != nil {
 				return fmt.Errorf("remove finalizer: %v", err)
 			}
@@ -515,72 +499,13 @@ func (ctrl *controller) syncClaim(ctx context.Context, claim *resourcev1alpha2.R
 		logger.V(5).Info("ResourceClaim is allocated")
 		return nil
 	}
-	if claim.Spec.AllocationMode != resourcev1alpha2.AllocationModeImmediate {
-		logger.V(5).Info("ResourceClaim waiting for first consumer")
-		return nil
-	}
-
-	// We need the ResourceClass to determine whether we should allocate it.
-	class, err := ctrl.rcLister.Get(claim.Spec.ResourceClassName)
-	if err != nil {
-		return err
-	}
-	if class.DriverName != ctrl.name {
-		// Not ours *at the moment*. This can change, so requeue and
-		// check again. We could trigger a faster check when the
-		// ResourceClass changes, but that shouldn't occur much in
-		// practice and thus isn't worth the effort.
-		//
-		// We use exponential backoff because it is unlikely that
-		// the ResourceClass changes much.
-		logger.V(5).Info("ResourceClaim is handled by other driver", "driver", class.DriverName)
-		return errRequeue
-	}
-
-	// Check parameters. Do not record event to Claim if its parameters are invalid,
-	// syncKey will record the error.
-	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class, false)
-	if err != nil {
-		return err
-	}
-
-	claimAllocations := claimAllocations{&ClaimAllocation{
-		Claim:           claim,
-		ClaimParameters: claimParameters,
-		Class:           class,
-		ClassParameters: classParameters,
-	}}
-
-	ctrl.allocateClaims(ctx, claimAllocations, "", nil)
-
-	if claimAllocations[0].Error != nil {
-		return fmt.Errorf("allocate: %v", claimAllocations[0].Error)
-	}
-
+	logger.V(5).Info("ResourceClaim waiting for first consumer")
 	return nil
-}
-
-func (ctrl *controller) getParameters(ctx context.Context, claim *resourcev1alpha2.ResourceClaim, class *resourcev1alpha2.ResourceClass, notifyClaim bool) (claimParameters, classParameters interface{}, err error) {
-	classParameters, err = ctrl.driver.GetClassParameters(ctx, class)
-	if err != nil {
-		ctrl.eventRecorder.Event(class, v1.EventTypeWarning, "Failed", err.Error())
-		err = fmt.Errorf("class parameters %s: %v", class.ParametersRef, err)
-		return
-	}
-	claimParameters, err = ctrl.driver.GetClaimParameters(ctx, claim, class, classParameters)
-	if err != nil {
-		if notifyClaim {
-			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, "Failed", err.Error())
-		}
-		err = fmt.Errorf("claim parameters %s: %v", claim.Spec.ParametersRef, err)
-		return
-	}
-	return
 }
 
 // allocateClaims filters list of claims, keeps those needing allocation and asks driver to do the allocations.
 // Driver is supposed to write the AllocationResult and Error field into argument claims slice.
-func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAllocation, selectedNode string, selectedUser *resourcev1alpha2.ResourceClaimConsumerReference) {
+func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAllocation, selectedNode string, selectedUser *resourceapi.ResourceClaimConsumerReference) {
 	logger := klog.FromContext(ctx)
 
 	needAllocation := make([]*ClaimAllocation, 0, len(claims))
@@ -610,7 +535,7 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 			logger.V(5).Info("Adding finalizer", "claim", claim.Name)
 			claim.Finalizers = append(claim.Finalizers, ctrl.finalizer)
 			var err error
-			claim, err = ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+			claim, err = ctrl.kubeClient.ResourceV1alpha3().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 			if err != nil {
 				logger.Error(err, "add finalizer", "claim", claim.Name)
 				claimAllocation.Error = fmt.Errorf("add finalizer: %v", err)
@@ -643,12 +568,12 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 		logger.V(5).Info("successfully allocated", "claim", klog.KObj(claimAllocation.Claim))
 		claim := claimAllocation.Claim.DeepCopy()
 		claim.Status.Allocation = claimAllocation.Allocation
-		claim.Status.DriverName = ctrl.name
+		claim.Status.Allocation.ControllerName = &ctrl.name
 		if selectedUser != nil && ctrl.setReservedFor {
 			claim.Status.ReservedFor = append(claim.Status.ReservedFor, *selectedUser)
 		}
 		logger.V(6).Info("Updating claim after allocation", "claim", claim)
-		claim, err := ctrl.kubeClient.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
+		claim, err := ctrl.kubeClient.ResourceV1alpha3().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			claimAllocation.Error = fmt.Errorf("add allocation: %v", err)
 			continue
@@ -678,40 +603,45 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 			return nil, err
 		}
 	}
-	if claim.Spec.AllocationMode != resourcev1alpha2.AllocationModeWaitForFirstConsumer {
-		// Nothing to do for it as part of pod scheduling.
-		return nil, nil
-	}
 	if claim.Status.Allocation != nil {
 		// Already allocated, class and parameter are not needed and nothing
 		// need to be done for the claim either.
 		return nil, nil
 	}
-	class, err := ctrl.rcLister.Get(claim.Spec.ResourceClassName)
-	if err != nil {
-		return nil, err
-	}
-	if class.DriverName != ctrl.name {
+	if ptr.Deref(claim.Spec.ControllerName, "") != ctrl.name {
 		return nil, nil
 	}
-	// Check parameters. Record event to claim and pod if parameters are invalid.
-	claimParameters, classParameters, err := ctrl.getParameters(ctx, claim, class, true)
-	if err != nil {
-		ctrl.eventRecorder.Event(pod, v1.EventTypeWarning, "Failed", fmt.Sprintf("claim %v: %v", claim.Name, err.Error()))
-		return nil, err
+
+	// Sanity checks and preparations...
+	ca := &ClaimAllocation{
+		PodClaimName:  podClaim.Name,
+		Claim:         claim,
+		DeviceClasses: make(map[string]*resourceapi.DeviceClass),
 	}
-	return &ClaimAllocation{
-		PodClaimName:    podClaim.Name,
-		Claim:           claim,
-		Class:           class,
-		ClaimParameters: claimParameters,
-		ClassParameters: classParameters,
-	}, nil
+	for _, request := range claim.Spec.Requests {
+		deviceRequest := request.Device
+		if deviceRequest == nil {
+			// Some unknown request. Abort!
+			return nil, fmt.Errorf("claim %s: unknown request type in request %s", klog.KObj(claim), request.Name)
+		}
+		deviceClassName := deviceRequest.DeviceClassName
+		if deviceClassName == "" {
+			// Should be set, but we don't care, so no error.
+			continue
+		}
+		class, err := ctrl.dcLister.Get(deviceClassName)
+		if err != nil {
+			return nil, fmt.Errorf("claim %s: request %s: class %s: %v", klog.KObj(claim), request.Name, deviceClassName, err)
+		}
+		ca.DeviceClasses[deviceClassName] = class
+	}
+
+	return ca, nil
 }
 
 // syncPodSchedulingContext determines which next action may be needed for a PodSchedulingContext object
 // and does it.
-func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulingCtx *resourcev1alpha2.PodSchedulingContext) error {
+func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulingCtx *resourceapi.PodSchedulingContext) error {
 	logger := klog.FromContext(ctx)
 
 	// Ignore deleted objects.
@@ -801,7 +731,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 			logger.V(2).Info("skipping allocation for unsuitable selected node", "node", selectedNode)
 		} else {
 			logger.V(2).Info("allocation for selected node", "node", selectedNode)
-			selectedUser := &resourcev1alpha2.ResourceClaimConsumerReference{
+			selectedUser := &resourceapi.ResourceClaimConsumerReference{
 				Resource: "pods",
 				Name:     pod.Name,
 				UID:      pod.UID,
@@ -838,7 +768,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 		if i < 0 {
 			// Add new entry.
 			schedulingCtx.Status.ResourceClaims = append(schedulingCtx.Status.ResourceClaims,
-				resourcev1alpha2.ResourceClaimSchedulingStatus{
+				resourceapi.ResourceClaimSchedulingStatus{
 					Name:            delayed.PodClaimName,
 					UnsuitableNodes: truncateNodes(delayed.UnsuitableNodes, selectedNode),
 				})
@@ -851,7 +781,7 @@ func (ctrl *controller) syncPodSchedulingContexts(ctx context.Context, schedulin
 	}
 	if modified {
 		logger.V(6).Info("Updating pod scheduling with modified unsuitable nodes", "podSchedulingCtx", schedulingCtx)
-		if _, err := ctrl.kubeClient.ResourceV1alpha2().PodSchedulingContexts(schedulingCtx.Namespace).UpdateStatus(ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
+		if _, err := ctrl.kubeClient.ResourceV1alpha3().PodSchedulingContexts(schedulingCtx.Namespace).UpdateStatus(ctx, schedulingCtx, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("update unsuitable node status: %v", err)
 		}
 	}
@@ -866,7 +796,7 @@ func truncateNodes(nodes []string, selectedNode string) []string {
 	// this list might be too long by one element. When truncating it, make
 	// sure that the selected node is listed.
 	lenUnsuitable := len(nodes)
-	if lenUnsuitable > resourcev1alpha2.PodSchedulingNodeListMaxSize {
+	if lenUnsuitable > resourceapi.PodSchedulingNodeListMaxSize {
 		if nodes[0] == selectedNode {
 			// Truncate at the end and keep selected node in the first element.
 			nodes = nodes[0 : lenUnsuitable-1]
@@ -893,7 +823,7 @@ func (claims claimAllocations) MarshalLog() interface{} {
 var _ logr.Marshaler = claimAllocations{}
 
 // findClaim returns the index of the specified pod claim, -1 if not found.
-func findClaim(claims []resourcev1alpha2.ResourceClaimSchedulingStatus, podClaimName string) int {
+func findClaim(claims []resourceapi.ResourceClaimSchedulingStatus, podClaimName string) int {
 	for i := range claims {
 		if claims[i].Name == podClaimName {
 			return i
@@ -926,7 +856,7 @@ func stringsDiffer(a, b []string) bool {
 }
 
 // hasFinalizer checks if the claim has the finalizer of the driver.
-func (ctrl *controller) hasFinalizer(claim *resourcev1alpha2.ResourceClaim) bool {
+func (ctrl *controller) hasFinalizer(claim *resourceapi.ResourceClaim) bool {
 	for _, finalizer := range claim.Finalizers {
 		if finalizer == ctrl.finalizer {
 			return true

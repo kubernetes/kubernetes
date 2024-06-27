@@ -14,14 +14,10 @@ spec:
       - name: resource-2b
   resourceClaims:
   - name: resource-1a
-    source:
-      resourceClaimTemplateName: test-claim-template
+    resourceClaimTemplateName: test-claim-template
   - name: resource-1b
-    source:
-      resourceClaimTemplateName: test-claim-template
+    resourceClaimTemplateName: test-claim-template
   - name: resource-2a
-    source:
-      resourceClaimTemplateName: another-test-claim-template
+    resourceClaimTemplateName: another-test-claim-template
   - name: resource-2b
-    source:
-      resourceClaimTemplateName: another-test-claim-template
+    resourceClaimTemplateName: another-test-claim-template

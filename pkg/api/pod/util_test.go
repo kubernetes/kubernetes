@@ -841,10 +841,8 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 			ResourceClaims: []api.PodResourceClaim{
 				{
-					Name: "my-claim",
-					Source: api.ClaimSource{
-						ResourceClaimName: &resourceClaimName,
-					},
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
 				},
 			},
 		},

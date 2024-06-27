@@ -11,6 +11,5 @@ spec:
       - name: resource
   resourceClaims:
   - name: resource
-    source:
-      # Five pods share access to the same claim.
-      resourceClaimName: test-claim-{{div .Index 5}}
+    # Five pods share access to the same claim.
+    resourceClaimName: test-claim-{{div .Index 5}}

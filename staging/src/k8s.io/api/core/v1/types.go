@@ -2635,6 +2635,11 @@ type ResourceClaim struct {
 	// the Pod where this field is used. It makes that resource available
 	// inside a container.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// A name set in claim.spec.requests[].name.
+	//
+	// +optional
+	RequestName *string `json:"requestName,omitempty" protobuf:"bytes,2,opt,name=requestName"`
 }
 
 const (
@@ -3920,7 +3925,10 @@ type PodSpec struct {
 	ResourceClaims []PodResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,39,rep,name=resourceClaims"`
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// PodResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the pod.
+//
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
 type PodResourceClaim struct {
@@ -3928,18 +3936,15 @@ type PodResourceClaim struct {
 	// This must be a DNS_LABEL.
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	// Source describes where to find the ResourceClaim.
-	Source ClaimSource `json:"source,omitempty" protobuf:"bytes,2,name=source"`
-}
+	// Tombstone comment: "source" and protobuf index 2 were used in Kubernetes < 1.31 instead of the inlined fields.
+	// Don't reuse for something else here!
 
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-type ClaimSource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
-	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,1,opt,name=resourceClaimName"`
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimName"`
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
 	// object in the same namespace as this pod.
@@ -3953,7 +3958,10 @@ type ClaimSource struct {
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
-	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimTemplateName"`
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
+	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,4,opt,name=resourceClaimTemplateName"`
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
@@ -6918,6 +6926,10 @@ const (
 	ResourceLimitsMemory ResourceName = "limits.memory"
 	// Local ephemeral storage limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
+	// resource.k8s.io ResourceClaims, number
+	ResourceClaims ResourceName = "resourceclaims"
+	// resource.k8s.io devices requested with a certain DeviceClass, number
+	ResourceClaimsPerClass string = ".deviceclass.resource.k8s.io/devices"
 )
 
 // The following identify resource prefix for Kubernetes object types
