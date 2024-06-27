@@ -2676,6 +2676,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		newRequestsAllocated bool // Whether the new requests have already been allocated (but not actuated)
 		expectedAllocations  v1.ResourceList
 		expectedResize       v1.PodResizeStatus
+		expectBackoffReset   bool
 		goos                 string
 	}{
 		{
@@ -2684,6 +2685,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
+			expectBackoffReset:  true,
 		},
 		{
 			name:                "Request CPU increase, memory decrease - expect InProgress",
@@ -2691,6 +2693,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
+			expectBackoffReset:  true,
 		},
 		{
 			name:                "Request CPU decrease, memory increase - expect InProgress",
@@ -2698,6 +2701,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newRequests:         v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedAllocations: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedResize:      v1.PodResizeStatusInProgress,
+			expectBackoffReset:  true,
 		},
 		{
 			name:                "Request CPU and memory increase beyond current capacity - expect Deferred",
@@ -2788,6 +2792,11 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 			}
 
+			now := kubelet.clock.Now()
+			// Put the container in backoff so we can confirm backoff is reset.
+			backoffKey := kuberuntime.GetStableKey(tt.pod, &tt.pod.Spec.Containers[0])
+			kubelet.backOff.Next(backoffKey, now)
+
 			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedAllocations, updatedPod.Spec.Containers[0].Resources.Requests, "updated pod spec resources")
@@ -2798,6 +2807,13 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 			resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
 			assert.Equal(t, tt.expectedResize, resizeStatus)
+
+			isInBackoff := kubelet.backOff.IsInBackOffSince(backoffKey, now)
+			if tt.expectBackoffReset {
+				assert.False(t, isInBackoff, "container backoff should be reset")
+			} else {
+				assert.True(t, isInBackoff, "container backoff should not be reset")
+			}
 		})
 	}
 }
