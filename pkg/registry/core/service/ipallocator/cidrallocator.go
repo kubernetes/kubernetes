@@ -257,10 +257,10 @@ func (c *MetaAllocator) syncAllocators() error {
 			if c.ipFamily != api.IPFamily(convertToV1IPFamily(netutils.IPFamilyOfCIDRString(cidr))) {
 				continue
 			}
-			// the readiness state of an allocator is an OR of all readiness states
-			ready := true
-			if !isReady(serviceCIDR) || !serviceCIDR.DeletionTimestamp.IsZero() {
-				ready = false
+			// the allocator is ready if the object is ready and is not being deleted
+			ready := false
+			if isReady(serviceCIDR) && serviceCIDR.DeletionTimestamp.IsZero() {
+				ready = true
 			}
 
 			// check if an allocator already exist for this CIDR
