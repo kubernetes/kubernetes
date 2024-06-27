@@ -43,69 +43,77 @@ const KubeadmGroupName = "kubeadm.k8s.io"
 
 func TestValidateSupportedVersion(t *testing.T) {
 	tests := []struct {
-		gv                schema.GroupVersion
+		gvk               schema.GroupVersionKind
 		allowDeprecated   bool
 		allowExperimental bool
 		expectedErr       bool
 	}{
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1alpha1",
+				Kind:    "InitConfiguration",
 			},
 			expectedErr: true,
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1alpha2",
+				Kind:    "InitConfiguration",
 			},
 			expectedErr: true,
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1alpha3",
+				Kind:    "InitConfiguration",
 			},
 			expectedErr: true,
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1beta1",
+				Kind:    "InitConfiguration",
 			},
 			expectedErr: true,
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1beta2",
+				Kind:    "InitConfiguration",
 			},
 			expectedErr: true,
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1beta3",
+				Kind:    "ClusterConfiguration",
 			},
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   "foo.k8s.io",
 				Version: "v1",
+				Kind:    "InitConfiguration",
 			},
 		},
 		{
-			gv: schema.GroupVersion{
+			gvk: schema.GroupVersionKind{
 				Group:   KubeadmGroupName,
 				Version: "v1beta4",
+				Kind:    "ResetConfiguration",
 			},
 		},
 	}
 
 	for _, rt := range tests {
-		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gv, rt.allowDeprecated), func(t *testing.T) {
-			err := validateSupportedVersion(rt.gv, rt.allowDeprecated, rt.allowExperimental)
+		t.Run(fmt.Sprintf("%s/allowDeprecated:%t", rt.gvk.GroupVersion(), rt.allowDeprecated), func(t *testing.T) {
+			err := validateSupportedVersion(rt.gvk, rt.allowDeprecated, rt.allowExperimental)
 			if rt.expectedErr && err == nil {
 				t.Error("unexpected success")
 			} else if !rt.expectedErr && err != nil {
