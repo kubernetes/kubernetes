@@ -22,7 +22,7 @@ package v1beta1
 // with apply.
 type IngressRuleApplyConfiguration struct {
 	Host                               *string `json:"host,omitempty"`
-	IngressRuleValueApplyConfiguration `json:",omitempty,inline"`
+	IngressRuleValueApplyConfiguration `json:",inline"`
 }
 
 // IngressRuleApplyConfiguration constructs a declarative configuration of the IngressRule type for use with
