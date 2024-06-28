@@ -148,9 +148,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
-    {{- if not .Base}}
     - testifylint
-    {{- end}}
     - unused
   {{- if .Strict}}
   disable:
@@ -209,9 +207,9 @@ linters-settings: # please keep this alphabetized
     checks:
       - "ST1019"   # Importing the same package multiple times
   {{- end}}
-  {{- if .Strict}}
   testifylint:
     enable-all: true
+    {{- if not .Base}}
     disable:  # TODO: remove each disabled rule and fix it
       - compares
       - empty
@@ -223,4 +221,4 @@ linters-settings: # please keep this alphabetized
       - len
       - nil-compare
       - require-error
-  {{- end}}
+    {{- end}}
