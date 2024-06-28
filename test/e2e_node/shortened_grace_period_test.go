@@ -119,7 +119,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 					framework.Failf("failed to find %v event", watch.Modified)
 				}
 				// Get pod logs.
-				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{Previous: true}).Stream(ctx)
+				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{Follow: true}).Stream(ctx)
 				framework.ExpectNoError(err, "failed to get pod logs")
 				defer func() {
 					if err := logs.Close(); err != nil {
