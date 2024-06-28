@@ -427,7 +427,7 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.TxBytes, label+".Net.TxBytes")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.TxErrors, label+".Net.TxErrors")
 
-	assert.EqualValues(t, 2, len(stats.Interfaces), "network interfaces should contain 2 elements")
+	assert.Len(t, stats.Interfaces, 2, "network interfaces should contain 2 elements")
 
 	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is not eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")

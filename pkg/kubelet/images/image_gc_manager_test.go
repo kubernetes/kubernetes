@@ -780,7 +780,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 	t.Log(fakeClock.Now())
 	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
 	require.NoError(t, err)
-	require.Equal(t, len(images), 1)
+	require.Len(t, images, 1)
 	// Simulate pod having just used this image, but having been GC'd
 	images[0].lastUsed = fakeClock.Now()
 
@@ -796,7 +796,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 	fakeClock.Step(policy.MaxAge + 1)
 	images, err = manager.freeOldImages(ctx, images, fakeClock.Now(), oldStartTime)
 	require.NoError(t, err)
-	assert.Len(images, 0)
+	assert.Empty(images)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
@@ -837,7 +837,7 @@ func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
 	t.Log(fakeClock.Now())
 	images, err := manager.imagesInEvictionOrder(ctx, fakeClock.Now())
 	require.NoError(t, err)
-	require.Equal(t, len(images), 1)
+	require.Len(t, images, 1)
 	assert.Len(fakeRuntime.ImageList, 2)
 
 	oldStartTime := fakeClock.Now()

@@ -113,5 +113,5 @@ func testStore(t *testing.T, store Store) {
 	// Test list keys.
 	keys, err = store.List()
 	require.NoError(t, err)
-	assert.Equal(t, len(keys), 0)
+	assert.Empty(t, keys)
 }

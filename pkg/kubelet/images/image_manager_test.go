@@ -374,7 +374,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
 
 		images, _ := fakeRuntime.ListImages(ctx)
-		assert.Equal(t, 1, len(images), "ListImages() count")
+		assert.Len(t, images, 1, "ListImages() count")
 
 		image := images[0]
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")
@@ -431,7 +431,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 		assert.Equal(t, c.expected[0].shouldRecordFinishedPullingTime, fakePodPullingTimeRecorder.finishedPullingRecorded)
 
 		images, _ := fakeRuntime.ListImages(ctx)
-		assert.Equal(t, 1, len(images), "ListImages() count")
+		assert.Len(t, images, 1, "ListImages() count")
 
 		image := images[0]
 		assert.Equal(t, "missing_image:latest", image.ID, "Image ID")

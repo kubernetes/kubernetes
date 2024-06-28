@@ -600,8 +600,8 @@ func TestKillPod(t *testing.T) {
 
 	err = m.KillPod(ctx, pod, runningPod, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(fakeRuntime.Containers))
-	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	assert.Len(t, fakeRuntime.Containers, 3)
+	assert.Len(t, fakeRuntime.Sandboxes, 1)
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
 	}
@@ -640,9 +640,9 @@ func TestSyncPod(t *testing.T) {
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
 	result := m.SyncPod(context.Background(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
-	assert.Equal(t, 2, len(fakeRuntime.Containers))
-	assert.Equal(t, 2, len(fakeImage.Images))
-	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
+	assert.Len(t, fakeRuntime.Containers, 2)
+	assert.Len(t, fakeImage.Images, 2)
+	assert.Len(t, fakeRuntime.Sandboxes, 1)
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
 	}
