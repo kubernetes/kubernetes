@@ -30,6 +30,7 @@ import (
 	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -430,6 +431,7 @@ func TestAddFlags(t *testing.T) {
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			},
 			RemoteKubeConfigFileOptional: true,
+			Anonymous:                    &apiserver.AnonymousAuthConfig{Enabled: true},
 		},
 		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
 			AllowCacheTTL:                10 * time.Second,

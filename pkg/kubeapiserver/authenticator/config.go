@@ -55,7 +55,10 @@ import (
 
 // Config contains the data on how to authenticate a request to the Kube API Server
 type Config struct {
-	Anonymous      bool
+	// Anonymous holds the effective anonymous config, specified either via config file
+	// (hoisted out of AuthenticationConfig) or via flags (constructed from flag-specified values).
+	Anonymous apiserver.AnonymousAuthConfig
+
 	BootstrapToken bool
 
 	TokenAuthFile               string
@@ -213,8 +216,8 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 	}
 
 	if len(authenticators) == 0 {
-		if config.Anonymous {
-			return anonymous.NewAuthenticator(), nil, &securityDefinitionsV2, securitySchemesV3, nil
+		if config.Anonymous.Enabled {
+			return anonymous.NewAuthenticator(config.Anonymous.Conditions), nil, &securityDefinitionsV2, securitySchemesV3, nil
 		}
 		return nil, nil, &securityDefinitionsV2, securitySchemesV3, nil
 	}
@@ -223,10 +226,10 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 
 	authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 
-	if config.Anonymous {
+	if config.Anonymous.Enabled {
 		// If the authenticator chain returns an error, return an error (don't consider a bad bearer token
 		// or invalid username/password combination anonymous).
-		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator(config.Anonymous.Conditions))
 	}
 
 	return authenticator, updateAuthenticationConfig, &securityDefinitionsV2, securitySchemesV3, nil
