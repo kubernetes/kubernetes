@@ -101,11 +101,17 @@ func TestJSONSchemaPropsOrArrayUnmarshalJSON(t *testing.T) {
 		{`{"val1": {"type":"string"}}`, JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}}},
 		{`{"val1": [{}]}`, JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}}},
 		{`{"val1": [{},{"type":"string"}]}`, JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}}},
+		{`{"val1": "foo"}`, JSONSchemaPropsOrArrayHolder{}},
+		{`{"val1": 7}`, JSONSchemaPropsOrArrayHolder{}},
+		{`{"val1": true}`, JSONSchemaPropsOrArrayHolder{}},
 
 		{`{"val2": {}}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{}}}},
 		{`{"val2": {"type":"string"}}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}}},
 		{`{"val2": [{}]}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}}},
 		{`{"val2": [{},{"type":"string"}]}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}}},
+		{`{"val2": "foo"}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{}}},
+		{`{"val2": 7}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{}}},
+		{`{"val2": true}`, JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{}}},
 	}
 
 	for _, c := range cases {
