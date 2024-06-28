@@ -19,6 +19,7 @@ package filters
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -700,17 +701,20 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 			stopCh := make(chan struct{})
 			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-			headerMatcher := headerMatcher{}
 			// we will raise a panic for the first request.
 			firstRequestPathPanic, secondRequestPathShouldWork := "/request/first/panic-as-expected", "/request/second/should-succeed-as-expected"
 			firstHandlerDoneCh, secondHandlerDoneCh := make(chan struct{}), make(chan struct{})
 			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				headerMatcher.inspect(t, w, fsName, plName)
 				switch {
 				case r.URL.Path == firstRequestPathPanic:
 					close(firstHandlerDoneCh)
 					panic(fmt.Errorf("request handler panic'd as expected - %#v", r.RequestURI))
 				case r.URL.Path == secondRequestPathShouldWork:
+					// write to the ResponseWriter, so the timeout handler
+					// copies the response header to the original ResponseWriter.
+					if _, err := w.Write([]byte("success")); err != nil {
+						t.Errorf("unexpected error from Write: %v", err)
+					}
 					close(secondHandlerDoneCh)
 				}
 			})
@@ -724,7 +728,7 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 			// we send two requests synchronously, one at a time
 			//  - the first request is expected to panic, and
 			//  - the second request is expected to succeed
-			_, err := requestGetter(firstRequestPathPanic)
+			_, err := requestGetter(t, firstRequestPathPanic, "")
 
 			// did the handler of the first request panic, as expected?
 			select {
@@ -738,8 +742,9 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 			expectStreamResetError(t, err)
 
 			// the second request should be served successfully.
-			response, err := requestGetter(secondRequestPathShouldWork)
+			response, err := requestGetter(t, secondRequestPathShouldWork, "")
 			expectStatusCode(t, http.StatusOK, secondRequestPathShouldWork, response, err)
+			expectResponseHeader(t, response, fsName, plName)
 
 			select {
 			case <-secondHandlerDoneCh:
@@ -786,12 +791,9 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 			stopCh := make(chan struct{})
 			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-			headerMatcher := headerMatcher{}
 			rquestTimesOutPath := "/request/time-out-as-expected"
 			reqHandlerCompletedCh, callerRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				headerMatcher.inspect(t, w, fsName, plName)
-
 				if r.URL.Path == rquestTimesOutPath {
 					defer close(reqHandlerCompletedCh)
 
@@ -817,7 +819,7 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 				defer close(callerRoundTripDoneCh)
 
 				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-				response, err = requestGetter(rquestTimesOutPath)
+				response, err = requestGetter(t, rquestTimesOutPath, "")
 				if isClientTimeout(err) {
 					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
 				}
@@ -871,12 +873,9 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 			stopCh := make(chan struct{})
 			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-			headerMatcher := headerMatcher{}
 			reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
 			rquestTimesOutPath := "/request/time-out-as-expected"
 			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				headerMatcher.inspect(t, w, fsName, plName)
-
 				if r.URL.Path == rquestTimesOutPath {
 					<-callerRoundTripDoneCh
 
@@ -905,7 +904,7 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 			func() {
 				defer close(callerRoundTripDoneCh)
 				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-				response, err = requestGetter(rquestTimesOutPath)
+				response, err = requestGetter(t, rquestTimesOutPath, "")
 				if isClientTimeout(err) {
 					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
 				}
@@ -962,12 +961,9 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 			stopCh := make(chan struct{})
 			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-			headerMatcher := headerMatcher{}
 			rquestTimesOutPath := "/request/time-out-as-expected"
 			reqHandlerErrCh, callerRoundTripDoneCh := make(chan error, 1), make(chan struct{})
 			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				headerMatcher.inspect(t, w, fsName, plName)
-
 				if r.URL.Path == rquestTimesOutPath {
 					// after the inner handler writes to the underlying
 					// ResponseWriter, we let the request time out.
@@ -997,7 +993,7 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 			func() {
 				defer close(callerRoundTripDoneCh)
 				t.Logf("Waiting for the request: %q to time out", rquestTimesOutPath)
-				_, err = requestGetter(rquestTimesOutPath)
+				_, err = requestGetter(t, rquestTimesOutPath, "")
 				if isClientTimeout(err) {
 					t.Fatalf("the client has unexpectedly timed out - request: %q error: %s", rquestTimesOutPath, err.Error())
 				}
@@ -1062,12 +1058,10 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 			stopCh := make(chan struct{})
 			controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-			headerMatcher := headerMatcher{}
 			firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-expected", "/request/second/enqueued-as-expected"
 			firstReqHandlerErrCh, firstReqInProgressCh := make(chan error, 1), make(chan struct{})
 			firstReqRoundTripDoneCh, secondReqRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 			requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				headerMatcher.inspect(t, w, fsName, plName)
 				switch {
 				case r.URL.Path == firstRequestTimesOutPath:
 					close(firstReqInProgressCh)
@@ -1088,16 +1082,23 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 				}
 			})
 
-			// NOTE: the server will enforce a 5s timeout on every
+			// NOTE: the server will enforce a default 1m timeout on every
 			//  incoming request, and the client enforces a timeout of 1m.
-			handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
+			handler := newHandlerChain(t, requestHandler, controller, userName, time.Minute)
 			server, requestGetter := newHTTP2ServerWithClient(handler, time.Minute)
 			defer server.Close()
 
 			// This test involves two requests sent to the same priority level, which has 1 queue and
 			// a concurrency limit of 1.  The handler chain include the timeout filter.
 			// Each request is sent from a separate goroutine, with a client-side timeout of 1m, on
-			// the other hand, the server enforces a timeout of 5s (via the timeout filter).
+			// the other hand:
+			//  - the server enforces a timeout of 10s for the first request, and 8s for the second
+			//  (via the timeout filter).
+			//  - both requests are fired at the same time, the first request is expected to timeout
+			//  after 10s, and the second request is expected to be rejected by APF after 2s (queue
+			//  wait timeout is 1/4th of request deadline). This leaves a time window of (8s - 2s)
+			//  of 6s to withstand flake (second request unexpectedly being timed out by the
+			//  timeout filter) in CI.
 			// The first request should get dispatched immediately; execution (a) starts with closing
 			// the channel that triggers the second client goroutine to send its request and then (b)
 			// waits for both client goroutines to have gotten a response (expected to be timeouts).
@@ -1112,13 +1113,14 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 			// (a) writing an HTTP response message with status 504 to indicate the timeout or (b) doing an
 			// HTTP/2 stream close; the latter is done if either the connection has been "hijacked" or some
 			// other goroutine (e.g., the one running the inner handler) has started to write a response.
-			// In the scenario tested here, there is thus a race between two goroutines to respond to
-			// the second request and any of their responses is allowed by the test.
+			// In the scenario tested here, although there is thus a race between two goroutines to respond
+			// to the second request, we have provided padding to withstand flakes in CI, we expect to see
+			// 429 status code for the second request.
 			firstReqResultCh, secondReqResultCh := make(chan result, 1), make(chan result, 1)
 			go func() {
 				defer close(firstReqRoundTripDoneCh)
 				t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), firstRequestTimesOutPath)
-				resp, err := requestGetter(firstRequestTimesOutPath)
+				resp, err := requestGetter(t, firstRequestTimesOutPath, "timeout=10s")
 				t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), firstRequestTimesOutPath)
 				firstReqResultCh <- result{err: err, response: resp}
 			}()
@@ -1129,7 +1131,7 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 
 				<-firstReqInProgressCh
 				t.Logf("At %s, Sending request: %q", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
-				resp, err := requestGetter(secondRequestEnqueuedPath)
+				resp, err := requestGetter(t, secondRequestEnqueuedPath, "timeout=8s")
 				t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), secondRequestEnqueuedPath)
 				secondReqResultCh <- result{err: err, response: resp}
 			}()
@@ -1161,6 +1163,7 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 			// b) we don't expect a stream reset error, since the second request
 			// handler never panics or writes to the ResponseWriter object.
 			expectStatusCode(t, http.StatusTooManyRequests, secondRequestEnqueuedPath, secondReqResult.response, secondReqResult.err)
+			expectResponseHeader(t, secondReqResult.response, fsName, plName)
 
 			close(stopCh)
 			t.Log("Waiting for the controller to shutdown")
@@ -1218,34 +1221,46 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 }
 
 // returns a started http2 server, with a client function to send request to the server.
-func newHTTP2ServerWithClient(handler http.Handler, clientTimeout time.Duration) (*httptest.Server, func(path string) (*http.Response, error)) {
+func newHTTP2ServerWithClient(handler http.Handler, clientTimeout time.Duration) (*httptest.Server, func(t *testing.T, path, params string) (*http.Response, error)) {
 	server := httptest.NewUnstartedServer(handler)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	cli := server.Client()
 	cli.Timeout = clientTimeout
-	return server, func(path string) (*http.Response, error) {
-		return cli.Get(server.URL + path)
+	return server, func(t *testing.T, path, params string) (*http.Response, error) {
+		resp, err := cli.Get(fmt.Sprintf("%s%s?%s", server.URL, path, params))
+
+		// TODO: the test suite does not assert on the content of the
+		// response body, so we read it off and close it here. move this
+		// function out of here, into its own contruct so test can opt in
+		// to assert on status code, body, headers.
+		if resp != nil {
+			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+				t.Errorf("unexpected error while reading from the response body: %v", err)
+			}
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("unexpected error while closing the response body: %v", err)
+			}
+		}
+		return resp, err
 	}
 }
 
-type headerMatcher struct{}
-
 // verifies that the expected flow schema and priority level UIDs are attached to the header.
-func (m *headerMatcher) inspect(t *testing.T, w http.ResponseWriter, expectedFS, expectedPL string) {
+func expectResponseHeader(t *testing.T, resp *http.Response, expectedFS, expectedPL string) {
 	t.Helper()
 	err := func() error {
-		if w == nil {
+		if resp == nil {
 			return fmt.Errorf("expected a non nil HTTP response")
 		}
 
 		key := flowcontrol.ResponseHeaderMatchedFlowSchemaUID
-		if value := w.Header().Get(key); expectedFS != value {
+		if value := resp.Header.Get(key); expectedFS != value {
 			return fmt.Errorf("expected HTTP header %s to have value %q, but got: %q", key, expectedFS, value)
 		}
 
 		key = flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID
-		if value := w.Header().Get(key); expectedPL != value {
+		if value := resp.Header.Get(key); expectedPL != value {
 			return fmt.Errorf("expected HTTP header %s to have value %q, but got %q", key, expectedPL, value)
 		}
 		return nil
@@ -1376,6 +1391,7 @@ func newConfiguration(fsName, plName, user string, concurrency int32, queueLengt
 					Type:    responseType,
 					Queuing: qcfg,
 				},
+				BorrowingLimitPercent: ptr.To(int32(0)),
 			},
 		},
 	}
