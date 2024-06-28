@@ -89,8 +89,11 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	cmd.Flags().StringVar(&flags.apiServerManifestPath, "api-server-manifest", defaultAPIServerManifestPath, "path to API server manifest")
+	cmd.Flags().MarkDeprecated("api-server-manifest", "This flag is deprecated and will be removed in a future release.")
 	cmd.Flags().StringVar(&flags.controllerManagerManifestPath, "controller-manager-manifest", defaultControllerManagerManifestPath, "path to controller manifest")
+	cmd.Flags().MarkDeprecated("controller-manager-manifest", "This flag is deprecated and will be removed in a future release.")
 	cmd.Flags().StringVar(&flags.schedulerManifestPath, "scheduler-manifest", defaultSchedulerManifestPath, "path to scheduler manifest")
+	cmd.Flags().MarkDeprecated("scheduler-manifest", "This flag is deprecated and will be removed in a future release.")
 	cmd.Flags().IntVarP(&flags.contextLines, "context-lines", "c", 3, "How many lines of context in the diff")
 
 	return cmd
