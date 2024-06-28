@@ -69,8 +69,8 @@ import (
 // composite Value. Modifying an empty, read-only value panics.
 type Value value
 
-// The protoreflect API uses a custom Value union type instead of interface{}
-// to keep the future open for performance optimizations. Using an interface{}
+// The protoreflect API uses a custom Value union type instead of any
+// to keep the future open for performance optimizations. Using an any
 // always incurs an allocation for primitives (e.g., int64) since it needs to
 // be boxed on the heap (as interfaces can only contain pointers natively).
 // Instead, we represent the Value union as a flat struct that internally keeps
@@ -85,7 +85,7 @@ type Value value
 // ValueOf returns a Value initialized with the concrete value stored in v.
 // This panics if the type does not match one of the allowed types in the
 // Value union.
-func ValueOf(v interface{}) Value {
+func ValueOf(v any) Value {
 	switch v := v.(type) {
 	case nil:
 		return Value{}
@@ -192,10 +192,10 @@ func (v Value) IsValid() bool {
 	return v.typ != nilType
 }
 
-// Interface returns v as an interface{}.
+// Interface returns v as an any.
 //
 // Invariant: v == ValueOf(v).Interface()
-func (v Value) Interface() interface{} {
+func (v Value) Interface() any {
 	switch v.typ {
 	case nilType:
 		return nil
@@ -406,8 +406,8 @@ func (k MapKey) IsValid() bool {
 	return Value(k).IsValid()
 }
 
-// Interface returns k as an interface{}.
-func (k MapKey) Interface() interface{} {
+// Interface returns k as an any.
+func (k MapKey) Interface() any {
 	return Value(k).Interface()
 }
 

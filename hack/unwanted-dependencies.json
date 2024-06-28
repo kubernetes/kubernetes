@@ -189,7 +189,6 @@
       "google.golang.org/appengine": [
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/prometheus/client_golang",
-        "github.com/prometheus/common",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "google.golang.org/grpc"
       ],

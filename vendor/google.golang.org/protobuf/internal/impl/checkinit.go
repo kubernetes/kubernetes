@@ -68,7 +68,7 @@ func (mi *MessageInfo) isInitExtensions(ext *map[int32]ExtensionField) error {
 	}
 	for _, x := range *ext {
 		ei := getExtensionFieldInfo(x.Type())
-		if ei.funcs.isInit == nil {
+		if ei.funcs.isInit == nil || x.isUnexpandedLazy() {
 			continue
 		}
 		v := x.Value()

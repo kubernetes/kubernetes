@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 )
 
 // A LabelSet is a collection of LabelName and LabelValue pairs.  The LabelSet
@@ -127,16 +126,6 @@ func (l LabelSet) Merge(other LabelSet) LabelSet {
 	}
 
 	return result
-}
-
-func (l LabelSet) String() string {
-	lstrs := make([]string, 0, len(l))
-	for l, v := range l {
-		lstrs = append(lstrs, fmt.Sprintf("%s=%q", l, v))
-	}
-
-	sort.Strings(lstrs)
-	return fmt.Sprintf("{%s}", strings.Join(lstrs, ", "))
 }
 
 // Fingerprint returns the LabelSet's fingerprint.
