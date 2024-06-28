@@ -167,9 +167,9 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 					Args: []string{`
 term() {
   if [ "$COUNT" -eq 0 ]; then
-    echo "SIGINT 1" >> /dev/termination-log
+    echo "SIGINT 1" 
   elif [ "$COUNT" -eq 1 ]; then
-    echo "SIGINT 2" >> /dev/termination-log
+    echo "SIGINT 2"
     sleep 50
     exit 0
   fi
