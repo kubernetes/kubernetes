@@ -148,7 +148,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
-    {{- if .Strict}}
+    {{- if not .Base}}
     - testifylint
     {{- end}}
     - unused
