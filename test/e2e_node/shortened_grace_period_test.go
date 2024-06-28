@@ -56,36 +56,20 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			testRcNamespace := ns
 			expectedWatchEvents := []watch.Event{
-				{Type: watch.Added},
 				{Type: watch.Modified},
 				{Type: watch.Modified},
+				{Type: watch.Deleted},
 			}
 			eventFound := false
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
+				podClient.CreateSync(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
+
 				w, err := podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
-				framework.ExpectNoError(err, "failed to watch")
-				podClient.Create(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
-				ctxUntil, cancel := context.WithTimeout(ctx, 15*time.Second)
-				defer cancel()
-				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
-					if watchEvent.Type != watch.Added {
-						return false, nil
-					}
-					actualWatchEvents = append(actualWatchEvents, watchEvent)
-					eventFound = true
-					return true, nil
-				})
-				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-				if !eventFound {
-					framework.Failf("failed to find %v event", watch.Added)
-				}
-				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 				framework.ExpectNoError(err, "failed to delete pod")
-				ctxUntil, cancel = context.WithTimeout(ctx, 20*time.Second)
+				ctxUntil, cancel := context.WithTimeout(ctx, 20*time.Second)
 				defer cancel()
-				eventFound := false
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
 					if watchEvent.Type != watch.Modified {
 						return false, nil
@@ -135,6 +119,23 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				// Verify the number of SIGINT
 				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
 				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
+				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
+				framework.ExpectNoError(err, "failed to watch")
+				ctxUntil, cancel = context.WithTimeout(ctx, 15*time.Second)
+				defer cancel()
+				eventFound = false
+				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
+					if watchEvent.Type != watch.Deleted {
+						return false, nil
+					}
+					actualWatchEvents = append(actualWatchEvents, watchEvent)
+					eventFound = true
+					return true, nil
+				})
+				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
+				if !eventFound {
+					framework.Failf("failed to find %v event", watch.Deleted)
+				}
 				return expectedWatchEvents
 			}
 			framework.WatchEventSequenceVerifier(ctx, dc, rcResource, ns, podName, metav1.ListOptions{LabelSelector: "test-shortened-grace=true"}, expectedWatchEvents, callback, func() (err error) {
