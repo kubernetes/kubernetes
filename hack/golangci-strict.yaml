@@ -222,14 +222,3 @@ linters-settings: # please keep this alphabetized
       - "all"
   testifylint:
     enable-all: true
-    disable:  # TODO: remove each disabled rule and fix it
-      - compares
-      - empty
-      - error-is-as
-      - error-nil
-      - expected-actual
-      - float-compare
-      - go-require
-      - len
-      - nil-compare
-      - require-error
