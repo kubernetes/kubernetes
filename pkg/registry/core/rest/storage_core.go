@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -351,6 +352,37 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, err
 		}
+		var bitmapAllocator ipallocator.Interface
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+			bitmapAllocator, err = ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+				mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+				if err != nil {
+					return nil, err
+				}
+				// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
+				// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
+				// the ResourceVersion of the opaque API object is zero.
+				rangeRegistry, err := etcd.Get()
+				if err != nil {
+					return nil, err
+				}
+				rangeRegistry.Range = serviceClusterIPRange.String()
+				if len(rangeRegistry.ResourceVersion) == 0 {
+					klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
+					err := etcd.CreateOrUpdate(rangeRegistry)
+					if err != nil {
+						return nil, err
+					}
+				}
+				registries.clusterIP = etcd
+				return etcd, nil
+			})
+			if err != nil {
+				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %w", err)
+			}
+
+		}
 		// TODO(aojea) Revisit the initialization of the allocators
 		// since right now it depends on the service-cidr flags and
 		// sets the default IPFamily that may not be coherent with the
@@ -360,6 +392,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			c.Informers.Networking().V1alpha1().ServiceCIDRs(),
 			c.Informers.Networking().V1alpha1().IPAddresses(),
 			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+			bitmapAllocator,
 		)
 		if err != nil {
 			return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
@@ -391,6 +424,37 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, err
 			}
+			var bitmapAllocator ipallocator.Interface
+			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+				bitmapAllocator, err = ipallocator.New(&c.Services.SecondaryClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+					mem := allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+					// TODO etcdallocator package to return a storage interface via the storageFactory
+					etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+					if err != nil {
+						return nil, err
+					}
+					// It is possible to start apiserver clusters with the new allocator and dual write enable on new environments.
+					// If this is the case we need to initialize the bitmap or it will fail to allocate IP addresses because
+					// the ResourceVersion of the opaque API object is zero.
+					rangeRegistry, err := etcd.Get()
+					if err != nil {
+						return nil, err
+					}
+					rangeRegistry.Range = serviceClusterIPRange.String()
+					if len(rangeRegistry.ResourceVersion) == 0 {
+						klog.Infof("kube-apiserver started with IP allocator and dual write enabled but bitmap allocator does not exist, recreating it ...")
+						err := etcd.CreateOrUpdate(rangeRegistry)
+						if err != nil {
+							return nil, err
+						}
+					}
+					registries.secondaryClusterIP = etcd
+					return etcd, nil
+				})
+				if err != nil {
+					return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %w", err)
+				}
+			}
 			// TODO(aojea) Revisit the initialization of the allocators
 			// since right now it depends on the service-cidr flags and
 			// sets the default IPFamily that may not be coherent with the
@@ -400,6 +464,7 @@ func (c *Config) newServiceIPAllocators() (registries rangeRegistries, primaryCl
 				c.Informers.Networking().V1alpha1().ServiceCIDRs(),
 				c.Informers.Networking().V1alpha1().IPAddresses(),
 				netutils.IsIPv6CIDR(&c.Services.SecondaryClusterIPRange),
+				bitmapAllocator,
 			)
 			if err != nil {
 				return rangeRegistries{}, nil, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)

@@ -206,7 +206,13 @@ func (a *Allocator) allocateService(svc *api.Service, ip net.IP, dryRun bool) er
 	if dryRun {
 		return nil
 	}
-	return a.createIPAddress(ip.String(), svc, "static")
+	start := time.Now()
+	err = a.createIPAddress(ip.String(), svc, "static")
+	if err != nil {
+		return err
+	}
+	a.metrics.setLatency(a.metricLabel, time.Since(start))
+	return nil
 }
 
 // AllocateNext return an IP address that wasn't allocated yet.
@@ -239,6 +245,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 
 	trace := utiltrace.New("allocate dynamic ClusterIP address")
 	defer trace.LogIfLong(500 * time.Millisecond)
+	start := time.Now()
 
 	// rand.Int63n panics for n <= 0 so we need to avoid problems when
 	// converting from uint64 to int64
@@ -255,6 +262,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 	iterator := ipIterator(a.offsetAddress, a.lastAddress, offset)
 	ip, err := a.allocateFromRange(iterator, svc)
 	if err == nil {
+		a.metrics.setLatency(a.metricLabel, time.Since(start))
 		return ip, nil
 	}
 	// check the lower range
@@ -263,6 +271,7 @@ func (a *Allocator) allocateNextService(svc *api.Service, dryRun bool) (net.IP, 
 		iterator = ipIterator(a.firstAddress, a.offsetAddress.Prev(), offset)
 		ip, err = a.allocateFromRange(iterator, svc)
 		if err == nil {
+			a.metrics.setLatency(a.metricLabel, time.Since(start))
 			return ip, nil
 		}
 	}

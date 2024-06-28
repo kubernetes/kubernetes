@@ -27,10 +27,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
@@ -49,7 +47,6 @@ import (
 // 6. start the new apiserver with the new ServiceCIDRs on the flags and shutdown the old one
 // 7. delete the kubernetes.default service, the new apiserver will recreate it within the new ServiceCIDR
 func TestMigrateServiceCIDR(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, true)
 	tCtx := ktesting.Init(t)
 
 	cidr1 := "192.168.0.0/29"
@@ -64,6 +61,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
+			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 
@@ -168,18 +166,22 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		if svc.Name == "kubernetes" {
 			continue
 		}
+
+		if err := client1.CoreV1().Services(svc.Namespace).Delete(context.Background(), svc.Name, metav1.DeleteOptions{}); err != nil {
+			t.Fatalf("got unexpected error: %v", err)
+		}
+		t.Logf("Deleted Service with IP %s", svc.Spec.ClusterIP)
+
 		// wipe the necessary fields so we can recreate the Service
 		svc.ResourceVersion = ""
 		svc.Spec.ClusterIP = ""
 		svc.Spec.ClusterIPs = nil
 		svc.Status = v1.ServiceStatus{}
-		if err := client1.CoreV1().Services(svc.Namespace).Delete(context.Background(), svc.Name, metav1.DeleteOptions{}); err != nil {
-			t.Fatalf("got unexpected error: %v", err)
-		}
 		svc, err := client1.CoreV1().Services(svc.Namespace).Create(context.Background(), &svc, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("got unexpected error: %v", err)
 		}
+		t.Logf("Created Service with IP %s", svc.Spec.ClusterIP)
 		if !cidrContainsIP(cidr2, svc.Spec.ClusterIP) {
 			t.Fatalf("Service expected to have an ip in range 10.168.0.0/24, got %s", svc.Spec.ClusterIP)
 		}
@@ -233,19 +235,23 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		}
 
 		if len(cidr.Spec.CIDRs) == 0 {
+			t.Logf("No CIDR available")
 			return false, nil
 		}
 
 		if cidr.Spec.CIDRs[0] != cidr2 {
+			t.Logf("CIDR expected %s got %s", cidr2, cidr.Spec.CIDRs[0])
 			return false, nil
 		}
 
 		if len(cidr.Finalizers) == 0 {
+			t.Logf("Expected finalizer to be set")
 			return false, nil
 		}
 
 		for _, condition := range cidr.Status.Conditions {
 			if condition.Type == networkingv1alpha1.ServiceCIDRConditionReady {
+				t.Logf("Expected Condition %s to be %s", condition.Status, metav1.ConditionTrue)
 				return condition.Status == metav1.ConditionTrue, nil
 			}
 		}
