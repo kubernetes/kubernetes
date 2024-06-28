@@ -19,6 +19,7 @@ package e2enode
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -117,6 +118,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				}
 				podLogs := buf.String()
 				// Verify the number of SIGINT
+				gomega.Expect(strings.Count(podLogs, "demo")).To(gomega.Equal(1), fmt.Sprintf("demo SIGTERM is:%s", podLogs))
 				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
 				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
 				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
@@ -166,6 +168,7 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 					Command: []string{"sh", "-c"},
 					Args: []string{`
 term() {
+  echo "Caught SIGTERM signal!
   if [ "$COUNT" -eq 0 ]; then
     echo "SIGINT 1"
   elif [ "$COUNT" -eq 1 ]; then
