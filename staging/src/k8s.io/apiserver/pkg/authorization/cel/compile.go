@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	celast "github.com/google/cel-go/common/ast"
+	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types/ref"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -118,13 +119,28 @@ func (c compiler) CompileCELExpression(expressionAccessor ExpressionAccessor) (C
 
 	var usesFieldSelector, usesLabelSelector bool
 	celast.PreOrderVisit(celast.NavigateAST(celAST), celast.NewExprVisitor(func(e celast.Expr) {
-		if e.Kind() == celast.SelectKind {
-			switch e.AsSelect().FieldName() {
-			case fieldSelectorVarName:
-				usesFieldSelector = true
-			case labelSelectorVarName:
-				usesLabelSelector = true
+		var fieldName string
+		switch e.Kind() {
+		case celast.SelectKind:
+			// simple select (.fieldSelector / .labelSelector)
+			fieldName = e.AsSelect().FieldName()
+		case celast.CallKind:
+			// optional select (.?fieldSelector / .?labelSelector)
+			if e.AsCall().FunctionName() != operators.OptSelect {
+				return
 			}
+			args := e.AsCall().Args()
+			if len(args) != 2 || args[1].Kind() != celast.LiteralKind || args[1].AsLiteral().Type() != cel.StringType {
+				return
+			}
+			fieldName, _ = args[1].AsLiteral().Value().(string)
+		}
+
+		switch fieldName {
+		case fieldSelectorVarName:
+			usesFieldSelector = true
+		case labelSelectorVarName:
+			usesLabelSelector = true
 		}
 	}))
 

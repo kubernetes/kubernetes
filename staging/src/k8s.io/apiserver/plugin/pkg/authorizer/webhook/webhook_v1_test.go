@@ -783,10 +783,16 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 					Expression: "has(request.resourceAttributes) && request.resourceAttributes.namespace == 'kittensandponies'",
 				},
 				{
-					Expression: "request.resourceAttributes.fieldSelector.requirements.exists(r, r.key=='foo' && r.operator=='In' && ('bar' in r.values))",
+					Expression: "request.?resourceAttributes.fieldSelector.requirements.orValue([]).exists(r, r.key=='foo' && r.operator=='In' && ('bar' in r.values))",
 				},
 				{
-					Expression: "request.resourceAttributes.labelSelector.requirements.exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+					Expression: "request.?resourceAttributes.labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.?labelSelector.requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
+				},
+				{
+					Expression: "request.resourceAttributes.labelSelector.?requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
 				},
 			},
 			featureEnabled:  true,

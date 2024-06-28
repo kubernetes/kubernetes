@@ -173,7 +173,7 @@ func compareFieldsForType(t *testing.T, nativeType reflect.Type, declType *apise
 
 func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	switch nativeType {
-	case reflect.TypeOf(""), reflect.TypeOf(metav1.LabelSelectorOperator("")):
+	case reflect.TypeOf(""), reflect.TypeOf(metav1.LabelSelectorOperator("")), reflect.TypeOf(metav1.FieldSelectorOperator("")):
 		return apiservercel.StringType
 	case reflect.TypeOf([]string{}):
 		return apiservercel.NewListType(apiservercel.StringType, -1)
@@ -207,9 +207,9 @@ func nativeTypeToCELType(t *testing.T, nativeType reflect.Type, field func(name 
 			return nil
 		}
 		return selectorAttributesDeclType
-	case reflect.TypeOf([]v1.FieldSelectorRequirement{}):
+	case reflect.TypeOf([]metav1.FieldSelectorRequirement{}):
 		requirementType := buildSelectorRequirementType(field, fields)
-		if err := compareFieldsForType(t, reflect.TypeOf(v1.FieldSelectorRequirement{}), requirementType, field, fields); err != nil {
+		if err := compareFieldsForType(t, reflect.TypeOf(metav1.FieldSelectorRequirement{}), requirementType, field, fields); err != nil {
 			t.Error(err)
 			return nil
 		}
