@@ -28,15 +28,33 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	endpointutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
 // podToEndpoint returns an Endpoint object generated from a Pod, a Node, and a Service for a particular addressType.
 func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType discovery.AddressType) discovery.Endpoint {
+	// A pod is serving if it has no readiness probes and containers are still running, or if it
+	// has readiness probes and the probes are still returning true. A pod that is terminating may
+	// still be considered ready.
 	serving := endpointutil.IsPodReady(pod)
+
+	// A pod that has been requested for deletion via the API (has DeletionTimestamp not nil) or
+	// a pod that is being disrupted on the Kubelet for any reason is considered to be terminating.
+	//
+	// The latter includes static pods that are beginning termination due to update or removal,
+	// eviction, graceful node shutdown, or any future scenario where the node is certain that the
+	// pod will stop running for some period of time.
 	terminating := pod.DeletionTimestamp != nil
+	if !terminating {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditionSignalsTerminating) {
+			terminating = endpointutil.IsPodDisruptionTarget(pod)
+		}
+	}
+
 	// For compatibility reasons, "ready" should never be "true" if a pod is terminatng, unless
 	// publishNotReadyAddresses was set.
 	ready := service.Spec.PublishNotReadyAddresses || (serving && !terminating)

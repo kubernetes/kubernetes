@@ -3142,7 +3142,7 @@ const (
 	PodReasonSchedulerError = "SchedulerError"
 
 	// TerminationByKubelet reason in DisruptionTarget pod condition indicates that the termination
-	// is initiated by kubelet
+	// is initiated by kubelet.
 	PodReasonTerminationByKubelet = "TerminationByKubelet"
 
 	// PodReasonPreemptionByScheduler reason in DisruptionTarget pod condition indicates that the

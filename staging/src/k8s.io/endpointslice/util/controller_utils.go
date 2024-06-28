@@ -31,8 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -107,6 +109,16 @@ func ShouldPodBeInEndpoints(pod *v1.Pod, includeTerminating bool) bool {
 		return false
 	}
 
+	// A pod that is being disrupted on the Kubelet for any reason should be excluded
+	// from the list of endpoints.
+	if !includeTerminating {
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditionSignalsTerminating) {
+			if IsPodDisruptionTarget(pod) {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
@@ -146,6 +158,13 @@ func podEndpointsChanged(oldPod, newPod *v1.Pod) (bool, bool) {
 	}
 	for i := range oldPod.Status.PodIPs {
 		if oldPod.Status.PodIPs[i].IP != newPod.Status.PodIPs[i].IP {
+			return true, labelsChanged
+		}
+	}
+
+	// Check if the DisruptionTarget condition has changed
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		if IsPodDisruptionTarget(oldPod) != IsPodDisruptionTarget(newPod) {
 			return true, labelsChanged
 		}
 	}
@@ -317,19 +336,24 @@ func IsPodReady(pod *v1.Pod) bool {
 	return isPodReadyConditionTrue(pod.Status)
 }
 
-// IsPodTerminal returns true if a pod is terminal, all containers are stopped and cannot ever regress.
+// IsPodDisruptionTarget returns true if Pods DisruptionTarget condition is true
+func IsPodDisruptionTarget(pod *v1.Pod) bool {
+	return isPodDisruptionTargetConditionTrue(pod.Status)
+}
+
+// isPodTerminal returns true if a pod is terminal, all containers are stopped and cannot ever regress.
 // copied from k8s.io/kubernetes/pkg/api/v1/pod
 func isPodTerminal(pod *v1.Pod) bool {
 	return isPodPhaseTerminal(pod.Status.Phase)
 }
 
-// IsPodPhaseTerminal returns true if the pod's phase is terminal.
+// isPodPhaseTerminal returns true if the pod's phase is terminal.
 // copied from k8s.io/kubernetes/pkg/api/v1/pod
 func isPodPhaseTerminal(phase v1.PodPhase) bool {
 	return phase == v1.PodFailed || phase == v1.PodSucceeded
 }
 
-// IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
+// isPodReadyConditionTrue returns true if a pod is ready; false otherwise.
 // copied from k8s.io/kubernetes/pkg/api/v1/pod
 func isPodReadyConditionTrue(status v1.PodStatus) bool {
 	condition := getPodReadyCondition(&status)
@@ -346,6 +370,28 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 
 	for i := range status.Conditions {
 		if status.Conditions[i].Type == v1.PodReady {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
+}
+
+// isPodDisruptionTargetConditionTrue returns true if a pod is a disruption target; false otherwise.
+func isPodDisruptionTargetConditionTrue(status v1.PodStatus) bool {
+	condition := getPodDisruptionTargetCondition(&status)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// getPodDisruptionTargetCondition extracts the pod disruption target condition from
+// the given status and returns that.
+// Returns nil if the condition is not present.
+func getPodDisruptionTargetCondition(status *v1.PodStatus) *v1.PodCondition {
+	if status == nil || status.Conditions == nil {
+		return nil
+	}
+
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == v1.DisruptionTarget {
 			return &status.Conditions[i]
 		}
 	}
