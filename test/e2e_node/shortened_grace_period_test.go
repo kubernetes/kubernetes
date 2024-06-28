@@ -46,7 +46,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
 			gracePeriod      = 10000
-			gracePeriodShort = 60
+			gracePeriodShort = 100
 		)
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
@@ -106,21 +106,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				logs := podClient.GetLogs(podName, &v1.PodLogOptions{})
 				rawLogs, _ := logs.DoRaw(context.TODO())
 				podLogs := (string(rawLogs))
-				//framework.ExpectNoError(err, "failed to get pod logs")
-				//defer func() {
-				//	if err := logs.Close(); err != nil {
-				//		framework.ExpectNoError(err, "failed to log close")
-				//	}
-				//}()
-				//buf := new(bytes.Buffer)
-				//_, err = buf.ReadFrom(logs)
-				//if err != nil {
-				//	framework.ExpectNoError(err, "failed to read from")
-				//}
-				//podLogs := buf.String()
-				// Verify the number of SIGINT
-				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), fmt.Sprint("unexpected number of SIGINT 1 entries in pod logs. %s", podLogs))
-				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), fmt.Sprint("unexpected number of SIGINT 2 entries in pod logs. %s", podLogs))
+				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), fmt.Sprintf("unexpected number of SIGINT 1 entries in pod logs. %s", podLogs))
+				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), fmt.Sprintf("unexpected number of SIGINT 2 entries in pod logs. %s", podLogs))
 				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				ctxUntil, cancel = context.WithTimeout(ctx, 15*time.Second)
@@ -172,7 +159,7 @@ term() {
     echo "SIGINT 1"
   elif [ "$COUNT" -eq 1 ]; then
     echo "SIGINT 2"
-    sleep 50
+    sleep 80
     exit 0
   fi
   COUNT=$((COUNT + 1))
