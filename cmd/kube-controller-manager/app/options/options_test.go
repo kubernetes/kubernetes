@@ -42,6 +42,7 @@ import (
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	netutils "k8s.io/utils/net"
 
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	clientgofeaturegate "k8s.io/client-go/features"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -440,9 +441,10 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:  "192.168.4.20",
-		Metrics: &metrics.Options{},
-		Logs:    logs.NewOptions(),
+		Master:                   "192.168.4.20",
+		Metrics:                  &metrics.Options{},
+		Logs:                     logs.NewOptions(),
+		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -1332,7 +1334,11 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 
 func TestWatchListClientFlagChange(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
+	}
+
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -1342,7 +1348,7 @@ func TestWatchListClientFlagChange(t *testing.T) {
 
 	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
 	if err := fs.Parse(args); err != nil {
-		t.Fatal(err)
+		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
 	}
 
 	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
