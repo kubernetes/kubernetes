@@ -1315,7 +1315,9 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 		if !knownPod {
 			one := int64(1)
 			killPodOptions := &KillPodOptions{
-				PodTerminationGracePeriodSecondsOverride: &one,
+				TerminatePodOptions: kubetypes.TerminatePodOptions{
+					GracePeriodSecondsOverride: &one,
+				},
 			}
 			klog.V(2).InfoS("Clean up containers for orphaned pod we had not seen before", "podUID", runningPod.ID, "killPodOptions", killPodOptions)
 			kl.podWorkers.UpdatePod(UpdatePodOptions{
@@ -1763,8 +1765,8 @@ func (kl *Kubelet) determinePodResizeStatus(pod *v1.Pod, podStatus *v1.PodStatus
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the
 // internal pod status. This method should only be called from within sync*Pod methods.
-func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodStatus {
-	klog.V(3).InfoS("Generating pod status", "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
+func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminating, podIsTerminal bool, abnormalTermination *kubetypes.TerminatePodOptions) v1.PodStatus {
+	klog.V(3).InfoS("Generating pod status", "podIsTerminating", podIsTerminating, "podIsTerminal", podIsTerminal, "pod", klog.KObj(pod))
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
@@ -1792,6 +1794,35 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
+	// check if the pod has been terminated abnormally
+	var abnormalTerminationConditions []v1.PodCondition
+	if abnormalTermination != nil && s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+		s.Phase = v1.PodFailed
+		s.Reason = abnormalTermination.Reason
+		s.Message = abnormalTermination.Message
+		abnormalTerminationConditions = abnormalTermination.Conditions
+		if len(abnormalTerminationConditions) == 0 {
+			abnormalTerminationConditions = append(abnormalTerminationConditions, v1.PodCondition{
+				Type:    v1.DisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonTerminationByKubelet,
+				Message: "Pod was terminated by the Kubelet.",
+			})
+		}
+	}
+
+	// check if an internal module has requested the pod is evicted and override the reason and message
+	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+		for _, podSyncHandler := range kl.PodSyncHandlers {
+			if result := podSyncHandler.ShouldEvict(pod); result.Evict {
+				s.Phase = v1.PodFailed
+				s.Reason = result.Reason
+				s.Message = result.Message
+				break
+			}
+		}
+	}
+
 	if s.Phase == oldPodStatus.Phase {
 		// preserve the reason and message which is associated with the phase
 		s.Reason = oldPodStatus.Reason
@@ -1801,16 +1832,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 		if len(s.Message) == 0 {
 			s.Message = pod.Status.Message
-		}
-	}
-
-	// check if an internal module has requested the pod is evicted and override the reason and message
-	for _, podSyncHandler := range kl.PodSyncHandlers {
-		if result := podSyncHandler.ShouldEvict(pod); result.Evict {
-			s.Phase = v1.PodFailed
-			s.Reason = result.Reason
-			s.Message = result.Message
-			break
 		}
 	}
 
@@ -1858,6 +1879,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})
+
+	// set all abnormal conditions (which should be in the list of Kubelet owned conditions),
+	// which may also override shared conditions (DisruptionTarget)
+	for _, condition := range abnormalTerminationConditions {
+		s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, &condition)
+	}
+
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()

@@ -37,6 +37,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -49,18 +50,14 @@ const (
 
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
-	pod                 *v1.Pod
-	evict               bool
-	statusFn            func(*v1.PodStatus)
-	gracePeriodOverride *int64
+	pod     *v1.Pod
+	options *kubetypes.TerminatePodOptions
 }
 
 // killPodNow records the pod that was killed
-func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
+func (m *mockPodKiller) TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 	m.pod = pod
-	m.statusFn = statusFn
-	m.evict = evict
-	m.gracePeriodOverride = gracePeriodOverride
+	m.options = &options
 	return nil
 }
 
@@ -267,20 +264,26 @@ type podToMake struct {
 	perLocalVolumeInodesUsed string
 }
 
+var one = int64(1)
+
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
+		wantTerminatePodOptions *kubetypes.TerminatePodOptions
 	}{
 		"eviction due to memory pressure; no image fs": {
-			wantPodStatus: v1.PodStatus{
-				Phase:   v1.PodFailed,
+			wantTerminatePodOptions: &kubetypes.TerminatePodOptions{
+				GracePeriodSecondsOverride: &one,
+
+				Evict:   true,
 				Reason:  "Evicted",
 				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
 			},
 		},
 		"eviction due to memory pressure; image fs": {
-			wantPodStatus: v1.PodStatus{
-				Phase:   v1.PodFailed,
+			wantTerminatePodOptions: &kubetypes.TerminatePodOptions{
+				GracePeriodSecondsOverride: &one,
+
+				Evict:   true,
 				Reason:  "Evicted",
 				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
 			},
@@ -329,7 +332,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
 				manager := &managerImpl{
 					clock:                        fakeClock,
-					killPodFunc:                  podKiller.killPodNow,
+					terminator:                   podKiller,
 					imageGC:                      diskGC,
 					containerGC:                  diskGC,
 					config:                       config,
@@ -356,20 +359,17 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 					t.Fatalf("Manager should have selected a pod for eviction")
 				}
 
-				wantPodStatus := tc.wantPodStatus.DeepCopy()
 				if enablePodDisruptionConditions {
-					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+					tc.wantTerminatePodOptions.Conditions = append(tc.wantTerminatePodOptions.Conditions, v1.PodCondition{
 						Type:    "DisruptionTarget",
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
-						Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+						Message: tc.wantTerminatePodOptions.Message,
 					})
 				}
 
-				// verify the pod status after applying the status update function
-				podKiller.statusFn(&podKiller.pod.Status)
-				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+				if diff := cmp.Diff(tc.wantTerminatePodOptions, podKiller.options, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected terminate pod options (-want,+got):\n%s", diff)
 				}
 			})
 		}
@@ -378,11 +378,13 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 
 func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
+		wantTerminatePodOptions *kubetypes.TerminatePodOptions
 	}{
 		"eviction due to pid pressure": {
-			wantPodStatus: v1.PodStatus{
-				Phase:   v1.PodFailed,
+			wantTerminatePodOptions: &kubetypes.TerminatePodOptions{
+				GracePeriodSecondsOverride: &one,
+
+				Evict:   true,
 				Reason:  "Evicted",
 				Message: "The node was low on resource: pids. Threshold quantity: 1200, available: 500. ",
 			},
@@ -431,7 +433,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500", "1000", podStats)}
 				manager := &managerImpl{
 					clock:                        fakeClock,
-					killPodFunc:                  podKiller.killPodNow,
+					terminator:                   podKiller,
 					imageGC:                      diskGC,
 					containerGC:                  diskGC,
 					config:                       config,
@@ -459,9 +461,9 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					t.Fatalf("Manager should have selected a pod for eviction")
 				}
 
-				wantPodStatus := tc.wantPodStatus.DeepCopy()
+				wantTerminatePodOptions := *tc.wantTerminatePodOptions
 				if enablePodDisruptionConditions {
-					wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+					wantTerminatePodOptions.Conditions = append(wantTerminatePodOptions.Conditions, v1.PodCondition{
 						Type:    "DisruptionTarget",
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
@@ -469,10 +471,8 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 					})
 				}
 
-				// verify the pod status after applying the status update function
-				podKiller.statusFn(&podKiller.pod.Status)
-				if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-					t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+				if diff := cmp.Diff(&wantTerminatePodOptions, podKiller.options, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+					t.Errorf("Unexpected terminate pod options (-want,+got):\n%s", diff)
 				}
 			})
 		}
@@ -579,8 +579,11 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 				podMaker := makePodWithDiskStats
 				summaryStatsMaker := makeDiskStats
 				podsToMake := tc.podToMakes
-				wantPodStatus := v1.PodStatus{
-					Phase:   v1.PodFailed,
+				one := int64(1)
+				wantTerminatePodOptions := kubetypes.TerminatePodOptions{
+					GracePeriodSecondsOverride: &one,
+
+					Evict:   true,
 					Reason:  "Evicted",
 					Message: tc.evictionMessage,
 				}
@@ -614,7 +617,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 				summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStat)}
 				manager := &managerImpl{
 					clock:                        fakeClock,
-					killPodFunc:                  podKiller.killPodNow,
+					terminator:                   podKiller,
 					imageGC:                      diskGC,
 					containerGC:                  diskGC,
 					config:                       config,
@@ -646,7 +649,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 					}
 
 					if enablePodDisruptionConditions {
-						wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+						wantTerminatePodOptions.Conditions = append(wantTerminatePodOptions.Conditions, v1.PodCondition{
 							Type:    "DisruptionTarget",
 							Status:  "True",
 							Reason:  "TerminationByKubelet",
@@ -654,10 +657,8 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 						})
 					}
 
-					// verify the pod status after applying the status update function
-					podKiller.statusFn(&podKiller.pod.Status)
-					if diff := cmp.Diff(wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-						t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
+					if diff := cmp.Diff(&wantTerminatePodOptions, podKiller.options, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+						t.Errorf("Unexpected terminate pod options (-want,+got):\n%s", diff)
 					}
 				}
 			})
@@ -718,7 +719,7 @@ func TestMemoryPressure(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		terminator:                   podKiller,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -790,16 +791,16 @@ func TestMemoryPressure(t *testing.T) {
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
-	if podKiller.gracePeriodOverride == nil {
+	if podKiller.options.GracePeriodSecondsOverride == nil {
 		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
 	}
-	observedGracePeriod := *podKiller.gracePeriodOverride
+	observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 	}
 	// reset state
 	podKiller.pod = nil
-	podKiller.gracePeriodOverride = nil
+	podKiller.options.GracePeriodSecondsOverride = nil
 
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
@@ -833,7 +834,7 @@ func TestMemoryPressure(t *testing.T) {
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
-	observedGracePeriod = *podKiller.gracePeriodOverride
+	observedGracePeriod = *podKiller.options.GracePeriodSecondsOverride
 	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
@@ -989,7 +990,7 @@ func TestPIDPressure(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				terminator:                   podKiller,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -1057,17 +1058,17 @@ func TestPIDPressure(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			if podKiller.gracePeriodOverride == nil {
+			if podKiller.options.GracePeriodSecondsOverride == nil {
 				t.Errorf("Manager chose to kill pod but should have had a grace period override.")
 			}
-			observedGracePeriod := *podKiller.gracePeriodOverride
+			observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
 				t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 			}
 
 			// reset state
 			podKiller.pod = nil
-			podKiller.gracePeriodOverride = nil
+			podKiller.options.GracePeriodSecondsOverride = nil
 
 			// remove PID pressure by simulating increased PID availability
 			fakeClock.Step(20 * time.Minute)
@@ -1101,10 +1102,10 @@ func TestPIDPressure(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			if podKiller.gracePeriodOverride == nil {
+			if podKiller.options.GracePeriodSecondsOverride == nil {
 				t.Errorf("Manager chose to kill pod but should have had a grace period override.")
 			}
-			observedGracePeriod = *podKiller.gracePeriodOverride
+			observedGracePeriod = *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != int64(1) {
 				t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 			}
@@ -1366,7 +1367,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				terminator:                   podKiller,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -1442,16 +1443,16 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Fatalf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			if podKiller.gracePeriodOverride == nil {
+			if podKiller.options.GracePeriodSecondsOverride == nil {
 				t.Fatalf("Manager chose to kill pod but should have had a grace period override.")
 			}
-			observedGracePeriod := *podKiller.gracePeriodOverride
+			observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
 				t.Fatalf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 			}
 			// reset state
 			podKiller.pod = nil
-			podKiller.gracePeriodOverride = nil
+			podKiller.options.GracePeriodSecondsOverride = nil
 
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
@@ -1492,7 +1493,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Fatalf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			observedGracePeriod = *podKiller.gracePeriodOverride
+			observedGracePeriod = *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != int64(1) {
 				t.Fatalf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 			}
@@ -1603,7 +1604,7 @@ func TestMinReclaim(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		terminator:                   podKiller,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -1642,7 +1643,7 @@ func TestMinReclaim(t *testing.T) {
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
-	observedGracePeriod := *podKiller.gracePeriodOverride
+	observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
@@ -1666,7 +1667,7 @@ func TestMinReclaim(t *testing.T) {
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
-	observedGracePeriod = *podKiller.gracePeriodOverride
+	observedGracePeriod = *podKiller.options.GracePeriodSecondsOverride
 	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
@@ -1888,7 +1889,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				terminator:                   podKiller,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -2058,7 +2059,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Fatalf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			observedGracePeriod := *podKiller.gracePeriodOverride
+			observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != int64(1) {
 				t.Fatalf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 			}
@@ -2345,7 +2346,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: startingStatsModified}
 			manager := &managerImpl{
 				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodNow,
+				terminator:                   podKiller,
 				imageGC:                      diskGC,
 				containerGC:                  diskGC,
 				config:                       config,
@@ -2413,16 +2414,16 @@ func TestInodePressureFsInodes(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Fatalf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			if podKiller.gracePeriodOverride == nil {
+			if podKiller.options.GracePeriodSecondsOverride == nil {
 				t.Fatalf("Manager chose to kill pod but should have had a grace period override.")
 			}
-			observedGracePeriod := *podKiller.gracePeriodOverride
+			observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
 				t.Fatalf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
 			}
 			// reset state
 			podKiller.pod = nil
-			podKiller.gracePeriodOverride = nil
+			podKiller.options.GracePeriodSecondsOverride = nil
 
 			// remove inode pressure
 			fakeClock.Step(20 * time.Minute)
@@ -2456,7 +2457,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Fatalf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 			}
-			observedGracePeriod = *podKiller.gracePeriodOverride
+			observedGracePeriod = *podKiller.options.GracePeriodSecondsOverride
 			if observedGracePeriod != int64(1) {
 				t.Fatalf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 			}
@@ -2579,7 +2580,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		terminator:                   podKiller,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -2628,7 +2629,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	}
 	// reset state
 	podKiller.pod = nil
-	podKiller.gracePeriodOverride = nil
+	podKiller.options = nil
 
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
@@ -2740,7 +2741,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStat)}
 			manager := &managerImpl{
 				clock:                         fakeClock,
-				killPodFunc:                   podKiller.killPodNow,
+				terminator:                    podKiller,
 				imageGC:                       diskGC,
 				containerGC:                   diskGC,
 				config:                        config,
@@ -2763,8 +2764,8 @@ func TestStorageLimitEvictions(t *testing.T) {
 			if podKiller.pod != podToEvict {
 				t.Errorf("Manager should have killed pod: %v, but instead killed: %v", podToEvict.Name, podKiller.pod.Name)
 			}
-			if *podKiller.gracePeriodOverride != 1 {
-				t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.gracePeriodOverride)
+			if *podKiller.options.GracePeriodSecondsOverride != 1 {
+				t.Errorf("Manager should have evicted with gracePeriodOverride of 1, but used: %v", *podKiller.options.GracePeriodSecondsOverride)
 			}
 		})
 	}
@@ -2815,7 +2816,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("4Gi", podStats)}
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		terminator:                   podKiller,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -2870,13 +2871,13 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	if podKiller.pod != podToEvict {
 		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
 	}
-	observedGracePeriod := *podKiller.gracePeriodOverride
+	observedGracePeriod := *podKiller.options.GracePeriodSecondsOverride
 	if observedGracePeriod != int64(1) {
 		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 1, observedGracePeriod)
 	}
 	// reset state
 	podKiller.pod = nil
-	podKiller.gracePeriodOverride = nil
+	podKiller.options.GracePeriodSecondsOverride = nil
 
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
@@ -2980,7 +2981,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	manager := &managerImpl{
 		clock:                        fakeClock,
-		killPodFunc:                  podKiller.killPodNow,
+		terminator:                   podKiller,
 		imageGC:                      diskGC,
 		containerGC:                  diskGC,
 		config:                       config,
@@ -3076,7 +3077,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 
 	mgr := &managerImpl{
 		clock:                         fakeClock,
-		killPodFunc:                   podKiller.killPodNow,
+		terminator:                    podKiller,
 		imageGC:                       diskGC,
 		containerGC:                   diskGC,
 		config:                        config,

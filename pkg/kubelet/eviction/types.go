@@ -91,15 +91,6 @@ type ContainerGC interface {
 	IsContainerFsSeparateFromImageFs(ctx context.Context) bool
 }
 
-// KillPodFunc kills a pod.
-// The pod status is updated, and then it is killed with the specified grace period.
-// This function must block until either the pod is killed or an error is encountered.
-// Arguments:
-// pod - the pod to kill
-// status - the desired status to associate with the pod (i.e. why its killed)
-// gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error
-
 // MirrorPodFunc returns the mirror pod for the given static pod and
 // whether it was known to the pod manager.
 type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)

@@ -3266,7 +3266,9 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		currentStatus                              *kubecontainer.PodStatus
 		unreadyContainer                           []string
 		previousStatus                             v1.PodStatus
+		isPodTerminating                           bool
 		isPodTerminal                              bool
+		abnormalTermination                        *kubetypes.TerminatePodOptions
 		enablePodDisruptionConditions              bool
 		expected                                   v1.PodStatus
 		expectedPodDisruptionCondition             v1.PodCondition
@@ -3715,12 +3717,17 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 				}
 				expected := test.expected.DeepCopy()
-				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus, test.isPodTerminal)
+				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus, test.isPodTerminating, test.isPodTerminal, test.abnormalTermination)
+
+				i, condition := pod.GetPodConditionFromList(expected.Conditions, v1.PodReadyToStartContainers)
 				if enablePodReadyToStartContainersCondition {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
-				}
-				if test.enablePodDisruptionConditions {
-					expected.Conditions = append([]v1.PodCondition{test.expectedPodDisruptionCondition}, expected.Conditions...)
+					if condition == nil {
+						expected.Conditions = append([]v1.PodCondition{test.expectedPodReadyToStartContainersCondition}, expected.Conditions...)
+					}
+				} else {
+					if i != -1 {
+						expected.Conditions = append(expected.Conditions[:i], expected.Conditions[i+1:]...)
+					}
 				}
 				if !apiequality.Semantic.DeepEqual(*expected, actual) {
 					t.Fatalf("Unexpected status: %s", cmp.Diff(*expected, actual))
@@ -3833,7 +3840,7 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			oldStatus := test.pod.Status
 			kl.statusManager = status.NewFakeManager()
 			kl.statusManager.SetPodStatus(test.pod, oldStatus)
-			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
+			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus, false, false, nil)
 
 			if actual.Resize != "" {
 				t.Fatalf("Unexpected Resize status: %s", actual.Resize)
@@ -4149,7 +4156,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus, false)
+			status := kl.generateAPIPodStatus(pod, criStatus, false, false, nil)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -4273,7 +4280,7 @@ func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			}
 			podStatus.IPs = tc.nodeIPs
 
-			status := kl.generateAPIPodStatus(pod, podStatus, false)
+			status := kl.generateAPIPodStatus(pod, podStatus, false, false, nil)
 			if !reflect.DeepEqual(status.PodIPs, tc.expectedPodIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedPodIPs, status.PodIPs)
 			}
@@ -4406,7 +4413,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus, false)
+			status := kl.generateAPIPodStatus(pod, criStatus, false, false, nil)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -5161,7 +5168,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				expectedRunningPod := runtimePod(simplePod())
 				if actual, expected := s.activeUpdate, (&UpdatePodOptions{
 					RunningPod:     expectedRunningPod,
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: &one},
+					KillPodOptions: &KillPodOptions{TerminatePodOptions: kubetypes.TerminatePodOptions{GracePeriodSecondsOverride: &one}},
 				}); !reflect.DeepEqual(expected, actual) {
 					t.Fatalf("unexpected pod activeUpdate: %s", cmp.Diff(expected, actual))
 				}
@@ -5527,7 +5534,7 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 				expectedRunningPod := runtimePod(simplePod())
 				if actual, expected := s.activeUpdate, (&UpdatePodOptions{
 					RunningPod:     expectedRunningPod,
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: &one},
+					KillPodOptions: &KillPodOptions{TerminatePodOptions: kubetypes.TerminatePodOptions{GracePeriodSecondsOverride: &one}},
 				}); !reflect.DeepEqual(expected, actual) {
 					t.Fatalf("unexpected pod activeUpdate: %s", cmp.Diff(expected, actual))
 				}
@@ -6024,9 +6031,9 @@ func TestKubelet_HandlePodCleanups(t *testing.T) {
 			syncFuncs := newPodSyncerFuncs(originalPodSyncer)
 			podWorkers.podSyncer = &syncFuncs
 			if tt.terminatingErr != nil {
-				syncFuncs.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+				syncFuncs.syncTerminatingPod = func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error {
 					t.Logf("called syncTerminatingPod")
-					if err := originalPodSyncer.SyncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn); err != nil {
+					if err := originalPodSyncer.SyncTerminatingPod(ctx, pod, podStatus, gracePeriod, abnormalTermination); err != nil {
 						t.Fatalf("unexpected error in syncTerminatingPodFn: %v", err)
 					}
 					return tt.terminatingErr
