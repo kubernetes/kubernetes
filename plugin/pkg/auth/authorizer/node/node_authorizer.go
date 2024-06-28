@@ -351,14 +351,11 @@ func (r *NodeAuthorizer) authorizeNode(nodeName string, attrs authorizer.Attribu
 	switch attrs.GetSubresource() {
 	case "":
 		switch attrs.GetVerb() {
-		case "create":
-			// Use the NodeRestriction admission plugin to limit a node to creating its own Node object.
+		case "create", "update", "patch":
+			// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
 			return authorizer.DecisionAllow, "", nil
 		case "get", "list", "watch":
 			return r.authorize(nodeName, nodeVertexType, attrs)
-		case "update", "patch":
-			// Use the NodeRestriction admission plugin to limit a node to updating its own Node object.
-			return authorizer.DecisionAllow, "", nil
 		}
 	case "status":
 		switch attrs.GetVerb() {
@@ -382,7 +379,7 @@ func (r *NodeAuthorizer) authorizePod(nodeName string, attrs authorizer.Attribut
 
 		case "list", "watch":
 			// allow a scoped fieldSelector
-			reqs, _ := attrs.ParseFieldSelector()
+			reqs, _ := attrs.GetFieldSelector()
 			for _, req := range reqs {
 				if req.Field == "spec.nodeName" && req.Operator == selection.Equals && req.Value == nodeName {
 					return authorizer.DecisionAllow, "", nil
