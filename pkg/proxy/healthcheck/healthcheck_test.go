@@ -37,7 +37,9 @@ import (
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeListener struct {
@@ -470,8 +472,12 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
+	server := hs.httpFactory.New(net.JoinHostPort(hs.nodeIPs[0].String(), strconv.Itoa(int(hs.port))), healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,
@@ -505,8 +511,12 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
-	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
+	fakeInterfacer := proxyutiltest.NewFakeNetwork()
+	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{&net.IPNet{IP: netutils.ParseIPSloppy("127.0.0.1"), Mask: net.CIDRMask(24, 32)}}
+	fakeInterfacer.AddInterfaceAddr(&itf, addrs)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, fakeInterfacer, []string{"127.0.0.0/8"}, 10256, 10*time.Second)
+	server := hs.httpFactory.New(net.JoinHostPort(hs.nodeIPs[0].String(), strconv.Itoa(int(hs.port))), livezHandler{hs: hs})
 
 	hsTest := &serverTest{
 		server:      server,

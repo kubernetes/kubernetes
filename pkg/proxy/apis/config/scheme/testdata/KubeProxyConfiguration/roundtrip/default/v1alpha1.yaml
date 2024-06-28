@@ -32,7 +32,7 @@ iptables:
   syncPeriod: 30s
 ipvs:
   excludeCIDRs: null
-  minSyncPeriod: 0s
+  minSyncPeriod: 1s
   scheduler: ""
   strictARP: false
   syncPeriod: 30s

@@ -18,13 +18,17 @@ package healthcheck
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/utils/clock"
 )
 
@@ -46,7 +50,8 @@ type ProxierHealthServer struct {
 	httpFactory httpServerFactory
 	clock       clock.Clock
 
-	addr          string
+	nodeIPs       []net.IP
+	port          int32
 	healthTimeout time.Duration
 
 	lock                   sync.RWMutex
@@ -56,16 +61,23 @@ type ProxierHealthServer struct {
 }
 
 // NewProxierHealthServer returns a proxier health http server.
-func NewProxierHealthServer(addr string, healthTimeout time.Duration) *ProxierHealthServer {
-	return newProxierHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout)
+func NewProxierHealthServer(cidrStrings []string, port int32, healthTimeout time.Duration) *ProxierHealthServer {
+	return newProxierHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, proxyutil.RealNetwork{}, cidrStrings, port, healthTimeout)
 }
 
-func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration) *ProxierHealthServer {
+func newProxierHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, nw proxyutil.NetworkInterfacer, cidrStrings []string, port int32, healthTimeout time.Duration) *ProxierHealthServer {
+	nodeIPs, err := proxyutil.FilterInterfaceAddrsByCIDRStrings(nw, cidrStrings)
+	if err != nil {
+		klog.V(3).ErrorS(err, "Failed to get node ips for healthz server")
+		return nil
+	}
+
 	return &ProxierHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
-		addr:          addr,
+		nodeIPs:       nodeIPs,
+		port:          port,
 		healthTimeout: healthTimeout,
 
 		lastUpdatedMap:         make(map[v1.IPFamily]time.Time),
@@ -162,23 +174,35 @@ func (hs *ProxierHealthServer) NodeEligible() bool {
 }
 
 // Run starts the healthz HTTP server and blocks until it exits.
-func (hs *ProxierHealthServer) Run() error {
+func (hs *ProxierHealthServer) Run(bindHardFail bool) chan error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
 	serveMux.Handle("/livez", livezHandler{hs: hs})
-	server := hs.httpFactory.New(hs.addr, serveMux)
+	errChan := make(chan error)
+	for _, nodeIP := range hs.nodeIPs {
+		addr := net.JoinHostPort(nodeIP.String(), strconv.Itoa(int(hs.port)))
+		healthzServer := hs.httpFactory.New(addr, serveMux)
 
-	listener, err := hs.listener.Listen(hs.addr)
-	if err != nil {
-		return fmt.Errorf("failed to start proxier healthz on %s: %v", hs.addr, err)
+		stopCh := make(chan struct{})
+		fn := func() {
+			ln, err := hs.listener.Listen(addr)
+			if err != nil {
+				if bindHardFail {
+					stopCh <- struct{}{}
+					errChan <- fmt.Errorf("failed to start proxier healthz on %s: %w", addr, err)
+				}
+				return
+			}
+			if err = healthzServer.Serve(ln); err != nil {
+				if bindHardFail {
+					stopCh <- struct{}{}
+					errChan <- fmt.Errorf("proxier healthz closed with error: %w", err)
+				}
+			}
+		}
+		go wait.Until(fn, 5*time.Second, stopCh)
 	}
-
-	klog.V(3).InfoS("Starting healthz HTTP server", "address", hs.addr)
-
-	if err := server.Serve(listener); err != nil {
-		return fmt.Errorf("proxier healthz closed with error: %v", err)
-	}
-	return nil
+	return errChan
 }
 
 type healthzHandler struct {
