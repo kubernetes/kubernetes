@@ -38,7 +38,7 @@ const (
 	fsStatsLogs fsStatsType = "logs"
 	// fsStatsRoot identifies stats for pod container writable layers.
 	fsStatsRoot fsStatsType = "root"
-	// fsStatsContainer identifies stats for pod container read-only layers
+	// fsStatsImages identifies stats for pod container read-only layers
 	fsStatsImages fsStatsType = "images"
 )
 
