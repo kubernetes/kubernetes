@@ -48,6 +48,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -3311,7 +3312,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
 				QOSClass: v1.PodQOSBestEffort,
 				Conditions: []v1.PodCondition{
-					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.DisruptionTarget, Status: v1.ConditionTrue, LastTransitionTime: normalized_now},
+					{Type: v1.PodReadyToStartContainers, Status: v1.ConditionTrue}, {Type: v1.PodInitialized, Status: v1.ConditionTrue},
 					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
 					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
@@ -3321,14 +3323,54 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
 			},
-			expectedPodDisruptionCondition: v1.PodCondition{
-				Type:               v1.DisruptionTarget,
-				Status:             v1.ConditionTrue,
-				LastTransitionTime: normalized_now,
+		},
+		{
+			name: "pod disruption condition was set by kubelet previously, is now cleared because the pod is no longer terminating",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+					Conditions: []v1.PodCondition{{
+						Type:               v1.DisruptionTarget,
+						Reason:             v1.PodReasonTerminationByKubelet,
+						Status:             v1.ConditionTrue,
+						LastTransitionTime: normalized_now,
+					}},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
 			},
-			expectedPodReadyToStartContainersCondition: v1.PodCondition{
-				Type:   v1.PodReadyToStartContainers,
-				Status: v1.ConditionTrue,
+			currentStatus: sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				Conditions: []v1.PodCondition{{
+					Type:               v1.DisruptionTarget,
+					Reason:             v1.PodReasonTerminationByKubelet,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: normalized_now,
+				}},
+			},
+			enablePodDisruptionConditions: true,
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodReadyToStartContainers, Status: v1.ConditionTrue}, {Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
 			},
 		},
 		{
@@ -3362,6 +3404,199 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
 				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			name: "current status ready, with previous statuses and deletion, terminating",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			isPodTerminating: true,
+			currentStatus:    sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			name: "current status ready, with previous statuses and deletion, terminating, no disruption conditions",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			isPodTerminating: true,
+			currentStatus:    sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			name: "current status ready, with previous statuses and deletion, terminating, abnormal termination",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			isPodTerminating: true,
+			abnormalTermination: &kubetypes.TerminatePodOptions{
+				Reason:  "elephant",
+				Message: "other",
+			},
+			enablePodDisruptionConditions: true,
+			currentStatus:                 sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodRunning,
+				Message:  "other",
+				Reason:   "elephant",
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionTrue},
+					{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+					{
+						Type:    v1.DisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonTerminationByKubelet,
+						Message: "Pod was terminated by the Kubelet.",
+					},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 0)),
+					ready(waitingWithLastTerminationUnknown("containerB", 0)),
+				},
+			},
+			expectedPodReadyToStartContainersCondition: v1.PodCondition{
+				Type:   v1.PodReadyToStartContainers,
+				Status: v1.ConditionTrue,
+			},
+		},
+		{
+			name: "current status ready, with previous statuses and deletion, terminated, abnormal termination",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
+			},
+			isPodTerminating: true,
+			isPodTerminal:    true,
+			abnormalTermination: &kubetypes.TerminatePodOptions{
+				Reason:  "elephant",
+				Message: "other",
+			},
+			enablePodDisruptionConditions: true,
+			currentStatus:                 sandboxReadyStatus,
+			previousStatus: v1.PodStatus{
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodFailed,
+				Message:  "other",
+				Reason:   "elephant",
+				HostIP:   "127.0.0.1",
+				HostIPs:  []v1.HostIP{{IP: "127.0.0.1"}, {IP: "::1"}},
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodFailed"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+					{
+						Type:    v1.DisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonTerminationByKubelet,
+						Message: "Pod was terminated by the Kubelet.",
+					},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					// TODO: Should containers that have completed and will not be
+					// restarted be set to ready=false (consistent with the condition)?
 					ready(waitingWithLastTerminationUnknown("containerA", 0)),
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
