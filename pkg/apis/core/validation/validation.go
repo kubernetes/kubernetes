@@ -3017,15 +3017,7 @@ func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResource
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
-		nameErrs := ValidateDNS1123Label(claim.Name, fldPath.Child("name"))
-		if len(nameErrs) > 0 {
-			allErrs = append(allErrs, nameErrs...)
-		} else if podMeta != nil && claim.ResourceClaimTemplateName != nil {
-			claimName := podMeta.Name + "-" + claim.Name
-			for _, detail := range ValidateResourceClaimName(claimName, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claimName, "final ResourceClaim name: "+detail))
-			}
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
 		podClaimNames.Insert(claim.Name)
 	}
 	if claim.ResourceClaimName != nil && claim.ResourceClaimTemplateName != nil {

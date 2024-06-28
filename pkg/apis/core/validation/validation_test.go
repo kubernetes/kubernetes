@@ -25860,9 +25860,6 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	shortPodName := &metav1.ObjectMeta{
 		Name: "some-pod",
 	}
-	brokenPodName := &metav1.ObjectMeta{
-		Name: ".dot.com",
-	}
 	goodClaimTemplate := core.PodSpec{
 		Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", Resources: core.ResourceRequirements{Claims: []core.ResourceClaim{{Name: "my-claim-template"}}}}},
 		RestartPolicy: core.RestartPolicyAlways,
@@ -26046,27 +26043,6 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
-
-	t.Run("generated-claim-name", func(t *testing.T) {
-		for _, spec := range []*core.PodSpec{&goodClaimTemplate, &goodClaimReference} {
-			claimName := spec.ResourceClaims[0].Name
-			t.Run(claimName, func(t *testing.T) {
-				for _, podMeta := range []*metav1.ObjectMeta{shortPodName, brokenPodName} {
-					t.Run(podMeta.Name, func(t *testing.T) {
-						errs := ValidatePodSpec(spec, podMeta, field.NewPath("field"), PodValidationOptions{})
-						// Only one out of the four combinations fails.
-						expectError := spec == &goodClaimTemplate && podMeta == brokenPodName
-						if expectError && len(errs) == 0 {
-							t.Error("did not get the expected failure")
-						}
-						if !expectError && len(errs) > 0 {
-							t.Errorf("unexpected failures: %+v", errs)
-						}
-					})
-				}
-			})
-		}
-	})
 }
 
 func TestValidateLoadBalancerStatus(t *testing.T) {
