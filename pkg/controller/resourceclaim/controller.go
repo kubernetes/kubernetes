@@ -297,7 +297,7 @@ func (ec *Controller) podNeedsWork(pod *v1.Pod) (bool, string) {
 		}
 		claim, err := ec.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
 		if apierrors.IsNotFound(err) {
-			if podClaim.Source.ResourceClaimTemplateName != nil {
+			if podClaim.ResourceClaimTemplateName != nil {
 				return true, "must create ResourceClaim from template"
 			}
 			// User needs to create claim.
@@ -593,7 +593,7 @@ func (ec *Controller) handleClaim(ctx context.Context, pod *v1.Pod, podClaim v1.
 		}
 	}
 
-	templateName := podClaim.Source.ResourceClaimTemplateName
+	templateName := podClaim.ResourceClaimTemplateName
 	if templateName == nil {
 		// Nothing to do.
 		return nil

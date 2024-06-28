@@ -714,7 +714,7 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 	pod := testutils.InitPausePod(&podConf)
 	podClaimName := "myclaim"
 	pod.Spec.Containers[0].Resources.Claims = []v1.ResourceClaim{{Name: podClaimName}}
-	pod.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: podClaimName, Source: v1.ClaimSource{ResourceClaimName: &claim.Name}}}
+	pod.Spec.ResourceClaims = []v1.PodResourceClaim{{Name: podClaimName, ResourceClaimName: &claim.Name}}
 	if _, err := testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}

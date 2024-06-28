@@ -3017,38 +3017,23 @@ func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResource
 	} else if podClaimNames.Has(claim.Name) {
 		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), claim.Name))
 	} else {
-		nameErrs := ValidateDNS1123Label(claim.Name, fldPath.Child("name"))
-		if len(nameErrs) > 0 {
-			allErrs = append(allErrs, nameErrs...)
-		} else if podMeta != nil && claim.Source.ResourceClaimTemplateName != nil {
-			claimName := podMeta.Name + "-" + claim.Name
-			for _, detail := range ValidateResourceClaimName(claimName, false) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), claimName, "final ResourceClaim name: "+detail))
-			}
-		}
+		allErrs = append(allErrs, ValidateDNS1123Label(claim.Name, fldPath.Child("name"))...)
 		podClaimNames.Insert(claim.Name)
 	}
-	allErrs = append(allErrs, validatePodResourceClaimSource(claim.Source, fldPath.Child("source"))...)
-
-	return allErrs
-}
-
-func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	if claimSource.ResourceClaimName != nil && claimSource.ResourceClaimTemplateName != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified"))
+	if claim.ResourceClaimName != nil && claim.ResourceClaimTemplateName != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, claim, "at most one of `resourceClaimName` or `resourceClaimTemplateName` may be specified"))
 	}
-	if claimSource.ResourceClaimName == nil && claimSource.ResourceClaimTemplateName == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, claimSource, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
+	if claim.ResourceClaimName == nil && claim.ResourceClaimTemplateName == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, claim, "must specify one of: `resourceClaimName`, `resourceClaimTemplateName`"))
 	}
-	if claimSource.ResourceClaimName != nil {
-		for _, detail := range ValidateResourceClaimName(*claimSource.ResourceClaimName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), *claimSource.ResourceClaimName, detail))
+	if claim.ResourceClaimName != nil {
+		for _, detail := range ValidateResourceClaimName(*claim.ResourceClaimName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimName"), *claim.ResourceClaimName, detail))
 		}
 	}
-	if claimSource.ResourceClaimTemplateName != nil {
-		for _, detail := range ValidateResourceClaimTemplateName(*claimSource.ResourceClaimTemplateName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimTemplateName"), *claimSource.ResourceClaimTemplateName, detail))
+	if claim.ResourceClaimTemplateName != nil {
+		for _, detail := range ValidateResourceClaimTemplateName(*claim.ResourceClaimTemplateName, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceClaimTemplateName"), *claim.ResourceClaimTemplateName, detail))
 		}
 	}
 	return allErrs

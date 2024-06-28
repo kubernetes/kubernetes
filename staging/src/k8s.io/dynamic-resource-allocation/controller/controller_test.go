@@ -668,10 +668,8 @@ func createPod(podName, podNamespace string, claims map[string]string) *corev1.P
 	for podClaimName, claimName := range claims {
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims,
 			corev1.PodResourceClaim{
-				Name: podClaimName,
-				Source: corev1.ClaimSource{
-					ResourceClaimName: &claimName,
-				},
+				Name:              podClaimName,
+				ResourceClaimName: &claimName,
 			},
 		)
 	}

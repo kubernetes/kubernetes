@@ -3476,17 +3476,11 @@ type PodResourceClaim struct {
 	// This must be a DNS_LABEL.
 	Name string
 
-	// Source describes where to find the ResourceClaim.
-	Source ClaimSource
-}
-
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-type ClaimSource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimName *string
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -3501,6 +3495,9 @@ type ClaimSource struct {
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimTemplateName *string
 }
 
