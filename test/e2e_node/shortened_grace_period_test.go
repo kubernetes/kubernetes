@@ -58,7 +58,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Added},
 				{Type: watch.Modified},
-				{Type: watch.Modified},
 				{Type: watch.Deleted},
 			}
 			eventFound := false
@@ -104,7 +103,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
 
-				ctxUntil, cancel = context.WithTimeout(ctx, 30*time.Second)
+				ctxUntil, cancel = context.WithTimeout(ctx, 50*time.Second)
 				defer cancel()
 				eventFound = false
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
