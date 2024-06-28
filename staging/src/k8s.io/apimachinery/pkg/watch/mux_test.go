@@ -242,7 +242,7 @@ func TestBroadcasterSendEventAfterShutdown(t *testing.T) {
 	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 
 	sendOnClosed, err := m.ActionOrDrop(event.Type, event.Object)
-	assert.Equal(t, sendOnClosed, false, "ActionOrDrop should return false if broadcaster is already shutdown")
+	assert.False(t, sendOnClosed, "ActionOrDrop should return false if broadcaster is already shutdown")
 	assert.EqualError(t, err, "broadcaster already stopped", "ActionOrDrop should report error id broadcaster is shutdown")
 }
 
