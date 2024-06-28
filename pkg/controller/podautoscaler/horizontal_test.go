@@ -5293,5 +5293,5 @@ func TestMultipleHPAs(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, hpaCount, len(processedHPA), "Expected to process all HPAs")
+	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
 }

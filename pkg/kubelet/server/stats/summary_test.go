@@ -102,7 +102,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "kubelet",
 		StartTime:          kubeletCreationTime,
@@ -199,7 +199,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	// Since we are a split filesystem we want root filesystem to be container fs and image to be image filesystem
 	assert.Equal(summary.Node.Runtime, &statsapi.RuntimeStats{ContainerFs: rootFsStats, ImageFs: imageFsStats})
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "kubelet",
 		StartTime:          kubeletCreationTime,
@@ -284,7 +284,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(summary.Node.Fs)
 	assert.Nil(summary.Node.Runtime)
 
-	assert.Equal(len(summary.Node.SystemContainers), 4)
+	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:      "kubelet",
 		StartTime: cgroupStatsMap["/kubelet"].cs.StartTime,

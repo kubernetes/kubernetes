@@ -69,7 +69,7 @@ func TestRemoveContainer(t *testing.T) {
 
 	// Create fake sandbox and container
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
-	assert.Equal(t, len(fakeContainers), 1)
+	assert.Len(t, fakeContainers, 1)
 
 	containerID := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
@@ -956,7 +956,7 @@ func TestUpdateContainerResources(t *testing.T) {
 
 	// Create fake sandbox and container
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
-	assert.Equal(t, len(fakeContainers), 1)
+	assert.Len(t, fakeContainers, 1)
 
 	ctx := context.Background()
 	cStatus, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)

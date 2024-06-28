@@ -237,12 +237,10 @@ linters-settings: # please keep this alphabetized
     disable:  # TODO: remove each disabled rule and fix it
       - blank-import
       - compares
-      - empty
       - error-is-as
       - error-nil
       - expected-actual
       - float-compare
       - go-require
-      - len
       - nil-compare
       - require-error

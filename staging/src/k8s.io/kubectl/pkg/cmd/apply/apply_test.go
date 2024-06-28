@@ -3432,7 +3432,7 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc serverside-applied (server dry run)\n", outbuff.String())
-		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		assert.Len(t, serverSideData, 1, "unexpected creation")
 		require.Nil(t, serverSideData[pathSecret], "secret was created")
 	})
 
@@ -3449,7 +3449,7 @@ func TestApplySetDryRun(t *testing.T) {
 			cmd.Run(cmd, []string{})
 		})
 		assert.Equal(t, "replicationcontroller/test-rc configured (dry run)\n", outbuff.String())
-		assert.Equal(t, len(serverSideData), 1, "unexpected creation")
+		assert.Len(t, serverSideData, 1, "unexpected creation")
 		require.Nil(t, serverSideData[pathSecret], "secret was created")
 	})
 }

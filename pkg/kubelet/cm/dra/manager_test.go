@@ -1428,7 +1428,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 
 			fakeClaimInfos, err := manager.GetContainerClaimInfos(test.pod, test.container)
 			assert.NoError(t, err)
-			assert.Equal(t, 1, len(fakeClaimInfos))
+			assert.Len(t, fakeClaimInfos, 1)
 			assert.Equal(t, test.expectedClaimName, fakeClaimInfos[0].ClaimInfoState.ClaimName)
 
 			manager.cache.delete(test.pod.Spec.ResourceClaims[0].Name, "default")

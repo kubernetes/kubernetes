@@ -195,7 +195,7 @@ func TestSyncServiceNoSelector(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	assert.Empty(t, client.Actions())
 }
 
 func TestServiceExternalNameTypeSync(t *testing.T) {
@@ -262,11 +262,11 @@ func TestServiceExternalNameTypeSync(t *testing.T) {
 
 			err = esController.syncService(logger, fmt.Sprintf("%s/%s", namespace, serviceName))
 			assert.NoError(t, err)
-			assert.Len(t, client.Actions(), 0)
+			assert.Empty(t, client.Actions())
 
 			sliceList, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{})
 			assert.NoError(t, err)
-			assert.Len(t, sliceList.Items, 0, "Expected 0 endpoint slices")
+			assert.Empty(t, sliceList.Items, "Expected 0 endpoint slices")
 		})
 	}
 }
@@ -288,7 +288,7 @@ func TestSyncServicePendingDeletion(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	err := esController.syncService(logger, fmt.Sprintf("%s/%s", ns, serviceName))
 	assert.NoError(t, err)
-	assert.Len(t, client.Actions(), 0)
+	assert.Empty(t, client.Actions())
 }
 
 // Ensure SyncService for service with selector but no pods results in placeholder EndpointSlice
@@ -341,7 +341,7 @@ func TestSyncServiceMissing(t *testing.T) {
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	// That should mean no client actions were performed
-	assert.Len(t, client.Actions(), 0)
+	assert.Empty(t, client.Actions())
 
 	// TriggerTimeTracker should have removed the reference to the missing service
 	assert.NotContains(t, esController.triggerTimeTracker.ServiceStates, missingServiceKey)

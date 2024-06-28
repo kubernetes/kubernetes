@@ -152,7 +152,7 @@ func TestOpenAPIDiskCache(t *testing.T) {
 	require.NoError(t, err)
 	defer fakeServer.HttpServer.Close()
 
-	require.Greater(t, len(fakeServer.ServedDocuments), 0)
+	require.NotEmpty(t, fakeServer.ServedDocuments)
 
 	client, err := NewCachedDiscoveryClientForConfig(
 		&restclient.Config{Host: fakeServer.HttpServer.URL},
@@ -175,7 +175,7 @@ func TestOpenAPIDiskCache(t *testing.T) {
 	paths, err := openapiClient.Paths()
 	require.NoError(t, err)
 	assert.Equal(t, 1, fakeServer.RequestCounters["/openapi/v3"])
-	require.Greater(t, len(paths), 0)
+	require.NotEmpty(t, paths)
 
 	contentTypes := []string{
 		runtime.ContentTypeJSON, openapi.ContentTypeOpenAPIV3PB,

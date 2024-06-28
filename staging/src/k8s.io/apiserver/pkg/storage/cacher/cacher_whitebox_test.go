@@ -2067,8 +2067,8 @@ func TestForgetWatcher(t *testing.T) {
 		cacher.Lock()
 		defer cacher.Unlock()
 
-		require.Equal(t, expectedWatchersCounter, len(cacher.watchers.allWatchers))
-		require.Equal(t, expectedValueWatchersCounter, len(cacher.watchers.valueWatchers))
+		require.Len(t, cacher.watchers.allWatchers, expectedWatchersCounter)
+		require.Len(t, cacher.watchers.valueWatchers, expectedValueWatchersCounter)
 	}
 	assertCacherInternalState(0, 0)
 

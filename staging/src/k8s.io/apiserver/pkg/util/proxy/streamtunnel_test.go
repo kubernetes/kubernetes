@@ -314,11 +314,11 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		for i, chunk := range strings.Split(responseHeadersAndBody, "split") {
 			if i > 0 {
 				n, err := hic.Write([]byte("split"))
-				require.Equal(t, n, len("split"))
+				require.Len(t, "split", n)
 				require.NoError(t, err)
 			}
 			n, err := hic.Write([]byte(chunk))
-			require.Equal(t, n, len(chunk))
+			require.Len(t, chunk, n)
 			require.NoError(t, err)
 		}
 		assert.True(t, hic.initialized)
@@ -392,11 +392,11 @@ func TestTunnelingHandler_HeaderInterceptingConn(t *testing.T) {
 		for i, chunk := range strings.Split(contentLengthHeadersAndBody, "split") {
 			if i > 0 {
 				n, err := hic.Write([]byte("split"))
-				require.Equal(t, n, len("split"))
+				require.Len(t, "split", n)
 				require.NoError(t, err)
 			}
 			n, err := hic.Write([]byte(chunk))
-			require.Equal(t, n, len(chunk))
+			require.Len(t, chunk, n)
 			require.NoError(t, err)
 		}
 		assert.True(t, hic.initialized, "successfully parsed http response headers")
