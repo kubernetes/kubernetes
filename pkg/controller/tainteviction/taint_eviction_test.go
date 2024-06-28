@@ -180,7 +180,7 @@ func TestCreatePod(t *testing.T) {
 			expectDelete: false,
 		},
 		{
-			description: "schedule on tainted Node with infinite ivalid toleration",
+			description: "schedule on tainted Node with infinite invalid toleration",
 			pod:         addToleration(testutil.NewPod("pod1", "node1"), 2, -1),
 			taintedNodes: map[string][]corev1.Taint{
 				"node1": {createNoExecuteTaint(1)},

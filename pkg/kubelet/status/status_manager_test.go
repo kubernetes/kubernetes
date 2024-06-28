@@ -1545,6 +1545,13 @@ func TestMergePodStatus(t *testing.T) {
 		expectPodStatus      v1.PodStatus
 	}{
 		{
+			"no change",
+			false,
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			func(input v1.PodStatus) v1.PodStatus { return input },
+			getPodStatus(),
+		},
+		{
 			"add DisruptionTarget condition when transitioning into failed phase",
 			false,
 			func(input v1.PodStatus) v1.PodStatus { return input },

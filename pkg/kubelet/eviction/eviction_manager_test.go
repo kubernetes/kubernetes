@@ -268,96 +268,87 @@ type podToMake struct {
 }
 
 func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
-	testCases := map[string]struct {
-		wantPodStatus v1.PodStatus
-	}{
-		"eviction due to memory pressure": {
-			wantPodStatus: v1.PodStatus{
-				Phase:   v1.PodFailed,
-				Reason:  "Evicted",
-				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+	podMaker := makePodWithMemoryStats
+	summaryStatsMaker := makeMemoryStats
+	podsToMake := []podToMake{
+		{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
+		{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
+	}
+	pods := []*v1.Pod{}
+	podStats := map[*v1.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*v1.Pod {
+		return pods
+	}
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
 			},
 		},
 	}
-	for _, tc := range testCases {
-		podMaker := makePodWithMemoryStats
-		summaryStatsMaker := makeMemoryStats
-		podsToMake := []podToMake{
-			{name: "below-requests", requests: newResourceList("", "1Gi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "900Mi"},
-			{name: "above-requests", requests: newResourceList("", "100Mi", ""), limits: newResourceList("", "1Gi", ""), memoryWorkingSet: "700Mi"},
-		}
-		pods := []*v1.Pod{}
-		podStats := map[*v1.Pod]statsapi.PodStats{}
-		for _, podToMake := range podsToMake {
-			pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
-			pods = append(pods, pod)
-			podStats[pod] = podStat
-		}
-		activePodsFunc := func() []*v1.Pod {
-			return pods
-		}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
 
-		fakeClock := testingclock.NewFakeClock(time.Now())
-		podKiller := &mockPodKiller{}
-		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
-		diskGC := &mockDiskGC{err: nil}
-		nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+	// synchronize to detect the memory pressure
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
-		config := Config{
-			PressureTransitionPeriod: time.Minute * 5,
-			Thresholds: []evictionapi.Threshold{
-				{
-					Signal:   evictionapi.SignalMemoryAvailable,
-					Operator: evictionapi.OpLessThan,
-					Value: evictionapi.ThresholdValue{
-						Quantity: quantityMustParse("2Gi"),
-					},
-				},
-			},
-		}
-		summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("1500Mi", podStats)}
-		manager := &managerImpl{
-			clock:                        fakeClock,
-			killPodFunc:                  podKiller.killPodNow,
-			imageGC:                      diskGC,
-			containerGC:                  diskGC,
-			config:                       config,
-			recorder:                     &record.FakeRecorder{},
-			summaryProvider:              summaryProvider,
-			nodeRef:                      nodeRef,
-			nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
-			thresholdsFirstObservedAt:    thresholdsObservedAt{},
-		}
+	if err != nil {
+		t.Fatalf("Manager expects no error but got %v", err)
+	}
+	// verify memory pressure is detected
+	if !manager.IsUnderMemoryPressure() {
+		t.Fatalf("Manager should have detected memory pressure")
+	}
 
-		// synchronize to detect the memory pressure
-		_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
+	// verify a pod is selected for eviction
+	if podKiller.pod == nil {
+		t.Fatalf("Manager should have selected a pod for eviction")
+	}
 
-		if err != nil {
-			t.Fatalf("Manager expects no error but got %v", err)
-		}
-		// verify memory pressure is detected
-		if !manager.IsUnderMemoryPressure() {
-			t.Fatalf("Manager should have detected memory pressure")
-		}
-
-		// verify a pod is selected for eviction
-		if podKiller.pod == nil {
-			t.Fatalf("Manager should have selected a pod for eviction")
-		}
-
-		wantPodStatus := tc.wantPodStatus.DeepCopy()
-		wantPodStatus.Conditions = append(wantPodStatus.Conditions, v1.PodCondition{
+	wantPodStatus := v1.PodStatus{
+		Phase:   v1.PodFailed,
+		Reason:  "Evicted",
+		Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
+		Conditions: []v1.PodCondition{{
 			Type:    "DisruptionTarget",
 			Status:  "True",
 			Reason:  "TerminationByKubelet",
 			Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
-		})
+		}},
+	}
 
-		// verify the pod status after applying the status update function
-		podKiller.statusFn(&podKiller.pod.Status)
-		if diff := cmp.Diff(*wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
-			t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
-		}
+	// verify the pod status after applying the status update function
+	podKiller.statusFn(&podKiller.pod.Status)
+	if diff := cmp.Diff(wantPodStatus, podKiller.pod.Status, cmpopts.IgnoreFields(v1.PodCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
+		t.Errorf("Unexpected pod status of the evicted pod (-want,+got):\n%s", diff)
 	}
 }
 

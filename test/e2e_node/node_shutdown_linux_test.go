@@ -83,7 +83,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		}
 	})
 
-	f.Context("graceful node shutdown; baseline scenario to verify DisruptionTarget is added", nodefeature.PodDisruptionConditions, func() {
+	f.Context("graceful node shutdown; baseline scenario to verify DisruptionTarget is added", func() {
 
 		const (
 			pollInterval            = 1 * time.Second
