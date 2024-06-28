@@ -455,8 +455,10 @@ func TestMigrateOldConfig(t *testing.T) {
 // - JoinConfiguration.Discovery.Timeout -> JoinConfiguration.Timeout.Discovery
 func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 	var (
-		gv    = kubeadmapiv1old.SchemeGroupVersion.String()
-		gvNew = kubeadmapiv1.SchemeGroupVersion.String()
+		gv         = kubeadmapiv1old.SchemeGroupVersion.String()
+		gvNew      = kubeadmapiv1.SchemeGroupVersion.String()
+		criSocket  = fmt.Sprintf("%s:///some-socket-path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+		caCertPath = kubeadmapiv1.DefaultCACertPath
 
 		input = dedent.Dedent(fmt.Sprintf(`
 		apiVersion: %s
@@ -473,7 +475,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		  advertiseAddress: 1.2.3.4
 		  bindPort: 6443
 		nodeRegistration:
-		  criSocket: unix:///some-socket-path
+		  criSocket: %[2]s
 		  kubeletExtraArgs: # MIGRATED
 		    foo: bar
 		  name: node
@@ -499,7 +501,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		apiVersion: %[1]s
 		kind: JoinConfiguration
 		nodeRegistration:
-		  criSocket: unix:///some-socket-path
+		  criSocket: %[2]s
 		  imagePullPolicy: IfNotPresent
 		  kubeletExtraArgs: # MIGRATED
 		    foo: baz
@@ -512,7 +514,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		    unsafeSkipCAVerification: true
 		  tlsBootstrapToken: abcdef.0123456789abcdef
 		  timeout: 2m10s # MIGRATED
-		`, gv))
+		`, gv, criSocket))
 
 		expectedOutput = dedent.Dedent(fmt.Sprintf(`
 		apiVersion: %s
@@ -529,7 +531,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		  advertiseAddress: 1.2.3.4
 		  bindPort: 6443
 		nodeRegistration:
-		  criSocket: unix:///some-socket-path
+		  criSocket: %[2]s
 		  imagePullPolicy: IfNotPresent
 		  imagePullSerial: true
 		  kubeletExtraArgs:
@@ -582,7 +584,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		    value: bar
 		---
 		apiVersion: %[1]s
-		caCertPath: /etc/kubernetes/pki/ca.crt
+		caCertPath: %[3]s
 		discovery:
 		  bootstrapToken:
 		    apiServerEndpoint: some-address:6443
@@ -591,7 +593,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		  tlsBootstrapToken: abcdef.0123456789abcdef
 		kind: JoinConfiguration
 		nodeRegistration:
-		  criSocket: unix:///some-socket-path
+		  criSocket: %[2]s
 		  imagePullPolicy: IfNotPresent
 		  imagePullSerial: true
 		  kubeletExtraArgs:
@@ -607,7 +609,7 @@ func TestMigrateV1Beta3WithBreakingChanges(t *testing.T) {
 		  kubernetesAPICall: 1m0s
 		  tlsBootstrap: 5m0s
 		  upgradeManifests: 5m0s
-		`, gvNew))
+		`, gvNew, criSocket, caCertPath))
 	)
 
 	b, err := MigrateOldConfig([]byte(input), false, defaultEmptyMigrateMutators())
