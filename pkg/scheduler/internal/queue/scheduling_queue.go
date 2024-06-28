@@ -1127,8 +1127,8 @@ func isPodResourcesResizedDown(pod *v1.Pod) bool {
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	if isPodResourcesResizedDown(newPod) {
-		// This case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
-		// because Pod related events maybe make Pods that rejected by NodeResourceFit schedulable.
+		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
+		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
 		p.moveAllToActiveOrBackoffQueue(logger, AssignedPodUpdate, oldPod, newPod, nil)
 	} else {
 		// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
@@ -1283,7 +1283,7 @@ func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Lo
 
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) {
+		if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) && pod.Namespace == pInfo.Pod.Namespace {
 			// This Pod may be schedulable now by this Pod event.
 			podsToMove = append(podsToMove, pInfo)
 			continue
