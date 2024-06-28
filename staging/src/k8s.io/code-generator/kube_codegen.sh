@@ -733,7 +733,7 @@ function kube::codegen::gen_register() {
         input_pkgs+=("${pkg}")
     done < <(
         ( kube::codegen::internal::grep -l --null \
-            -e '+groupName=' \
+            -e '^\s*//\s*+groupName' \
             -r "${in_dir}" \
             --include '*.go' \
             || true \
