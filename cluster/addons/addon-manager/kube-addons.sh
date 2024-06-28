@@ -281,14 +281,14 @@ function is_leader() {
     return 1
     ;;
 
-  "${HOSTNAME}"-*)
+  "${HOSTNAME}"*)
     log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
     return 0
     ;;
 
   *)
-    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}_*"
-    return 1
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}*"
+    return 0
     ;;
   esac
 }
