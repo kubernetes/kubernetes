@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -354,6 +356,12 @@ func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interfa
 
 // deletePod will enqueue a Recreate Deployment once all of its pods have stopped running.
 func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
+	// TODO: remove this handler, the pod informer and pod permissions from deployment-controller's ClusterRole once DeploymentPodReplacementPolicy feature gate is graduated to GA and removed
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		// RecreateDeploymentStrategyType should receive updates on pod termination through replica sets now
+		return
+	}
+
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -633,11 +641,14 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 	// List all Pods owned by this Deployment, grouped by their ReplicaSet.
 	// Current uses of the podMap are:
 	//
-	// * check if a Pod is labeled correctly with the pod-template-hash label.
-	// * check that no old Pods are running in the middle of Recreate Deployments.
-	podMap, err := dc.getPodMapForDeployment(d, rsList)
-	if err != nil {
-		return err
+	// * check that no old Pods are running in the middle of Recreate Deployments. (TO BE REMOVED)
+	var podMap map[types.UID][]*v1.Pod
+	// TODO: remove getPodMapForDeployment once DeploymentPodReplacementPolicy feature gate is graduated to GA and removed
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		podMap, err = dc.getPodMapForDeployment(d, rsList)
+		if err != nil {
+			return err
+		}
 	}
 
 	if d.DeletionTimestamp != nil {

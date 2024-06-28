@@ -21,6 +21,8 @@ package replicaset
 import (
 	"context"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"strconv"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -231,6 +233,7 @@ func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
+	dropDisabledStatusFields(&newRS.Status, &oldRS.Status)
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -240,4 +243,13 @@ func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 // WarningsOnUpdate returns warnings for the given update.
 func (rsStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledStatusFields removes disabled fields from the replica set status.
+func dropDisabledStatusFields(rsStatus, oldRSStatus *apps.ReplicaSetStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		if oldRSStatus.TerminatingReplicas == 0 {
+			rsStatus.TerminatingReplicas = 0
+		}
+	}
 }

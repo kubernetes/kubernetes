@@ -108,6 +108,7 @@ func startDeploymentController(ctx context.Context, controllerContext Controller
 		ctx,
 		controllerContext.InformerFactory.Apps().V1().Deployments(),
 		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
+		// TODO: remove the pod informer and pod permissions from deployment-controller's ClusterRole once DeploymentPodReplacementPolicy feature gate is graduated to GA and removed
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("deployment-controller"),
 	)

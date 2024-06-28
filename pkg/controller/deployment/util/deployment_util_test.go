@@ -18,6 +18,10 @@ package util
 
 import (
 	"fmt"
+	"github.com/google/go-cmp/cmp"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"math"
 	"math/rand"
 	"reflect"
@@ -346,39 +350,75 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 	rs1 := generateRS(generateDeployment("foo"))
 	*(rs1.Spec.Replicas) = 1
 	rs1.Status.Replicas = 2
+	rs1.Status.TerminatingReplicas = 3
 	rs2 := generateRS(generateDeployment("bar"))
 	*(rs2.Spec.Replicas) = 2
 	rs2.Status.Replicas = 3
+	rs2.Status.TerminatingReplicas = 1
+	rs3 := generateRS(generateDeployment("unsynced"))
+	*(rs3.Spec.Replicas) = 3
+	rs3.Status.Replicas = 0
+	rs3.Status.TerminatingReplicas = 0
 
 	tests := []struct {
-		Name           string
-		sets           []*apps.ReplicaSet
-		expectedCount  int32
-		expectedActual int32
+		name                     string
+		sets                     []*apps.ReplicaSet
+		expectedCount            int32
+		expectedActual           int32
+		expectedTerminating      int32
+		expectSurgeCapacityCount int32
 	}{
 		{
-			"1:2 Replicas",
-			[]*apps.ReplicaSet{&rs1},
-			1,
-			2,
+			name:                     "scaling down rs1",
+			sets:                     []*apps.ReplicaSet{&rs1},
+			expectedCount:            1,
+			expectedActual:           2,
+			expectedTerminating:      3,
+			expectSurgeCapacityCount: 2,
 		},
 		{
-			"3:5 Replicas",
-			[]*apps.ReplicaSet{&rs1, &rs2},
-			3,
-			5,
+			name:                     "scaling down rs1 and rs2",
+			sets:                     []*apps.ReplicaSet{&rs1, &rs2},
+			expectedCount:            3,
+			expectedActual:           5,
+			expectedTerminating:      4,
+			expectSurgeCapacityCount: 5,
+		},
+		{
+			name:                     "scaling up rs3",
+			sets:                     []*apps.ReplicaSet{&rs3},
+			expectedCount:            3,
+			expectedActual:           0,
+			expectedTerminating:      0,
+			expectSurgeCapacityCount: 3,
+		},
+		{
+			name:                     "scaling down rs1 and rs2 and scaling up rs3",
+			sets:                     []*apps.ReplicaSet{&rs1, &rs2, &rs3},
+			expectedCount:            6,
+			expectedActual:           5,
+			expectedTerminating:      4,
+			expectSurgeCapacityCount: 8,
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			rs := GetReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedCount {
-				t.Errorf("In test case %s, expectedCount %+v, got %+v", test.Name, test.expectedCount, rs)
+		t.Run(test.name, func(t *testing.T) {
+			count := GetReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedCount {
+				t.Errorf("expectedCount %+v, got %+v", test.expectedCount, count)
 			}
-			rs = GetActualReplicaCountForReplicaSets(test.sets)
-			if rs != test.expectedActual {
-				t.Errorf("In test case %s, expectedActual %+v, got %+v", test.Name, test.expectedActual, rs)
+			count = GetActualReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedActual {
+				t.Errorf("expectedActual %+v, got %+v", test.expectedActual, count)
+			}
+			count = GetTerminatingReplicaCountForReplicaSets(test.sets)
+			if count != test.expectedTerminating {
+				t.Errorf("expectedTerminating %+v, got %+v", test.expectedTerminating, count)
+			}
+			count = GetReplicaSurgeCapacityCountForReplicaSets(test.sets)
+			if count != test.expectSurgeCapacityCount {
+				t.Errorf("expectSurgeCapacityCount %+v, got %+v", test.expectSurgeCapacityCount, count)
 			}
 		})
 	}
@@ -476,7 +516,7 @@ func TestResolveFenceposts(t *testing.T) {
 
 func TestNewRSNewReplicas(t *testing.T) {
 	tests := []struct {
-		Name          string
+		name          string
 		strategyType  apps.DeploymentStrategyType
 		depReplicas   int32
 		newRSReplicas int32
@@ -484,41 +524,54 @@ func TestNewRSNewReplicas(t *testing.T) {
 		expected      int32
 	}{
 		{
-			"can not scale up - to newRSReplicas",
-			apps.RollingUpdateDeploymentStrategyType,
-			1, 5, 1, 5,
+			name:          "can not scale up - to newRSReplicas",
+			strategyType:  apps.RollingUpdateDeploymentStrategyType,
+			depReplicas:   1,
+			newRSReplicas: 5,
+			maxSurge:      1,
+			expected:      5,
 		},
 		{
-			"scale up - to depReplicas",
-			apps.RollingUpdateDeploymentStrategyType,
-			6, 2, 10, 6,
+			name:          "scale up - to depReplicas",
+			strategyType:  apps.RollingUpdateDeploymentStrategyType,
+			depReplicas:   6,
+			newRSReplicas: 2,
+			maxSurge:      10,
+			expected:      6,
 		},
 		{
-			"recreate - to depReplicas",
-			apps.RecreateDeploymentStrategyType,
-			3, 1, 1, 3,
+			name:          "recreate - to depReplicas",
+			strategyType:  apps.RecreateDeploymentStrategyType,
+			depReplicas:   3,
+			newRSReplicas: 1,
+			maxSurge:      1,
+			expected:      3,
 		},
 	}
-	newDeployment := generateDeployment("nginx")
-	newRC := generateRS(newDeployment)
-	rs5 := generateRS(newDeployment)
-	*(rs5.Spec.Replicas) = 5
 
 	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
+			newDeployment := generateDeployment("nginx")
 			*(newDeployment.Spec.Replicas) = test.depReplicas
 			newDeployment.Spec.Strategy = apps.DeploymentStrategy{Type: test.strategyType}
-			newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
-				MaxUnavailable: ptr.To(intstr.FromInt32(1)),
-				MaxSurge:       ptr.To(intstr.FromInt32(test.maxSurge)),
+			if test.strategyType == apps.RollingUpdateDeploymentStrategyType {
+				newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+					MaxSurge:       ptr.To(intstr.FromInt32(test.maxSurge)),
+				}
 			}
+
+			newRC := generateRS(newDeployment)
 			*(newRC.Spec.Replicas) = test.newRSReplicas
+			rs5 := generateRS(newDeployment)
+			*(rs5.Spec.Replicas) = 5
+
 			rs, err := NewRSNewReplicas(&newDeployment, []*apps.ReplicaSet{&rs5}, &newRC)
 			if err != nil {
-				t.Errorf("In test case %s, got unexpected error %v", test.Name, err)
+				t.Errorf("In test case %s, got unexpected error %v", test.name, err)
 			}
 			if rs != test.expected {
-				t.Errorf("In test case %s, expected %+v, got %+v", test.Name, test.expected, rs)
+				t.Errorf("In test case %s, expected %+v, got %+v", test.name, test.expected, rs)
 			}
 		})
 	}
@@ -1020,11 +1073,73 @@ func TestMaxUnavailable(t *testing.T) {
 	}
 }
 
+func TestGetNonNegativeIntFromAnnotation(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue int32
+		expectedValid bool
+		expectErr     bool
+	}{
+		{
+			name: "invalid empty",
+		},
+		{
+			name:        "invalid negative ",
+			annotations: map[string]string{"test": "-1", "foo": "2"},
+			expectErr:   true,
+		},
+		{
+			name:        "invalid",
+			annotations: map[string]string{"test": "invalid", "foo": "2"},
+			expectErr:   true,
+		},
+		{
+			name:          "valid",
+			annotations:   map[string]string{"test": "13", "foo": "2"},
+			expectedValue: 13,
+			expectedValid: true,
+		},
+		{
+			name:          "valid zero",
+			annotations:   map[string]string{"test": "0", "foo": "2"},
+			expectedValue: 0,
+			expectedValid: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tDeployment := generateDeployment("nginx")
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.annotations
+			value, valid, err := getNonNegativeIntFromAnnotation(&tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
+			}
+			if test.expectErr != (err != nil) {
+				t.Fatalf("expected err:%v, got:%v", test.expectErr, err)
+			}
+		})
+	}
+}
+
 // Set of simple tests for annotation related util functions
 func TestAnnotationUtils(t *testing.T) {
 
 	//Setup
 	tDeployment := generateDeployment("nginx")
+	tDeployment.Spec.Replicas = ptr.To(int32(10))
+	tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+		RollingUpdate: &apps.RollingUpdateDeployment{
+			MaxSurge:       ptr.To(intstr.FromInt32(1)),
+			MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+		},
+		Type: apps.RollingUpdateDeploymentStrategyType,
+	}
 	tRS := generateRS(tDeployment)
 	tDeployment.Annotations[RevisionAnnotation] = "1"
 
@@ -1052,31 +1167,32 @@ func TestAnnotationUtils(t *testing.T) {
 	})
 
 	//Test Case 2:  Check if annotations are set properly
-	t.Run("SetReplicasAnnotations", func(t *testing.T) {
-		updated := SetReplicasAnnotations(&tRS, 10, 11)
-		if !updated {
-			t.Errorf("SetReplicasAnnotations() failed")
+	t.Run("SetReplicaSetScaleAnnotations", func(t *testing.T) {
+		annotationUpdate, needUpdate := ComputeReplicaSetScaleAnnotations(&tRS, &tDeployment, false)
+		if !needUpdate {
+			t.Errorf("ComputeReplicaSetScaleAnnotations() failed")
 		}
+		SetReplicaSetScaleAnnotations(&tRS, annotationUpdate)
 		value, ok := tRS.Annotations[DesiredReplicasAnnotation]
 		if !ok {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation")
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation")
 		}
 		if value != "10" {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation correctly value=%s", value)
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation correctly value=%s", value)
 		}
 		if value, ok = tRS.Annotations[MaxReplicasAnnotation]; !ok {
-			t.Errorf("SetReplicasAnnotations did not set DesiredReplicasAnnotation")
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set DesiredReplicasAnnotation")
 		}
 		if value != "11" {
-			t.Errorf("SetReplicasAnnotations did not set MaxReplicasAnnotation correctly value=%s", value)
+			t.Errorf("ComputeReplicaSetScaleAnnotations / SetReplicaSetScaleAnnotations did not set MaxReplicasAnnotation correctly value=%s", value)
 		}
 	})
 
 	//Test Case 3:  Check if annotations reflect deployments state
-	tRS.Annotations[DesiredReplicasAnnotation] = "1"
-	tRS.Status.AvailableReplicas = 1
+	tRS.Annotations[DesiredReplicasAnnotation] = "10"
+	tRS.Status.AvailableReplicas = 10
 	tRS.Spec.Replicas = new(int32)
-	*tRS.Spec.Replicas = 1
+	*tRS.Spec.Replicas = 10
 
 	t.Run("IsSaturated", func(t *testing.T) {
 		saturated := IsSaturated(&tDeployment, &tRS)
@@ -1087,15 +1203,17 @@ func TestAnnotationUtils(t *testing.T) {
 	//Tear Down
 }
 
-func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
-
-	desiredReplicas := fmt.Sprintf("%d", int32(10))
-	maxReplicas := fmt.Sprintf("%d", int32(20))
+func TestComputeAndSetReplicaSetScaleAnnotations(t *testing.T) {
+	desiredReplicas := fmt.Sprintf("%d", int32(13))
+	maxReplicas := fmt.Sprintf("%d", int32(24))
 
 	tests := []struct {
-		name       string
-		replicaSet *apps.ReplicaSet
-		expected   bool
+		name                           string
+		replicaSet                     *apps.ReplicaSet
+		partialScaling                 bool
+		requiresPodReplacementPolicyFG bool
+		expectedNeedUpdate             bool
+		expectedAnnotations            map[string]string
 	}{
 		{
 			name: "test Annotations nil",
@@ -1105,7 +1223,8 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 		{
 			name: "test desiredReplicas update",
@@ -1113,13 +1232,14 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "hello",
 					Namespace:   "test",
-					Annotations: map[string]string{DesiredReplicasAnnotation: "8", MaxReplicasAnnotation: maxReplicas},
+					Annotations: map[string]string{DesiredReplicasAnnotation: "8", MaxReplicasAnnotation: maxReplicas, "foo": "bar"},
 				},
 				Spec: apps.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedNeedUpdate:  true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas, "foo": "bar"},
 		},
 		{
 			name: "test maxReplicas update",
@@ -1133,7 +1253,8 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: true,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 		{
 			name: "test needn't update",
@@ -1147,18 +1268,127 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
-			expected: false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  false,
+		},
+		{
+			name: "test removes replicasBeforeScale when not partial scaling",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas, ReplicaSetReplicasBeforeScale: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			partialScaling:      false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
+		},
+		{
+			name: "test starts partial scaling and keeps old desiredReplicas and maxReplicas",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(5)),
+				},
+			},
+			partialScaling:                 true,
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "5"},
+			expectedNeedUpdate:             true,
+		},
+		{
+			name: "test starts partial scaling with invalid ReplicaSetReplicasBeforeScale value, keeps old desiredReplicas and maxReplicas",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "invalid"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(5)),
+				},
+			},
+			partialScaling:                 true,
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "5"},
+			expectedNeedUpdate:             true,
+		},
+		{
+			name: "test continues partial scaling and keeps old desiredReplicas and maxReplicas and replicasBeforeScale",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(6)),
+				},
+			},
+			partialScaling:                 true,
+			requiresPodReplacementPolicyFG: true,
+			expectedAnnotations:            map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "5"},
+			expectedNeedUpdate:             false,
+		},
+		{
+			name: "test removes updates desiredReplicas and maxReplicas and replicasBeforeScale when finishing partial scaling",
+			replicaSet: &apps.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "hello",
+					Namespace:   "test",
+					Annotations: map[string]string{DesiredReplicasAnnotation: "7", MaxReplicasAnnotation: "18", ReplicaSetReplicasBeforeScale: "5"},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+					Replicas: ptr.To(int32(10)),
+				},
+			},
+			partialScaling:      false,
+			expectedAnnotations: map[string]string{DesiredReplicasAnnotation: desiredReplicas, MaxReplicasAnnotation: maxReplicas},
+			expectedNeedUpdate:  true,
 		},
 	}
 
-	for i, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := ReplicasAnnotationsNeedUpdate(test.replicaSet, 10, 20)
-			if result != test.expected {
-				t.Errorf("case[%d]:%s Expected %v, Got: %v", i, test.name, test.expected, result)
+	for _, podReplacementPolicyFG := range []bool{true, false} {
+		for _, test := range tests {
+			if test.requiresPodReplacementPolicyFG && !podReplacementPolicyFG {
+				continue
 			}
-		})
+			t.Run(test.name+fmt.Sprintf("with podReplacementPolicyFG=%v", podReplacementPolicyFG), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, podReplacementPolicyFG)()
+				tDeployment := generateDeployment("hello")
+				tDeployment.Spec.Replicas = ptr.To(int32(13))
+				tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+					RollingUpdate: &apps.RollingUpdateDeployment{
+						MaxSurge:       ptr.To(intstr.FromInt32(11)),
+						MaxUnavailable: ptr.To(intstr.FromInt32(2)),
+					},
+					Type: apps.RollingUpdateDeploymentStrategyType,
+				}
+				annotationUpdate, needUpdate := ComputeReplicaSetScaleAnnotations(test.replicaSet, &tDeployment, test.partialScaling)
+				tReplicaSet := test.replicaSet.DeepCopy()
+				SetReplicaSetScaleAnnotations(tReplicaSet, annotationUpdate)
+				if needUpdate != test.expectedNeedUpdate {
+					t.Errorf("Expected needUpdate %v, Got: %v", test.expectedNeedUpdate, needUpdate)
+				}
+				if !reflect.DeepEqual(test.expectedAnnotations, tReplicaSet.Annotations) {
+					t.Errorf("invalid annotations: %v", cmp.Diff(test.expectedAnnotations, tReplicaSet.Annotations))
+				}
+			})
+		}
 	}
+
 }
 
 func TestGetDeploymentsForReplicaSet(t *testing.T) {
