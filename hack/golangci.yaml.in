@@ -209,7 +209,7 @@ linters-settings: # please keep this alphabetized
   {{- end}}
   testifylint:
     enable-all: true
-    {{- if not .Base}}
+    {{- if .Base}}
     disable:  # TODO: remove each disabled rule and fix it
       - compares
       - empty
