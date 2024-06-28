@@ -111,6 +111,7 @@ status:
   runtimeHandlers:
   - features:
       recursiveReadOnlyMounts: true
+      userNamespaces: true
     name: nameValue
   volumesAttached:
   - devicePath: devicePathValue

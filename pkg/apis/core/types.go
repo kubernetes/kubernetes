@@ -4903,7 +4903,11 @@ type NodeRuntimeHandlerFeatures struct {
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool
-	// Reserved: UserNamespaces *bool
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces.
+	// More specifically, the underlying runtime is expected to support idmapped mounting.
+	// +featureGate=UserNamespaces
+	// +optional
+	UserNamespaces *bool
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.

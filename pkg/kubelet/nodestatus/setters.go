@@ -495,6 +495,7 @@ func RuntimeHandlers(fn func() []kubecontainer.RuntimeHandler) Setter {
 				Name: h.Name,
 				Features: &v1.NodeRuntimeHandlerFeatures{
 					RecursiveReadOnlyMounts: &h.SupportsRecursiveReadOnlyMounts,
+					UserNamespaces:          &h.SupportsUserNamespaces,
 				},
 			}
 		}

@@ -6127,6 +6127,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: recursiveReadOnlyMounts
       type:
         scalar: boolean
+    - name: userNamespaces
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.NodeSelector
   map:
     fields:

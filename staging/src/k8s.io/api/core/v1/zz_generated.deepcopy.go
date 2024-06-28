@@ -2829,6 +2829,11 @@ func (in *NodeRuntimeHandlerFeatures) DeepCopyInto(out *NodeRuntimeHandlerFeatur
 		*out = new(bool)
 		**out = **in
 	}
+	if in.UserNamespaces != nil {
+		in, out := &in.UserNamespaces, &out.UserNamespaces
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
