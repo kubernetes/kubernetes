@@ -910,7 +910,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if sysruntime.GOOS == "linux" {
 		// AppArmor is a Linux kernel security module and it does not support other operating systems.
 		klet.appArmorValidator = apparmor.NewValidator()
-		klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
+		klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
 
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
@@ -1291,12 +1291,6 @@ type Kubelet struct {
 
 	// the list of handlers to call during pod admission.
 	admitHandlers lifecycle.PodAdmitHandlers
-
-	// softAdmithandlers are applied to the pod after it is admitted by the Kubelet, but before it is
-	// run. A pod rejected by a softAdmitHandler will be left in a Pending state indefinitely. If a
-	// rejected pod should not be recreated, or the scheduler is not aware of the rejection rule, the
-	// admission rule should be applied by a softAdmitHandler.
-	softAdmitHandlers lifecycle.PodAdmitHandlers
 
 	// the list of handlers to call during pod sync loop.
 	lifecycle.PodSyncLoopHandlers
@@ -1795,31 +1789,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		return isTerminal, nil
 	}
 
-	// If the pod should not be running, we request the pod's containers be stopped. This is not the same
-	// as termination (we want to stop the pod, but potentially restart it later if soft admission allows
-	// it later). Set the status and phase appropriately
-	runnable := kl.canRunPod(pod)
-	if !runnable.Admit {
-		// Pod is not runnable; and update the Pod and Container statuses to why.
-		if apiPodStatus.Phase != v1.PodFailed && apiPodStatus.Phase != v1.PodSucceeded {
-			apiPodStatus.Phase = v1.PodPending
-		}
-		apiPodStatus.Reason = runnable.Reason
-		apiPodStatus.Message = runnable.Message
-		// Waiting containers are not creating.
-		const waitingReason = "Blocked"
-		for _, cs := range apiPodStatus.InitContainerStatuses {
-			if cs.State.Waiting != nil {
-				cs.State.Waiting.Reason = waitingReason
-			}
-		}
-		for _, cs := range apiPodStatus.ContainerStatuses {
-			if cs.State.Waiting != nil {
-				cs.State.Waiting.Reason = waitingReason
-			}
-		}
-	}
-
 	// Record the time it takes for the pod to become running
 	// since kubelet first saw the pod if firstSeenTime is set.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
@@ -1829,25 +1798,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
-
-	// Pods that are not runnable must be stopped - return a typed error to the pod worker
-	if !runnable.Admit {
-		klog.V(2).InfoS("Pod is not runnable and must have running containers stopped", "pod", klog.KObj(pod), "podUID", pod.UID, "message", runnable.Message)
-		var syncErr error
-		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-		if err := kl.killPod(ctx, pod, p, nil); err != nil {
-			if !wait.Interrupted(err) {
-				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
-				syncErr = fmt.Errorf("error killing pod: %w", err)
-				utilruntime.HandleError(syncErr)
-			}
-		} else {
-			// There was no error killing the pod, but the pod cannot be run.
-			// Return an error to signal that the sync loop should back off.
-			syncErr = fmt.Errorf("pod cannot be run: %v", runnable.Message)
-		}
-		return false, syncErr
-	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
@@ -2330,20 +2280,6 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 	}
 
 	return true, "", ""
-}
-
-func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
-	attrs := &lifecycle.PodAdmitAttributes{Pod: pod}
-	// Get "OtherPods". Rejected pods are failed, so only include admitted pods that are alive.
-	attrs.OtherPods = kl.GetActivePods()
-
-	for _, handler := range kl.softAdmitHandlers {
-		if result := handler.Admit(attrs); !result.Admit {
-			return result
-		}
-	}
-
-	return lifecycle.PodAdmitResult{Admit: true}
 }
 
 // syncLoop is the main loop for processing changes. It watches for changes from
