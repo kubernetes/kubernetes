@@ -90,7 +90,7 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 		{Version: "v1", Resource: "pods"}:                     {},
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
@@ -214,7 +214,7 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 		t.Fatal(err)
 	}
 
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
