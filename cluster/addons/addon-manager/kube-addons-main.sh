@@ -58,12 +58,12 @@ done < <(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.js
 log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
   start_sec=$(date +"%s")
-  if is_leader; then
-    ensure_addons
-    reconcile_addons
-  else
-    log INFO "Not elected leader, going back to sleep."
-  fi
+  # if is_leader; then
+  ensure_addons
+  reconcile_addons
+  # else
+  #   log INFO "Not elected leader, going back to sleep."
+  # fi
   end_sec=$(date +"%s")
   len_sec=$((end_sec-start_sec))
   # subtract the time passed from the sleep time
