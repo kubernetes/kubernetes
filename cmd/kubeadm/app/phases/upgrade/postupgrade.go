@@ -31,10 +31,12 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -107,6 +109,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
 		errs = append(errs, err)
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
+		if err := UpdateKubeletLocalMode(cfg, dryRun); err != nil {
+			return errors.Wrap(err, "failed to update kubelet local mode")
+		}
 	}
 
 	return errorsutil.NewAggregate(errs)
@@ -280,4 +288,54 @@ func GetKubeletDir(dryRun bool) (string, error) {
 		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
+}
+
+func UpdateKubeletLocalMode(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+	// TODO(chrischdi): how to get the correct dir? kubeadm init has a flag to change the location
+	dir := kubeadmconstants.KubernetesDir
+
+	kubeletKubeConfigFilePath := filepath.Join(dir, kubeadmconstants.KubeletKubeConfigFileName)
+
+	if _, err := os.Stat(kubeletKubeConfigFilePath); err != nil {
+		if os.IsNotExist(err) {
+			// TODO(chrischdi): should we print a warning or even return the error?
+			return nil
+		}
+		return err
+	}
+
+	config, err := clientcmd.LoadFromFile(kubeletKubeConfigFilePath)
+	if err != nil {
+		return err
+	}
+
+	configContext, ok := config.Contexts[config.CurrentContext]
+	if !ok {
+		return errors.Errorf("cannot find cluster for active context in kubeconfig %q", kubeletKubeConfigFilePath)
+	}
+
+	localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)
+	if err != nil {
+		return err
+	}
+
+	// Skip changing kubeconfig file if LocalAPIEndpoint is already set.
+	if config.Clusters[configContext.Cluster].Server == localAPIEndpoint {
+		return nil
+	}
+
+	if dryRun {
+		fmt.Printf("[dryrun] Would change the server url from %q to %q in %s and try to restart kubelet\n", localAPIEndpoint, config.Clusters[configContext.Cluster].Server, kubeletKubeConfigFilePath)
+		return nil
+	}
+
+	config.Clusters[configContext.Cluster].Server = localAPIEndpoint
+
+	if err := clientcmd.WriteToFile(*config, kubeletKubeConfigFilePath); err != nil {
+		return err
+	}
+
+	kubeletphase.TryRestartKubelet()
+
+	return nil
 }
