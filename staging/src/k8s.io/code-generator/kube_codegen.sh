@@ -668,7 +668,7 @@ function kube::codegen::gen_client() {
 
 # Generate register code
 #
-# USAGE: kube::codegen::gen_registers [FLAGS] <input-dir>
+# USAGE: kube::codegen::gen_register [FLAGS] <input-dir>
 #
 # <input-dir>
 #   The root directory under which to search for Go files which request code to
@@ -681,7 +681,7 @@ function kube::codegen::gen_client() {
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
 #
-function kube::codegen::gen_registers() {
+function kube::codegen::gen_register() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
