@@ -34,6 +34,7 @@ import (
 
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/fs"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
@@ -45,6 +46,8 @@ import (
 type cadvisorClient struct {
 	imageFsInfoProvider ImageFsInfoProvider
 	rootPath            string
+	started             bool
+	fsContext           *fs.Context
 	manager.Manager
 }
 
@@ -125,7 +128,11 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 }
 
 func (cc *cadvisorClient) Start() error {
-	return cc.Manager.Start()
+	if err := cc.Manager.Start(); err != nil {
+		return err
+	}
+	cc.started = true
+	return nil
 }
 
 func (cc *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
@@ -149,7 +156,69 @@ func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 }
 
 func (cc *cadvisorClient) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
-	return cc.GetDirFsInfo(cc.rootPath)
+	if cc.started {
+		return cc.GetDirFsInfo(cc.rootPath)
+	}
+
+	return cc.getDirFsInfo(cc.rootPath)
+}
+
+func (cc *cadvisorClient) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+	if cc.started {
+		return cc.Manager.GetDirFsInfo(cc.rootPath)
+	}
+
+	return cc.getDirFsInfo(path)
+}
+
+func (cc *cadvisorClient) getDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
+	if cc.fsContext == nil {
+		context := &fs.Context{}
+		err := cadvisormetrics.InitializeFSContext(context)
+		if err != nil {
+			return cadvisorapiv2.FsInfo{}, err
+		}
+
+		cc.fsContext = context
+	}
+
+	fsInfo, err := fs.NewFsInfo(*cc.fsContext)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+	device, err := fsInfo.GetDirFsDevice(path)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+	mountPoint, err := fsInfo.GetMountpointForDevice(device.Device)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+	labels, err := fsInfo.GetLabelsForDevice(device.Device)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+
+	mountSet := map[string]struct{}{mountPoint: {}}
+	fss, err := fsInfo.GetFsInfoForPath(mountSet)
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
+	}
+
+	fs := fss[0]
+
+	fi := cadvisorapiv2.FsInfo{
+		Timestamp:  time.Now(),
+		Device:     device.Device,
+		Mountpoint: mountPoint,
+		Capacity:   fs.Capacity,
+		Usage:      fs.Capacity - fs.Free,
+		Available:  fs.Available,
+		Labels:     labels,
+		Inodes:     fs.Inodes,
+		InodesFree: fs.InodesFree,
+	}
+	return fi, nil
 }
 
 func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) {

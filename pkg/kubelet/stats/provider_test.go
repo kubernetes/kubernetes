@@ -145,16 +145,12 @@ func TestRootFsStats(t *testing.T) {
 		mockPodManager   = new(kubepodtest.MockManager)
 		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
 
-		assert  = assert.New(t)
-		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
+		assert = assert.New(t)
 
-		rootFsInfo       = getTestFsInfo(rootFsInfoSeed)
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
-		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{"/": containerInfo}
+		rootFsInfo = getTestFsInfo(rootFsInfoSeed)
 	)
 
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
-	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
 	stats, err := provider.RootFsStats()
@@ -162,7 +158,7 @@ func TestRootFsStats(t *testing.T) {
 
 	checkFsStats(t, "", rootFsInfoSeed, stats)
 
-	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), stats.Time)
+	assert.Equal(metav1.NewTime(rootFsInfo.Timestamp), stats.Time)
 	assert.Equal(rootFsInfo.Usage, *stats.UsedBytes)
 	assert.Equal(*rootFsInfo.Inodes-*rootFsInfo.InodesFree, *stats.InodesUsed)
 }

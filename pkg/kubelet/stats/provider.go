@@ -154,15 +154,8 @@ func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 		nodeFsInodesUsed = &nodeFsIU
 	}
 
-	// Get the root container stats's timestamp, which will be used as the
-	// imageFs stats timestamp.  Don't force a stats update, as we only want the timestamp.
-	rootStats, err := getCgroupStats(p.cadvisor, "/", false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get root container stats: %v", err)
-	}
-
 	return &statsapi.FsStats{
-		Time:           metav1.NewTime(rootStats.Timestamp),
+		Time:           metav1.NewTime(rootFsInfo.Timestamp),
 		AvailableBytes: &rootFsInfo.Available,
 		CapacityBytes:  &rootFsInfo.Capacity,
 		UsedBytes:      &rootFsInfo.Usage,

@@ -352,20 +352,6 @@ func getCgroupInfo(cadvisor cadvisor.Interface, containerName string, updateStat
 	return &info, nil
 }
 
-// getCgroupStats returns the latest stats of the container having the
-// specified containerName from cadvisor.
-func getCgroupStats(cadvisor cadvisor.Interface, containerName string, updateStats bool) (*cadvisorapiv2.ContainerStats, error) {
-	info, err := getCgroupInfo(cadvisor, containerName, updateStats)
-	if err != nil {
-		return nil, err
-	}
-	stats, found := latestContainerStats(info)
-	if !found {
-		return nil, fmt.Errorf("failed to get latest stats from container info for %q", containerName)
-	}
-	return stats, nil
-}
-
 func buildLogsStats(cstat *cadvisorapiv2.ContainerStats, rootFs *cadvisorapiv2.FsInfo) *statsapi.FsStats {
 	fsStats := &statsapi.FsStats{
 		Time:           metav1.NewTime(cstat.Timestamp),
