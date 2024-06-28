@@ -1185,6 +1185,7 @@ func (f fakePermitPlugin) Name() string {
 
 const (
 	podWaitingReason = "podWaiting"
+	permitTimeout    = 10 * time.Second
 )
 
 func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
@@ -1193,7 +1194,7 @@ func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleStat
 		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
-	return framework.NewStatus(framework.Wait), 100 * time.Second
+	return framework.NewStatus(framework.Wait), permitTimeout
 }
 
 var _ framework.PermitPlugin = &fakePermitPlugin{}
