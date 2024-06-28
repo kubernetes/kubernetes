@@ -26,7 +26,7 @@ import (
 
 func TestLibraryCompatibility(t *testing.T) {
 	var libs []map[string][]cel.FunctionOpt
-	libs = append(libs, authzLibraryDeclsV0, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls, formatLibraryDecls, authzLibraryDeclsV1)
+	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls, formatLibraryDecls, authzSelectorsLibraryDecls)
 	functionNames := sets.New[string]()
 	for _, lib := range libs {
 		for name := range lib {

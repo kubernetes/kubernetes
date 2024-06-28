@@ -87,9 +87,8 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 	},
 	{
 		IntroducedVersion: version.MajorMinor(1, 27),
-		RemovedVersion:    version.MajorMinor(1, 31), // removed in favor of version 1, adding fieldSelector / labelSelector
 		EnvOptions: []cel.EnvOption{
-			library.Authz(0),
+			library.Authz(),
 		},
 	},
 	{
@@ -147,10 +146,12 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 			library.Format(),
 		},
 	},
+	// Authz selectors
 	{
 		IntroducedVersion: version.MajorMinor(1, 31),
+		// TODO(liggitt): limit this to feature enablement
 		EnvOptions: []cel.EnvOption{
-			library.Authz(1), // adds fieldSelector / labelSelector
+			library.AuthzSelectors(),
 		},
 	},
 }
