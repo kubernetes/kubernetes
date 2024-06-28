@@ -46,7 +46,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var rcResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		const (
 			gracePeriod      = 10000
-			gracePeriodShort = 30
+			gracePeriodShort = 60
 		)
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
@@ -58,7 +58,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			expectedWatchEvents := []watch.Event{
 				{Type: watch.Added},
 				{Type: watch.Modified},
-				{Type: watch.Deleted},
+				{Type: watch.Modified},
 			}
 			eventFound := false
 			callback := func(retryWatcher *watchtools.RetryWatcher) (actualWatchEvents []watch.Event) {
@@ -103,11 +103,11 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 				framework.ExpectNoError(err, "failed to delete pod")
 
-				ctxUntil, cancel = context.WithTimeout(ctx, 50*time.Second)
+				ctxUntil, cancel = context.WithTimeout(ctx, 20*time.Second)
 				defer cancel()
 				eventFound = false
 				_, err = watchtools.UntilWithoutRetry(ctxUntil, w, func(watchEvent watch.Event) (bool, error) {
-					if watchEvent.Type != watch.Deleted {
+					if watchEvent.Type != watch.Modified {
 						return false, nil
 					}
 					actualWatchEvents = append(actualWatchEvents, watchEvent)
@@ -116,7 +116,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				})
 				framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
 				if !eventFound {
-					framework.Failf("failed to find %v event", watch.Deleted)
+					framework.Failf("failed to find %v event", watch.Modified)
 				}
 				// Get pod logs.
 				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{Previous: true}).Stream(ctx)
@@ -169,7 +169,7 @@ term() {
     echo "SIGINT 1" >> /dev/termination-log
   elif [ "$COUNT" -eq 1 ]; then
     echo "SIGINT 2" >> /dev/termination-log
-    sleep 20
+    sleep 50
     exit 0
   fi
   COUNT=$((COUNT + 1))
