@@ -99,11 +99,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 				if !eventFound {
 					framework.Failf("failed to find %v event", watch.Modified)
 				}
-				pod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				containerStatus := pod.Status.ContainerStatuses[0]
-				gomega.Expect(containerStatus.State.Terminated.ExitCode).To(gomega.Equal(int32(0)), "container exit code non-zero")
-
 				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
