@@ -114,7 +114,7 @@ func NewOptions() *Options {
 		Logs:                    logs.NewOptions(),
 		Traces:                  genericoptions.NewTracingOptions(),
 
-		EnableLogsHandler:                   true,
+		EnableLogsHandler:                   false,
 		EventTTL:                            1 * time.Hour,
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{metav1.NamespaceSystem, metav1.NamespacePublic, metav1.NamespaceDefault},
@@ -150,7 +150,7 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
-	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.19")
+	fs.MarkDeprecated("enable-logs-handler", "This flag will be removed in v1.33") //nolint:errcheck
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
