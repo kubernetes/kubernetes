@@ -609,6 +609,7 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeName,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
+		"api-server-manifest", "controller-manager-manifest", "scheduler-manifest", // TODO: remove this line when these flags are deprecated and dropped from "kubeadm upgrade diff"
 		"print-join-command", "rootfs", "v", "log-file", "yes")
 	if allowedFlags.Has(flagName) {
 		return true
