@@ -18,7 +18,6 @@ package dynamicresources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
@@ -1460,7 +1460,9 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// The allocation would be enough. The full object is useful for
 		// debugging and testing, so let's make it realistic.
 		claim = claim.DeepCopy()
-		claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+		if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
+			claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+		}
 		claim.Status.DriverName = driverName
 		claim.Status.Allocation = allocation
 		pl.inFlightAllocations.Store(claim.UID, claim)
@@ -1619,72 +1621,88 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 // and reservation are recorded. This finishes the work started in Reserve.
 func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourcev1alpha2.ResourceClaim, finalErr error) {
 	logger := klog.FromContext(ctx)
-	claim := state.claims[index]
-	allocationPatch := ""
-
+	claim := state.claims[index].DeepCopy()
 	allocation := state.informationsForClaim[index].allocation
-	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
+	defer func() {
+		if allocation != nil {
+			// The scheduler was handling allocation. Now that has
+			// completed, either successfully or with a failure.
+			if finalErr == nil {
+				// This can fail, but only for reasons that are okay (concurrent delete or update).
+				// Shouldn't happen in this case.
+				if err := pl.claimAssumeCache.Assume(claim); err != nil {
+					logger.V(5).Info("Claim not stored in assume cache", "err", finalErr)
+				}
+			}
+			pl.inFlightAllocations.Delete(claim.UID)
+		}
+	}()
 
-	// Do we need to store an allocation result from Reserve?
-	if allocation != nil {
-		buffer, err := json.Marshal(allocation)
+	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
+
+	// We may run into a ResourceVersion conflict because there may be some
+	// benign concurrent changes. In that case we get the latest claim and
+	// try again.
+	refreshClaim := false
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if refreshClaim {
+			updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("get updated claim %s after conflict: %w", klog.KObj(claim), err)
+			}
+			logger.V(5).Info("retrying update after conflict", "claim", klog.KObj(claim))
+			claim = updatedClaim
+		} else {
+			// All future retries must get a new claim first.
+			refreshClaim = true
+		}
+
+		if claim.DeletionTimestamp != nil {
+			return fmt.Errorf("claim %s got deleted in the meantime", klog.KObj(claim))
+		}
+
+		// Do we need to store an allocation result from Reserve?
+		if allocation != nil {
+			if claim.Status.Allocation != nil {
+				return fmt.Errorf("claim %s got allocated elsewhere in the meantime", klog.KObj(claim))
+			}
+
+			// The finalizer needs to be added in a normal update.
+			// If we were interrupted in the past, it might already be set and we simply continue.
+			if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
+				claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+				updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
+				}
+				claim = updatedClaim
+			}
+
+			claim.Status.DriverName = state.informationsForClaim[index].allocationDriverName
+			claim.Status.Allocation = allocation
+		}
+
+		// We can simply try to add the pod here without checking
+		// preconditions. The apiserver will tell us with a
+		// non-conflict error if this isn't possible.
+		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
+		updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("marshaling AllocationResult failed: %v", err)
-		}
-		allocationPatch = fmt.Sprintf(`"driverName": %q, "allocation": %s, `, state.informationsForClaim[index].allocationDriverName, string(buffer))
-
-		// The finalizer needs to be added in a normal update. Using a simple update is fine
-		// because we don't expect concurrent modifications while the claim is not allocated
-		// yet. If there are any, we want to fail.
-		//
-		// If we were interrupted in the past, it might already be set and we simply continue.
-		if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
-			claim := state.claims[index].DeepCopy()
-			claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
-			if _, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
-				return nil, fmt.Errorf("add finalizer: %v", err)
+			if allocation != nil {
+				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)
 			}
+			return fmt.Errorf("add reservation to claim %s: %w", klog.KObj(claim), err)
 		}
+		claim = updatedClaim
+		return nil
+	})
+
+	if retryErr != nil {
+		return nil, retryErr
 	}
 
-	// The claim might be stale, for example because the claim can get shared and some
-	// other goroutine has updated it in the meantime. We therefore cannot use
-	// SSA here to add the pod because then we would have to send the entire slice
-	// or use different field manager strings for each entry.
-	//
-	// With a strategic-merge-patch, we can simply send one new entry. The apiserver
-	// validation will catch if two goroutines try to do that at the same time and
-	// the claim cannot be shared.
-	//
-	// Note that this also works when the allocation result gets added twice because
-	// two pods both started using a shared claim: the first pod to get here adds the
-	// allocation result. The second pod then only adds itself to reservedFor.
-	patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": {%s "reservedFor": [ {"resource": "pods", "name": %q, "uid": %q} ] }}`,
-		claim.UID,
-		allocationPatch,
-		pod.Name,
-		pod.UID,
-	)
-	if loggerV := logger.V(6); loggerV.Enabled() {
-		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim), "patch", patch)
-	} else {
-		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
-	}
-	claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
-	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim), "err", err)
-	if allocationPatch != "" {
-		// The scheduler was handling allocation. Now that has
-		// completed, either successfully or with a failure.
-		if err == nil {
-			// This can fail, but only for reasons that are okay (concurrent delete or update).
-			// Shouldn't happen in this case.
-			if err := pl.claimAssumeCache.Assume(claim); err != nil {
-				logger.V(5).Info("Claim not stored in assume cache", "err", err)
-			}
-		}
-		pl.inFlightAllocations.Delete(claim.UID)
-	}
-	return claim, err
+	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim))
+	return claim, nil
 }
 
 // PostBind is called after a pod is successfully bound to a node. Now we are

@@ -580,6 +580,115 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"delayed-allocation-structured-with-resources-has-finalizer": {
+			// As before. but the finalizer is already set. Could happen if
+			// the scheduler got interrupted.
+			pod: podWithClaimName,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := pendingDelayedClaim.DeepCopy()
+				claim.Finalizers = structuredAllocatedClaim.Finalizers
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"delayed-allocation-structured-with-resources-finalizer-gets-removed": {
+			// As before. but the finalizer is already set. Then it gets
+			// removed before the scheduler reaches PreBind.
+			pod: podWithClaimName,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := pendingDelayedClaim.DeepCopy()
+				claim.Finalizers = structuredAllocatedClaim.Finalizers
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim.Finalizers = nil
+						return claim
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = structuredAllocatedClaim.Finalizers
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"delayed-allocation-structured-with-resources-finalizer-gets-added": {
+			// No finalizer initially, then it gets added before
+			// the scheduler reaches PreBind. Shouldn't happen?
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim.Finalizers = structuredAllocatedClaim.Finalizers
+						return claim
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
 		"delayed-allocation-structured-skip-bind": {
 			pod:     podWithClaimName,
 			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
