@@ -235,6 +235,7 @@ linters-settings: # please keep this alphabetized
   testifylint:
     enable-all: true
     disable:  # TODO: remove each disabled rule and fix it
+      - blank-import
       - compares
       - empty
       - error-is-as
