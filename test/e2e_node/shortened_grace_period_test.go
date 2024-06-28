@@ -17,7 +17,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/onsi/ginkgo/v2"
@@ -104,22 +103,24 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 					framework.Failf("failed to find %v event", watch.Modified)
 				}
 				// Get pod logs.
-				logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
-				framework.ExpectNoError(err, "failed to get pod logs")
-				defer func() {
-					if err := logs.Close(); err != nil {
-						framework.ExpectNoError(err, "failed to log close")
-					}
-				}()
-				buf := new(bytes.Buffer)
-				_, err = buf.ReadFrom(logs)
-				if err != nil {
-					framework.ExpectNoError(err, "failed to read from")
-				}
-				podLogs := buf.String()
+				logs := podClient.GetLogs(podName, &v1.PodLogOptions{})
+				rawLogs, _ := logs.DoRaw(context.TODO())
+				podLogs := (string(rawLogs))
+				//framework.ExpectNoError(err, "failed to get pod logs")
+				//defer func() {
+				//	if err := logs.Close(); err != nil {
+				//		framework.ExpectNoError(err, "failed to log close")
+				//	}
+				//}()
+				//buf := new(bytes.Buffer)
+				//_, err = buf.ReadFrom(logs)
+				//if err != nil {
+				//	framework.ExpectNoError(err, "failed to read from")
+				//}
+				//podLogs := buf.String()
 				// Verify the number of SIGINT
-				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
-				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), fmt.Sprintf("unexpected number of SIGINT 2 entries in pod logs.%s", podLogs))
+				gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), fmt.Sprint("unexpected number of SIGINT 1 entries in pod logs. %s", podLogs))
+				gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), fmt.Sprint("unexpected number of SIGINT 2 entries in pod logs. %s", podLogs))
 				w, err = podClient.Watch(context.TODO(), metav1.ListOptions{LabelSelector: "test-shortened-grace=true"})
 				framework.ExpectNoError(err, "failed to watch")
 				ctxUntil, cancel = context.WithTimeout(ctx, 15*time.Second)
@@ -166,21 +167,21 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 					Image:   busyboxImage,
 					Command: []string{"sh", "-c"},
 					Args: []string{`
- term() {
-          if [ "$COUNT" -eq 0 ]; then
-            echo "SIGINT 1"
-          elif [ "$COUNT" -eq 1 ]; then
-            echo "SIGINT 2"
-            sleep 20
-            exit 0
-          fi
-          COUNT=$((COUNT + 1))
-        }
-        COUNT=0
-        trap term SIGTERM
-        while true; do
-          sleep 1
-        done
+term() {
+  if [ "$COUNT" -eq 0 ]; then
+    echo "SIGINT 1"
+  elif [ "$COUNT" -eq 1 ]; then
+    echo "SIGINT 2"
+    sleep 50
+    exit 0
+  fi
+  COUNT=$((COUNT + 1))
+}
+COUNT=0
+trap term SIGTERM
+while true; do
+  sleep 1
+done
 `},
 				},
 			},
