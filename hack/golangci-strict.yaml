@@ -222,7 +222,7 @@ linters-settings: # please keep this alphabetized
       - "all"
   testifylint:
     enable-all: true
-    disable:
+    disable:  # TODO: remove each disabled rule and fix it
       - compares
       - empty
       - error-is-as
