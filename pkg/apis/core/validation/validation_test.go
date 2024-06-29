@@ -9922,29 +9922,29 @@ func TestValidatePodSpec(t *testing.T) {
 		"populate HostNetwork": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(core.PodSecurityContext{HostNetwork: true}),
+			podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
 		),
 		"populate RunAsUser SupplementalGroups FSGroup with minID 0": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID},
 				RunAsUser:          &minUserID,
 				FSGroup:            &minGroupID,
 			}),
 		),
 		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
 			}),
 		),
 		"populate HostIPC": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostIPC: true,
 			}),
 		),
 		"populate HostPID": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostPID: true,
 			}),
 		),
@@ -9986,7 +9986,7 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 		"populate HostAliases with HostNetwork": *podtest.MakePod("",
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}),
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
 			}),
 		),
@@ -9994,7 +9994,7 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetPriorityClassName("valid-name"),
 		),
 		"populate ShareProcessNamespace": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				ShareProcessNamespace: &[]bool{true}[0],
 			}),
 		),
@@ -10005,7 +10005,7 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetOverhead(core.ResourceList{}),
 		),
 		"populate FSGroupChangePolicy": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &goodfsGroupChangePolicy,
 			}),
 		),
@@ -10045,56 +10045,56 @@ func TestValidatePodSpec(t *testing.T) {
 		"with hostNetwork hostPort unspecified": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 0, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
 			}),
 		),
 		"with hostNetwork hostPort not equal to containerPort": *podtest.MakePod("",
 			podtest.SetContainers(podtest.MakeContainer("ctr",
 				podtest.SetContainerPorts(core.ContainerPort{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}))),
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
 			}),
 		),
 		"with hostAliases with invalid IP": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
 		),
 		"with hostAliases with invalid hostname": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "12.34.56.78", Hostnames: []string{"@#$^#@#$"}}),
 		),
 		"bad supplementalGroups large than math.MaxInt32": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID, 1234},
 			}),
 		),
 		"bad supplementalGroups less than 0": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{minGroupID, 1234},
 			}),
 		),
 		"bad runAsUser large than math.MaxInt32": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &maxUserID,
 			}),
 		),
 		"bad runAsUser less than 0": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &minUserID,
 			}),
 		),
 		"bad fsGroup large than math.MaxInt32": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroup: &maxGroupID,
 			}),
 		),
 		"bad fsGroup less than 0": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroup: &minGroupID,
 			}),
 		),
@@ -10111,7 +10111,7 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetPriorityClassName("InvalidName"),
 		),
 		"ShareProcessNamespace and HostPID both set": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostPID:               true,
 				ShareProcessNamespace: &[]bool{true}[0],
 			}),
@@ -10120,12 +10120,12 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetRuntimeClassName("invalid/sandbox"),
 		),
 		"bad empty fsGroupchangepolicy": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy2,
 			}),
 		),
 		"bad invalid fsgroupchangepolicy": *podtest.MakePod("",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
 			}),
 		),
@@ -10396,7 +10396,7 @@ func TestValidatePod(t *testing.T) {
 			),
 		),
 		"runtime default seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type: core.SeccompProfileTypeRuntimeDefault,
 				},
@@ -10413,7 +10413,7 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"unconfined seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type: core.SeccompProfileTypeRuntimeDefault,
 				},
@@ -10429,7 +10429,7 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"localhost seccomp profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type:             core.SeccompProfileTypeLocalhost,
 					LocalhostProfile: utilpointer.String("filename.json"),
@@ -10463,7 +10463,7 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"runtime default AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type: core.AppArmorProfileTypeRuntimeDefault,
 				},
@@ -10479,7 +10479,7 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"unconfined AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type: core.AppArmorProfileTypeUnconfined,
 				},
@@ -10495,7 +10495,7 @@ func TestValidatePod(t *testing.T) {
 			)),
 		),
 		"localhost AppArmor profile for a pod": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type:             core.AppArmorProfileTypeLocalhost,
 					LocalhostProfile: ptr.To("example-org/application-foo"),
@@ -10529,7 +10529,7 @@ func TestValidatePod(t *testing.T) {
 			podtest.SetAnnotations(map[string]string{
 				core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueLocalhostPrefix + "foo",
 			}),
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				AppArmorProfile: &core.AppArmorProfile{
 					Type:             core.AppArmorProfileTypeLocalhost,
 					LocalhostProfile: ptr.To("foo"),
@@ -10537,7 +10537,7 @@ func TestValidatePod(t *testing.T) {
 			}),
 		),
 		"syntactically valid sysctls": *podtest.MakePod("123",
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				Sysctls: []core.Sysctl{{
 					Name:  "kernel.shmmni",
 					Value: "32768",
@@ -11675,7 +11675,7 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetAnnotations(map[string]string{
 					core.SeccompPodAnnotationKey: "unconfined",
 				}),
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type: core.SeccompProfileTypeRuntimeDefault,
 					},
@@ -11743,7 +11743,7 @@ func TestValidatePod(t *testing.T) {
 		"unsupported pod AppArmor profile type": {
 			expectedError: `Unsupported value: "test"`,
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: "test",
 					},
@@ -11765,7 +11765,7 @@ func TestValidatePod(t *testing.T) {
 		"missing pod AppArmor profile type": {
 			expectedError: "Required value: type is required when appArmorProfile is set",
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: "",
 					},
@@ -11775,7 +11775,7 @@ func TestValidatePod(t *testing.T) {
 		"missing AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: core.AppArmorProfileTypeLocalhost,
 					},
@@ -11785,7 +11785,7 @@ func TestValidatePod(t *testing.T) {
 		"empty AppArmor localhost profile": {
 			expectedError: "Required value: must be set when AppArmor type is Localhost",
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To(""),
@@ -11796,7 +11796,7 @@ func TestValidatePod(t *testing.T) {
 		"invalid AppArmor localhost profile type": {
 			expectedError: `Invalid value: "foo-bar"`,
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeRuntimeDefault,
 						LocalhostProfile: ptr.To("foo-bar"),
@@ -11807,7 +11807,7 @@ func TestValidatePod(t *testing.T) {
 		"invalid AppArmor localhost profile": {
 			expectedError: `Invalid value: "foo-bar "`,
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To("foo-bar "),
@@ -11818,7 +11818,7 @@ func TestValidatePod(t *testing.T) {
 		"too long AppArmor localhost profile": {
 			expectedError: "Too long: may not be longer than 4095",
 			spec: *podtest.MakePod("123",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type:             core.AppArmorProfileTypeLocalhost,
 						LocalhostProfile: ptr.To(strings.Repeat("a", 4096)),
@@ -11847,7 +11847,7 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetAnnotations(map[string]string{
 					core.DeprecatedAppArmorAnnotationKeyPrefix + "ctr": core.DeprecatedAppArmorAnnotationValueRuntimeDefault,
 				}),
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					AppArmorProfile: &core.AppArmorProfile{
 						Type: core.AppArmorProfileTypeUnconfined,
 					},
@@ -12615,12 +12615,12 @@ func TestValidatePodUpdate(t *testing.T) {
 			test: "Pod QoS change, burstable -> besteffort",
 		}, {
 			new: *podtest.MakePod("pod",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					FSGroupChangePolicy: &validfsGroupChangePolicy,
 				}),
 			),
 			old: *podtest.MakePod("pod",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					FSGroupChangePolicy: nil,
 				}),
 			),
@@ -12798,22 +12798,22 @@ func TestValidatePodUpdate(t *testing.T) {
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
-				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetOS(core.Linux),
-				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
-				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetOS(core.Linux),
-				podtest.SetSecurityContext(core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
 			),
 			err:  "spec.securityContext.seLinuxOptions: Forbidden",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
@@ -14422,7 +14422,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 			)),
 			podtest.SetEphemeralContainers(ephemeralContainers...),
 			podtest.SetRestartPolicy(core.RestartPolicyOnFailure),
-			podtest.SetSecurityContext(core.PodSecurityContext{
+			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostNetwork: true,
 				WindowsOptions: &core.WindowsSecurityContextOptions{
 					HostProcess: proto.Bool(true),
@@ -16427,7 +16427,7 @@ func TestValidateReplicationController(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: podtest.MakePod("",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					HostNetwork: true,
 				}),
 				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(
@@ -22881,7 +22881,7 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 				},
 			},
 			Spec: podtest.MakePod("",
-				podtest.SetSecurityContext(core.PodSecurityContext{
+				podtest.SetSecurityContext(&core.PodSecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type: core.SeccompProfileTypeUnconfined,
 					},
@@ -24097,18 +24097,12 @@ func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
 	}
 	for name, tt := range validatePodSpecTestCases {
 		t.Run(name, func(t *testing.T) {
-			podSpec := &core.PodSpec{
-				SecurityContext: tt.securityContext,
-				Containers: []core.Container{
-					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			}
+			podSpec := podtest.MakePodSpec(core.RestartPolicyAlways, podtest.SetSecurityContext(tt.securityContext), podtest.SetContainers(podtest.MakeContainer("con")))
+
 			if tt.wantFieldErrors == nil {
 				tt.wantFieldErrors = field.ErrorList{}
 			}
-			errs := ValidatePodSpec(podSpec, nil, fldPath, PodValidationOptions{})
+			errs := ValidatePodSpec(&podSpec, nil, fldPath, PodValidationOptions{})
 			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
@@ -24144,19 +24138,11 @@ func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T)
 
 	for name, tt := range testCases {
 		t.Run(name, func(t *testing.T) {
-			podSpec := &core.PodSpec{
-				OS:              &core.PodOS{Name: core.Windows},
-				SecurityContext: tt.securityContext,
-				Containers: []core.Container{
-					{Name: "con", Image: "pause", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-				},
-				RestartPolicy: core.RestartPolicyAlways,
-				DNSPolicy:     core.DNSClusterFirst,
-			}
+			podSpec := podtest.MakePodSpec(core.RestartPolicyAlways, podtest.SetSecurityContext(tt.securityContext), podtest.SetOS(core.Windows), podtest.SetContainers(podtest.MakeContainer("con")))
 			if tt.wantFieldErrors == nil {
 				tt.wantFieldErrors = field.ErrorList{}
 			}
-			errs := validateWindows(podSpec, fldPath)
+			errs := validateWindows(&podSpec, fldPath)
 			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}

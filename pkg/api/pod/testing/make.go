@@ -17,7 +17,7 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -123,9 +123,9 @@ func SetServiceAccountName(name string) Tweak {
 	}
 }
 
-func SetSecurityContext(ctx api.PodSecurityContext) Tweak {
+func SetSecurityContext(ctx *api.PodSecurityContext) Tweak {
 	return func(pod *api.Pod) {
-		pod.Spec.SecurityContext = &ctx
+		pod.Spec.SecurityContext = ctx
 	}
 }
 

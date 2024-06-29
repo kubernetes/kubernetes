@@ -69,7 +69,7 @@ func validNewPod() *api.Pod {
 	pod := podtest.MakePod("foo",
 		podtest.SetContainers(podtest.MakeContainer("foo",
 			podtest.SetContainerSecurityContext(*securitycontext.ValidInternalSecurityContextWithContainerDefaults()))),
-		podtest.SetSecurityContext(api.PodSecurityContext{}),
+		podtest.SetSecurityContext(&api.PodSecurityContext{}),
 	)
 	pod.Spec.SchedulerName = v1.DefaultSchedulerName
 	pod.Spec.EnableServiceLinks = &enableServiceLinks

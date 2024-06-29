@@ -1985,7 +1985,7 @@ func TestValidateDaemonSet(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
-				podtest.SetSecurityContext(api.PodSecurityContext{
+				podtest.SetSecurityContext(&api.PodSecurityContext{
 					HostNetwork: true,
 				}),
 				podtest.SetContainers(podtest.MakeContainer("abc",
@@ -3105,7 +3105,7 @@ func TestValidateReplicaSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
-				podtest.SetSecurityContext(api.PodSecurityContext{
+				podtest.SetSecurityContext(&api.PodSecurityContext{
 					HostNetwork: true,
 				}),
 				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(api.ContainerPort{
