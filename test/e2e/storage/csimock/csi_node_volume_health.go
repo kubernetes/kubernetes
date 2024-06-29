@@ -18,11 +18,9 @@ package csimock
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/onsi/gomega"
 	"google.golang.org/grpc/codes"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -42,29 +40,21 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
-var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth, framework.WithFeatureGate(features.CSIVolumeHealth), func() {
-	f := framework.NewDefaultFramework("csi-mock-node-volume-stats")
+var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth, framework.WithFeatureGate(features.CSIVolumeHealth), func() {
+	f := framework.NewDefaultFramework("csi-mock-node-volume-health")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
 
-	f.Context("CSI Mock Node Volume Stats", f.WithSlow(), func() {
+	f.Context("CSI Mock Node Volume Health", f.WithSlow(), func() {
 		trackedCalls := []string{
 			"NodeGetVolumeStats",
 		}
 		tests := []struct {
 			name                        string
 			expectedCalls               []csiCall
-			nodeVolumeStatRequired      bool
 			nodeVolumeConditionRequired bool
 			nodeAbnormalVolumeCondition bool
 		}{
-			{
-				name:                        "volume stats not returned",
-				expectedCalls:               []csiCall{},
-				nodeVolumeStatRequired:      false,
-				nodeVolumeConditionRequired: false,
-				nodeAbnormalVolumeCondition: false,
-			},
 			{
 				name: "return normal volume stats",
 				expectedCalls: []csiCall{
@@ -73,7 +63,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth,
 						expectedError:  codes.OK,
 					},
 				},
-				nodeVolumeStatRequired:      true,
 				nodeVolumeConditionRequired: true,
 				nodeAbnormalVolumeCondition: false,
 			},
@@ -85,7 +74,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth,
 						expectedError:  codes.OK,
 					},
 				},
-				nodeVolumeStatRequired:      true,
 				nodeVolumeConditionRequired: false,
 				nodeAbnormalVolumeCondition: false,
 			},
@@ -97,7 +85,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth,
 						expectedError:  codes.OK,
 					},
 				},
-				nodeVolumeStatRequired:      true,
 				nodeVolumeConditionRequired: true,
 				nodeAbnormalVolumeCondition: true,
 			},
@@ -105,11 +92,9 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth,
 		for _, t := range tests {
 			test := t
 			ginkgo.It(test.name, func(ctx context.Context) {
-				ginkgo.By(fmt.Sprintf("volume stats: %+v", test))
 				// Hooks appear to be required for enableNodeVolumeStat.
 				m.init(ctx, testParameters{
 					registerDriver:            true,
-					enableNodeVolumeStat:      test.nodeVolumeStatRequired,
 					enableNodeVolumeCondition: test.nodeVolumeConditionRequired,
 					hooks:                     createGetVolumeStatsHook(test.nodeAbnormalVolumeCondition),
 				})
@@ -142,34 +127,30 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Stats", feature.CSIVolumeHealth,
 					}
 					return false, nil
 				})
-				if test.nodeVolumeStatRequired {
-					// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
-					// the mocked csidriver register doesn't regist itself to normal csidriver.
-					if test.nodeVolumeConditionRequired {
-						nodeName, err := e2epod.GetPodNodeName(ctx, f.ClientSet, pod.Namespace, pod.Name)
-						framework.ExpectNoError(err, "no error of node name")
-						grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
-						framework.ExpectNoError(err, "creating the metrics grabber")
-						waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
-							framework.Logf("Grabbing Kubelet metrics")
-							// Grab kubelet metrics from the node the pod was scheduled on
-							var err error
-							kubeMetrics, err := grabber.GrabFromKubelet(ctx, nodeName)
-							if err != nil {
-								framework.Logf("Error fetching kubelet metrics err: %v", err)
-								return false, err
-							}
-							if !findVolumeConditionMetrics(f.Namespace.Name, claim.Name, kubeMetrics, test.nodeAbnormalVolumeCondition) {
-								return false, nil
-							}
-							return true, nil
-						})
-						framework.ExpectNoError(waitErr, "call metrics should not have any error")
-					}
-					framework.ExpectNoError(err, "while waiting for all CSI calls")
-				} else {
-					gomega.Expect(err).To(gomega.HaveOccurred(), "an error should have occurred")
+				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
+				// the mocked csidriver register doesn't regist itself to normal csidriver.
+				if test.nodeVolumeConditionRequired {
+					nodeName, err := e2epod.GetPodNodeName(ctx, f.ClientSet, pod.Namespace, pod.Name)
+					framework.ExpectNoError(err, "no error of node name")
+					grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
+					framework.ExpectNoError(err, "creating the metrics grabber")
+					waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
+						framework.Logf("Grabbing Kubelet metrics")
+						// Grab kubelet metrics from the node the pod was scheduled on
+						var err error
+						kubeMetrics, err := grabber.GrabFromKubelet(ctx, nodeName)
+						if err != nil {
+							framework.Logf("Error fetching kubelet metrics err: %v", err)
+							return false, err
+						}
+						if !findVolumeConditionMetrics(f.Namespace.Name, claim.Name, kubeMetrics, test.nodeAbnormalVolumeCondition) {
+							return false, nil
+						}
+						return true, nil
+					})
+					framework.ExpectNoError(waitErr, "call metrics should not have any error")
 				}
+				framework.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}
 
