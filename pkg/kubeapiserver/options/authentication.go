@@ -132,6 +132,8 @@ type ServiceAccountAuthenticationOptions struct {
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
+	// WithoutNodes is a flag to indicate that the service account token getter should be created without nodes support.
+	WithoutNodes bool
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -208,6 +210,12 @@ func (o *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 // WithServiceAccounts set default value for service account authentication
 func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
 	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true}
+	return o
+}
+
+// WithNodelessServiceAccounts set default value for service account authentication in nodeless mode.
+func (o *BuiltInAuthenticationOptions) WithNodelessServiceAccounts() *BuiltInAuthenticationOptions {
+	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true, WithoutNodes: true}
 	return o
 }
 
@@ -673,13 +681,21 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 		nodeLister = versionedInformer.Core().V1().Nodes().Lister()
 	}
-	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-		extclient,
-		versionedInformer.Core().V1().Secrets().Lister(),
-		versionedInformer.Core().V1().ServiceAccounts().Lister(),
-		versionedInformer.Core().V1().Pods().Lister(),
-		nodeLister,
-	)
+	if o.ServiceAccounts.WithoutNodes {
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewNodelessGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+		)
+	} else {
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+			nodeLister,
+		)
+	}
 	authenticatorConfig.SecretsWriter = extclient.CoreV1()
 
 	if authenticatorConfig.BootstrapToken {
