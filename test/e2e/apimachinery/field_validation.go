@@ -17,14 +17,12 @@ limitations under the License.
 package apimachinery
 
 import (
-	// ensure libs have a chance to initialize
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
-	_ "github.com/stretchr/testify/assert"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"

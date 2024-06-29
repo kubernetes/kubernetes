@@ -74,7 +74,7 @@ step: Errorf a b 42`,
 				tCtx.Log(buffer.String())
 
 				noSuchValue := tCtx.Value("some other key")
-				assert.Equal(tCtx, nil, noSuchValue, "value for unknown context value key")
+				assert.Nil(tCtx, noSuchValue, "value for unknown context value key")
 			},
 			expectLog: `<klog header>: step: You requested a progress report.
 

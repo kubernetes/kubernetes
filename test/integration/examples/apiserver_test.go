@@ -788,9 +788,9 @@ func testAPIGroupList(ctx context.Context, t *testing.T, client rest.Interface) 
 	if err != nil {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis", err)
 	}
-	assert.Equal(t, 1, len(apiGroupList.Groups))
+	assert.Len(t, apiGroupList.Groups, 1)
 	assert.Equal(t, wardlev1alpha1.GroupName, apiGroupList.Groups[0].Name)
-	assert.Equal(t, 2, len(apiGroupList.Groups[0].Versions))
+	assert.Len(t, apiGroupList.Groups[0].Versions, 2)
 
 	v1alpha1 := metav1.GroupVersionForDiscovery{
 		GroupVersion: wardlev1alpha1.SchemeGroupVersion.String(),
@@ -818,7 +818,7 @@ func testAPIGroup(ctx context.Context, t *testing.T, client rest.Interface) {
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.example.com", err)
 	}
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Group, apiGroup.Name)
-	assert.Equal(t, 2, len(apiGroup.Versions))
+	assert.Len(t, apiGroup.Versions, 2)
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiGroup.Versions[1].GroupVersion)
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.Version, apiGroup.Versions[1].Version)
 	assert.Equal(t, apiGroup.PreferredVersion, apiGroup.Versions[0])
@@ -836,7 +836,7 @@ func testAPIResourceList(ctx context.Context, t *testing.T, client rest.Interfac
 		t.Fatalf("Error in unmarshalling response from server %s: %v", "/apis/wardle.example.com/v1alpha1", err)
 	}
 	assert.Equal(t, wardlev1alpha1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
-	assert.Equal(t, 2, len(apiResourceList.APIResources))
+	assert.Len(t, apiResourceList.APIResources, 2)
 	assert.Equal(t, "fischers", apiResourceList.APIResources[0].Name)
 	assert.False(t, apiResourceList.APIResources[0].Namespaced)
 	assert.Equal(t, "flunders", apiResourceList.APIResources[1].Name)
