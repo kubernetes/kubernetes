@@ -72,22 +72,19 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	// Re-sort the addresses with InternalIPs first and then ExternalIPs
 	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
+	var internalIPs, externalIPs []net.IP
 	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeInternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
-			if ip != nil {
-				allIPs = append(allIPs, ip)
+		ip := netutils.ParseIPSloppy(addr.Address)
+		if ip != nil {
+			if addr.Type == v1.NodeInternalIP {
+				internalIPs = append(internalIPs, ip)
+			} else if addr.Type == v1.NodeExternalIP {
+				externalIPs = append(externalIPs, ip)
 			}
 		}
 	}
-	for _, addr := range node.Status.Addresses {
-		if addr.Type == v1.NodeExternalIP {
-			ip := netutils.ParseIPSloppy(addr.Address)
-			if ip != nil {
-				allIPs = append(allIPs, ip)
-			}
-		}
-	}
+	allIPs = append(allIPs, internalIPs...)
+	allIPs = append(allIPs, externalIPs...)
 	if len(allIPs) == 0 {
 		return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
 	}
