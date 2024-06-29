@@ -546,7 +546,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(ctx, quota, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -568,7 +568,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	ginkgo.By(fmt.Sprintf("Checking rc %q has the desired failure condition set", name))
 	generation := rc.Generation
 	conditions := rc.Status.Conditions
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -597,7 +597,7 @@ func testReplicationControllerConditionCheck(ctx context.Context, f *framework.F
 	ginkgo.By(fmt.Sprintf("Checking rc %q has no failure condition set", name))
 	generation = rc.Generation
 	conditions = rc.Status.Conditions
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		rc, err = c.CoreV1().ReplicationControllers(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -645,7 +645,7 @@ func testRCAdoptMatchingOrphans(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the orphan pod is adopted")
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the RC
 		if apierrors.IsNotFound(err) {
@@ -678,7 +678,7 @@ func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framew
 	framework.ExpectNoError(err)
 
 	p := pods.Items[0]
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
@@ -695,7 +695,7 @@ func testRCReleaseControlledNotMatching(ctx context.Context, f *framework.Framew
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the pod is released")
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		for _, owner := range p2.OwnerReferences {
@@ -719,7 +719,7 @@ type updateRcFunc func(d *v1.ReplicationController)
 func updateReplicationControllerWithRetries(ctx context.Context, c clientset.Interface, namespace, name string, applyUpdate updateRcFunc) (*v1.ReplicationController, error) {
 	var rc *v1.ReplicationController
 	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		var err error
 		if rc, err = c.CoreV1().ReplicationControllers(namespace).Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err

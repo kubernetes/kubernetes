@@ -37,8 +37,8 @@ import (
 
 // waits for a deployment to be created and the desired replicas
 // are updated and available, and no old pods are running.
-func waitForDeployment(getDeploymentFunc func() (*appsv1.Deployment, error), interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+func waitForDeployment(ctx context.Context, getDeploymentFunc func() (*appsv1.Deployment, error), interval, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
 			if apierrors.IsNotFound(err) {

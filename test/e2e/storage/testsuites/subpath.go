@@ -730,7 +730,7 @@ func waitForPodSubpathError(ctx context.Context, f *framework.Framework, pod *v1
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, framework.Poll, f.Timeouts.PodStart, true, func(ctx context.Context) (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -817,7 +817,7 @@ func testPodContainerRestartWithHooks(ctx context.Context, f *framework.Framewor
 	// and "start pod".
 	ginkgo.By("Waiting for container to restart")
 	restarts := int32(0)
-	err = wait.PollImmediate(10*time.Second, f.Timeouts.PodDelete+f.Timeouts.PodStart, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Second, f.Timeouts.PodDelete+f.Timeouts.PodStart, true, func(ctx context.Context) (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -848,7 +848,7 @@ func testPodContainerRestartWithHooks(ctx context.Context, f *framework.Framewor
 	ginkgo.By("Waiting for container to stop restarting")
 	stableCount := int(0)
 	stableThreshold := int(time.Minute / framework.Poll)
-	err = wait.PollImmediate(framework.Poll, f.Timeouts.PodStartSlow, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, framework.Poll, f.Timeouts.PodStartSlow, true, func(ctx context.Context) (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

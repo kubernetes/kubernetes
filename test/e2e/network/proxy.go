@@ -353,7 +353,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
-				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				pollErr := wait.PollUntilContextTimeout(ctx, requestRetryPeriod, requestRetryTimeout, true, validateProxyVerbRequest(client, urlString, httpVerb, msg))
 				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 
@@ -364,7 +364,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/test-service/proxy/some/path/with/" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
-				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				pollErr := wait.PollUntilContextTimeout(ctx, requestRetryPeriod, requestRetryTimeout, true, validateProxyVerbRequest(client, urlString, httpVerb, msg))
 				framework.ExpectNoError(err, "Service didn't start within time out period. %v", pollErr)
 			}
 		})
@@ -447,7 +447,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/pods/agnhost/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
-				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				pollErr := wait.PollUntilContextTimeout(ctx, requestRetryPeriod, requestRetryTimeout, true, validateProxyVerbRequest(client, urlString, httpVerb, msg))
 				framework.ExpectNoError(pollErr, "Pod didn't start within time out period. %v", pollErr)
 			}
 
@@ -458,7 +458,7 @@ var _ = common.SIGDescribe("Proxy", func() {
 				urlString := strings.TrimRight(f.ClientConfig().Host, "/") + "/api/v1/namespaces/" + ns + "/services/" + testSvcName + "/proxy?method=" + httpVerb
 				framework.Logf("Starting http.Client for %s", urlString)
 
-				pollErr := wait.PollImmediate(requestRetryPeriod, requestRetryTimeout, validateProxyVerbRequest(client, urlString, httpVerb, msg))
+				pollErr := wait.PollUntilContextTimeout(ctx, requestRetryPeriod, requestRetryTimeout, true, validateProxyVerbRequest(client, urlString, httpVerb, msg))
 				framework.ExpectNoError(pollErr, "Service didn't start within time out period. %v", pollErr)
 			}
 
@@ -491,8 +491,8 @@ func validateRedirectRequest(client *http.Client, redirectVerb string, urlString
 // validateProxyVerbRequest checks that a http request to a pod
 // or service was valid for any http verb. Requires agnhost image
 // with porter --json-response
-func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb string, msg string) func() (bool, error) {
-	return func() (bool, error) {
+func validateProxyVerbRequest(client *http.Client, urlString string, httpVerb string, msg string) func(context.Context) (bool, error) {
+	return func(context.Context) (bool, error) {
 		var err error
 
 		request, err := http.NewRequest(httpVerb, urlString, nil)

@@ -192,18 +192,18 @@ properties:
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 // Aware of the kubectl example files map.
-func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
+func cleanupKubectlInputs(ctx context.Context, fileContents string, ns string, selectors ...string) {
 	ginkgo.By("using delete to clean up resources")
 	// support backward compatibility : file paths or raw json - since we are removing file path
 	// dependencies from this test.
 	e2ekubectl.RunKubectlOrDieInput(ns, fileContents, "delete", "--grace-period=0", "--force", "-f", "-")
-	assertCleanup(ns, selectors...)
+	assertCleanup(ctx, ns, selectors...)
 }
 
 // assertCleanup asserts that cleanup of a namespace wrt selectors occurred.
-func assertCleanup(ns string, selectors ...string) {
+func assertCleanup(ctx context.Context, ns string, selectors ...string) {
 	var e error
-	verifyCleanupFunc := func() (bool, error) {
+	verifyCleanupFunc := func(context.Context) (bool, error) {
 		e = nil
 		for _, selector := range selectors {
 			resources := e2ekubectl.RunKubectlOrDie(ns, "get", "rc,svc", "-l", selector, "--no-headers")
@@ -219,7 +219,7 @@ func assertCleanup(ns string, selectors ...string) {
 		}
 		return true, nil
 	}
-	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
+	err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 1*time.Minute, true, verifyCleanupFunc)
 	if err != nil {
 		framework.Failf(e.Error())
 	}
@@ -335,7 +335,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2.
 		*/
 		framework.ConformanceIt("should create and stop a replication controller", func(ctx context.Context) {
-			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
+			defer cleanupKubectlInputs(ctx, nautilus, ns, updateDemoSelector)
 
 			ginkgo.By("creating a replication controller")
 			e2ekubectl.RunKubectlOrDieInput(ns, nautilus, "create", "-f", "-")
@@ -348,7 +348,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			Description: Create a Pod and a container with a given image. Configure replication controller to run 2 replicas. The number of running instances of the Pod MUST equal the number of replicas set on the replication controller which is 2. Update the replicaset to 1. Number of running instances of the Pod MUST be 1. Update the replicaset to 2. Number of running instances of the Pod MUST be 2.
 		*/
 		framework.ConformanceIt("should scale a replication controller", func(ctx context.Context) {
-			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
+			defer cleanupKubectlInputs(ctx, nautilus, ns, updateDemoSelector)
 			nautilusImage := imageutils.GetE2EImage(imageutils.Nautilus)
 
 			ginkgo.By("creating a replication controller")
@@ -392,7 +392,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		*/
 		framework.ConformanceIt("should create and stop a working application", func(ctx context.Context) {
 			defer forEachGBFile(func(contents string) {
-				cleanupKubectlInputs(contents, ns)
+				cleanupKubectlInputs(ctx, contents, ns)
 			})
 			ginkgo.By("creating all guestbook components")
 			forEachGBFile(func(contents string) {
@@ -413,8 +413,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, simplePodName, ns, framework.PodStartTimeout))
 		})
-		ginkgo.AfterEach(func() {
-			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
+		ginkgo.AfterEach(func(ctx context.Context) {
+			cleanupKubectlInputs(ctx, podYaml, ns, simplePodSelector)
 		})
 
 		ginkgo.It("should support exec", func(ctx context.Context) {
@@ -1431,7 +1431,7 @@ metadata:
 				{"Pod Template:"},
 				{"Image:", imageutils.GetE2EImage(imageutils.Agnhost)},
 				{"Events:"}}
-			checkKubectlOutputWithRetry(ns, requiredStrings, "describe", "rc", "agnhost-primary")
+			checkKubectlOutputWithRetry(ctx, ns, requiredStrings, "describe", "rc", "agnhost-primary")
 
 			// Service
 			output := e2ekubectl.RunKubectlOrDie(ns, "describe", "service", "agnhost-primary")
@@ -1491,7 +1491,7 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, cronjobYaml, "create", "-f", "-")
 
 			ginkgo.By("waiting for cronjob to start.")
-			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			err := wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 				cj, err := c.BatchV1().CronJobs(ns).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("Failed getting CronJob %s: %w", ns, err)
@@ -1612,8 +1612,8 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, pausePodName, ns, framework.PodStartTimeout))
 		})
-		ginkgo.AfterEach(func() {
-			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
+		ginkgo.AfterEach(func(ctx context.Context) {
+			cleanupKubectlInputs(ctx, podYaml, ns, pausePodSelector)
 		})
 
 		/*
@@ -1651,8 +1651,8 @@ metadata:
 			e2ekubectl.RunKubectlOrDieInput(ns, podYaml, "create", "-f", "-")
 			framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, c, busyboxPodName, ns, framework.PodStartTimeout))
 		})
-		ginkgo.AfterEach(func() {
-			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
+		ginkgo.AfterEach(func(ctx context.Context) {
+			cleanupKubectlInputs(ctx, podYaml, ns, busyboxPodSelector)
 		})
 
 		/*
@@ -2172,9 +2172,9 @@ func checkOutput(output string, required [][]string) {
 	}
 }
 
-func checkKubectlOutputWithRetry(namespace string, required [][]string, args ...string) {
+func checkKubectlOutputWithRetry(ctx context.Context, namespace string, required [][]string, args ...string) {
 	var pollErr error
-	wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+	_ = wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		output := e2ekubectl.RunKubectlOrDie(namespace, args...)
 		err := checkOutputReturnError(output, required)
 		if err != nil {

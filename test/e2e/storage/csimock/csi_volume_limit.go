@@ -49,7 +49,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
-			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			csiNodeAttachLimit, err := checkCSINodeForLimits(ctx, nodeName, driverName, m.cs)
 			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 2))
@@ -68,7 +68,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			_, _, pod3 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod3).NotTo(gomega.BeNil(), "while creating third pod")
-			err = waitForMaxVolumeCondition(pod3, m.cs)
+			err = waitForMaxVolumeCondition(ctx, pod3, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
 		})
 
@@ -81,7 +81,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
-			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			csiNodeAttachLimit, err := checkCSINodeForLimits(ctx, nodeName, driverName, m.cs)
 			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
@@ -94,7 +94,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			_, _, pod2 := m.createPod(ctx, genericEphemeral)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
-			err = waitForMaxVolumeCondition(pod2, m.cs)
+			err = waitForMaxVolumeCondition(ctx, pod2, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 
@@ -107,7 +107,7 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 			nodeName := m.config.ClientNodeSelection.Name
 			driverName := m.config.GetUniqueDriverName()
 
-			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			csiNodeAttachLimit, err := checkCSINodeForLimits(ctx, nodeName, driverName, m.cs)
 			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
@@ -120,17 +120,17 @@ var _ = utils.SIGDescribe("CSI Mock volume limit", func() {
 
 			_, _, pod2 := m.createPod(ctx, pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
-			err = waitForMaxVolumeCondition(pod2, m.cs)
+			err = waitForMaxVolumeCondition(ctx, pod2, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 	})
 })
 
-func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
+func checkCSINodeForLimits(ctx context.Context, nodeName string, driverName string, cs clientset.Interface) (int32, error) {
 	var attachLimit int32
 
-	waitErr := wait.PollImmediate(10*time.Second, csiNodeLimitUpdateTimeout, func() (bool, error) {
-		csiNode, err := cs.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, csiNodeLimitUpdateTimeout, true, func(ctx context.Context) (bool, error) {
+		csiNode, err := cs.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}

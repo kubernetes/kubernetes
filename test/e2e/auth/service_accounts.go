@@ -740,7 +740,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			3. Reconciled if modified
 	*/
 	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func(ctx context.Context) {
-		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Get(ctx, rootCAConfigMapName, metav1.GetOptions{})
 			if err == nil {
 				return true, nil

@@ -896,7 +896,7 @@ func createLocalPVCsPVs(ctx context.Context, config *localTestConfig, volumes []
 		// Verify PVCs are not bound by waiting for phase==bound with a timeout and asserting that we hit the timeout.
 		// There isn't really a great way to verify this without making the test be slow...
 		const bindTimeout = 10 * time.Second
-		waitErr := wait.PollImmediate(time.Second, bindTimeout, func() (done bool, err error) {
+		waitErr := wait.PollUntilContextTimeout(ctx, time.Second, bindTimeout, true, func(ctx context.Context) (done bool, err error) {
 			for _, volume := range volumes {
 				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(ctx, volume.pvc.Name, metav1.GetOptions{})
 				if err != nil {

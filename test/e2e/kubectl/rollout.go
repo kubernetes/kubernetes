@@ -52,8 +52,8 @@ var _ = SIGDescribe("Kubectl rollout", func() {
 	})
 
 	ginkgo.Describe("undo", func() {
-		ginkgo.AfterEach(func() {
-			cleanupKubectlInputs(deploymentYaml, ns, "app=httpd")
+		ginkgo.AfterEach(func(ctx context.Context) {
+			cleanupKubectlInputs(ctx, deploymentYaml, ns, "app=httpd")
 		})
 		ginkgo.It("undo should rollback and update deployment env", func(ctx context.Context) {
 			var err error

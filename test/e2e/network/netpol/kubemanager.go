@@ -19,6 +19,11 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,10 +32,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	netutils "k8s.io/utils/net"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // defaultPollIntervalSeconds [seconds] is the default value for which the Prober will wait before attempting next attempt.
@@ -186,15 +187,15 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 	var probeError error
 	var stderr string
 
-	// Instead of re-running the job on connectivity failure, the following conditionFunc when passed to PollImmediate, reruns
-	// the job when the observed value don't match the expected value, so we don't rely on return value of PollImmediate, we
+	// Instead of re-running the job on connectivity failure, the following conditionFunc when passed to PollUntilContextTimeout, reruns
+	// the job when the observed value don't match the expected value, so we don't rely on return value of PollUntilContextTimeout, we
 	// simply discard it and use probeError, defined outside scope of conditionFunc, for returning the result of probeConnectivity.
-	conditionFunc := func() (bool, error) {
+	conditionFunc := func(ctx context.Context) (bool, error) {
 		_, stderr, probeError = k.executeRemoteCommand(args.nsFrom, args.podFrom, args.containerFrom, cmd)
 		// retry should only occur if expected and observed value don't match.
 		if args.expectConnectivity {
 			if probeError != nil {
-				// since we expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
+				// since we expect connectivity here, we fail the condition for PollUntilContextTimeout to reattempt the probe.
 				// this happens in the cases where network is congested, we don't have any policy rejecting traffic
 				// from "podFrom" to "podTo" and probes from "podFrom" to "podTo" are failing.
 				framework.Logf("probe #%d :: connectivity expected :: %s/%s -> %s :: stderr - %s",
@@ -211,7 +212,7 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 				// we got the expected results, exit immediately.
 				return true, nil
 			} else {
-				// since we don't expect connectivity here, we fail the condition for PollImmediate to reattempt the probe.
+				// since we don't expect connectivity here, we fail the condition for PollUntilContextTimeout to reattempt the probe.
 				// this happens in the cases where we have policy rejecting traffic from "podFrom" to "podTo", but CNI takes
 				// time to implement the policy and probe from "podFrom" to "podTo" was successful in that window.
 				framework.Logf(" probe #%d :: connectivity not expected :: %s/%s -> %s",
@@ -223,10 +224,12 @@ func (k *kubeManager) probeConnectivity(args *probeConnectivityArgs) (bool, stri
 		}
 	}
 
-	// ignore the result of PollImmediate, we are only concerned with probeError.
-	_ = wait.PollImmediate(
+	// ignore the result of PollUntilContextTimeout, we are only concerned with probeError.
+	_ = wait.PollUntilContextTimeout(
+		context.TODO(),
 		time.Duration(args.pollIntervalSeconds)*time.Second,
 		time.Duration(args.pollTimeoutSeconds)*time.Second,
+		true,
 		conditionFunc,
 	)
 

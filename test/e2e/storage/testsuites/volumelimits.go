@@ -384,7 +384,7 @@ func getInTreeNodeLimits(ctx context.Context, cs clientset.Interface, nodeName s
 func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName string, driverInfo *storageframework.DriverInfo) (int, error) {
 	// Retry with a timeout, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
-	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, 2*time.Second, csiNodeInfoTimeout, true, func(ctx context.Context) (bool, error) {
 		csiNode, err := cs.StorageV1().CSINodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)

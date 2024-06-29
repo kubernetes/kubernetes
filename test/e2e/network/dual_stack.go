@@ -272,7 +272,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoint belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -318,7 +318,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -363,7 +363,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -408,7 +408,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -453,7 +453,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil

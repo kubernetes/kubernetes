@@ -164,7 +164,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
-			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
+			framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, framework.Poll, time.Minute, true, func(ctx context.Context) (bool, error) {
 				_, err := rcClient.Get(ctx, rcName, metav1.GetOptions{})
 				if apierrors.IsNotFound(err) {
 					return true, nil // done

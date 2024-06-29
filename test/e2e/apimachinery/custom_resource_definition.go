@@ -312,7 +312,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "setting default for a to \"A\" in schema")
 
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			u1, err := crClient.Get(ctx, name1, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -354,7 +354,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		]`), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "setting default for b to \"B\" and remove default for a")
 
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			u2, err := crClient.Get(ctx, name2, metav1.GetOptions{})
 			if err != nil {
 				return false, err

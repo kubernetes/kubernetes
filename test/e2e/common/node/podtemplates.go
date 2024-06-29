@@ -162,7 +162,7 @@ var _ = SIGDescribe("PodTemplates", func() {
 
 		ginkgo.By("check that the list of pod templates matches the requested quantity")
 
-		err = wait.PollImmediate(podTemplateRetryPeriod, podTemplateRetryTimeout, checkPodTemplateListQuantity(ctx, f, "podtemplate-set=true", 0))
+		err = wait.PollUntilContextTimeout(ctx, podTemplateRetryPeriod, podTemplateRetryTimeout, true, checkPodTemplateListQuantity(ctx, f, "podtemplate-set=true", 0))
 		framework.ExpectNoError(err, "failed to count required pod templates")
 
 	})
@@ -212,8 +212,8 @@ var _ = SIGDescribe("PodTemplates", func() {
 
 })
 
-func checkPodTemplateListQuantity(ctx context.Context, f *framework.Framework, label string, quantity int) func() (bool, error) {
-	return func() (bool, error) {
+func checkPodTemplateListQuantity(ctx context.Context, f *framework.Framework, label string, quantity int) func(ctx context.Context) (bool, error) {
+	return func(context.Context) (bool, error) {
 		var err error
 
 		framework.Logf("requesting list of pod templates to confirm quantity")
