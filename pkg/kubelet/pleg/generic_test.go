@@ -31,6 +31,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -50,11 +53,11 @@ type TestGenericPLEG struct {
 	clock   *testingclock.FakeClock
 }
 
-func newTestGenericPLEG() *TestGenericPLEG {
-	return newTestGenericPLEGWithChannelSize(largeChannelCap)
+func newTestGenericPLEG(t *testing.T) *TestGenericPLEG {
+	return newTestGenericPLEGWithChannelSize(largeChannelCap, t)
 }
 
-func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
+func newTestGenericPLEGWithChannelSize(eventChannelCap int, t *testing.T) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
 	clock := testingclock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
@@ -65,6 +68,8 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 		eventChannel:   make(chan *PodLifecycleEvent, eventChannelCap),
 		podRecords:     make(podRecords),
 		clock:          clock,
+		cache:          kubecontainer.NewCache(),
+		logger:         newGenericLogger(t),
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -105,13 +110,15 @@ func verifyEvents(t *testing.T, expected, actual []*PodLifecycleEvent) {
 }
 
 func TestRelisting(t *testing.T) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
-			ID: "1234",
+			ID:        "1234",
+			Name:      "testPod",
+			Namespace: "testNamespace",
 			Containers: []*kubecontainer.Container{
 				createTestContainer("c1", kubecontainer.ContainerStateExited),
 				createTestContainer("c2", kubecontainer.ContainerStateRunning),
@@ -124,6 +131,15 @@ func TestRelisting(t *testing.T) {
 				createTestContainer("c1", kubecontainer.ContainerStateExited),
 			},
 		}},
+	}
+	runtime.PodStatus = kubecontainer.PodStatus{
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:        kubecontainer.ContainerID{Type: testContainerRuntimeType, ID: "c1"},
+				ExitCode:  137,
+				CreatedAt: time.Unix(0, time.Now().Unix()),
+			},
+		},
 	}
 	pleg.Relist()
 	// Report every running/exited container if we see them for the first time.
@@ -172,7 +188,7 @@ func TestRelisting(t *testing.T) {
 
 // TestEventChannelFull test when channel is full, the events will be discard.
 func TestEventChannelFull(t *testing.T) {
-	testPleg := newTestGenericPLEGWithChannelSize(4)
+	testPleg := newTestGenericPLEGWithChannelSize(4, t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
@@ -242,7 +258,7 @@ func TestDetectingContainerDeaths(t *testing.T) {
 }
 
 func testReportMissingContainers(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -283,7 +299,7 @@ func testReportMissingContainers(t *testing.T, numRelists int) {
 }
 
 func testReportMissingPods(t *testing.T, numRelists int) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	runtime.AllPodList = []*containertest.FakePod{
@@ -424,7 +440,7 @@ func TestRemoveCacheEntry(t *testing.T) {
 }
 
 func TestHealthy(t *testing.T) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 
 	// pleg should initially be unhealthy
 	pleg, _, clock := testPleg.pleg, testPleg.runtime, testPleg.clock
@@ -523,7 +539,7 @@ func TestRelistWithReinspection(t *testing.T) {
 
 // Test detecting sandbox state changes.
 func TestRelistingWithSandboxes(t *testing.T) {
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
 	ch := pleg.Watch()
 	// The first relist should send a PodSync event to each pod.
@@ -665,9 +681,8 @@ func TestRelistIPChange(t *testing.T) {
 
 func TestRunningPodAndContainerCount(t *testing.T) {
 	metrics.Register()
-	testPleg := newTestGenericPLEG()
+	testPleg := newTestGenericPLEG(t)
 	pleg, runtime := testPleg.pleg, testPleg.runtime
-
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
 			ID: "1234",
@@ -731,4 +746,10 @@ kubelet_running_pods 2
 			}
 		})
 	}
+}
+
+func newGenericLogger(t *testing.T) klog.Logger {
+	logger, _ := ktesting.NewTestContext(t)
+	logger = klog.LoggerWithName(logger, "GenericPLEG")
+	return logger
 }

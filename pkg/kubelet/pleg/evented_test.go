@@ -30,25 +30,29 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	critest "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-func newTestEventedPLEG() *EventedPLEG {
+func newTestEventedPLEG(t *testing.T) *EventedPLEG {
 	return &EventedPLEG{
 		runtime:        &containertest.FakeRuntime{},
 		clock:          testingclock.NewFakeClock(time.Time{}),
 		cache:          kubecontainer.NewCache(),
 		runtimeService: critest.NewFakeRuntimeService(),
 		eventChannel:   make(chan *PodLifecycleEvent, 100),
+		logger:         newEventLogger(t),
 	}
 }
 
 func TestHealthyEventedPLEG(t *testing.T) {
 	metrics.Register()
-	pleg := newTestEventedPLEG()
+	pleg := newTestEventedPLEG(t)
 
 	_, _, events := createTestPodsStatusesAndEvents(100)
 	for _, event := range events[:5] {
@@ -72,7 +76,7 @@ func TestHealthyEventedPLEG(t *testing.T) {
 
 func TestUpdateRunningPodMetric(t *testing.T) {
 	metrics.Register()
-	pleg := newTestEventedPLEG()
+	pleg := newTestEventedPLEG(t)
 
 	podStatuses := make([]*kubecontainer.PodStatus, 5)
 	for i := range podStatuses {
@@ -222,7 +226,8 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 	for _, test := range tests {
 		cache.Set(test.args.pid, test.oldstatus, nil, time.Time{})
 		e := &EventedPLEG{
-			cache: cache,
+			cache:  cache,
+			logger: newEventLogger(t),
 		}
 		t.Run(test.name, func(t *testing.T) {
 			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
@@ -230,4 +235,10 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newEventLogger(t *testing.T) klog.Logger {
+	logger, _ := ktesting.NewTestContext(t)
+	logger = klog.LoggerWithName(logger, "EventedPLEG")
+	return logger
 }
