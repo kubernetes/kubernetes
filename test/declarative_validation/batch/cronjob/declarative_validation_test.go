@@ -17,6 +17,7 @@ limitations under the License.
 package cronjob
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -40,6 +41,106 @@ import (
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
 		testDeclarativeValidate(t, apiVersion)
+	}
+}
+
+func TestDeclarativeValidatePodFailurePolicyNames(t *testing.T) {
+	namePath := field.NewPath("spec", "jobTemplate", "spec", "podFailurePolicy", "rules")
+	testCases := map[string]struct {
+		names        []*string
+		expectedErrs field.ErrorList
+	}{
+		"valid names": {
+			names: []*string{new("out-of-quota"), nil},
+		},
+		"63 character name": {
+			names: []*string{new(strings.Repeat("a", 63))},
+		},
+		"empty name": {
+			names:        []*string{new("")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath.Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"duplicate names": {
+			names:        []*string{new("a"), new("a")},
+			expectedErrs: field.ErrorList{field.Duplicate(namePath.Index(1).Child("name"), nil).MarkFromImperative()},
+		},
+		"name matching another rule index": {
+			names: []*string{nil, new("0")},
+		},
+		"invalid syntax": {
+			names:        []*string{new("a_b")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath.Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"64 character name": {
+			names:        []*string{new(strings.Repeat("a", 64))},
+			expectedErrs: field.ErrorList{field.Invalid(namePath.Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"uppercase name": {
+			names:        []*string{new("OutOfQuota")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath.Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+		"dotted name": {
+			names:        []*string{new("out.of.quota")},
+			expectedErrs: field.ErrorList{field.Invalid(namePath.Index(0).Child("name"), nil, "").WithOrigin("format=k8s-short-name")},
+		},
+	}
+	for _, apiVersion := range apiVersions {
+		for name, tc := range testCases {
+			for _, enabled := range []bool{false, true} {
+				t.Run(apiVersion+"/"+name+"/gate="+strconv.FormatBool(enabled), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodFailurePolicyName, enabled)
+					ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+						APIGroup: "batch", APIVersion: apiVersion, Resource: "cronjobs", IsResourceRequest: true, Verb: "create",
+					})
+					job := mkCronJob(tweakPodFailurePolicyRuleNames(tc.names...))
+					registry.Strategy.PrepareForCreate(ctx, &job)
+					var expectedErrs field.ErrorList
+					if enabled {
+						expectedErrs = tc.expectedErrs
+					}
+					apitesting.VerifyValidationEquivalence(t, ctx, &job, registry.Strategy, expectedErrs)
+
+					for _, namesInUse := range []bool{false, true} {
+						t.Run("update/names-in-use="+strconv.FormatBool(namesInUse), func(t *testing.T) {
+							var oldName *string
+							if namesInUse {
+								oldName = new("stored")
+							}
+							oldJob := mkCronJob(tweakPodFailurePolicyRuleNames(oldName))
+							oldJob.ResourceVersion = "1"
+							updatedJob := mkCronJob(tweakPodFailurePolicyRuleNames(tc.names...))
+							updatedJob.ResourceVersion = "1"
+							ctx := genericapirequest.WithRequestInfo(ctx, &genericapirequest.RequestInfo{
+								APIGroup: "batch", APIVersion: apiVersion, Resource: "cronjobs", IsResourceRequest: true, Verb: "update",
+							})
+							registry.Strategy.PrepareForUpdate(ctx, &updatedJob, &oldJob)
+							var expectedErrs field.ErrorList
+							if enabled || namesInUse {
+								expectedErrs = tc.expectedErrs
+							}
+							apitesting.VerifyUpdateValidationEquivalence(t, ctx, &updatedJob, &oldJob, registry.Strategy, expectedErrs)
+						})
+					}
+				})
+			}
+		}
+	}
+}
+
+func tweakPodFailurePolicyRuleNames(names ...*string) func(*batch.CronJob) {
+	return func(job *batch.CronJob) {
+		spec := &job.Spec.JobTemplate.Spec
+		spec.Template.Spec.RestartPolicy = api.RestartPolicyNever
+		spec.PodFailurePolicy = &batch.PodFailurePolicy{}
+		for _, name := range names {
+			spec.PodFailurePolicy.Rules = append(spec.PodFailurePolicy.Rules, batch.PodFailurePolicyRule{
+				Name: name, Action: batch.PodFailurePolicyActionFailJob,
+				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+					Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			})
+		}
 	}
 }
 

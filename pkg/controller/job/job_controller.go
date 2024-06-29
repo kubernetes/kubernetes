@@ -1715,7 +1715,8 @@ func newCondition(conditionType batch.JobConditionType, status v1.ConditionStatu
 	}
 }
 
-// getFailJobMessage returns a job failure message if the job should fail with the current counters
+// getFailJobMessage returns a job failure message if a failed pod matches a
+// FailJob rule of the pod failure policy.
 func getFailJobMessage(job *batch.Job, pods []*v1.Pod) *string {
 	if job.Spec.PodFailurePolicy == nil {
 		return nil

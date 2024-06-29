@@ -1463,6 +1463,72 @@ func TestValidateJobCreate(t *testing.T) {
 	}
 }
 
+func TestValidateJobCreatePodFailurePolicyRuleNames(t *testing.T) {
+	validGeneratedSelector := getValidGeneratedSelector()
+	template := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	template.Spec.RestartPolicy = api.RestartPolicyNever
+	jobWithRuleNames := func(names ...*string) *batch.Job {
+		job := &batch.Job{
+			ObjectMeta: metav1.ObjectMeta{Name: "myjob", Namespace: metav1.NamespaceDefault, UID: types.UID("1a2b3c")},
+			Spec: batch.JobSpec{
+				Selector:         validGeneratedSelector,
+				Template:         template,
+				PodFailurePolicy: &batch.PodFailurePolicy{},
+			},
+		}
+		for _, name := range names {
+			job.Spec.PodFailurePolicy.Rules = append(job.Spec.PodFailurePolicy.Rules, batch.PodFailurePolicyRule{
+				Name:   name,
+				Action: batch.PodFailurePolicyActionFailJob,
+				OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
+					Operator: batch.PodFailurePolicyOnExitCodesOpIn,
+					Values:   []int32{1},
+				},
+			})
+		}
+		return job
+	}
+	namePath := func(i int) *field.Path {
+		return field.NewPath("spec", "podFailurePolicy", "rules").Index(i).Child("name")
+	}
+
+	cases := map[string]struct {
+		job      *batch.Job
+		wantErrs field.ErrorList
+	}{
+		"unnamed rules": {
+			job: jobWithRuleNames(nil, nil),
+		},
+		"mix of named and unnamed rules": {
+			job: jobWithRuleNames(new("oom-killed"), nil, new("out-of-quota")),
+		},
+		"numeric name equal to own index": {
+			job: jobWithRuleNames(nil, new("1")),
+		},
+		"numeric name outside the rule index range": {
+			job: jobWithRuleNames(new("a"), new("5")),
+		},
+		"numeric name with leading zero does not collide": {
+			job: jobWithRuleNames(nil, new("00")),
+		},
+		"duplicate names": {
+			job:      jobWithRuleNames(new("a"), nil, new("a")),
+			wantErrs: field.ErrorList{field.Duplicate(namePath(2), "a")},
+		},
+		"name equal to another rule's index": {
+			job: jobWithRuleNames(nil, new("0")),
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateJobCreate(tc.job, JobValidationOptions{RequirePrefixedLabels: true})
+			if diff := cmp.Diff(tc.wantErrs, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+				t.Errorf("unexpected errors (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateJobUpdate(t *testing.T) {
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)

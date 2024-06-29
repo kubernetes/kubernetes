@@ -32,14 +32,37 @@ import (
 // oldJobSpec is nil on create. It is shared by the Job and CronJob registry
 // strategies, which both embed a JobSpec.
 func DropDisabledFields(jobSpec, oldJobSpec *batch.JobSpec) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) || schedulingInUse(oldJobSpec) {
-		return
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) && !schedulingInUse(oldJobSpec) {
+		jobSpec.Scheduling = nil
 	}
-	jobSpec.Scheduling = nil
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodFailurePolicyName) && !podFailurePolicyNameInUse(oldJobSpec) {
+		dropPodFailurePolicyRuleNames(jobSpec)
+	}
 }
 
 func schedulingInUse(jobSpec *batch.JobSpec) bool {
 	return jobSpec != nil && jobSpec.Scheduling != nil
+}
+
+func podFailurePolicyNameInUse(jobSpec *batch.JobSpec) bool {
+	if jobSpec == nil || jobSpec.PodFailurePolicy == nil {
+		return false
+	}
+	for _, rule := range jobSpec.PodFailurePolicy.Rules {
+		if rule.Name != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func dropPodFailurePolicyRuleNames(jobSpec *batch.JobSpec) {
+	if jobSpec.PodFailurePolicy == nil {
+		return
+	}
+	for i := range jobSpec.PodFailurePolicy.Rules {
+		jobSpec.PodFailurePolicy.Rules[i].Name = nil
+	}
 }
 
 func WorkloadInputForJobInternal(s *batch.JobSchedulingConfiguration) workloadbuilder.WorkloadInput {

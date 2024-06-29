@@ -549,6 +549,133 @@ func TestJobPodFailurePolicy(t *testing.T) {
 	}
 }
 
+// TestJobPodFailurePolicyName checks that names appear only in failure messages,
+// while condition reasons and metric labels remain unchanged.
+func TestJobPodFailurePolicyName(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+	failJobRule := func(name *string, exitCode int32) batchv1.PodFailurePolicyRule {
+		return batchv1.PodFailurePolicyRule{
+			Name:   name,
+			Action: batchv1.PodFailurePolicyActionFailJob,
+			OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+				ContainerName: new("main-container"),
+				Operator:      batchv1.PodFailurePolicyOnExitCodesOpIn,
+				Values:        []int32{exitCode},
+			},
+		}
+	}
+	rules := []batchv1.PodFailurePolicyRule{
+		failJobRule(new("out-of-quota"), 5),
+		failJobRule(nil, 6),
+	}
+
+	testCases := map[string]struct {
+		enableFeature     bool
+		exitCode          int32
+		wantRuleNames     []*string
+		wantNameInMessage bool
+	}{
+		"feature enabled, named rule": {
+			enableFeature:     true,
+			exitCode:          5,
+			wantRuleNames:     []*string{new("out-of-quota"), nil},
+			wantNameInMessage: true,
+		},
+		"feature enabled, unnamed rule": {
+			enableFeature: true,
+			exitCode:      6,
+			wantRuleNames: []*string{new("out-of-quota"), nil},
+		},
+		"feature disabled, rule names are dropped": {
+			exitCode:      5,
+			wantRuleNames: []*string{nil, nil},
+		},
+	}
+
+	closeFn, restConfig, clientSet, ns := setup(t, "pod-failure-policy-name")
+	t.Cleanup(closeFn)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodFailurePolicyName, tc.enableFeature)
+			resetMetrics()
+
+			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
+			t.Cleanup(cancel)
+
+			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:                     "main-container",
+								Image:                    "foo",
+								ImagePullPolicy:          v1.PullIfNotPresent,
+								TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+							}},
+						},
+					},
+					PodFailurePolicy: &batchv1.PodFailurePolicy{Rules: slices.Clone(rules)},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			var gotRuleNames []*string
+			for _, rule := range jobObj.Spec.PodFailurePolicy.Rules {
+				gotRuleNames = append(gotRuleNames, rule.Name)
+			}
+			if diff := cmp.Diff(tc.wantRuleNames, gotRuleNames); diff != "" {
+				t.Errorf("Unexpected rule names (-want,+got):\n%s", diff)
+			}
+			validateJobPodsStatus(ctx, t, clientSet, jobObj, "", podsByStatus{
+				Active:      1,
+				Ready:       ptr.To[int32](0),
+				Terminating: ptr.To[int32](0),
+			})
+
+			op := func(p *v1.Pod) bool {
+				p.Status = v1.PodStatus{
+					Phase: v1.PodFailed,
+					ContainerStatuses: []v1.ContainerStatus{{
+						Name:  "main-container",
+						State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: tc.exitCode}},
+					}},
+				}
+				return true
+			}
+			if _, err := updateJobPodsStatus(ctx, clientSet, jobObj, op, 1); err != nil {
+				t.Fatalf("Failed to update pod status for Job %q: %v", jobObj.Name, err)
+			}
+
+			validateJobCondition(ctx, t, clientSet, jobObj, batchv1.JobFailed)
+			j, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get Job: %v", err)
+			}
+			for _, cType := range []batchv1.JobConditionType{batchv1.JobFailureTarget, batchv1.JobFailed} {
+				var gotReason string
+				var gotMessage string
+				for _, c := range j.Status.Conditions {
+					if c.Type == cType {
+						gotReason = c.Reason
+						gotMessage = c.Message
+					}
+				}
+				if gotReason != batchv1.JobReasonPodFailurePolicy {
+					t.Errorf("Unexpected %s condition reason: want %q, got %q", cType, batchv1.JobReasonPodFailurePolicy, gotReason)
+				}
+				if strings.Contains(gotMessage, "(out-of-quota)") != tc.wantNameInMessage {
+					t.Errorf("Unexpected %s condition message: want named rule %t, got %q", cType, tc.wantNameInMessage, gotMessage)
+				}
+			}
+			validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
+				Labels: []string{"NonIndexed", "failed", batchv1.JobReasonPodFailurePolicy},
+				Value:  1,
+			})
+		})
+	}
+}
+
 // TestSuccessPolicy tests handling of job and its pods when
 // successPolicy is used.
 func TestSuccessPolicy(t *testing.T) {
