@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"math"
+	"strconv"
 
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -66,6 +67,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.PodReplacementPolicy = &podReplacementPolicy
 			if c.RandBool() {
 				c.Fuzz(j.ManagedBy)
+			}
+			if j.PodFailurePolicy != nil {
+				for i, rule := range j.PodFailurePolicy.Rules {
+					name := strconv.Itoa(i)
+					rule.Name = &name
+				}
 			}
 		},
 		func(sj *batch.CronJobSpec, c fuzz.Continue) {

@@ -363,7 +363,9 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			wantFailed:           1,
 			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
+				// exit code 2 in `podStatusMatchingOnExitCodesTerminateRule`
+				// corresponds to the pod failure policy rule index 2
+				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy_2"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
@@ -379,7 +381,9 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			wantFailed:           1,
 			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
+				// exit code 2 in `podStatusMatchingOnExitCodesTerminateRule`
+				// corresponds to the pod failure policy rule index 2
+				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy_2"},
 				Value:  1,
 			},
 		},
@@ -473,7 +477,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			wantFailed:           1,
 			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
+				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy_0"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{

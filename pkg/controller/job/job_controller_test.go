@@ -3075,6 +3075,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 
 	onExitCodeRules := []batch.PodFailurePolicyRule{
 		{
+			Name:   ptr.To("0"),
 			Action: batch.PodFailurePolicyActionIgnore,
 			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3082,6 +3083,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			},
 		},
 		{
+			Name:   ptr.To("1"),
 			Action: batch.PodFailurePolicyActionFailJob,
 			OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 				Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3114,6 +3116,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									ContainerName: ptr.To("main-container"),
@@ -3122,6 +3125,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								},
 							},
 							{
+								Name:   ptr.To("1"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									ContainerName: ptr.To("main-container"),
@@ -3237,13 +3241,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3270,7 +3274,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 						{
 							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  batch.JobReasonPodFailurePolicy,
+							Reason:  batch.JobReasonPodFailurePolicy + "_1",
 							Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 						},
 					},
@@ -3297,13 +3301,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3330,7 +3334,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 						{
 							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  batch.JobReasonPodFailurePolicy,
+							Reason:  batch.JobReasonPodFailurePolicy + "_1",
 							Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
 						},
 					},
@@ -3357,13 +3361,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/already-deleted-pod failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3412,13 +3416,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3468,7 +3472,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-1 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3513,13 +3517,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3540,6 +3544,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
@@ -3571,13 +3576,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_0",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 42 matching FailJob rule at index 0",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_0",
 					Message: "Container main-container for pod default/mypod-0 failed with exit code 42 matching FailJob rule at index 0",
 				},
 			},
@@ -3598,6 +3603,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpNotIn,
@@ -3677,13 +3683,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container init-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_1",
 					Message: "Container init-container for pod default/mypod-0 failed with exit code 5 matching FailJob rule at index 1",
 				},
 			},
@@ -3878,6 +3884,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3885,6 +3892,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 								},
 							},
 							{
+								Name:   ptr.To("1"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -3930,6 +3938,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -3995,6 +4004,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4038,6 +4048,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4084,6 +4095,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4113,13 +4125,13 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 				{
 					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_0",
 					Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
-					Reason:  batch.JobReasonPodFailurePolicy,
+					Reason:  batch.JobReasonPodFailurePolicy + "_0",
 					Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 				},
 			},
@@ -4139,6 +4151,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionCount,
 								OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{
 									{
@@ -4364,6 +4377,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
+							Name:   ptr.To("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4415,6 +4429,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
+							Name:   ptr.To("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4685,6 +4700,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
+							Name:   ptr.To("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -4715,7 +4731,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					{
 						Type:    batch.JobFailureTarget,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
+						Reason:  batch.JobReasonPodFailurePolicy + "_0",
 						Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 					},
 				},
@@ -4839,6 +4855,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
+							Name:   ptr.To("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -5042,6 +5059,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					},
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{{
+							Name:   ptr.To("0"),
 							Action: batch.PodFailurePolicyActionFailJob,
 							OnPodConditions: []batch.PodFailurePolicyOnPodConditionsPattern{{
 								Type:   v1.DisruptionTarget,
@@ -5060,7 +5078,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						{
 							Type:    batch.JobFailureTarget,
 							Status:  v1.ConditionTrue,
-							Reason:  batch.JobReasonPodFailurePolicy,
+							Reason:  batch.JobReasonPodFailurePolicy + "_0",
 							Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 						},
 					},
@@ -5086,13 +5104,13 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 					{
 						Type:    batch.JobFailureTarget,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
+						Reason:  batch.JobReasonPodFailurePolicy + "_0",
 						Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
+						Reason:  batch.JobReasonPodFailurePolicy + "_0",
 						Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 					},
 				},
@@ -5390,6 +5408,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionFailIndex,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -5439,6 +5458,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionFailJob,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,
@@ -5474,13 +5494,13 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					{
 						Type:    batch.JobFailureTarget,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
+						Reason:  batch.JobReasonPodFailurePolicy + "_0",
 						Message: "Container x for pod default/mypod-0 failed with exit code 3 matching FailJob rule at index 0",
 					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
+						Reason:  batch.JobReasonPodFailurePolicy + "_0",
 						Message: "Container x for pod default/mypod-0 failed with exit code 3 matching FailJob rule at index 0",
 					},
 				},
@@ -5503,6 +5523,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 					PodFailurePolicy: &batch.PodFailurePolicy{
 						Rules: []batch.PodFailurePolicyRule{
 							{
+								Name:   ptr.To("0"),
 								Action: batch.PodFailurePolicyActionIgnore,
 								OnExitCodes: &batch.PodFailurePolicyOnExitCodesRequirement{
 									Operator: batch.PodFailurePolicyOnExitCodesOpIn,

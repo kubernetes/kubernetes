@@ -28,6 +28,7 @@ type PodFailurePolicyRuleApplyConfiguration struct {
 	Action          *batchv1.PodFailurePolicyAction                            `json:"action,omitempty"`
 	OnExitCodes     *PodFailurePolicyOnExitCodesRequirementApplyConfiguration  `json:"onExitCodes,omitempty"`
 	OnPodConditions []PodFailurePolicyOnPodConditionsPatternApplyConfiguration `json:"onPodConditions,omitempty"`
+	Name            *string                                                    `json:"name,omitempty"`
 }
 
 // PodFailurePolicyRuleApplyConfiguration constructs a declarative configuration of the PodFailurePolicyRule type for use with
@@ -62,5 +63,13 @@ func (b *PodFailurePolicyRuleApplyConfiguration) WithOnPodConditions(values ...*
 		}
 		b.OnPodConditions = append(b.OnPodConditions, *values[i])
 	}
+	return b
+}
+
+// WithName sets the Name field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Name field is set to the value of the last call.
+func (b *PodFailurePolicyRuleApplyConfiguration) WithName(value string) *PodFailurePolicyRuleApplyConfiguration {
+	b.Name = &value
 	return b
 }

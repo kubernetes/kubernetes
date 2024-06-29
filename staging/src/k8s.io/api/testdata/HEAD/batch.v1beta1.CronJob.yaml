@@ -81,6 +81,7 @@ spec:
       podFailurePolicy:
         rules:
         - action: actionValue
+          name: nameValue
           onExitCodes:
             containerName: containerNameValue
             operator: operatorValue

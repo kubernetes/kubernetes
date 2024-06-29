@@ -219,6 +219,13 @@ type PodFailurePolicyOnPodConditionsPattern struct {
 // PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
 // One of OnExitCodes and onPodConditions, but not both, can be used in each rule.
 type PodFailurePolicyRule struct {
+	// Name of the pod failure policy rule. Defaults to the index of the rule if unset.
+	// The name must be unique within the given Job, and the Job failure condition
+	// reason that would be generated from a given rule name
+	// (i.e., `PodFailurePolicy_{ruleName}`) must be a valid condition reason.
+	// +optional
+	Name *string
+
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	// Possible values are:
 	//

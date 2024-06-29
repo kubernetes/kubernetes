@@ -31,48 +31,44 @@ import (
 //   - a boolean indicating if the failure should be counted towards backoffLimit
 //     (and backoffLimitPerIndex if specified). It should not be counted
 //     if the pod matched an 'Ignore' rule,
-//   - a pointer to the matched pod failure policy action.
-func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *v1.Pod) (*string, bool, *batch.PodFailurePolicyAction) {
+//   - a pointer to the matched pod failure policy rule.
+func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *v1.Pod) (*string, bool, *batch.PodFailurePolicyRule) {
 	if podFailurePolicy == nil {
 		return nil, true, nil
 	}
-	ignore := batch.PodFailurePolicyActionIgnore
-	failJob := batch.PodFailurePolicyActionFailJob
-	failIndex := batch.PodFailurePolicyActionFailIndex
-	count := batch.PodFailurePolicyActionCount
 	for index, podFailurePolicyRule := range podFailurePolicy.Rules {
 		if podFailurePolicyRule.OnExitCodes != nil {
 			if containerStatus := matchOnExitCodes(&failedPod.Status, podFailurePolicyRule.OnExitCodes); containerStatus != nil {
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
-					return nil, false, &ignore
+					return nil, false, &podFailurePolicyRule
 				case batch.PodFailurePolicyActionFailIndex:
 					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
-						return nil, true, &failIndex
+						return nil, true, &podFailurePolicyRule
 					}
 				case batch.PodFailurePolicyActionCount:
-					return nil, true, &count
+					return nil, true, &podFailurePolicyRule
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Container %s for pod %s/%s failed with exit code %v matching %v rule at index %d",
 						containerStatus.Name, failedPod.Namespace, failedPod.Name, containerStatus.State.Terminated.ExitCode, podFailurePolicyRule.Action, index)
-					return &msg, true, &failJob
+					return &msg, true, &podFailurePolicyRule
 				}
 			}
 		} else if podFailurePolicyRule.OnPodConditions != nil {
 			if podCondition := matchOnPodConditions(&failedPod.Status, podFailurePolicyRule.OnPodConditions); podCondition != nil {
 				switch podFailurePolicyRule.Action {
 				case batch.PodFailurePolicyActionIgnore:
-					return nil, false, &ignore
+					return nil, false, &podFailurePolicyRule
 				case batch.PodFailurePolicyActionFailIndex:
 					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
-						return nil, true, &failIndex
+						return nil, true, &podFailurePolicyRule
 					}
 				case batch.PodFailurePolicyActionCount:
-					return nil, true, &count
+					return nil, true, &podFailurePolicyRule
 				case batch.PodFailurePolicyActionFailJob:
 					msg := fmt.Sprintf("Pod %s/%s has condition %v matching %v rule at index %d",
 						failedPod.Namespace, failedPod.Name, podCondition.Type, podFailurePolicyRule.Action, index)
-					return &msg, true, &failJob
+					return &msg, true, &podFailurePolicyRule
 				}
 			}
 		}
