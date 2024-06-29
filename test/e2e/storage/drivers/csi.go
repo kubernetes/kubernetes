@@ -551,7 +551,6 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		attachable:                    !driverOpts.DisableAttach,
 		attachLimit:                   driverOpts.AttachLimit,
 		enableNodeExpansion:           driverOpts.EnableNodeExpansion,
-		enableNodeVolumeStat:          driverOpts.EnableNodeVolumeStat,
 		enableNodeVolumeCondition:     driverOpts.EnableNodeVolumeCondition,
 		tokenRequests:                 driverOpts.TokenRequests,
 		requiresRepublish:             driverOpts.RequiresRepublish,
