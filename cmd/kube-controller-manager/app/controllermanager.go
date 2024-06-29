@@ -267,7 +267,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// id = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(id, "")
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
-	id = id + "-" + string(uuid.NewUUID())
+	id = id + "_" + string(uuid.NewUUID())
 
 	// leaderMigrator will be non-nil if and only if Leader Migration is enabled.
 	var leaderMigrator *leadermigration.LeaderMigrator = nil
