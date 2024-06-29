@@ -256,6 +256,7 @@ func TestAddFlags(t *testing.T) {
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
 				Lookup:           true,
 				ExtendExpiration: true,
+				WithoutNodes:     true,
 			},
 			TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
 			TokenSuccessCacheTTL: 10 * time.Second,
