@@ -43,6 +43,19 @@ func NewGetterFromClient(c clientset.Interface, secretLister v1listers.SecretLis
 	return clientGetter{c, secretLister, serviceAccountLister, podLister, nodeLister}
 }
 
+// NewNodelessGetterFromClient returns a ServiceAccountTokenGetter that
+// uses the specified client to retrieve service accounts and secrets only.
+// The client should NOT authenticate using a service account token
+// the returned getter will be used to retrieve, or recursion will result.
+// IMPORTANT: This should be intended for use in environments where nodes and pods are not available.
+func NewNodelessGetterFromClient(c clientset.Interface, secretLister v1listers.SecretLister, serviceAccountLister v1listers.ServiceAccountLister) serviceaccount.ServiceAccountTokenGetter {
+	return clientGetter{
+		client:               c,
+		secretLister:         secretLister,
+		serviceAccountLister: serviceAccountLister,
+	}
+}
+
 func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error) {
 	if serviceAccount, err := c.serviceAccountLister.ServiceAccounts(namespace).Get(name); err == nil {
 		return serviceAccount, nil
@@ -51,6 +64,9 @@ func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAcco
 }
 
 func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
+	if c.podLister == nil {
+		return nil, apierrors.NewNotFound(v1.Resource("pods"), name)
+	}
 	if pod, err := c.podLister.Pods(namespace).Get(name); err == nil {
 		return pod, nil
 	}
