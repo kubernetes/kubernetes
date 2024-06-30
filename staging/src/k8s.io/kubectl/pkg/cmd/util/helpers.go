@@ -451,10 +451,7 @@ func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"validate",
 		"strict",
-		`Must be one of: strict (or true), warn, ignore (or false).
-		"true" or "strict" will use a schema to validate the input and fail the request if invalid. It will perform server side validation if ServerSideFieldValidation is enabled on the api-server, but will fall back to less reliable client-side validation if not.
-		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
-		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
+		`Must be one of: strict (or true), warn, ignore (or false). "true" or "strict" will use a schema to validate the input and fail the request if invalid. It will perform server side validation if ServerSideFieldValidation is enabled on the api-server, but will fall back to less reliable client-side validation if not. "warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise. "false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
 	)
 
 	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
