@@ -55,8 +55,8 @@ func MakePod(name string, tweaks ...Tweak) *api.Pod {
 	return pod
 }
 
-func MakePodSpec(policy api.RestartPolicy, tweaks ...Tweak) api.PodSpec {
-	return MakePod("", append([]Tweak{SetRestartPolicy(policy)}, tweaks...)...).Spec
+func MakePodSpec(tweaks ...Tweak) api.PodSpec {
+	return MakePod("", tweaks...).Spec
 }
 
 func SetNamespace(ns string) Tweak {

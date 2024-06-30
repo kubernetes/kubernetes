@@ -74,7 +74,7 @@ func validNewJob() *batch.Job {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
-				Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+				Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 			},
 		},
 	}

@@ -1021,7 +1021,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 	}
 	validPodTemplateSpecNever := *validPodTemplateSpec.DeepCopy()
 	validPodTemplateSpecNever.Spec.RestartPolicy = api.RestartPolicyNever
@@ -1223,7 +1223,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test"},
 						},
-						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 					},
 				},
 			},
@@ -1249,7 +1249,7 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{batch.LegacyJobNameLabel: "myjob", batch.JobNameLabel: "myjob", batch.LegacyControllerUidLabel: "test", batch.ControllerUidLabel: "test"},
 						},
-						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 					},
 				},
 			},
@@ -1315,7 +1315,7 @@ func TestJobStrategy_WarningsOnUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 	}
 	cases := map[string]struct {
 		oldJob            *batch.Job
@@ -1470,7 +1470,7 @@ func TestJobStrategy_WarningsOnCreate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: validSelector.MatchLabels,
 		},
-		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 	}
 	validSpec := batch.JobSpec{
 		CompletionMode: completionModePtr(batch.NonIndexedCompletion),
@@ -1537,8 +1537,8 @@ func TestJobStrategy_Validate(t *testing.T) {
 	batchLabels := getValidBatchLabels()
 	labelsWithNonBatch := getValidBatchLabelsWithNonBatch()
 	defaultSelector := &metav1.LabelSelector{MatchLabels: map[string]string{batch.ControllerUidLabel: string(theUID)}}
-	validPodSpec := podtest.MakePodSpec(api.RestartPolicyOnFailure)
-	validPodSpecNever := podtest.MakePodSpec(api.RestartPolicyNever)
+	validPodSpec := podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure))
+	validPodSpecNever := podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever))
 	validObjectMeta := getValidObjectMeta(0)
 	testcases := map[string]struct {
 		enableJobPodFailurePolicy     bool
@@ -1721,7 +1721,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
-						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure,
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
 							podtest.SetVolumes(api.Volume{Name: "volume-name"})),
 					},
 				},
@@ -1735,7 +1735,7 @@ func TestJobStrategy_Validate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: labelsWithNonBatch,
 						},
-						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure,
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure),
 							podtest.SetVolumes(api.Volume{Name: "volume-name"})),
 					},
 				},

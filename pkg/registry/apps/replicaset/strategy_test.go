@@ -50,7 +50,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePod("").Spec,
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	rs := &apps.ReplicaSet{
@@ -215,7 +215,7 @@ func newReplicaSetWithSelectorLabels(selectorLabels map[string]string) *apps.Rep
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,
 				},
-				Spec: podtest.MakePod("").Spec,
+				Spec: podtest.MakePodSpec(),
 			},
 		},
 	}

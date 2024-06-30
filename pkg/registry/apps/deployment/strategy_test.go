@@ -174,7 +174,7 @@ func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *apps.Dep
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: selectorLabels,
 				},
-				Spec: podtest.MakePod("").Spec,
+				Spec: podtest.MakePodSpec(),
 			},
 		},
 	}
@@ -205,7 +205,7 @@ func newDeploymentWithHugePageValue(resourceName api.ResourceName, value resourc
 					Name:      "foo",
 					Labels:    map[string]string{"foo": "bar"},
 				},
-				Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+				Spec: podtest.MakePodSpec(
 					podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResources(
 						api.ResourceRequirements{
 							Requests: api.ResourceList{

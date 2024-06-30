@@ -56,7 +56,7 @@ func validNewPodTemplate(name string) *api.PodTemplate {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{"test": "foo"},
 			},
-			Spec: podtest.MakePod("").Spec,
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 }

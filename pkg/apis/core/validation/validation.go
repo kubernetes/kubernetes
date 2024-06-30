@@ -3142,6 +3142,9 @@ func handlerFromLifecycle(lh *core.LifecycleHandler) commonHandler {
 
 func validateSleepAction(sleep *core.SleepAction, gracePeriod *int64, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
+	// We allow gracePeriod to be nil here because the pod in which this SleepAction
+	// is defined might have an invalid grace period defined, and we don't want to
+	// flag another error here when the real problem will already be flagged.
 	if gracePeriod != nil && sleep.Seconds <= 0 || sleep.Seconds > *gracePeriod {
 		invalidStr := fmt.Sprintf("must be greater than 0 and less than terminationGracePeriodSeconds (%d)", *gracePeriod)
 		allErrors = append(allErrors, field.Invalid(fldPath, sleep.Seconds, invalidStr))

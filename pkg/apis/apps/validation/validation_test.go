@@ -1504,14 +1504,14 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	validSelector2 := map[string]string{"c": "d"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
-	validPodSpecAbc := podtest.MakePodSpec(api.RestartPolicyAlways,
+	validPodSpecAbc := podtest.MakePodSpec(
 		podtest.SetContainers(podtest.MakeContainer("abc")))
-	validPodSpecDef := podtest.MakePodSpec(api.RestartPolicyAlways,
+	validPodSpecDef := podtest.MakePodSpec(
 		podtest.SetContainers(podtest.MakeContainer("def")))
-	validPodSpecNodeSelector := podtest.MakePodSpec(api.RestartPolicyAlways,
+	validPodSpecNodeSelector := podtest.MakePodSpec(
 		podtest.SetNodeSelector(validSelector),
 		podtest.SetNodeName("xyz"))
-	validPodSpecVolume := podtest.MakePodSpec(api.RestartPolicyAlways,
+	validPodSpecVolume := podtest.MakePodSpec(
 		podtest.SetVolumes(api.Volume{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}))
 
 	validPodTemplateAbc := api.PodTemplate{
@@ -1558,7 +1558,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			// no containers specified
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
+			Spec: podtest.MakePodSpec(podtest.SetContainers()),
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
@@ -1976,7 +1976,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	validHostNetPodTemplate := api.PodTemplate{
@@ -1984,7 +1984,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validSelector,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+			Spec: podtest.MakePodSpec(
 				podtest.SetSecurityContext(&api.PodSecurityContext{
 					HostNetwork: true,
 				}),
@@ -1999,7 +1999,7 @@ func TestValidateDaemonSet(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetLabels(invalidSelector)),
+			Spec: podtest.MakePodSpec(podtest.SetLabels(invalidSelector)),
 		},
 	}
 	successCases := []apps.DaemonSet{{
@@ -2124,7 +2124,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: apps.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure, podtest.SetLabels(validSelector)),
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure), podtest.SetLabels(validSelector)),
 				},
 			},
 		},
@@ -2136,7 +2136,7 @@ func TestValidateDaemonSet(t *testing.T) {
 			Spec: apps.DaemonSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validSelector},
 				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyNever, podtest.SetLabels(validSelector)),
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever), podtest.SetLabels(validSelector)),
 				},
 			},
 		},
@@ -2148,7 +2148,7 @@ func TestValidateDaemonSet(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validSelector,
 					},
-					Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+					Spec: podtest.MakePodSpec(
 						podtest.SetEphemeralContainers(api.EphemeralContainer{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}})),
 				},
 				UpdateStrategy: apps.DaemonSetUpdateStrategy{
@@ -2207,7 +2207,7 @@ func validDeployment(tweaks ...func(d *apps.Deployment)) *apps.Deployment {
 						"name": "abc",
 					},
 				},
-				Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+				Spec: podtest.MakePodSpec(),
 			},
 			RollbackTo: &apps.RollbackConfig{
 				Revision: 1,
@@ -2538,7 +2538,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
@@ -2546,7 +2546,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+			Spec: podtest.MakePodSpec(
 				podtest.SetVolumes(api.Volume{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
 			),
 		},
@@ -2555,7 +2555,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			// no containers specified
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
+			Spec: podtest.MakePodSpec(podtest.SetContainers()),
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
 			},
@@ -2852,7 +2852,7 @@ func TestValidateReplicaSetStatusUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	type rcUpdateTest struct {
@@ -2930,7 +2930,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	readWriteVolumePodTemplate := api.PodTemplate{
@@ -2938,7 +2938,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+			Spec: podtest.MakePodSpec(
 				podtest.SetVolumes(api.Volume{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
 			),
 		},
@@ -2946,7 +2946,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways, podtest.SetContainers()),
+			Spec: podtest.MakePodSpec(podtest.SetContainers()),
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
 			},
@@ -3096,7 +3096,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 		},
 	}
 	validHostNetPodTemplate := api.PodTemplate{
@@ -3104,7 +3104,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+			Spec: podtest.MakePodSpec(
 				podtest.SetSecurityContext(&api.PodSecurityContext{
 					HostNetwork: true,
 				}),
@@ -3120,7 +3120,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: validLabels,
 			},
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways,
+			Spec: podtest.MakePodSpec(
 				podtest.SetVolumes(api.Volume{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
 			),
 		},
@@ -3128,7 +3128,7 @@ func TestValidateReplicaSet(t *testing.T) {
 	invalidLabels := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	invalidPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
-			Spec: podtest.MakePodSpec(api.RestartPolicyAlways),
+			Spec: podtest.MakePodSpec(),
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: invalidLabels,
 			},
@@ -3262,7 +3262,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			Spec: apps.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validLabels,
 					},
@@ -3277,7 +3277,7 @@ func TestValidateReplicaSet(t *testing.T) {
 			Spec: apps.ReplicaSetSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
 				Template: api.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(api.RestartPolicyNever),
+					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever)),
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: validLabels,
 					},
