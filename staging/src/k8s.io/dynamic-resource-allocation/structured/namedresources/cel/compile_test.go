@@ -124,7 +124,7 @@ attributes.stringslice["stringslice"].isSorted()`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			result := Compiler.CompileCELExpression(scenario.expression, environment.StoredExpressions)
+			result := GetCompiler().CompileCELExpression(scenario.expression, environment.StoredExpressions)
 			if scenario.expectCompileError != "" && result.Error == nil {
 				t.Fatalf("expected compile error %q, got none", scenario.expectCompileError)
 			}

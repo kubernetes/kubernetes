@@ -153,7 +153,7 @@ func validateSelector(opts Options, selector string, fldPath *field.Path) field.
 		if opts.StoredExpressions {
 			envType = environment.StoredExpressions
 		}
-		result := namedresourcescel.Compiler.CompileCELExpression(selector, envType)
+		result := namedresourcescel.GetCompiler().CompileCELExpression(selector, envType)
 		if result.Error != nil {
 			allErrs = append(allErrs, convertCELErrorToValidationError(fldPath, selector, result.Error))
 		}

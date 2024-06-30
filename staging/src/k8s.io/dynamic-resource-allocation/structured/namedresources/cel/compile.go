@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/blang/semver/v4"
 	"github.com/google/cel-go/cel"
@@ -38,8 +39,16 @@ const (
 )
 
 var (
-	Compiler = newCompiler()
+	lazyCompilerInit sync.Once
+	lazyCompiler     *compiler
 )
+
+func GetCompiler() *compiler {
+	lazyCompilerInit.Do(func() {
+		lazyCompiler = newCompiler()
+	})
+	return lazyCompiler
+}
 
 // CompilationResult represents a compiled expression.
 type CompilationResult struct {
