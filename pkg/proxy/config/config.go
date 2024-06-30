@@ -24,12 +24,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1informers "k8s.io/client-go/informers/core/v1"
 	discoveryv1informers "k8s.io/client-go/informers/discovery/v1"
-	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
+	networkingv1beta1informers "k8s.io/client-go/informers/networking/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -401,7 +401,7 @@ type ServiceCIDRConfig struct {
 }
 
 // NewServiceCIDRConfig creates a new ServiceCIDRConfig.
-func NewServiceCIDRConfig(ctx context.Context, serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
+func NewServiceCIDRConfig(ctx context.Context, serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
 	result := &ServiceCIDRConfig{
 		listerSynced: serviceCIDRInformer.Informer().HasSynced,
 		cidrs:        sets.New[string](),
@@ -443,11 +443,11 @@ func (c *ServiceCIDRConfig) Run(stopCh <-chan struct{}) {
 // handleServiceCIDREvent is a helper function to handle Add, Update and Delete
 // events on ServiceCIDR objects and call downstream event handlers.
 func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
-	var oldServiceCIDR, newServiceCIDR *networkingv1alpha1.ServiceCIDR
+	var oldServiceCIDR, newServiceCIDR *networkingv1beta1.ServiceCIDR
 	var ok bool
 
 	if oldObj != nil {
-		oldServiceCIDR, ok = oldObj.(*networkingv1alpha1.ServiceCIDR)
+		oldServiceCIDR, ok = oldObj.(*networkingv1beta1.ServiceCIDR)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 			return
@@ -455,7 +455,7 @@ func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
 	}
 
 	if newObj != nil {
-		newServiceCIDR, ok = newObj.(*networkingv1alpha1.ServiceCIDR)
+		newServiceCIDR, ok = newObj.(*networkingv1beta1.ServiceCIDR)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 			return

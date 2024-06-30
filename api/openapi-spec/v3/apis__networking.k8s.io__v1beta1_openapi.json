@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.networking.v1alpha1.IPAddress": {
+      "io.k8s.api.networking.v1beta1.IPAddress": {
         "description": "IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses. An IP address can be represented in different formats, to guarantee the uniqueness of the IP, the name of the object is the IP address in canonical format, four decimal digits separated by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6. Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1 Invalid: 10.01.2.3 or 2001:db8:0:0:0::1",
         "properties": {
           "apiVersion": {
@@ -24,7 +24,7 @@
           "spec": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressSpec"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressSpec"
               }
             ],
             "default": {},
@@ -36,11 +36,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "IPAddress",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.networking.v1alpha1.IPAddressList": {
+      "io.k8s.api.networking.v1beta1.IPAddressList": {
         "description": "IPAddressList contains a list of IPAddress.",
         "properties": {
           "apiVersion": {
@@ -52,7 +52,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               ],
               "default": {}
@@ -81,17 +81,17 @@
           {
             "group": "networking.k8s.io",
             "kind": "IPAddressList",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.networking.v1alpha1.IPAddressSpec": {
+      "io.k8s.api.networking.v1beta1.IPAddressSpec": {
         "description": "IPAddressSpec describe the attributes in an IP Address.",
         "properties": {
           "parentRef": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ParentReference"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ParentReference"
               }
             ],
             "description": "ParentRef references the resource that an IPAddress is attached to. An IPAddress must reference a parent object."
@@ -102,7 +102,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.networking.v1alpha1.ParentReference": {
+      "io.k8s.api.networking.v1beta1.ParentReference": {
         "description": "ParentReference describes a reference to a parent object.",
         "properties": {
           "group": {
@@ -128,7 +128,7 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.networking.v1alpha1.ServiceCIDR": {
+      "io.k8s.api.networking.v1beta1.ServiceCIDR": {
         "description": "ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64). This range is used to allocate ClusterIPs to Service objects.",
         "properties": {
           "apiVersion": {
@@ -151,7 +151,7 @@
           "spec": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRSpec"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRSpec"
               }
             ],
             "default": {},
@@ -160,7 +160,7 @@
           "status": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRStatus"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRStatus"
               }
             ],
             "default": {},
@@ -172,11 +172,11 @@
           {
             "group": "networking.k8s.io",
             "kind": "ServiceCIDR",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.networking.v1alpha1.ServiceCIDRList": {
+      "io.k8s.api.networking.v1beta1.ServiceCIDRList": {
         "description": "ServiceCIDRList contains a list of ServiceCIDR objects.",
         "properties": {
           "apiVersion": {
@@ -188,7 +188,7 @@
             "items": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               ],
               "default": {}
@@ -217,15 +217,15 @@
           {
             "group": "networking.k8s.io",
             "kind": "ServiceCIDRList",
-            "version": "v1alpha1"
+            "version": "v1beta1"
           }
         ]
       },
-      "io.k8s.api.networking.v1alpha1.ServiceCIDRSpec": {
+      "io.k8s.api.networking.v1beta1.ServiceCIDRSpec": {
         "description": "ServiceCIDRSpec define the CIDRs the user wants to use for allocating ClusterIPs for Services.",
         "properties": {
           "cidrs": {
-            "description": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. The network address of each CIDR, the address that identifies the subnet of a host, is reserved and will not be allocated. The broadcast address for IPv4 CIDRs is also reserved and will not be allocated. This field is immutable.",
+            "description": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
             "items": {
               "default": "",
               "type": "string"
@@ -236,7 +236,7 @@
         },
         "type": "object"
       },
-      "io.k8s.api.networking.v1alpha1.ServiceCIDRStatus": {
+      "io.k8s.api.networking.v1beta1.ServiceCIDRStatus": {
         "description": "ServiceCIDRStatus describes the current state of the ServiceCIDR.",
         "properties": {
           "conditions": {
@@ -1465,10 +1465,10 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/apis/networking.k8s.io/v1alpha1/": {
+    "/apis/networking.k8s.io/v1beta1/": {
       "get": {
         "description": "get available resources",
-        "operationId": "getNetworkingV1alpha1APIResources",
+        "operationId": "getNetworkingV1beta1APIResources",
         "responses": {
           "200": {
             "content": {
@@ -1495,14 +1495,14 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ]
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/ipaddresses": {
+    "/apis/networking.k8s.io/v1beta1/ipaddresses": {
       "delete": {
         "description": "delete collection of IPAddress",
-        "operationId": "deleteNetworkingV1alpha1CollectionIPAddress",
+        "operationId": "deleteNetworkingV1beta1CollectionIPAddress",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -1648,18 +1648,18 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "list or watch objects of kind IPAddress",
-        "operationId": "listNetworkingV1alpha1IPAddress",
+        "operationId": "listNetworkingV1beta1IPAddress",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -1757,27 +1757,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddressList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddressList"
                 }
               }
             },
@@ -1788,13 +1788,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -1810,7 +1810,7 @@
       ],
       "post": {
         "description": "create an IPAddress",
-        "operationId": "createNetworkingV1alpha1IPAddress",
+        "operationId": "createNetworkingV1beta1IPAddress",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -1844,7 +1844,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
               }
             }
           },
@@ -1855,17 +1855,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -1875,17 +1875,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -1895,17 +1895,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -1916,20 +1916,20 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/ipaddresses/{name}": {
+    "/apis/networking.k8s.io/v1beta1/ipaddresses/{name}": {
       "delete": {
         "description": "delete an IPAddress",
-        "operationId": "deleteNetworkingV1alpha1IPAddress",
+        "operationId": "deleteNetworkingV1beta1IPAddress",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2023,34 +2023,34 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "read the specified IPAddress",
-        "operationId": "readNetworkingV1alpha1IPAddress",
+        "operationId": "readNetworkingV1beta1IPAddress",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -2061,13 +2061,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2093,7 +2093,7 @@
       ],
       "patch": {
         "description": "partially update the specified IPAddress",
-        "operationId": "patchNetworkingV1alpha1IPAddress",
+        "operationId": "patchNetworkingV1beta1IPAddress",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2162,17 +2162,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -2182,17 +2182,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -2203,18 +2203,18 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace the specified IPAddress",
-        "operationId": "replaceNetworkingV1alpha1IPAddress",
+        "operationId": "replaceNetworkingV1beta1IPAddress",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2248,7 +2248,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
               }
             }
           },
@@ -2259,17 +2259,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -2279,17 +2279,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.IPAddress"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.IPAddress"
                 }
               }
             },
@@ -2300,20 +2300,20 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/servicecidrs": {
+    "/apis/networking.k8s.io/v1beta1/servicecidrs": {
       "delete": {
         "description": "delete collection of ServiceCIDR",
-        "operationId": "deleteNetworkingV1alpha1CollectionServiceCIDR",
+        "operationId": "deleteNetworkingV1beta1CollectionServiceCIDR",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -2459,18 +2459,18 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "list or watch objects of kind ServiceCIDR",
-        "operationId": "listNetworkingV1alpha1ServiceCIDR",
+        "operationId": "listNetworkingV1beta1ServiceCIDR",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -2568,27 +2568,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDRList"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDRList"
                 }
               }
             },
@@ -2599,13 +2599,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2621,7 +2621,7 @@
       ],
       "post": {
         "description": "create a ServiceCIDR",
-        "operationId": "createNetworkingV1alpha1ServiceCIDR",
+        "operationId": "createNetworkingV1beta1ServiceCIDR",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2655,7 +2655,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
               }
             }
           },
@@ -2666,17 +2666,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -2686,17 +2686,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -2706,17 +2706,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -2727,20 +2727,20 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/servicecidrs/{name}": {
+    "/apis/networking.k8s.io/v1beta1/servicecidrs/{name}": {
       "delete": {
         "description": "delete a ServiceCIDR",
-        "operationId": "deleteNetworkingV1alpha1ServiceCIDR",
+        "operationId": "deleteNetworkingV1beta1ServiceCIDR",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2834,34 +2834,34 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "get": {
         "description": "read the specified ServiceCIDR",
-        "operationId": "readNetworkingV1alpha1ServiceCIDR",
+        "operationId": "readNetworkingV1beta1ServiceCIDR",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -2872,13 +2872,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -2904,7 +2904,7 @@
       ],
       "patch": {
         "description": "partially update the specified ServiceCIDR",
-        "operationId": "patchNetworkingV1alpha1ServiceCIDR",
+        "operationId": "patchNetworkingV1beta1ServiceCIDR",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2973,17 +2973,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -2993,17 +2993,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3014,18 +3014,18 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace the specified ServiceCIDR",
-        "operationId": "replaceNetworkingV1alpha1ServiceCIDR",
+        "operationId": "replaceNetworkingV1beta1ServiceCIDR",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3059,7 +3059,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
               }
             }
           },
@@ -3070,17 +3070,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3090,17 +3090,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3111,36 +3111,36 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/servicecidrs/{name}/status": {
+    "/apis/networking.k8s.io/v1beta1/servicecidrs/{name}/status": {
       "get": {
         "description": "read status of the specified ServiceCIDR",
-        "operationId": "readNetworkingV1alpha1ServiceCIDRStatus",
+        "operationId": "readNetworkingV1beta1ServiceCIDRStatus",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3151,13 +3151,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3183,7 +3183,7 @@
       ],
       "patch": {
         "description": "partially update status of the specified ServiceCIDR",
-        "operationId": "patchNetworkingV1alpha1ServiceCIDRStatus",
+        "operationId": "patchNetworkingV1beta1ServiceCIDRStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3252,17 +3252,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3272,17 +3272,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3293,18 +3293,18 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "put": {
         "description": "replace status of the specified ServiceCIDR",
-        "operationId": "replaceNetworkingV1alpha1ServiceCIDRStatus",
+        "operationId": "replaceNetworkingV1beta1ServiceCIDRStatus",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3338,7 +3338,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
               }
             }
           },
@@ -3349,17 +3349,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3369,17 +3369,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1alpha1.ServiceCIDR"
+                  "$ref": "#/components/schemas/io.k8s.api.networking.v1beta1.ServiceCIDR"
                 }
               }
             },
@@ -3390,20 +3390,20 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       }
     },
-    "/apis/networking.k8s.io/v1alpha1/watch/ipaddresses": {
+    "/apis/networking.k8s.io/v1beta1/watch/ipaddresses": {
       "get": {
         "description": "watch individual changes to a list of IPAddress. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchNetworkingV1alpha1IPAddressList",
+        "operationId": "watchNetworkingV1beta1IPAddressList",
         "responses": {
           "200": {
             "content": {
@@ -3440,13 +3440,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3551,10 +3551,10 @@
         }
       ]
     },
-    "/apis/networking.k8s.io/v1alpha1/watch/ipaddresses/{name}": {
+    "/apis/networking.k8s.io/v1beta1/watch/ipaddresses/{name}": {
       "get": {
         "description": "watch changes to an object of kind IPAddress. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchNetworkingV1alpha1IPAddress",
+        "operationId": "watchNetworkingV1beta1IPAddress",
         "responses": {
           "200": {
             "content": {
@@ -3591,13 +3591,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "IPAddress",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3712,10 +3712,10 @@
         }
       ]
     },
-    "/apis/networking.k8s.io/v1alpha1/watch/servicecidrs": {
+    "/apis/networking.k8s.io/v1beta1/watch/servicecidrs": {
       "get": {
         "description": "watch individual changes to a list of ServiceCIDR. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchNetworkingV1alpha1ServiceCIDRList",
+        "operationId": "watchNetworkingV1beta1ServiceCIDRList",
         "responses": {
           "200": {
             "content": {
@@ -3752,13 +3752,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [
@@ -3863,10 +3863,10 @@
         }
       ]
     },
-    "/apis/networking.k8s.io/v1alpha1/watch/servicecidrs/{name}": {
+    "/apis/networking.k8s.io/v1beta1/watch/servicecidrs/{name}": {
       "get": {
         "description": "watch changes to an object of kind ServiceCIDR. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchNetworkingV1alpha1ServiceCIDR",
+        "operationId": "watchNetworkingV1beta1ServiceCIDR",
         "responses": {
           "200": {
             "content": {
@@ -3903,13 +3903,13 @@
           }
         },
         "tags": [
-          "networking_v1alpha1"
+          "networking_v1beta1"
         ],
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "networking.k8s.io",
           "kind": "ServiceCIDR",
-          "version": "v1alpha1"
+          "version": "v1beta1"
         }
       },
       "parameters": [

@@ -982,7 +982,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	go endpointSliceConfig.Run(ctx.Done())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1alpha1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
+		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1beta1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
 		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
 		go serviceCIDRConfig.Run(wait.NeverStop)
 	}

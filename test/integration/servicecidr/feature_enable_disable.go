@@ -49,7 +49,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 	s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=false",
+			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
@@ -82,7 +82,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	// apiserver with the feature enabled
 	s2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=true", features.MultiCIDRServiceAllocator)},
@@ -113,7 +113,7 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	// start an apiserver with the feature disabled
 	s3 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=false",
+			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},

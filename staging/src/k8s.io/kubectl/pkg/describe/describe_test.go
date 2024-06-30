@@ -37,7 +37,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -6368,12 +6367,12 @@ func TestDescribeServiceCIDR(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"ServiceCIDR v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			}),
@@ -6384,12 +6383,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16, fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv4": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16"},
 				},
 			}),
@@ -6400,12 +6399,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv6": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"fd00:1:1::/64"},
 				},
 			}),
@@ -6439,13 +6438,13 @@ func TestDescribeIPAddress(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"IPAddress v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.IPAddress{
+		"IPAddress v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.IPAddressSpec{
-					ParentRef: &networkingv1alpha1.ParentReference{
+				Spec: networkingv1beta1.IPAddressSpec{
+					ParentRef: &networkingv1beta1.ParentReference{
 						Group:     "mygroup",
 						Resource:  "myresource",
 						Namespace: "mynamespace",

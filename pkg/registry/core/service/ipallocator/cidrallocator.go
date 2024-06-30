@@ -24,16 +24,16 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	networkingv1alpha1informers "k8s.io/client-go/informers/networking/v1alpha1"
-	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
-	networkingv1alpha1listers "k8s.io/client-go/listers/networking/v1alpha1"
+	networkingv1beta1informers "k8s.io/client-go/informers/networking/v1beta1"
+	networkingv1beta1client "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
+	networkingv1beta1listers "k8s.io/client-go/listers/networking/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -52,12 +52,12 @@ import (
 // MetaAllocator implements current allocator interface using
 // ServiceCIDR and IPAddress API objects.
 type MetaAllocator struct {
-	client            networkingv1alpha1client.NetworkingV1alpha1Interface
-	serviceCIDRLister networkingv1alpha1listers.ServiceCIDRLister
+	client            networkingv1beta1client.NetworkingV1beta1Interface
+	serviceCIDRLister networkingv1beta1listers.ServiceCIDRLister
 	serviceCIDRSynced cache.InformerSynced
-	ipAddressLister   networkingv1alpha1listers.IPAddressLister
+	ipAddressLister   networkingv1beta1listers.IPAddressLister
 	ipAddressSynced   cache.InformerSynced
-	ipAddressInformer networkingv1alpha1informers.IPAddressInformer
+	ipAddressInformer networkingv1beta1informers.IPAddressInformer
 	queue             workqueue.TypedRateLimitingInterface[string]
 
 	internalStopCh chan struct{}
@@ -87,9 +87,9 @@ var _ Interface = &MetaAllocator{}
 // and ServiceCIDR objects to track the assigned IP addresses,
 // using an informer cache as storage.
 func NewMetaAllocator(
-	client networkingv1alpha1client.NetworkingV1alpha1Interface,
-	serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer,
-	ipAddressInformer networkingv1alpha1informers.IPAddressInformer,
+	client networkingv1beta1client.NetworkingV1beta1Interface,
+	serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer,
+	ipAddressInformer networkingv1beta1informers.IPAddressInformer,
 	isIPv6 bool,
 	bitmapAllocator Interface,
 ) (*MetaAllocator, error) {
@@ -100,9 +100,9 @@ func NewMetaAllocator(
 }
 
 // newMetaAllocator is used to build the allocator for testing
-func newMetaAllocator(client networkingv1alpha1client.NetworkingV1alpha1Interface,
-	serviceCIDRInformer networkingv1alpha1informers.ServiceCIDRInformer,
-	ipAddressInformer networkingv1alpha1informers.IPAddressInformer,
+func newMetaAllocator(client networkingv1beta1client.NetworkingV1beta1Interface,
+	serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer,
+	ipAddressInformer networkingv1beta1informers.IPAddressInformer,
 	isIPv6 bool,
 	bitmapAllocator Interface,
 ) *MetaAllocator {
@@ -152,13 +152,13 @@ func (c *MetaAllocator) enqueueServiceCIDR(obj interface{}) {
 }
 
 func (c *MetaAllocator) deleteServiceCIDR(obj interface{}) {
-	serviceCIDR, ok := obj.(*networkingv1alpha1.ServiceCIDR)
+	serviceCIDR, ok := obj.(*networkingv1beta1.ServiceCIDR)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			return
 		}
-		serviceCIDR, ok = tombstone.Obj.(*networkingv1alpha1.ServiceCIDR)
+		serviceCIDR, ok = tombstone.Obj.(*networkingv1beta1.ServiceCIDR)
 		if !ok {
 			return
 		}
@@ -414,8 +414,8 @@ func (c *MetaAllocator) Release(ip net.IP) error {
 }
 func (c *MetaAllocator) ForEach(f func(ip net.IP)) {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1alpha1.LabelIPAddressFamily: string(c.IPFamily()),
-		networkingv1alpha1.LabelManagedBy:       ControllerName,
+		networkingv1beta1.LabelIPAddressFamily: string(c.IPFamily()),
+		networkingv1beta1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := c.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -454,8 +454,8 @@ func (c *MetaAllocator) Destroy() {
 // for testing
 func (c *MetaAllocator) Used() int {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1alpha1.LabelIPAddressFamily: string(c.IPFamily()),
-		networkingv1alpha1.LabelManagedBy:       ControllerName,
+		networkingv1beta1.LabelIPAddressFamily: string(c.IPFamily()),
+		networkingv1beta1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := c.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -512,13 +512,13 @@ func (c *MetaAllocator) DryRun() Interface {
 	return &Allocator{}
 }
 
-func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
+func isReady(serviceCIDR *networkingv1beta1.ServiceCIDR) bool {
 	if serviceCIDR == nil {
 		return false
 	}
 
 	for _, condition := range serviceCIDR.Status.Conditions {
-		if condition.Type == networkingv1alpha1.ServiceCIDRConditionReady {
+		if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
 			return condition.Status == metav1.ConditionStatus(metav1.ConditionTrue)
 		}
 	}

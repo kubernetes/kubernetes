@@ -74,7 +74,7 @@ func TestServiceAllocation(t *testing.T) {
 			s1 := kubeapiservertesting.StartTestServerOrDie(t,
 				apiServerOptions,
 				[]string{
-					"--runtime-config=networking.k8s.io/v1alpha1=true",
+					"--runtime-config=networking.k8s.io/v1beta1=true",
 					"--service-cluster-ip-range=" + serviceCIDR,
 					"--advertise-address=10.0.0.2",
 					"--disable-admission-plugins=ServiceAccount",
@@ -159,7 +159,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 	s1 := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=" + serviceCIDR,
 			"--advertise-address=2001:db8::10",
 			"--disable-admission-plugins=ServiceAccount",
@@ -205,7 +205,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = client.NetworkingV1alpha1().IPAddresses().Get(tCtx, svc.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = client.NetworkingV1beta1().IPAddresses().Get(tCtx, svc.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}
@@ -218,7 +218,8 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, lastSvc, metav1.CreateOptions{}); err != nil {
 		t.Errorf("unexpected error text: %v", err)
 	}
-	_, err = client.NetworkingV1alpha1().IPAddresses().Get(tCtx, lastSvc.Spec.ClusterIP, metav1.GetOptions{})
+
+	_, err = client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), lastSvc.Spec.ClusterIP, metav1.GetOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -231,7 +232,7 @@ func TestMigrateService(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -285,7 +286,7 @@ func TestMigrateService(t *testing.T) {
 
 	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		// The repair loop must create the IP address associated
-		_, err = kubeclient.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), svc.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient.NetworkingV1beta1().IPAddresses().Get(context.TODO(), svc.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -319,7 +320,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 	// s1 uses IPAddress allocator
 	s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
@@ -338,7 +339,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		_, err = kubeclient1.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}
@@ -347,7 +348,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 	// s2 uses bitmap allocator
 	s2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=false",
+			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
@@ -368,7 +369,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 
 		err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 			// The repair loop must create the IP address associated
-			_, err = kubeclient1.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+			_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -409,7 +410,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 	// oldServer uses bitmap allocator
 	oldServer := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=false",
+			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/16",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
@@ -423,7 +424,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 	// s1 uses IPAddress allocator
 	newServer := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/16",
 			"--disable-admission-plugins=ServiceAccount",
 			fmt.Sprintf("--feature-gates=%s=true,%s=false", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite)},
@@ -497,7 +498,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 	// It takes some time for the repairip loop to create the corresponding IPAddress objects
 	// ClusterIPs are synchronized through the bitmap.
 	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(context.Context) (bool, error) {
-		ips, err := kubeclientNew.NetworkingV1alpha1().IPAddresses().List(context.Background(), metav1.ListOptions{})
+		ips, err := kubeclientNew.NetworkingV1beta1().IPAddresses().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -526,7 +527,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 		ip := fmt.Sprintf("10.0.0.%d", i)
 		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(context.Context) (bool, error) {
 			// The repair loop must create the IP address associated
-			_, err = kubeclientNew.NetworkingV1alpha1().IPAddresses().Get(context.Background(), ip, metav1.GetOptions{})
+			_, err = kubeclientNew.NetworkingV1beta1().IPAddresses().Get(context.Background(), ip, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -558,7 +559,7 @@ func TestFlagsIPAllocator(t *testing.T) {
 	// s1 uses IPAddress allocator
 	s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			fmt.Sprintf("--feature-gates=%s=true", features.MultiCIDRServiceAllocator)},
 		etcdOptions)
@@ -576,7 +577,7 @@ func TestFlagsIPAllocator(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		_, err = kubeclient1.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}

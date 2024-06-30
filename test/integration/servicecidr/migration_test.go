@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -57,7 +57,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	s1 := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -77,15 +77,15 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	// ServiceCIDR controller
 	go servicecidrs.NewController(
 		tCtx,
-		informers1.Networking().V1alpha1().ServiceCIDRs(),
-		informers1.Networking().V1alpha1().IPAddresses(),
+		informers1.Networking().V1beta1().ServiceCIDRs(),
+		informers1.Networking().V1beta1().IPAddresses(),
 		client1,
 	).Run(tCtx, 5)
 	informers1.Start(tCtx.Done())
 
 	// the default serviceCIDR should have a finalizer and ready condition set to true
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client1.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
+		cidr, err := client1.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -119,13 +119,13 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		}
 	}
 	// Add a new service CIDR to be able to migrate the apiserver
-	if _, err := client1.NetworkingV1alpha1().ServiceCIDRs().Create(context.Background(), makeServiceCIDR("migration-cidr", cidr2, ""), metav1.CreateOptions{}); err != nil {
+	if _, err := client1.NetworkingV1beta1().ServiceCIDRs().Create(context.Background(), makeServiceCIDR("migration-cidr", cidr2, ""), metav1.CreateOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// wait ServiceCIDR is ready
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client1.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), "migration-cidr", metav1.GetOptions{})
+		cidr, err := client1.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), "migration-cidr", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -135,18 +135,18 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	}
 
 	// delete the default ServiceCIDR so is no longer used for allocating IPs
-	if err := client1.NetworkingV1alpha1().ServiceCIDRs().Delete(context.Background(), defaultservicecidr.DefaultServiceCIDRName, metav1.DeleteOptions{}); err != nil {
+	if err := client1.NetworkingV1beta1().ServiceCIDRs().Delete(context.Background(), defaultservicecidr.DefaultServiceCIDRName, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// the default serviceCIDR should be pending deletion with Ready condition set to false
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client1.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
+		cidr, err := client1.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		for _, condition := range cidr.Status.Conditions {
-			if condition.Type == networkingv1alpha1.ServiceCIDRConditionReady {
+			if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
 				return condition.Status == metav1.ConditionFalse, nil
 			}
 		}
@@ -191,7 +191,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	s2 := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1alpha1=true",
+			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=" + cidr2,
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
@@ -215,8 +215,8 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
 	go servicecidrs.NewController(
 		tCtx2,
-		informers2.Networking().V1alpha1().ServiceCIDRs(),
-		informers2.Networking().V1alpha1().IPAddresses(),
+		informers2.Networking().V1beta1().ServiceCIDRs(),
+		informers2.Networking().V1beta1().IPAddresses(),
 		client2,
 	).Run(tCtx2, 5)
 	informers2.Start(tCtx2.Done())
@@ -229,7 +229,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 
 	// the default serviceCIDR should  be the new one
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		cidr, err := client2.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
+		cidr, err := client2.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
@@ -250,7 +250,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		}
 
 		for _, condition := range cidr.Status.Conditions {
-			if condition.Type == networkingv1alpha1.ServiceCIDRConditionReady {
+			if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
 				t.Logf("Expected Condition %s to be %s", condition.Status, metav1.ConditionTrue)
 				return condition.Status == metav1.ConditionTrue, nil
 			}
@@ -275,13 +275,13 @@ func TestMigrateServiceCIDR(t *testing.T) {
 	}
 
 	// The temporary ServiceCIDR can be deleted now since the Default ServiceCIDR will cover it
-	if err := client2.NetworkingV1alpha1().ServiceCIDRs().Delete(context.Background(), "migration-cidr", metav1.DeleteOptions{}); err != nil {
+	if err := client2.NetworkingV1beta1().ServiceCIDRs().Delete(context.Background(), "migration-cidr", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// wait ServiceCIDR no longer exist
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
-		_, err := client2.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), "migration-cidr", metav1.GetOptions{})
+		_, err := client2.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), "migration-cidr", metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, nil
 		}

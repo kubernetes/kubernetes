@@ -21,14 +21,14 @@ import (
 	"net"
 	"net/netip"
 
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
-	networkinglisters "k8s.io/client-go/listers/networking/v1alpha1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1beta1"
 )
 
 // OverlapsPrefix return the list of ServiceCIDR that overlaps with the prefix passed as argument
-func OverlapsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1alpha1.ServiceCIDR {
-	result := []*networkingv1alpha1.ServiceCIDR{}
+func OverlapsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1beta1.ServiceCIDR {
+	result := []*networkingv1beta1.ServiceCIDR{}
 	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
 	if err != nil {
 		return result
@@ -47,8 +47,8 @@ func OverlapsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefi
 }
 
 // ContainsPrefix return the list of ServiceCIDR that contains the prefix passed as argument
-func ContainsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1alpha1.ServiceCIDR {
-	result := []*networkingv1alpha1.ServiceCIDR{}
+func ContainsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefix netip.Prefix) []*networkingv1beta1.ServiceCIDR {
+	result := []*networkingv1beta1.ServiceCIDR{}
 	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
 	if err != nil {
 		return result
@@ -67,14 +67,14 @@ func ContainsPrefix(serviceCIDRLister networkinglisters.ServiceCIDRLister, prefi
 }
 
 // ContainsIP return the list of ServiceCIDR that contains the IP address passed as argument
-func ContainsIP(serviceCIDRLister networkinglisters.ServiceCIDRLister, ip net.IP) []*networkingv1alpha1.ServiceCIDR {
+func ContainsIP(serviceCIDRLister networkinglisters.ServiceCIDRLister, ip net.IP) []*networkingv1beta1.ServiceCIDR {
 	address := IPToAddr(ip)
 	return ContainsAddress(serviceCIDRLister, address)
 }
 
 // ContainsAddress return the list of ServiceCIDR that contains the address passed as argument
-func ContainsAddress(serviceCIDRLister networkinglisters.ServiceCIDRLister, address netip.Addr) []*networkingv1alpha1.ServiceCIDR {
-	result := []*networkingv1alpha1.ServiceCIDR{}
+func ContainsAddress(serviceCIDRLister networkinglisters.ServiceCIDRLister, address netip.Addr) []*networkingv1beta1.ServiceCIDR {
+	result := []*networkingv1beta1.ServiceCIDR{}
 	serviceCIDRList, err := serviceCIDRLister.List(labels.Everything())
 	if err != nil {
 		return result

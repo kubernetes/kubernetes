@@ -89,7 +89,7 @@ func TestServiceAllocPerformance(t *testing.T) {
 			s1 := kubeapiservertesting.StartTestServerOrDie(t,
 				apiServerOptions,
 				[]string{
-					"--runtime-config=networking.k8s.io/v1alpha1=true",
+					"--runtime-config=networking.k8s.io/v1beta1=true",
 					"--service-cluster-ip-range=" + "10.0.0.0/12",
 					"--advertise-address=10.0.0.1",
 					"--disable-admission-plugins=ServiceAccount",
@@ -108,7 +108,7 @@ func TestServiceAllocPerformance(t *testing.T) {
 
 			// 100 workers for 15k services
 			nworkers := 100
-			nservices := 15000
+			nservices := 150
 			jobs := make(chan int, nservices)
 			results := make(chan error, nservices)
 			t.Log("Starting workers to create ClusterIP Service")

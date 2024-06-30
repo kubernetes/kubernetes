@@ -202,17 +202,17 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/networking/v1alpha1
-		gvr("networking.k8s.io", "v1alpha1", "ipaddresses"): {
-			Stub:             `{"metadata": {"name": "192.168.1.2"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
-			ExpectedEtcdPath: "/registry/ipaddresses/192.168.1.2",
+		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
+		gvr("networking.k8s.io", "v1beta1", "ipaddresses"): {
+			Stub:             `{"metadata": {"name": "192.168.1.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath: "/registry/ipaddresses/192.168.1.3",
 		},
 		// --
 
-		// k8s.io/kubernetes/pkg/apis/networking/v1alpha1
-		gvr("networking.k8s.io", "v1alpha1", "servicecidrs"): {
-			Stub:             `{"metadata": {"name": "range1"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
-			ExpectedEtcdPath: "/registry/servicecidrs/range1",
+		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
+		gvr("networking.k8s.io", "v1beta1", "servicecidrs"): {
+			Stub:             `{"metadata": {"name": "range-b1"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath: "/registry/servicecidrs/range-b1",
 		},
 		// --
 
