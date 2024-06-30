@@ -43,6 +43,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
@@ -827,33 +828,24 @@ func TestPodIndexFunc(t *testing.T) {
 }
 
 func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *api.Pod {
-	return &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:       "default",
-			Name:            "foo",
-			ResourceVersion: "1",
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSDefault,
-			Containers: []api.Container{{
-				Name:                     "foo",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-				Resources: api.ResourceRequirements{
-					Requests: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("10"),
-						resourceName:    value,
-					},
-					Limits: api.ResourceList{
-						api.ResourceCPU: resource.MustParse("10"),
-						resourceName:    value,
-					},
-				}},
-			},
-		},
-	}
+	return podtest.MakePod("", podtest.SetObjectMeta(metav1.ObjectMeta{
+		Namespace:       "default",
+		Name:            "foo",
+		ResourceVersion: "1",
+	}),
+		podtest.SetContainers(podtest.MakeContainer("foo",
+			podtest.SetContainerResources(api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("10"),
+					resourceName:    value,
+				},
+				Limits: api.ResourceList{
+					api.ResourceCPU: resource.MustParse("10"),
+					resourceName:    value,
+				},
+			}),
+		)),
+	)
 }
 
 func TestPodStrategyValidate(t *testing.T) {
@@ -871,102 +863,58 @@ func TestPodStrategyValidate(t *testing.T) {
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "foo",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
-							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
-							},
-						}},
-					},
-				},
-			},
+			pod: podtest.MakePod("foo",
+				podtest.SetInitContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
+					api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+						},
+					}))),
+			),
 			wantErr: true,
 		},
 		{
 			name: "a new pod setting init-container with indivisible hugepages values while container with divisible hugepages values",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "foo",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					InitContainers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
-							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
-							},
-						}},
-					},
-					Containers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
-							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
-							},
-						}},
-					},
-				},
-			},
+			pod: podtest.MakePod("foo",
+				podtest.SetInitContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
+					api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+						},
+					}))),
+				podtest.SetContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
+					api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+						},
+					}))),
+			),
 			wantErr: true,
 		},
 		{
 			name: "a new pod setting container with divisible hugepages values",
-			pod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "foo",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{{
-						Name:                     containerName,
-						Image:                    "image",
-						ImagePullPolicy:          "IfNotPresent",
-						TerminationMessagePolicy: "File",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
-							},
-							Limits: api.ResourceList{
-								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
-								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
-							},
-						}},
-					},
-				},
-			},
+			pod: podtest.MakePod("foo",
+				podtest.SetContainers(podtest.MakeContainer(containerName, podtest.SetContainerResources(
+					api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+							api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+						},
+						Limits: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+							api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+						},
+					}))),
+			),
 		},
 	}
 
@@ -992,54 +940,20 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 	}{
 		{
 			name: "add ephemeral container to regular pod and expect success",
-			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetEphemeralContainers(api.EphemeralContainer{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 					},
-				},
-			},
-			newPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-					EphemeralContainers: []api.EphemeralContainer{
-						{
-							EphemeralContainerCommon: api.EphemeralContainerCommon{
-								Name:                     "debugger",
-								Image:                    "image",
-								ImagePullPolicy:          "IfNotPresent",
-								TerminationMessagePolicy: "File",
-							},
-						},
-					},
-				},
-			},
+				}),
+			),
 		},
 	}
 
@@ -1059,170 +973,64 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 	}{
 		{
 			name: "add ephemeral container to static pod and expect failure",
-			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetAnnotations(map[string]string{api.MirrorPodAnnotationKey: "someVal"}),
+				podtest.SetNodeName("example.com"),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetAnnotations(map[string]string{api.MirrorPodAnnotationKey: "someVal"}),
+				podtest.SetEphemeralContainers(api.EphemeralContainer{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 					},
-					NodeName: "example.com",
-				},
-			},
-			newPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-					Annotations:     map[string]string{api.MirrorPodAnnotationKey: "someVal"},
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-					EphemeralContainers: []api.EphemeralContainer{
-						{
-							EphemeralContainerCommon: api.EphemeralContainerCommon{
-								Name:                     "debugger",
-								Image:                    "image",
-								ImagePullPolicy:          "IfNotPresent",
-								TerminationMessagePolicy: "File",
-							},
-						},
-					},
-					NodeName: "example.com",
-				},
-			},
+				}),
+				podtest.SetNodeName("example.com"),
+			),
 		},
 		{
 			name: "remove ephemeral container from regular pod and expect failure",
-			newPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+			),
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetEphemeralContainers(api.EphemeralContainer{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 					},
-				},
-			},
-			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-					EphemeralContainers: []api.EphemeralContainer{
-						{
-							EphemeralContainerCommon: api.EphemeralContainerCommon{
-								Name:                     "debugger",
-								Image:                    "image",
-								ImagePullPolicy:          "IfNotPresent",
-								TerminationMessagePolicy: "File",
-							},
-						},
-					},
-				},
-			},
+				}),
+			),
 		},
 		{
 			name: "change ephemeral container from regular pod and expect failure",
-			newPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetEphemeralContainers(api.EphemeralContainer{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "image2",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 					},
-					EphemeralContainers: []api.EphemeralContainer{
-						{
-							EphemeralContainerCommon: api.EphemeralContainerCommon{
-								Name:                     "debugger",
-								Image:                    "image2",
-								ImagePullPolicy:          "IfNotPresent",
-								TerminationMessagePolicy: "File",
-							},
-						},
+				}),
+			),
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetEphemeralContainers(api.EphemeralContainer{
+					EphemeralContainerCommon: api.EphemeralContainerCommon{
+						Name:                     "debugger",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 					},
-				},
-			},
-			oldPod: &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-pod",
-					Namespace:       "test-ns",
-					ResourceVersion: "1",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-					EphemeralContainers: []api.EphemeralContainer{
-						{
-							EphemeralContainerCommon: api.EphemeralContainerCommon{
-								Name:                     "debugger",
-								Image:                    "image",
-								ImagePullPolicy:          "IfNotPresent",
-								TerminationMessagePolicy: "File",
-							},
-						},
-					},
-				},
-			},
+				}),
+			),
 		},
 	}
 
@@ -1530,24 +1338,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
 
-			pod := &api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "foo",
-				},
-				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSDefault,
-					Containers: []api.Container{
-						{
-							Name:                     "container",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-				},
-			}
+			pod := podtest.MakePod("foo")
 			wantPod := pod.DeepCopy()
 			pod.Spec.TopologySpreadConstraints = append(pod.Spec.TopologySpreadConstraints, tc.topologySpreadConstraints...)
 
@@ -1575,34 +1366,15 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, true)
 	ctx := genericapirequest.NewDefaultContext()
 
-	pod := &api.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:       "default",
-			Name:            "foo",
-			ResourceVersion: "1",
-		},
-		Spec: api.PodSpec{
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSDefault,
-			Containers: []api.Container{
-				{
-					Name:                     "container",
-					Image:                    "image",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			},
-			TopologySpreadConstraints: []api.TopologySpreadConstraint{
-				{
-					NodeAffinityPolicy: &ignore,
-					NodeTaintsPolicy:   &honor,
-					WhenUnsatisfiable:  api.DoNotSchedule,
-					TopologyKey:        "kubernetes.io/hostname",
-					MaxSkew:            1,
-				},
-			},
-		},
-	}
+	pod := podtest.MakePod("foo",
+		podtest.SetTopologySpreadConstraints(api.TopologySpreadConstraint{
+			NodeAffinityPolicy: &ignore,
+			NodeTaintsPolicy:   &honor,
+			WhenUnsatisfiable:  api.DoNotSchedule,
+			TopologyKey:        "kubernetes.io/hostname",
+			MaxSkew:            1,
+		}),
+	)
 
 	errs := Strategy.Validate(ctx, pod)
 	if len(errs) != 0 {

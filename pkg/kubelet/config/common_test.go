@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -290,7 +291,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 	}
 	for _, c := range testCases {
 		assert.Equal(t, c.expected, generatePodName(c.podName, c.nodeName), "wrong pod name generated")
-		pod := &core.Pod{}
+		pod := podtest.MakePod("")
 		pod.Name = c.podName
 		if c.overwrite != "" {
 			pod.Name = c.overwrite
