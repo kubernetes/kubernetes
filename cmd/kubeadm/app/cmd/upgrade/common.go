@@ -143,14 +143,6 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
-	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
-	if flags.featureGatesString != "" {
-		initCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
-		if err != nil {
-			return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
-		}
-	}
-
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, initCfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
