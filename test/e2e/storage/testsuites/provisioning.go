@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,6 +48,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -303,11 +305,11 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/rbac-data-source-validator.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/volume-data-source-validator/setup-data-source-validator.yaml",
 		}
-		err = storageutils.CreateFromManifests(ctx, f, valNamespace,
-			func(item interface{}) error { return nil },
-			valManifests...)
 
-		framework.ExpectNoError(err)
+		tCtx := f.TContext(ctx)
+		tCtx = ktesting.WithStep(tCtx, "deploy validators")
+		tCtx = ktesting.WithNamespace(tCtx, valNamespace.Name)
+		storageutils.CreateFromManifests(tCtx, nil, valManifests...)
 
 		ginkgo.By("Creating populator namespace")
 		popNamespace, err := f.CreateNamespace(ctx, fmt.Sprintf("%s-pop", f.Namespace.Name), map[string]string{
@@ -322,10 +324,12 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/crd/hello-populator-crd.yaml",
 			"test/e2e/testing-manifests/storage-csi/any-volume-datasource/hello-populator-deploy.yaml",
 		}
-		err = storageutils.CreateFromManifests(ctx, f, popNamespace,
-			func(item interface{}) error {
-				switch item := item.(type) {
-				case *appsv1.Deployment:
+		tCtx = f.TContext(ctx)
+		tCtx = ktesting.WithStep(tCtx, "deploy polulators")
+		tCtx = ktesting.WithNamespace(tCtx, popNamespace.Name)
+		storageutils.CreateFromManifests(tCtx,
+			func(tCtx ktesting.TContext, item runtime.Object) {
+				if item, ok := item.(*appsv1.Deployment); ok {
 					for i, container := range item.Spec.Template.Spec.Containers {
 						switch container.Name {
 						case "hello":
@@ -356,11 +360,8 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 						}
 					}
 				}
-				return nil
 			},
 			popManifests...)
-
-		framework.ExpectNoError(err)
 
 		dc := l.config.Framework.DynamicClient
 

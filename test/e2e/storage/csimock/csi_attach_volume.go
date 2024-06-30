@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
@@ -35,6 +36,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -160,12 +162,13 @@ var _ = utils.SIGDescribe("CSI Mock volume attach", func() {
 				NewDriverName: "csi-mock-" + f.UniqueName,
 				CanAttach:     &canAttach,
 			}
-			err = utils.CreateFromManifests(ctx, f, driverNamespace, func(item interface{}) error {
-				return utils.PatchCSIDeployment(f, o, item)
-			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
-			if err != nil {
-				framework.Failf("fail to deploy CSIDriver object: %v", err)
-			}
+			tCtx := f.TContext(ctx)
+			tCtx = ktesting.WithStep(tCtx, "deploy CSI mock driver")
+			tCtx = ktesting.WithNamespace(tCtx, driverNamespace.Name)
+			utils.CreateFromManifests(tCtx,
+				func(tCtx ktesting.TContext, obj runtime.Object) {
+					utils.PatchCSIDeployment(tCtx, o, obj)
+				}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
 
 			ginkgo.By("Wait for the pod in running status")
 			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)

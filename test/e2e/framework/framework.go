@@ -31,12 +31,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	v1 "k8s.io/api/core/v1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1svc "k8s.io/client-go/applyconfigurations/core/v1"
@@ -48,8 +48,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"github.com/go-logr/logr"
 	"github.com/onsi/ginkgo/v2"
 )
 
@@ -95,7 +97,16 @@ var (
 // The default pod security profile is "restricted".
 // Each of the labels can be overridden by using more specific NamespacePodSecurity* attributes of this
 // struct.
+//
+// A framework instance implements ktesting.TB and thus can be passed as
+// first parameter to [github.com/stretchr/testify/assert]. There are
+// just two caveats:
+//   - Error and Errorf abort the currently running test.
+//   - The implementation is only usable while a test runs,
+//     not while defining tests.
 type Framework struct {
+	ktesting.TB
+
 	BaseName string
 
 	// Set together with creating the ClientSet and the namespace.
@@ -104,6 +115,7 @@ type Framework struct {
 	UniqueName string
 
 	clientConfig                     *rest.Config
+	restMapper                       *restmapper.DeferredDiscoveryRESTMapper
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
 
@@ -137,6 +149,86 @@ type Framework struct {
 	// DumpAllNamespaceInfo is invoked by the framework to record
 	// information about a namespace after a test failure.
 	DumpAllNamespaceInfo DumpAllNamespaceInfoAction
+}
+
+// CleanupCtx implements [ktesting.ContextTB.CleanupCtx]. It's identical to
+// ginkgo.DeferCleanup.
+func (f *Framework) CleanupCtx(cb func(context.Context)) {
+	ginkgo.GinkgoHelper()
+	ginkgo.DeferCleanup(cb)
+}
+
+// Log overrides the implementation from Ginkgo to ensure consistent output.
+func (f *Framework) Log(args ...any) {
+	log(1, fmt.Sprintln(args...))
+}
+
+// Logf overrides the implementation from Ginkgo to ensure consistent output.
+func (f *Framework) Logf(format string, args ...any) {
+	log(1, fmt.Sprintf(format, args...))
+}
+
+var _ ktesting.ContextTB = &Framework{}
+
+// TContext combines the framework and the context in a [ktesting.TContext].
+//
+// Legacy code which accepts separate [context.Context] and [clientset.Interface]
+// parameters can call [ContextTODO] with those two parameters to
+// create a [ktesting.TContext] which also has all clients, but this is
+// an interim solution. It's cleaner to rewrite that code to accept
+// a [ktesting.TContext].
+func (f *Framework) TContext(ctx context.Context) ktesting.TContext {
+	tCtx := ktesting.InitCtx(ctx, f)
+	tCtx = ktesting.WithClients(tCtx, f.clientConfig, f.restMapper, f.ClientSet, f.DynamicClient, apiextensions.NewForConfigOrDie(f.clientConfig))
+	tCtx = ktesting.WithNamespace(tCtx, f.Namespace.Name)
+	tCtx = ensureLogger(tCtx)
+	return tCtx
+}
+
+// ContextTODO can be used as interim solution in functions which currently
+// accept a [context.Context] and [clientset.Interface] to create
+// a [ktesting.TContext] for other code which already uses that instead
+// of different parameters. If the client is [Framework.ClientSet],
+// the result is identical to the one from [Framework.TContext].
+// In particular, dynamic client and rest config are available.
+//
+// Long-term code relying on ContextTODO should get rewritten.
+func ContextTODO(ctx context.Context, client clientset.Interface) ktesting.TContext {
+	// If the client was taken from a framework instance, then
+	// we can cast it here to prepare a complete context.
+	if fc, ok := client.(fClient); ok {
+		return fc.f.TContext(ctx)
+	}
+	f := NewDefaultFramework("tcontext")
+	tCtx := ktesting.InitCtx(ctx, f)
+	tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
+	tCtx = ensureLogger(tCtx)
+	return tCtx
+}
+
+// ensureLogger installs the Ginkgo logger in the context if there isn't one
+// already.
+//
+// This isn't needed for code which uses klog.FromContext because that uses the
+// klog logger as default, which is the Gingko logger. But there might also be
+// code which uses go-logr directly: then providing the logger through the
+// context is useful.
+func ensureLogger(tCtx ktesting.TContext) ktesting.TContext {
+	_, ok := logr.FromContext(tCtx)
+	if ok == nil {
+		return tCtx
+	}
+
+	return ktesting.WithLogger(tCtx, ginkgoLogger)
+}
+
+// fClient is stored in framework.ClientSet and used by ContextTODO.
+//
+// TODO: remove this and ContextTODO once it is no longer needed, i.e.
+// when all code accepts a TContext.
+type fClient struct {
+	clientset.Interface
+	f *Framework
 }
 
 // DumpAllNamespaceInfoAction is called after each failed test for namespaces
@@ -188,6 +280,7 @@ func NewDefaultFramework(baseName string) *Framework {
 // NewFramework creates a test framework.
 func NewFramework(baseName string, options Options, client clientset.Interface) *Framework {
 	f := &Framework{
+		TB:        ginkgo.GinkgoT(),
 		BaseName:  baseName,
 		Options:   options,
 		ClientSet: client,
@@ -230,8 +323,12 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 		config.ContentType = TestContext.KubeAPIContentType
 	}
 	f.clientConfig = rest.CopyConfig(config)
-	f.ClientSet, err = clientset.NewForConfig(config)
+	clientSet, err := clientset.NewForConfig(config)
 	ExpectNoError(err)
+	f.ClientSet = fClient{
+		Interface: clientSet,
+		f:         f,
+	}
 	f.DynamicClient, err = dynamic.NewForConfig(config)
 	ExpectNoError(err)
 
@@ -250,6 +347,7 @@ func (f *Framework) BeforeEach(ctx context.Context) {
 	cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
 	restMapper.Reset()
+	f.restMapper = restMapper
 	resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 	f.ScalesGetter = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 

@@ -159,6 +159,10 @@ type TContext interface {
 	Dynamic() dynamic.Interface
 	APIExtensions() apiextensions.Interface
 
+	// Namespace returns the Kubernetes namespace associated with the context.
+	// May be empty if there is none.
+	Namespace() string
+
 	// The following methods must be implemented by every implementation
 	// of TContext to ensure that the leaf TContext is used, not some
 	// embedded TContext:
@@ -482,4 +486,8 @@ func (tCtx tContext) Dynamic() dynamic.Interface {
 
 func (tCtx tContext) APIExtensions() apiextensions.Interface {
 	return nil
+}
+
+func (tCtx tContext) Namespace() string {
+	return ""
 }

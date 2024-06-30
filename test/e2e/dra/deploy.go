@@ -40,6 +40,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha2"
 	"k8s.io/client-go/tools/cache"
@@ -52,6 +53,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -255,7 +257,9 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
-	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
+	tCtx := d.f.TContext(ctx)
+	tCtx = ktesting.WithStep(tCtx, "deploy kubelet plugin replicaset")
+	utils.CreateFromManifests(tCtx, func(tCtx ktesting.TContext, item runtime.Object) {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
 			item.Name += d.NameSuffix
@@ -288,9 +292,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Group = d.parameterAPIGroup
 
 		}
-		return nil
 	}, manifests...)
-	framework.ExpectNoError(err, "deploy kubelet plugin replicaset")
 
 	rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get replicaset")

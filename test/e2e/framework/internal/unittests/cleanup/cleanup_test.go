@@ -33,10 +33,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	testapiserver "k8s.io/kubernetes/test/utils/apiserver"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // The line number of the following code is checked in TestFailureOutput below.
@@ -102,6 +102,28 @@ var _ = ginkgo.Describe("e2e", func() {
 		}
 		ginkgo.DeferCleanup(framework.IgnoreNotFound(fail), "failure") // Without a failure the output would not be shown in JUnit.
 
+		tCtx := f.TContext(ctx)
+		tCtx.Log("log", "hello", "world")
+		tCtx.Logger().Info("info hello world") //
+		var discardLogger klog.Logger
+		tCtx = ktesting.WithLogger(tCtx, discardLogger)
+		oldCtx := tCtx
+		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+			if tCtx.Logger() != discardLogger {
+				tCtx.Errorf("expected discard logger in context, got %+v", tCtx.Logger())
+			}
+			_, ok := tCtx.Value("GINKGO_SPEC_CONTEXT").(ginkgo.SpecContext)
+			if !ok {
+				tCtx.Errorf("expected Ginkgo context, got %+v", tCtx)
+			}
+			if oldCtx.Err() == nil {
+				tCtx.Error("Ginkgo.It context should be canceled but isn't")
+			}
+			if tCtx.Err() != nil {
+				tCtx.Errorf("Ginkgo.DeferCleanup context should not be canceled but is: %v", tCtx.Err())
+			}
+		})
+
 		// More test cases can be added here without affeccting line numbering
 		// of existing tests.
 	})
@@ -134,6 +156,7 @@ STEP: Building a namespace api object, basename test-namespace - framework.go:xx
 <klog> cleanup_test.go:76] before #2
 < Exit [BeforeEach] e2e - cleanup_test.go:75 <time>
 > Enter [It] works - cleanup_test.go:90 <time>
+log hello world
 < Exit [It] works - cleanup_test.go:90 <time>
 > Enter [AfterEach] e2e - cleanup_test.go:57 <time>
 <klog> cleanup_test.go:57] extension after
@@ -144,6 +167,8 @@ STEP: Building a namespace api object, basename test-namespace - framework.go:xx
 > Enter [AfterEach] e2e - cleanup_test.go:86 <time>
 <klog> cleanup_test.go:87] after #2
 < Exit [AfterEach] e2e - cleanup_test.go:86 <time>
+> Enter [DeferCleanup (Each)] e2e - cleanup_test.go:111 <time>
+< Exit [DeferCleanup (Each)] e2e - cleanup_test.go:111 <time>
 > Enter [DeferCleanup (Each)] e2e - cleanup_test.go:103 <time>
 [FAILED] DeferCleanup callback returned error: fake error for "failure"
 In [DeferCleanup (Each)] at: cleanup_test.go:103 <time>
