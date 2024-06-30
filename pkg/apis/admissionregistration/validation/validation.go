@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/api/validation/path"
@@ -1066,9 +1067,9 @@ func validateMatchConditionsExpression(expression string, opts validationOptions
 	}
 	var compiler plugincel.Compiler
 	if opts.strictCostEnforcement {
-		compiler = strictStatelessCELCompiler
+		compiler = getStrictStatelessCELCompiler()
 	} else {
-		compiler = nonStrictStatelessCELCompiler
+		compiler = getNonStrictStatelessCELCompiler()
 	}
 	return validateCELCondition(compiler, &matchconditions.MatchCondition{
 		Expression: expression,
@@ -1270,15 +1271,34 @@ func validateFieldRef(fieldRef string, fldPath *field.Path) field.ErrorList {
 // variable composition is not allowed, for example, when validating MatchConditions.
 // strictStatelessCELCompiler is a cel Compiler that enforces strict cost enforcement.
 // nonStrictStatelessCELCompiler is a cel Compiler that does not enforce strict cost enforcement.
-var strictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-var nonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
+var (
+	lazyStrictStatelessCELCompilerInit sync.Once
+	lazyStrictStatelessCELCompiler     plugincel.Compiler
+
+	lazyNonStrictStatelessCELCompilerInit sync.Once
+	lazyNonStrictStatelessCELCompiler     plugincel.Compiler
+)
+
+func getStrictStatelessCELCompiler() plugincel.Compiler {
+	lazyStrictStatelessCELCompilerInit.Do(func() {
+		lazyStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
+	})
+	return lazyStrictStatelessCELCompiler
+}
+
+func getNonStrictStatelessCELCompiler() plugincel.Compiler {
+	lazyNonStrictStatelessCELCompilerInit.Do(func() {
+		lazyNonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false))
+	})
+	return lazyNonStrictStatelessCELCompiler
+}
 
 func createCompiler(allowComposition, strictCost bool) plugincel.Compiler {
 	if !allowComposition {
 		if strictCost {
-			return strictStatelessCELCompiler
+			return getStrictStatelessCELCompiler()
 		} else {
-			return nonStrictStatelessCELCompiler
+			return getNonStrictStatelessCELCompiler()
 		}
 	}
 	compiler, err := plugincel.NewCompositedCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))

@@ -68,7 +68,7 @@ func AddAllocation(m *Model, result *resourceapi.NamedResourcesAllocationResult)
 func NewClaimController(filter *resourceapi.NamedResourcesFilter, requests []*resourceapi.NamedResourcesRequest) (*Controller, error) {
 	c := &Controller{}
 	if filter != nil {
-		compilation := cel.Compiler.CompileCELExpression(filter.Selector, environment.StoredExpressions)
+		compilation := cel.GetCompiler().CompileCELExpression(filter.Selector, environment.StoredExpressions)
 		if compilation.Error != nil {
 			// Shouldn't happen because of validation.
 			return nil, fmt.Errorf("compile class filter CEL expression: %w", compilation.Error)
@@ -76,7 +76,7 @@ func NewClaimController(filter *resourceapi.NamedResourcesFilter, requests []*re
 		c.filter = &compilation
 	}
 	for _, request := range requests {
-		compilation := cel.Compiler.CompileCELExpression(request.Selector, environment.StoredExpressions)
+		compilation := cel.GetCompiler().CompileCELExpression(request.Selector, environment.StoredExpressions)
 		if compilation.Error != nil {
 			// Shouldn't happen because of validation.
 			return nil, fmt.Errorf("compile request CEL expression: %w", compilation.Error)

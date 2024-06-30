@@ -3425,14 +3425,16 @@ func TestValidateValidatingAdmissionPolicyUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	if strictCost {
-		strictStatelessCELCompiler = plugincel.NewCompiler(extended)
+		originalCompiler := getStrictStatelessCELCompiler()
+		lazyStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
 		defer func() {
-			strictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+			lazyStrictStatelessCELCompiler = originalCompiler
 		}()
 	} else {
-		nonStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
+		originalCompiler := getNonStrictStatelessCELCompiler()
+		lazyNonStrictStatelessCELCompiler = plugincel.NewCompiler(extended)
 		defer func() {
-			nonStrictStatelessCELCompiler = plugincel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), strictCost))
+			lazyNonStrictStatelessCELCompiler = originalCompiler
 		}()
 	}
 
