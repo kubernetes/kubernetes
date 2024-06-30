@@ -60,7 +60,7 @@ func validNewCronJob() *batch.CronJob {
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
 					Template: api.PodTemplateSpec{
-						Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 					},
 				},
 			},

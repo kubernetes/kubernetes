@@ -63,7 +63,7 @@ func newValidDaemonSet() *apps.DaemonSet {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"a": "b"},
 				},
-				Spec: podtest.MakePod("").Spec,
+				Spec: podtest.MakePodSpec(),
 			},
 		},
 	}

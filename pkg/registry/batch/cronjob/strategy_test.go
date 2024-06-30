@@ -30,7 +30,7 @@ import (
 
 var (
 	validPodTemplateSpec = api.PodTemplateSpec{
-		Spec: podtest.MakePodSpec(api.RestartPolicyOnFailure),
+		Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyOnFailure)),
 	}
 	validCronjobSpec = batch.CronJobSpec{
 		Schedule:          "5 5 * * ?",
