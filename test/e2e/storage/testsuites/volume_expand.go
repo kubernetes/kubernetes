@@ -318,7 +318,7 @@ func ExpandPVCSize(ctx context.Context, origPVC *v1.PersistentVolumeClaim, size 
 	// Retry the update on error, until we hit a timeout.
 	// TODO: Determine whether "retry with timeout" is appropriate here. Maybe we should only retry on version conflict.
 	var lastUpdateError error
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Get(ctx, pvcName, metav1.GetOptions{})
 		if err != nil {
