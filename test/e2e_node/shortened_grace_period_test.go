@@ -165,9 +165,9 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 				{
 					Name:    name,
 					Image:   busyboxImage,
-					Command: []string{"/bin/bash", "-c"},
+					Command: []string{"sh", "-c"},
 					Args: []string{`
-term() {
+_term() {
   echo "Caught SIGTERM signal!"
   if [ "$COUNT" -eq 0 ]; then
     echo "SIGINT 1"
@@ -179,7 +179,7 @@ term() {
   COUNT=$((COUNT + 1))
 }
 COUNT=0
-trap 'term' SIGTERM
+trap _term SIGTERM
 echo "pod start!"
 while true; do
   sleep 1
