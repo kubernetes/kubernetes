@@ -132,6 +132,9 @@ type ServiceAccountAuthenticationOptions struct {
 	JWKSURI          string
 	MaxExpiration    time.Duration
 	ExtendExpiration bool
+	// OptionalTokenGetter is a function that returns a service account token getter.
+	// If not set, the default token getter will be used.
+	OptionalTokenGetter func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
 }
 
 // TokenFileAuthenticationOptions contains token file authentication options for API Server
@@ -207,7 +210,20 @@ func (o *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 
 // WithServiceAccounts set default value for service account authentication
 func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
-	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true}
+	if o.ServiceAccounts == nil {
+		o.ServiceAccounts = &ServiceAccountAuthenticationOptions{}
+	}
+	o.ServiceAccounts.Lookup = true
+	o.ServiceAccounts.ExtendExpiration = true
+	return o
+}
+
+// WithTokenGetterFunction set optional service account token getter function
+func (o *BuiltInAuthenticationOptions) WithTokenGetterFunction(f func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter) *BuiltInAuthenticationOptions {
+	if o.ServiceAccounts == nil {
+		o.ServiceAccounts = &ServiceAccountAuthenticationOptions{}
+	}
+	o.ServiceAccounts.OptionalTokenGetter = f
 	return o
 }
 
@@ -673,13 +689,19 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
 		nodeLister = versionedInformer.Core().V1().Nodes().Lister()
 	}
-	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-		extclient,
-		versionedInformer.Core().V1().Secrets().Lister(),
-		versionedInformer.Core().V1().ServiceAccounts().Lister(),
-		versionedInformer.Core().V1().Pods().Lister(),
-		nodeLister,
-	)
+
+	// If the optional token getter function is set, use it. Otherwise, use the default token getter.
+	if o.ServiceAccounts.OptionalTokenGetter != nil {
+		authenticatorConfig.ServiceAccountTokenGetter = o.ServiceAccounts.OptionalTokenGetter(versionedInformer)
+	} else {
+		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+			extclient,
+			versionedInformer.Core().V1().Secrets().Lister(),
+			versionedInformer.Core().V1().ServiceAccounts().Lister(),
+			versionedInformer.Core().V1().Pods().Lister(),
+			nodeLister,
+		)
+	}
 	authenticatorConfig.SecretsWriter = extclient.CoreV1()
 
 	if authenticatorConfig.BootstrapToken {
