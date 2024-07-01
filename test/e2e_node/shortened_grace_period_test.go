@@ -40,26 +40,25 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var ns string
 		var podName = "test-shortened-grace"
 		var ctx = context.Background()
-		const (
-			gracePeriod      = 5000
-			gracePeriodShort = 100
-		)
+
+		var gracePeriod int64 = 5000
+		var gracePeriodShort int64 = 100
+
 		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			podClient = e2epod.NewPodClient(f)
 		})
 		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
 			testRcNamespace := ns
-
 			podClient.CreateSync(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
-			err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
+			err := podClient.Delete(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 			framework.ExpectNoError(err, "failed to delete pod")
-			time.Sleep(20 * time.Second)
-			err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
+			time.Sleep(10 * time.Second)
+			err = podClient.Delete(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodShort})
 			framework.ExpectNoError(err, "failed to delete pod")
 			time.Sleep(10 * time.Second)
 			// Get pod logs.
-			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{Follow: true}).Stream(ctx)
+			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 			framework.ExpectNoError(err, "failed to get pod logs")
 			defer func() {
 				if err := logs.Close(); err != nil {
@@ -73,9 +72,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			}
 			podLogs := buf.String()
 			// Verify the number of SIGINT
-			gomega.Expect(strings.Count(podLogs, "demo")).To(gomega.Equal(1), fmt.Sprintf("demo SIGTERM is:%s", podLogs))
-			gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), "unexpected number of SIGINT 1 entries in pod logs")
-			gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), "unexpected number of SIGINT 2 entries in pod logs")
+			gomega.Expect(strings.Count(podLogs, "SIGINT 1")).To(gomega.Equal(1), fmt.Sprintf("unexpected number of SIGINT 1 entries in pod logs. logs is:%s", podLogs))
+			gomega.Expect(strings.Count(podLogs, "SIGINT 2")).To(gomega.Equal(1), fmt.Sprintf("unexpected number of SIGINT 2 entries in pod logs. logs is:%s", podLogs))
 
 		})
 	})
@@ -102,18 +100,17 @@ func getGracePeriodTestPod(name, testRcNamespace string, gracePeriod int64) *v1.
 					Command: []string{"sh", "-c"},
 					Args: []string{`
 _term() {
-  echo "Caught SIGTERM signal!"
   if [ "$COUNT" -eq 0 ]; then
     echo "SIGINT 1"
   elif [ "$COUNT" -eq 1 ]; then
     echo "SIGINT 2"
-    sleep 80
+    sleep 50
     exit 0
   fi
   COUNT=$((COUNT + 1))
 }
 COUNT=0
-trap _term SIGTERM SIGKILL SIGINT SIGHUP SIGQUIT
+trap _term SIGTERM
 while true; do
   sleep 1
 done
