@@ -1076,6 +1076,9 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			schedulingCycle := sched.SchedulingQueue.SchedulingCycle()
 			go func() {
+				metrics.Goroutines.WithLabelValues(metrics.Requeueing).Inc()
+				defer metrics.Goroutines.WithLabelValues(metrics.Requeueing).Dec()
+
 				// When handling events takes time in the queue, AddUnschedulableIfNotPresent could be blocked by a shared lock within the queue,
 				// which negatively impacts the scheduling throughput.
 				// So, we put an unschedulable pod back to the queue in a goroutine.

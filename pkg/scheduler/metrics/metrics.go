@@ -36,6 +36,8 @@ const (
 	PrioritizingExtender = "prioritizing_extender"
 	// Binding - binding work/operation label value.
 	Binding = "binding"
+	// Requeueing - putting Pods into the queue.
+	Requeueing = "requeueing"
 )
 
 // ExtentionPoints is a list of possible values for the extension_point label.
