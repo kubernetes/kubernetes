@@ -270,7 +270,7 @@ func (d *DynamicEncryptionConfigContent) validateNewTransformersHealth(
 	ctx, cancel = context.WithTimeout(ctx, kmsPluginCloseGracePeriod)
 	defer cancel()
 
-	pollErr := wait.PollImmediateWithContext(ctx, 100*time.Millisecond, kmsPluginCloseGracePeriod, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, kmsPluginCloseGracePeriod, false, func(ctx context.Context) (bool, error) {
 		// create a fake http get request to health check endpoint
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("/healthz/%s", kmsPluginHealthzCheck.Name()), nil)
 		if err != nil {

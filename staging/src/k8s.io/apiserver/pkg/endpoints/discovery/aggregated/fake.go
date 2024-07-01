@@ -97,10 +97,11 @@ func (f *fakeResourceManager) Validate() error {
 }
 
 func (f *fakeResourceManager) WaitForActions(ctx context.Context, timeout time.Duration) error {
-	err := wait.PollImmediateWithContext(
+	err := wait.PollUntilContextTimeout(
 		ctx,
 		100*time.Millisecond, // try every 100ms
 		timeout,              // timeout after timeout
+		false,
 		func(ctx context.Context) (done bool, err error) {
 			if f.HasExpectedNumberActions() {
 				return true, f.Validate()
