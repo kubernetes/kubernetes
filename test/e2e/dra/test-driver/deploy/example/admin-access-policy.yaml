@@ -1,0 +1,71 @@
+# This example shows how to use a validating admission policy (VAP)
+# to control who may use "admin access", a privileged mode which
+# grants access to devices which are currently in use, potentially
+# by some other user.
+#
+# The policy applies in any namespace which does not have the
+# "admin-access.dra.example.com" label. Other ways of making that decision are
+# also possible.
+#
+# Cluster administrators need to adapt at least the names and replace
+# "dra.example.com".
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: resourceclaim-policy.dra.example.com
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["resource.k8s.io"]
+      apiVersions: ["v1alpha3"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["resourceclaims"]
+  validations:
+    - expression: '! object.spec.devices.requests.exists(e, has(e.device) && has(e.device.adminAccess) && e.device.adminAccess)'
+      reason: Forbidden
+      messageExpression: '"admin access to devices not enabled"' # in namespace " + object.metadata.namespace' - need to use __namespace__, but somehow that also doesn't work.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: resourceclaim-binding.dra.example.com
+spec:
+  policyName:  resourceclaim-policy.dra.example.com
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - key: admin-access.dra.example.com
+        operator: DoesNotExist
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: resourceclaimtemplate-policy.dra.example.com
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["resource.k8s.io"]
+      apiVersions: ["v1alpha3"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["resourceclaimtemplates"]
+  validations:
+    - expression: '! object.spec.spec.devices.requests.exists(e, has(e.device) && has(e.device.adminAccess) && e.device.adminAccess)'
+      reason: Forbidden
+      messageExpression: '"admin access to devices not enabled"' # in namespace " + object.metadata.namespace' - need to use __namespace__, but somehow that also doesn't work.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: resourceclaimtemplate-binding.dra.example.com
+spec:
+  policyName:  resourceclaimtemplate-policy.dra.example.com
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+      - key: admin-access.dra.example.com
+        operator: DoesNotExist
