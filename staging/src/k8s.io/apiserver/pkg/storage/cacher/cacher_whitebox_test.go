@@ -181,6 +181,9 @@ func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.O
 func (d *dummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
+func (d *dummyStorage) ReadinessCheck() error {
+	return nil
+}
 func (d *dummyStorage) injectError(err error) {
 	d.Lock()
 	defer d.Unlock()

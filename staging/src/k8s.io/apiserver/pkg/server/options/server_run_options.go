@@ -47,16 +47,17 @@ const (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
-	CorsAllowedOriginList       []string
-	HSTSDirectives              []string
-	ExternalHost                string
-	MaxRequestsInFlight         int
-	MaxMutatingRequestsInFlight int
-	RequestTimeout              time.Duration
-	GoawayChance                float64
-	LivezGracePeriod            time.Duration
-	MinRequestTimeout           int
-	ShutdownDelayDuration       time.Duration
+	CorsAllowedOriginList        []string
+	HSTSDirectives               []string
+	ExternalHost                 string
+	MaxRequestsInFlight          int
+	MaxMutatingRequestsInFlight  int
+	RequestTimeout               time.Duration
+	GoawayChance                 float64
+	LivezGracePeriod             time.Duration
+	MinRequestTimeout            int
+	StorageInitializationTimeout time.Duration
+	ShutdownDelayDuration        time.Duration
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
 	JSONPatchMaxCopyBytes int64
@@ -116,6 +117,7 @@ func NewServerRunOptionsForComponent(componentName string, componentGlobalsRegis
 		RequestTimeout:                      defaults.RequestTimeout,
 		LivezGracePeriod:                    defaults.LivezGracePeriod,
 		MinRequestTimeout:                   defaults.MinRequestTimeout,
+		StorageInitializationTimeout:        defaults.StorageInitializationTimeout,
 		ShutdownDelayDuration:               defaults.ShutdownDelayDuration,
 		ShutdownWatchTerminationGracePeriod: defaults.ShutdownWatchTerminationGracePeriod,
 		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
@@ -140,6 +142,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.RequestTimeout = s.RequestTimeout
 	c.GoawayChance = s.GoawayChance
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.StorageInitializationTimeout = s.StorageInitializationTimeout
 	c.ShutdownDelayDuration = s.ShutdownDelayDuration
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
@@ -195,6 +198,10 @@ func (s *ServerRunOptions) Validate() []error {
 
 	if s.MinRequestTimeout < 0 {
 		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
+	if s.StorageInitializationTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--storage-initialization-timeout can not be negative value"))
 	}
 
 	if s.ShutdownDelayDuration < 0 {
@@ -349,6 +356,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"a request open before timing it out. Currently only honored by the watch request "+
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
+
+	fs.DurationVar(&s.StorageInitializationTimeout, "storage-initialization-timeout", s.StorageInitializationTimeout,
+		"Maximum amount of time to wait for storage initialization before declaring apiserver ready. Defaults to 1m.")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+
 		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+

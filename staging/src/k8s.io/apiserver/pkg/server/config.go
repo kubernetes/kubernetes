@@ -216,6 +216,10 @@ type Config struct {
 	// twice this value.  Note that it is up to the request handlers to ignore or honor this timeout. In seconds.
 	MinRequestTimeout int
 
+	// StorageInitializationTimeout defines the maximum amount of time to wait for storage initialization
+	// before declaring apiserver ready.
+	StorageInitializationTimeout time.Duration
+
 	// This represents the maximum amount of time it should take for apiserver to complete its startup
 	// sequence and become healthy. From apiserver's start time to when this amount of time has
 	// elapsed, /livez will assume that unfinished post-start hooks will complete successfully and
@@ -426,6 +430,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxMutatingRequestsInFlight:    200,
 		RequestTimeout:                 time.Duration(60) * time.Second,
 		MinRequestTimeout:              1800,
+		StorageInitializationTimeout:   time.Minute,
 		LivezGracePeriod:               time.Duration(0),
 		ShutdownDelayDuration:          time.Duration(0),
 		// 1.5MB is the default client request size in bytes
@@ -824,6 +829,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		ShutdownSendRetryAfter: c.ShutdownSendRetryAfter,
 
 		APIServerID:           c.APIServerID,
+		StorageReadinessHook:  NewStorageReadinessHook(c.StorageInitializationTimeout),
 		StorageVersionManager: c.StorageVersionManager,
 
 		EffectiveVersion: c.EffectiveVersion,

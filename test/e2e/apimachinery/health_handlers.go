@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -126,6 +128,13 @@ var _ = SIGDescribe("health handlers", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should contain necessary checks", func(ctx context.Context) {
+		if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.WatchCacheInitializationPostStartHook) {
+			storageReadinessCheck := "[+]poststarthook/storage-readiness ok"
+			requiredHealthzChecks.Insert(storageReadinessCheck)
+			requiredLivezChecks.Insert(storageReadinessCheck)
+			requiredReadyzChecks.Insert(storageReadinessCheck)
+		}
+
 		ginkgo.By("/health")
 		err := testPath(ctx, f.ClientSet, "/healthz?verbose=1", requiredHealthzChecks)
 		framework.ExpectNoError(err)
