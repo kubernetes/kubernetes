@@ -259,6 +259,37 @@ EOF
   fi
 }
 
+function test_assert_is_leader() {
+  local -r name=$1;
+  local -r hostname=$2;
+  local -r ret=$3;
+  cat <<EOF | kubectl apply -f -
+apiVersion: "coordination.k8s.io/v1"
+kind: "Lease"
+metadata:
+  name: "kube-controller-manager"
+  namespace: "${TEST_NS}"
+spec:
+  holderIdentity: "${name}"
+  leaseDurationSeconds: 15
+EOF
+  LEADER_ELECTION_NS="${TEST_NS}" HOSTNAME="${hostname}" is_leader
+  if [[ $? -eq ${ret} ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+function test_is_leader_suite() {
+  test_assert_is_leader "hostname_uuid" "hostname" 0
+  test_assert_is_leader "hostname_7d912eef-3e25-4804-a0ac-6df53422094d" "hostname" 0
+  test_assert_is_leader "com.example.hostname_7d912eef-3e25-4804-a0ac-6df53422094d" "com.example.hostname" 0
+  test_assert_is_leader "com.example.hostname---7d912eef-3e25-4804-a0ac-6df53422094d" "com.example.hostname" 0
+  test_assert_is_leader "hostname_uuid" "mismatchhostname" 1
+  test_assert_is_leader "hostname_7d912eef-3e25-4804-a0ac-6df53422094d" "mismatchhostname" 1
+}
+
 function test_func() {
   local -r name="${1}"
 
@@ -274,6 +305,7 @@ function test_func() {
 }
 
 failures=0
+test_func test_is_leader_suite
 test_func test_create_resource_reconcile
 test_func test_create_resource_ensureexists
 test_func test_create_multiresource

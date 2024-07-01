@@ -80,6 +80,7 @@ CLUSTER_SERVICE_LABEL="kubernetes.io/cluster-service"
 # Disabling this flag will force all addon managers to assume they are the
 # leaders.
 ADDON_MANAGER_LEADER_ELECTION=${ADDON_MANAGER_LEADER_ELECTION:-true}
+LEADER_ELECTION_NS="kube-system"
 
 # Remember that you can't log from functions that print some output (because
 # logs are also printed on stdout).
@@ -273,7 +274,7 @@ function is_leader() {
   fi
   # shellcheck disable=SC2086
   # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
-  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get leases.v1.coordination.k8s.io kube-controller-manager -o "jsonpath={.spec.holderIdentity}")
+  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n ${LEADER_ELECTION_NS} get leases.v1.coordination.k8s.io kube-controller-manager -o "jsonpath={.spec.holderIdentity}")
 
   case "${KUBE_CONTROLLER_MANAGER_LEADER}" in
   "")
@@ -281,13 +282,13 @@ function is_leader() {
     return 1
     ;;
 
-  "${HOSTNAME}"_*)
+  "${HOSTNAME}"_* | "${HOSTNAME}"---*)
     log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
     return 0
     ;;
 
   *)
-    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}_*"
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}_<HASH> or ${HOSTNAME}---<HASH>"
     return 1
     ;;
   esac

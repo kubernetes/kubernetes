@@ -1,3 +1,8 @@
+### Version 9.1.8 (Wed July 3 2024 Jeffrey Ying <jeffrey.ying86@live.com>)
+- Update kubectl to v1.30.2.
+- Update debian-base to v2.0.0.
+- Addon manager matches for "HOSTNAME---<hash>" in addition to "HOSTNAME_<hash>" when checking leader.
+
 ### Version 9.1.7 (Thu May 15 2023 Paco Xu <paco.xu@daocloud.io>)
 - Update kubectl to v1.27.1.
 - Use `--prune-allowlist` instead of deprecated `--prune-whitelist`.
