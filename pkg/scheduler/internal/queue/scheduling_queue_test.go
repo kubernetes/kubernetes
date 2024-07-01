@@ -153,7 +153,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
 	}
 	if len(q.nominator.nominatedPods["node1"]) != 2 {
-		t.Errorf("Expected medPriorityPodInfo and unschedulablePodInfo to be still present in nomindatePods: %v", q.nominator.nominatedPods["node1"])
+		t.Errorf("Expected medPriorityPodInfo and unschedulablePodInfo to be still present in nominatedPods: %v", q.nominator.nominatedPods["node1"])
 	}
 }
 
@@ -881,7 +881,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriNominatedPodInfo.Pod.Name, p.Pod.Name)
 	}
 	if len(q.nominator.nominatedPods) != 1 {
-		t.Errorf("Expected nomindatePods to have one element: %v", q.nominator)
+		t.Errorf("Expected nominatedPods to have one element: %v", q.nominator)
 	}
 	// unschedulablePodInfo is inserted to unschedulable pod pool because no events happened during scheduling.
 	if getUnschedulablePod(q, unschedulablePodInfo.Pod) != unschedulablePodInfo.Pod {
@@ -967,7 +967,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 			t.Errorf("Expected: %v after Pop, but got: %v", medPriorityPodInfo.Pod.Name, p.Pod.Name)
 		}
 		if len(q.nominator.nominatedPods["node1"]) != 1 {
-			t.Errorf("Expected medPriorityPodInfo to be present in nomindatePods: %v", q.nominator.nominatedPods["node1"])
+			t.Errorf("Expected medPriorityPodInfo to be present in nominatedPods: %v", q.nominator.nominatedPods["node1"])
 		}
 	}()
 	q.Add(logger, medPriorityPodInfo.Pod)
@@ -1165,7 +1165,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				}
 
 				if tt.wantAddedToNominated && len(q.nominator.nominatedPods) != 1 {
-					t.Errorf("Expected one item in nomindatePods map: %v", q.nominator)
+					t.Errorf("Expected one item in nominatedPods map: %v", q.nominator)
 				}
 
 			})
@@ -1212,7 +1212,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 	}
 
 	if err := q.Update(logger, testPod, updatedPod); err != nil {
-		t.Error("Error calling Update")
+		t.Errorf("Error calling Update: %v", err)
 	}
 	// test-pod got rejected by fakePlugin,
 	// but the update event that it just got may change this scheduling result,
@@ -1251,13 +1251,13 @@ func TestPriorityQueue_Delete(t *testing.T) {
 		t.Errorf("Didn't expect %v to be in activeQ.", highPriorityPodInfo.Pod.Name)
 	}
 	if len(q.nominator.nominatedPods) != 1 {
-		t.Errorf("Expected nomindatePods to have only 'unschedulablePodInfo': %v", q.nominator.nominatedPods)
+		t.Errorf("Expected nominatedPods to have only 'unschedulablePodInfo': %v", q.nominator.nominatedPods)
 	}
 	if err := q.Delete(unschedulablePodInfo.Pod); err != nil {
 		t.Errorf("delete failed: %v", err)
 	}
 	if len(q.nominator.nominatedPods) != 0 {
-		t.Errorf("Expected nomindatePods to be empty: %v", q.nominator)
+		t.Errorf("Expected nominatedPods to be empty: %v", q.nominator)
 	}
 }
 
@@ -2016,23 +2016,23 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 		name      string
 		podInfo   *framework.PodInfo
 		deletePod bool
-		want      bool
+		wantLen   int
 	}{
 		{
 			name:    "alive pod gets added into PodNominator",
 			podInfo: medPriorityPodInfo,
-			want:    true,
+			wantLen: 1,
 		},
 		{
 			name:      "deleted pod shouldn't be added into PodNominator",
 			podInfo:   highPriNominatedPodInfo,
 			deletePod: true,
-			want:      false,
+			wantLen:   0,
 		},
 		{
 			name:    "pod without .status.nominatedPodName specified shouldn't be added into PodNominator",
 			podInfo: highPriorityPodInfo,
-			want:    false,
+			wantLen: 0,
 		},
 	}
 
@@ -2057,8 +2057,8 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 
 			q.AddNominatedPod(logger, tt.podInfo, nil)
 
-			if got := len(q.NominatedPodsForNode(tt.podInfo.Pod.Status.NominatedNodeName)) == 1; got != tt.want {
-				t.Errorf("Want %v, but got %v", tt.want, got)
+			if got := len(q.NominatedPodsForNode(tt.podInfo.Pod.Status.NominatedNodeName)); got != tt.wantLen {
+				t.Errorf("Expected %v nominated pods for node, but got %v", tt.wantLen, got)
 			}
 		})
 	}
@@ -3884,21 +3884,21 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 
 	gatedPod := st.MakePod().SchedulingGates([]string{"hello world"}).Obj()
 	if err := q.Add(logger, gatedPod); err != nil {
-		t.Error("Error calling Add")
+		t.Errorf("Error while adding gated pod: %v", err)
 	}
 
 	if !q.unschedulablePods.get(gatedPod).Gated {
-		t.Error("expected pod to be gated")
+		t.Error("Expected pod to be gated")
 	}
 
 	ungatedPod := gatedPod.DeepCopy()
 	ungatedPod.Spec.SchedulingGates = nil
 	if err := q.Update(logger, gatedPod, ungatedPod); err != nil {
-		t.Error("Error calling Update")
+		t.Errorf("Error while updating pod to ungated: %v", err)
 	}
 
 	ungatedPodInfo, _ := q.Pop(logger)
 	if ungatedPodInfo.Gated {
-		t.Error("expected pod to be ungated")
+		t.Error("Expected pod to be ungated")
 	}
 }
