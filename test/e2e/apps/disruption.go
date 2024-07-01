@@ -516,7 +516,20 @@ var _ = SIGDescribe("DisruptionController", func() {
 					evictedPods.Insert(pod.Name)
 				}
 			}
-			gomega.Expect(evictedPods).Should(gomega.HaveLen(tc.expectedSuccesfulPodEvictions))
+
+			// It's possible that while we're evicting pods one by one, a new
+			// one can be created in the mean time. To ensure we account for that
+			// fact we check the list of pods after finishing the evictions, and
+			// expect the list of evicted pods to be greater or equal to the
+			// minimal expectation as specified in the test, but not greater
+			// than the number of new pods.
+			updatedPodList, err := cs.CoreV1().Pods(ns).List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			newPods := countNewPods(podList.Items, updatedPodList.Items)
+			gomega.Expect(len(evictedPods)).Should(gomega.And(
+				gomega.BeNumerically(">=", tc.expectedSuccesfulPodEvictions),
+				gomega.BeNumerically("<=", newPods)))
+
 			_, err = e2epod.WaitForPods(ctx, cs, ns, metav1.ListOptions{}, e2epod.Range{NoneMatching: true}, framework.PodDeleteTimeout, "evicted pods should be deleted", func(pod *v1.Pod) bool {
 				return evictedPods.Has(pod.Name) && pod.DeletionTimestamp == nil
 			})
@@ -524,6 +537,20 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	}
 })
+
+func countNewPods(oldPods, newPods []v1.Pod) int {
+	uids := sets.Set[types.UID]{}
+	for _, pod := range oldPods {
+		uids.Insert(pod.UID)
+	}
+	count := 0
+	for _, pod := range newPods {
+		if !uids.Has(pod.UID) {
+			count++
+		}
+	}
+	return count
+}
 
 func createPDBMinAvailableOrDie(ctx context.Context, cs kubernetes.Interface, ns string, name string, minAvailable intstr.IntOrString, labels map[string]string) {
 	pdb := policyv1.PodDisruptionBudget{
