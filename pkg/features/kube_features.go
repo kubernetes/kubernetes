@@ -1277,7 +1277,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 
-	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.WatchList: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 

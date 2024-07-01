@@ -305,6 +305,7 @@ const (
 
 	// owner: @p0lyn0mial
 	// alpha: v1.27
+	// beta: v1.31
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
@@ -411,7 +412,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
-	WatchList: {Default: false, PreRelease: featuregate.Alpha},
+	WatchList: {Default: true, PreRelease: featuregate.Beta},
 
 	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 
