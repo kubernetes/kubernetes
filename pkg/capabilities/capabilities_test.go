@@ -78,7 +78,7 @@ func TestSetup(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer ResetForTest(nil)
+			ResetForTest(nil)
 
 			Setup(tc.allowPrivileged, tc.perConnectionBytesPerSec)
 			res := Get()
