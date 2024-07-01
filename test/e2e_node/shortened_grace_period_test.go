@@ -41,7 +41,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 		var podName = "test-shortened-grace"
 		var ctx = context.Background()
 		const (
-			gracePeriod      = 10000
+			gracePeriod      = 5000
 			gracePeriodShort = 100
 		)
 		ginkgo.BeforeEach(func() {
@@ -52,7 +52,6 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			testRcNamespace := ns
 
 			podClient.CreateSync(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
-
 			err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err, "failed to delete pod")
 			time.Sleep(20 * time.Second)
@@ -114,8 +113,7 @@ _term() {
   COUNT=$((COUNT + 1))
 }
 COUNT=0
-trap _term SIGTERM
-echo "pod start!"
+trap _term SIGTERM SIGKILL SIGINT SIGHUP SIGQUIT
 while true; do
   sleep 1
 done
