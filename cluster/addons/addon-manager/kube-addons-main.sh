@@ -33,6 +33,8 @@ fi
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result of that. Start everything below that directory.
 log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
+log FORCEQUIT
+exit 0
 
 # Wait for the default service account to be created in the kube-system namespace.
 # shellcheck disable=SC2086
@@ -57,6 +59,7 @@ done < <(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.js
 # created/updated/deleted the files on the master.
 log INFO "== Entering periodical apply loop at $(date -Is) =="
 while true; do
+  exit 0
   start_sec=$(date +"%s")
   if is_leader; then
     ensure_addons
