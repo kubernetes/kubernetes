@@ -143,6 +143,7 @@ func TestTLSConfigKey(t *testing.T) {
 		},
 		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
 		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
+		"non cacheable":  {TLS: TLSConfig{DisableCaching: true}},
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
@@ -157,7 +158,7 @@ func TestTLSConfigKey(t *testing.T) {
 				continue
 			}
 
-			shouldCacheA := valueA.Proxy == nil
+			shouldCacheA := valueA.TLS.DisableCaching == false && valueA.Proxy == nil
 			if shouldCacheA != canCacheA {
 				t.Errorf("Unexpected canCache=false for " + nameA)
 			}

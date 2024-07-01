@@ -152,6 +152,9 @@ type TLSConfig struct {
 	// Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
 	// This struct indirection is used to make transport configs cacheable.
 	GetCertHolder *GetCertHolder
+
+	// Set to true in order to avoid caching
+	DisableCaching bool
 }
 
 // GetCertHolder is used to make the wrapped function comparable so that it can be used as a map key.

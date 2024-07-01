@@ -242,6 +242,9 @@ type TLSClientConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+
+	// Set to true in order to avoid TLS transports created with this Config to be cached
+	DisableTransportCaching bool
 }
 
 var _ fmt.Stringer = TLSClientConfig{}
