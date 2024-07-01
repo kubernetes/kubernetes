@@ -28,6 +28,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"strings"
+	"time"
 )
 
 var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", func() {
@@ -57,7 +58,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 
 			err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 			framework.ExpectNoError(err, "failed to delete pod")
-
+			time.Sleep(10 * time.Second)
 			// Get pod logs.
 			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 			framework.ExpectNoError(err, "failed to get pod logs")
