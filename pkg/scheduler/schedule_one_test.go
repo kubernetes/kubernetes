@@ -2482,7 +2482,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -2545,7 +2545,7 @@ func TestFindFitAllError(t *testing.T) {
 			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+		frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2585,7 +2585,7 @@ func TestFindFitSomeError(t *testing.T) {
 			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+		frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -2662,7 +2662,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			fwk, err := tf.NewFramework(
 				ctx,
 				registerPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(nil)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -2803,7 +2803,7 @@ func TestZeroRequest(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -3206,7 +3206,7 @@ func Test_prioritizeNodes(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
@@ -3324,7 +3324,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
+		frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3406,7 +3406,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				ctx,
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -3564,7 +3564,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+		frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 
