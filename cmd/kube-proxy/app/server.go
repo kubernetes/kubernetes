@@ -209,8 +209,6 @@ func newProxyServer(ctx context.Context, cfg *kubeproxyconfig.KubeProxyConfigura
 	nodeLister := s.nodeInformer.Lister()
 	nodeInformerHasSynced := s.nodeInformer.Informer().HasSynced
 
-	// This has to start after the calls to NewNodeConfig because that must
-	// configure the shared informer event handler first.
 	currentNodeInformerFactory.Start(wait.NeverStop)
 
 	if !cache.WaitForNamedCacheSync("node informer cache", ctx.Done(), nodeInformerHasSynced) {
@@ -577,8 +575,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
 		go serviceCIDRConfig.Run(wait.NeverStop)
 	}
-	// This has to start after the calls to NewServiceConfig because that
-	// function must configure its shared informer event handlers first.
+
 	informerFactory.Start(wait.NeverStop)
 	serviceInformerFactory.Start(wait.NeverStop)
 
