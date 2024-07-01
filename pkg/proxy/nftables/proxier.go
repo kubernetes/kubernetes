@@ -29,6 +29,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -296,12 +297,17 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 	// check the kernel version, under the assumption that the distro will have an nft
 	// binary that supports the same features as its kernel does, and so kernel 5.13
 	// or later implies nft 1.0.1 or later. https://issues.k8s.io/122743
-	kernelVersion, err := utilkernel.GetVersion()
-	if err != nil {
-		return nil, fmt.Errorf("could not check kernel version: %w", err)
-	}
-	if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.NFTablesKubeProxyKernelVersion)) {
-		return nil, fmt.Errorf("kube-proxy in nftables mode requires kernel %s or later", utilkernel.NFTablesKubeProxyKernelVersion)
+	//
+	// However, we allow the user to bypass this check by setting
+	// `KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK` to anything non-empty.
+	if os.Getenv("KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK") != "" {
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			return nil, fmt.Errorf("could not check kernel version: %w", err)
+		}
+		if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.NFTablesKubeProxyKernelVersion)) {
+			return nil, fmt.Errorf("kube-proxy in nftables mode requires kernel %s or later", utilkernel.NFTablesKubeProxyKernelVersion)
+		}
 	}
 
 	return nft, nil
