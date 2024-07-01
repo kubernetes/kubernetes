@@ -59,7 +59,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			framework.ExpectNoError(err, "failed to delete pod")
 			time.Sleep(10 * time.Second)
 			// Get pod logs.
-			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
+			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{Follow: true}).Stream(ctx)
 			framework.ExpectNoError(err, "failed to get pod logs")
 			defer func() {
 				if err := logs.Close(); err != nil {
