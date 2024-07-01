@@ -169,37 +169,37 @@ type ProxyServer struct {
 }
 
 // newProxyServer creates a ProxyServer based on the given config
-func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfiguration, master string, initOnly bool) (*ProxyServer, error) {
+func newProxyServer(ctx context.Context, cfg *kubeproxyconfig.KubeProxyConfiguration, master string, initOnly bool) (*ProxyServer, error) {
 	logger := klog.FromContext(ctx)
 
 	s := &ProxyServer{
-		Config: config,
+		Config: cfg,
 	}
 
 	cz, err := configz.New(kubeproxyconfig.GroupName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
-	cz.Set(config)
+	cz.Set(cfg)
 
-	if len(config.ShowHiddenMetricsForVersion) > 0 {
+	if len(cfg.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
 	}
 
-	s.Hostname, err = nodeutil.GetHostname(config.HostnameOverride)
+	s.Hostname, err = nodeutil.GetHostname(cfg.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}
 
-	s.Client, err = createClient(ctx, config.ClientConnection, master)
+	s.Client, err = createClient(ctx, cfg.ClientConnection, master)
 	if err != nil {
 		return nil, err
 	}
 
 	rawNodeIPs := getNodeIPs(ctx, s.Client, s.Hostname)
-	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
+	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, cfg.BindAddress)
 
-	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
+	if len(cfg.NodePortAddresses) == 1 && cfg.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
 		var nodePortAddresses []string
 		if nodeIP := s.NodeIPs[v1.IPv4Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
 			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/32", nodeIP.String()))
@@ -207,7 +207,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		if nodeIP := s.NodeIPs[v1.IPv6Protocol]; nodeIP != nil && !nodeIP.IsLoopback() {
 			nodePortAddresses = append(nodePortAddresses, fmt.Sprintf("%s/128", nodeIP.String()))
 		}
-		config.NodePortAddresses = nodePortAddresses
+		cfg.NodePortAddresses = nodePortAddresses
 	}
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
@@ -220,8 +220,8 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		Namespace: "",
 	}
 
-	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+	if len(cfg.HealthzBindAddress) > 0 {
+		s.HealthzServer = healthcheck.NewProxierHealthServer(cfg.HealthzBindAddress, 2*cfg.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup(ctx)
@@ -253,7 +253,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		logger.Error(err, "Kube-proxy configuration may be incomplete or incorrect")
 	}
 
-	s.Proxier, err = s.createProxier(ctx, config, dualStackSupported, initOnly)
+	s.Proxier, err = s.createProxier(ctx, cfg, dualStackSupported, initOnly)
 	if err != nil {
 		return nil, err
 	}
