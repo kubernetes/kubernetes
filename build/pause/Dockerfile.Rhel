@@ -4,7 +4,7 @@ COPY . .
 RUN mkdir -p bin && \
     gcc -Os -Wall -Werror -o bin/pause ./linux/pause.c
 
-FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
+FROM registry.ci.openshift.org/ocp/4.17:base-rhel9
 COPY --from=builder /go/src/github.com/openshift/kubernetes/build/pause/bin/pause /usr/bin/pod
 LABEL io.k8s.display-name="OpenShift Pod" \
       io.k8s.description="This is a component of OpenShift and contains the binary that holds the pod namespaces." \
