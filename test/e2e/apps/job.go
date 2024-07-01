@@ -710,8 +710,8 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
-	for i := 0; i < 100; i++ {
-		ginkgo.It(fmt.Sprintf("should fail when exceeds active deadline - %v", i), func(ctx context.Context) {
+	for i := 0; i < 50; i++ {
+		ginkgo.It(fmt.Sprintf("should fail when exceeds active deadline early - %v", i), func(ctx context.Context) {
 			activeDeadlineSeconds := int64(1)
 			parallelism := int32(2)
 			completions := int32(4)
@@ -719,13 +719,44 @@ done`}
 
 			ginkgo.By("Creating a job")
 			job := e2ejob.NewTestJob("notTerminate", fmt.Sprintf("exceed-active-deadline-%v", i), v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
-			// set low to TerminationGracePeriodSeconds to ensure quick pod termination
-			// when SIGTERM hits before the trap is registered
-			//job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To[int64](1)
 			job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 			framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
 			ginkgo.By("Ensuring job past active deadline")
-			err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+40)*time.Second, "DeadlineExceeded")
+			err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+60)*time.Second, "DeadlineExceeded")
+			framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
+		})
+	}
+
+	for i := 0; i < 150; i++ {
+		ginkgo.It(fmt.Sprintf("should fail when exceeds active deadline while running - %v", i), func(ctx context.Context) {
+			parallelism := int32(2)
+			completions := int32(4)
+			backoffLimit := int32(6) // default value
+
+			ginkgo.By("Creating a job")
+			job := e2ejob.NewTestJob("notTerminate", fmt.Sprintf("exceeded-active-deadline-%v", i), v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+			job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensure the job controller updates the status.ready field")
+			err = e2ejob.WaitForJobReady(ctx, f.ClientSet, f.Namespace.Name, job.Name, &parallelism)
+			framework.ExpectNoError(err, "failed to ensure job status ready field in namespace: %s", f.Namespace.Name)
+
+			jobClient := f.ClientSet.BatchV1().Jobs(f.Namespace.Name)
+			ginkgo.By("Setting the activeDeadlineSeconds")
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				updatedJob, err := jobClient.Get(ctx, job.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Unable to get job %s", job.Name)
+				updatedJob.Spec.ActiveDeadlineSeconds = ptr.To[int64](1)
+				_, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, updatedJob)
+				return err
+			})
+
+			framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring job past active deadline")
+			err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(60)*time.Second, "DeadlineExceeded")
 			framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 		})
 	}
