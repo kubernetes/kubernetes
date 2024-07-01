@@ -55,7 +55,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 
 			err := podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriod))
 			framework.ExpectNoError(err, "failed to delete pod")
-
+			time.Sleep(20 * time.Second)
 			err = podClient.Delete(ctx, podName, *metav1.NewDeleteOptions(gracePeriodShort))
 			framework.ExpectNoError(err, "failed to delete pod")
 			time.Sleep(10 * time.Second)
