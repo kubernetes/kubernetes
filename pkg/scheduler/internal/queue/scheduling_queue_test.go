@@ -85,7 +85,7 @@ var (
 
 	nominatorCmpOpts = []cmp.Option{
 		cmp.AllowUnexported(nominator{}),
-		cmpopts.IgnoreFields(nominator{}, "podLister", "lock"),
+		cmpopts.IgnoreFields(nominator{}, "podLister", "nLock", "nominatedPodsToInfo"),
 	}
 
 	queueHintReturnQueue = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
@@ -136,8 +136,8 @@ func TestPriorityQueue_Add(t *testing.T) {
 			medPriorityPodInfo.Pod.UID:   "node1",
 			unschedulablePodInfo.Pod.UID: "node1",
 		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {medPriorityPodInfo, unschedulablePodInfo},
+		nominatedPods: map[string][]PodRef{
+			"node1": {PodToRef(medPriorityPodInfo.Pod), PodToRef(unschedulablePodInfo.Pod)},
 		},
 	}
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
@@ -870,8 +870,8 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 			unschedulablePodInfo.Pod.UID:    "node1",
 			highPriNominatedPodInfo.Pod.UID: "node1",
 		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {highPriNominatedPodInfo, unschedulablePodInfo},
+		nominatedPods: map[string][]PodRef{
+			"node1": {PodToRef(highPriNominatedPodInfo.Pod), PodToRef(unschedulablePodInfo.Pod)},
 		},
 	}
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
@@ -2178,10 +2178,10 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			highPriorityPodInfo.Pod.UID:  "node2",
 			unschedulablePodInfo.Pod.UID: "node5",
 		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {medPriorityPodInfo},
-			"node2": {highPriorityPodInfo},
-			"node5": {unschedulablePodInfo},
+		nominatedPods: map[string][]PodRef{
+			"node1": {PodToRef(medPriorityPodInfo.Pod)},
+			"node2": {PodToRef(highPriorityPodInfo.Pod)},
+			"node5": {PodToRef(unschedulablePodInfo.Pod)},
 		},
 	}
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
@@ -2203,10 +2203,10 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			highPriorityPodInfo.Pod.UID:  "node4",
 			unschedulablePodInfo.Pod.UID: "node5",
 		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {medPriorityPodInfo},
-			"node4": {highPriorityPodInfo},
-			"node5": {unschedulablePodInfo},
+		nominatedPods: map[string][]PodRef{
+			"node1": {PodToRef(medPriorityPodInfo.Pod)},
+			"node4": {PodToRef(highPriorityPodInfo.Pod)},
+			"node5": {PodToRef(unschedulablePodInfo.Pod)},
 		},
 	}
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
@@ -2236,9 +2236,9 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 			medPriorityPodInfo.Pod.UID:   "node1",
 			unschedulablePodInfo.Pod.UID: "node5",
 		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {medPriorityPodInfo},
-			"node5": {unschedulablePodInfo},
+		nominatedPods: map[string][]PodRef{
+			"node1": {PodToRef(medPriorityPodInfo.Pod)},
+			"node5": {PodToRef(unschedulablePodInfo.Pod)},
 		},
 	}
 	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
