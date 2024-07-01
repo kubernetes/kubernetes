@@ -429,22 +429,21 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			// be scheduled immediately when the timer
 			// triggers. Instead we track the actual time stamps.
 			duration := now.Sub(lastSampleTime)
-			durationInSeconds := duration.Seconds()
-			throughput := float64(newScheduled) / durationInSeconds
 			expectedDuration := throughputSampleInterval * time.Duration(skipped+1)
 			errorMargin := (duration - expectedDuration).Seconds() / expectedDuration.Seconds() * 100
 			if tc.errorMargin > 0 && math.Abs(errorMargin) > tc.errorMargin {
 				// This might affect the result, report it.
-				tCtx.Errorf("ERROR: Expected throuput collector to sample at regular time intervals. The %d most recent intervals took %s instead of %s, a difference of %0.1f%%.", skipped+1, duration, expectedDuration, errorMargin)
+				klog.Infof("WARNING: Expected throughput collector to sample at regular time intervals. The %d most recent intervals took %s instead of %s, a difference of %0.1f%%.", skipped+1, duration, expectedDuration, errorMargin)
 			}
 
 			// To keep percentiles accurate, we have to record multiple samples with the same
 			// throughput value if we skipped some intervals.
+			throughput := float64(newScheduled) / duration.Seconds()
 			for i := 0; i <= skipped; i++ {
 				tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
 			}
 			lastScheduledCount = scheduled
-			klog.Infof("%d pods scheduled", lastScheduledCount)
+			klog.Infof("%d pods have been scheduled successfully", lastScheduledCount)
 			skipped = 0
 			lastSampleTime = now
 		}
