@@ -215,7 +215,9 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 
 			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
 			if err != nil {
-				logger.Error(err, "Failed to get health of node", "node", klog.KRef("", string(attachedVolume.NodeName)))
+				logger.V(5).Info("Failed to get health of node",
+					"node", klog.KRef("", string(attachedVolume.NodeName)),
+					"err", err)
 			}
 
 			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration if force detach is enabled
@@ -228,7 +230,9 @@ func (rc *reconciler) reconcile(ctx context.Context) {
 
 			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
 			if err != nil {
-				logger.Error(err, "Failed to get taint specs for node", "node", klog.KRef("", string(attachedVolume.NodeName)))
+				logger.V(5).Info("Failed to get taint specs for node",
+					"node", klog.KRef("", string(attachedVolume.NodeName)),
+					"err", err)
 			}
 
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless we have
