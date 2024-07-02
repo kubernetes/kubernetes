@@ -308,6 +308,8 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	return imagesInUse, nil
 }
 
+var ErrImageGCFailedLowerFreedBytes = goerrors.New("Failed to garbage collect required amount of images")
+
 func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
 	defer otelSpan.End()
@@ -360,7 +362,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 		}
 
 		if freed < amountToFree {
-			err := fmt.Errorf("Failed to garbage collect required amount of images. Attempted to free %d bytes, but only found %d bytes eligible to free.", amountToFree, freed)
+			err := fmt.Errorf("%w. Attempted to free %d bytes, but only found %d bytes eligible to free.", ErrImageGCFailedLowerFreedBytes, amountToFree, freed)
 			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
 			return err
 		}
