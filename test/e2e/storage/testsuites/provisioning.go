@@ -219,7 +219,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
@@ -258,7 +258,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, expectedContent)
 
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 		l.pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
@@ -483,7 +483,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		l.pvc.Name = "pvc-origin"
 		dc := l.config.Framework.DynamicClient
 		testConfig := storageframework.ConvertTestConfig(l.config)
-		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
+		dataSourceRef := prepareSnapshotDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.config, pattern, l.cs, dc, l.pvc, l.sc, sDriver, pattern.VolMode, "")
 
 		// Get the created PVC and record the actual size of the pv (from pvc status).
 		c, err := l.testCase.Client.CoreV1().PersistentVolumeClaims(l.pvc.Namespace).Get(ctx, l.pvc.Name, metav1.GetOptions{})
@@ -551,7 +551,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
+		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 		l.testCase.NodeSelection = testConfig.ClientNodeSelection
 		l.testCase.PvCheck = func(ctx context.Context, claim *v1.PersistentVolumeClaim) {
@@ -566,9 +566,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
 		}
-		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-		volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, dataSourceRef.Name, l.sourcePVC.Namespace)
-		framework.ExpectNoError(e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision))
 		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
@@ -590,7 +587,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
+		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 		l.pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{
 			v1.PersistentVolumeAccessMode(v1.ReadOnlyMany),
@@ -608,9 +605,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 			}
 			e2evolume.TestVolumeClientSlow(ctx, f, testConfig, nil, "", tests)
 		}
-		// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-		volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, dataSourceRef.Name, l.sourcePVC.Namespace)
-		framework.ExpectNoError(e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision))
 		l.testCase.TestDynamicProvisioning(ctx)
 	})
 
@@ -634,7 +628,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 		testConfig := storageframework.ConvertTestConfig(l.config)
 		expectedContent := fmt.Sprintf("Hello from namespace %s", f.Namespace.Name)
-		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
+		dataSourceRef := preparePVCDataSourceForProvisioning(ctx, f, dInfo, testConfig, l.cs, l.sourcePVC, l.sc, pattern.VolMode, expectedContent)
 		l.pvc.Spec.DataSourceRef = dataSourceRef
 
 		var wg sync.WaitGroup
@@ -662,9 +656,6 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 					}
 					e2evolume.TestVolumeClientSlow(ctx, f, myTestConfig, nil, "", tests)
 				}
-				// Cloning fails if the source disk is still in the process of detaching, so we wait for the VolumeAttachment to be removed before cloning.
-				volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, testConfig, l.testCase.Provisioner, dataSourceRef.Name, l.sourcePVC.Namespace)
-				framework.ExpectNoError(e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision))
 				t.TestDynamicProvisioning(ctx)
 			}(i)
 		}
@@ -1204,6 +1195,7 @@ func verifyPVCsPending(ctx context.Context, client clientset.Interface, pvcs []*
 func prepareSnapshotDataSourceForProvisioning(
 	ctx context.Context,
 	f *framework.Framework,
+	dInfo *storageframework.DriverInfo,
 	config e2evolume.TestConfig,
 	perTestConfig *storageframework.PerTestConfig,
 	pattern storageframework.TestPattern,
@@ -1238,7 +1230,8 @@ func prepareSnapshotDataSourceForProvisioning(
 			ExpectedContent: injectContent,
 		},
 	}
-	e2evolume.InjectContent(ctx, f, config, nil, "", tests)
+	verifyDetach := dInfo.Capabilities[storageframework.CapOfflineSnapshotClone]
+	e2evolume.InjectContent(ctx, f, config, nil, "", tests, initClaim, class.Provisioner, verifyDetach)
 
 	parameters := map[string]string{}
 	snapshotResource := storageframework.CreateSnapshotResource(ctx, sDriver, perTestConfig, pattern, initClaim.GetName(), initClaim.GetNamespace(), f.Timeouts, parameters)
@@ -1267,6 +1260,7 @@ func prepareSnapshotDataSourceForProvisioning(
 func preparePVCDataSourceForProvisioning(
 	ctx context.Context,
 	f *framework.Framework,
+	dInfo *storageframework.DriverInfo,
 	config e2evolume.TestConfig,
 	client clientset.Interface,
 	source *v1.PersistentVolumeClaim,
@@ -1293,7 +1287,8 @@ func preparePVCDataSourceForProvisioning(
 			ExpectedContent: injectContent,
 		},
 	}
-	e2evolume.InjectContent(ctx, f, config, nil, "", tests)
+	verifyDetach := dInfo.Capabilities[storageframework.CapOfflineSnapshotClone]
+	e2evolume.InjectContent(ctx, f, config, nil, "", tests, source, class.Provisioner, verifyDetach)
 
 	dataSourceRef := &v1.TypedObjectReference{
 		Kind: "PersistentVolumeClaim",

@@ -188,16 +188,16 @@ func CreateStorageServer(ctx context.Context, cs clientset.Interface, config Tes
 	return pod, ip
 }
 
-// GetVolumeAttachmentName returns the hash value of the provisioner, the config ClientNodeSelection name,
+// GetVolumeAttachmentName returns the hash value of the provisioner, the clientNodeSelectionName,
 // and the VolumeAttachment name of the PV that is bound to the PVC with the passed in claimName and claimNamespace.
-func GetVolumeAttachmentName(ctx context.Context, cs clientset.Interface, config TestConfig, provisioner string, claimName string, claimNamespace string) string {
+func GetVolumeAttachmentName(ctx context.Context, cs clientset.Interface, clientNodeSelectionName string, provisioner string, claimName string, claimNamespace string) string {
 	var nodeName string
 	// For provisioning tests, ClientNodeSelection is not set so we do not know the NodeName of the VolumeAttachment of the PV that is
 	// bound to the PVC with the passed in claimName and claimNamespace. We need this NodeName because it is used to generate the
 	// attachmentName that is returned, and used to look up a certain VolumeAttachment in WaitForVolumeAttachmentTerminated.
 	// To get the nodeName of the VolumeAttachment, we get all the VolumeAttachments, look for the VolumeAttachment with a
 	// PersistentVolumeName equal to the PV that is bound to the passed in PVC, and then we get the NodeName from that VolumeAttachment.
-	if config.ClientNodeSelection.Name == "" {
+	if clientNodeSelectionName == "" {
 		claim, _ := cs.CoreV1().PersistentVolumeClaims(claimNamespace).Get(ctx, claimName, metav1.GetOptions{})
 		pvName := claim.Spec.VolumeName
 		volumeAttachments, _ := cs.StorageV1().VolumeAttachments().List(ctx, metav1.ListOptions{})
@@ -208,7 +208,7 @@ func GetVolumeAttachmentName(ctx context.Context, cs clientset.Interface, config
 			}
 		}
 	} else {
-		nodeName = config.ClientNodeSelection.Name
+		nodeName = clientNodeSelectionName
 	}
 	handle := getVolumeHandle(ctx, cs, claimName, claimNamespace)
 	attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, provisioner, nodeName)))
@@ -573,9 +573,10 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
-// starting and auxiliary pod which writes the file there.
-// The volume must be writable.
-func InjectContent(ctx context.Context, f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+// starting and auxiliary pod which writes the file there. The volume must be writable.
+// The pod is deleted before returning.
+// The volume is fully detached before returning if verifyDetach is true.
+func InjectContent(ctx context.Context, f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, initClaim *v1.PersistentVolumeClaim, provisioner string, verifyDetach bool) {
 	privileged := true
 	timeouts := f.Timeouts
 	if framework.NodeOSDistroIs("windows") {
@@ -587,10 +588,19 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 		return
 	}
 	defer func() {
-		// This pod must get deleted before the function returns becaue the test relies on
+		var volumeAttachment string
+		if verifyDetach {
+			volumeAttachment = GetVolumeAttachmentName(ctx, f.ClientSet, config.ClientNodeSelection.Name, provisioner, initClaim.Name, initClaim.Namespace)
+		}
+		// This pod must get deleted before the function returns because the test relies on
 		// the volume not being in use.
 		e2epod.DeletePodOrFail(ctx, f.ClientSet, injectorPod.Namespace, injectorPod.Name)
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, injectorPod.Name, injectorPod.Namespace, timeouts.PodDelete))
+		// For some volume types, snapshotting / cloning will fail if the source disk is in the process of detaching,
+		// so the VolumeAttachment must also be deleted before returning.
+		if verifyDetach {
+			framework.ExpectNoError(WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision))
+		}
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")

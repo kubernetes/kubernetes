@@ -124,6 +124,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			pod                 *v1.Pod
 			claimSize           string
 			originalMntTestData string
+			dInfo               = driver.GetDriverInfo()
 		)
 		init := func(ctx context.Context) {
 			sDriver, _ = driver.(storageframework.SnapshottableTestDriver)
@@ -324,6 +325,15 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				})
 				if !success {
 					framework.Failf("timed out waiting for node=%s to not use the volume=%s", nodeName, volumeName)
+				}
+				// For some volume types, snapshotting fails if the source disk is still in the process of detaching, so wait for the VolumeAttachment
+				// to be removed before snapshotting.
+				verifyDetach := dInfo.Capabilities[storageframework.CapOfflineSnapshotClone]
+				if verifyDetach {
+					volumeAttachment := e2evolume.GetVolumeAttachmentName(ctx, f.ClientSet, config.ClientNodeSelection.Name, sc.Provisioner, pvc.Name, pvc.Namespace)
+					framework.Logf("found VolumeAttachment %q for initClaim %q/%q", volumeAttachment, pvc.Namespace, pvc.Name)
+					framework.ExpectNoError(e2evolume.WaitForVolumeAttachmentTerminated(ctx, volumeAttachment, f.ClientSet, f.Timeouts.DataSourceProvision))
+					framework.Logf("VolumeAttachment %q for initClaim %q/%q, is terminated", volumeAttachment, pvc.Namespace, pvc.Name)
 				}
 
 				// Take the snapshot.

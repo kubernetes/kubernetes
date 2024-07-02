@@ -178,7 +178,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		e2evolume.InjectContent(ctx, f, config, fsGroup, pattern.FsType, tests)
+		e2evolume.InjectContent(ctx, f, config, fsGroup, pattern.FsType, tests, nil, "", false /* verifyDetach */)
 		if driver.GetDriverInfo().Capabilities[storageframework.CapPersistence] {
 			e2evolume.TestVolumeClient(ctx, f, config, fsGroup, pattern.FsType, tests)
 		} else {
