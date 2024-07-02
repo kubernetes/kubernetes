@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
@@ -2088,31 +2086,29 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
-				var err error
-				kflags := KeepFlags{
-					Labels:         tc.opts.KeepLabels,
-					Annotations:    tc.opts.KeepAnnotations,
-					Liveness:       tc.opts.KeepLiveness,
-					Readiness:      tc.opts.KeepReadiness,
-					Startup:        tc.opts.KeepStartup,
-					InitContainers: tc.opts.KeepInitContainers,
-				}
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
-				if err != nil {
-					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
-				}
-				tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
+			var err error
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
+			}
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
+			if err != nil {
+				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
+			}
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 
-				pod, err := tc.opts.generateNodeDebugPod(tc.node)
-				if err != nil {
-					t.Fatalf("Fail to generate node debug pod: %v", err)
-				}
-				tc.expected.Name = pod.Name
-				if diff := cmp.Diff(tc.expected, pod); diff != "" {
-					t.Error("unexpected diff in generated object: (-want +got):\n", diff)
-				}
-			})
+			pod, err := tc.opts.generateNodeDebugPod(tc.node)
+			if err != nil {
+				t.Fatalf("Fail to generate node debug pod: %v", err)
+			}
+			tc.expected.Name = pod.Name
+			if diff := cmp.Diff(tc.expected, pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
 		})
 	}
 }
@@ -2296,31 +2292,29 @@ func TestGenerateCopyDebugPodCustomProfile(t *testing.T) {
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
-				var err error
-				kflags := KeepFlags{
-					Labels:         tc.opts.KeepLabels,
-					Annotations:    tc.opts.KeepAnnotations,
-					Liveness:       tc.opts.KeepLiveness,
-					Readiness:      tc.opts.KeepReadiness,
-					Startup:        tc.opts.KeepStartup,
-					InitContainers: tc.opts.KeepInitContainers,
-				}
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
-				if err != nil {
-					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
-				}
-				tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
+			var err error
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
+			}
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
+			if err != nil {
+				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
+			}
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 
-				pod, dc, err := tc.opts.generatePodCopyWithDebugContainer(tc.copyPod)
-				if err != nil {
-					t.Fatalf("Fail to generate node debug pod: %v", err)
-				}
-				tc.expected.Spec.Containers[0].Name = dc
-				if diff := cmp.Diff(tc.expected, pod); diff != "" {
-					t.Error("unexpected diff in generated object: (-want +got):\n", diff)
-				}
-			})
+			pod, dc, err := tc.opts.generatePodCopyWithDebugContainer(tc.copyPod)
+			if err != nil {
+				t.Fatalf("Fail to generate node debug pod: %v", err)
+			}
+			tc.expected.Spec.Containers[0].Name = dc
+			if diff := cmp.Diff(tc.expected, pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
 		})
 	}
 }
@@ -2510,31 +2504,29 @@ func TestGenerateEphemeralDebugPodCustomProfile(t *testing.T) {
 	} {
 
 		t.Run(tc.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.DebugCustomProfile}, t, func(t *testing.T) {
-				var err error
-				kflags := KeepFlags{
-					Labels:         tc.opts.KeepLabels,
-					Annotations:    tc.opts.KeepAnnotations,
-					Liveness:       tc.opts.KeepLiveness,
-					Readiness:      tc.opts.KeepReadiness,
-					Startup:        tc.opts.KeepStartup,
-					InitContainers: tc.opts.KeepInitContainers,
-				}
-				tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
-				if err != nil {
-					t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
-				}
-				tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
+			var err error
+			kflags := KeepFlags{
+				Labels:         tc.opts.KeepLabels,
+				Annotations:    tc.opts.KeepAnnotations,
+				Liveness:       tc.opts.KeepLiveness,
+				Readiness:      tc.opts.KeepReadiness,
+				Startup:        tc.opts.KeepStartup,
+				InitContainers: tc.opts.KeepInitContainers,
+			}
+			tc.opts.Applier, err = NewProfileApplier(tc.opts.Profile, kflags)
+			if err != nil {
+				t.Fatalf("Fail to create profile applier: %s: %v", tc.opts.Profile, err)
+			}
+			tc.opts.IOStreams = genericiooptions.NewTestIOStreamsDiscard()
 
-				pod, ec, err := tc.opts.generateDebugContainer(tc.copyPod)
-				if err != nil {
-					t.Fatalf("Fail to generate node debug pod: %v", err)
-				}
-				tc.expected.Spec.EphemeralContainers[0].Name = ec.Name
-				if diff := cmp.Diff(tc.expected, pod); diff != "" {
-					t.Error("unexpected diff in generated object: (-want +got):\n", diff)
-				}
-			})
+			pod, ec, err := tc.opts.generateDebugContainer(tc.copyPod)
+			if err != nil {
+				t.Fatalf("Fail to generate node debug pod: %v", err)
+			}
+			tc.expected.Spec.EphemeralContainers[0].Name = ec.Name
+			if diff := cmp.Diff(tc.expected, pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
 		})
 	}
 }
