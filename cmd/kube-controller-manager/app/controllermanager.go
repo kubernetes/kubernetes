@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -297,8 +298,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		leaseCandidate := &leaderelection.LeaseCandidate{
 			LeaseClient:            c.Client.CoordinationV1alpha1().LeaseCandidates("kube-system"),
 			LeaseCandidateInformer: kubeInformerFactory.Coordination().V1alpha1().LeaseCandidates(),
-			LeaseName:              id,            // TODO: safely append uids
-			LeaseNamespace:         "kube-system", // TODO: put this in kube-system once RBAC is set up for that
+			LeaseName:              strings.Replace(id, "_", "-", -1), // TODO: Hack until addon manager PR is merged
+			LeaseNamespace:         "kube-system",                     // TODO: put this in kube-system once RBAC is set up for that
 			LeaseDurationSeconds:   10,
 			Clock:                  clock.RealClock{},
 			TargetLease:            "kube-controller-manager", // TODO: wire this in. It must be comma separated namespace/name pairs.
@@ -310,7 +311,7 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	// Start the main lock
-	go leaderElectAndRun(ctx, c, id, electionChecker,
+	go leaderElectAndRun(ctx, c, strings.Replace(id, "_", "-", -1), electionChecker,
 		c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		leaderelection.LeaderCallbacks{
