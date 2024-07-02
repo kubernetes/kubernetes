@@ -275,7 +275,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 4, len(pods))
+	assert.Len(t, pods, 4)
 	indexPods := make(map[statsapi.PodReference]statsapi.PodStats, len(pods))
 	for _, pod := range pods {
 		indexPods[pod.PodRef] = pod
@@ -448,7 +448,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	pods, err := p.ListPodCPUAndMemoryStats(ctx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 3, len(pods))
+	assert.Len(t, pods, 3)
 	indexPods := make(map[statsapi.PodReference]statsapi.PodStats, len(pods))
 	for _, pod := range pods {
 		indexPods[pod.PodRef] = pod
@@ -742,7 +742,7 @@ func TestCadvisorListPodStatsWhenContainerLogFound(t *testing.T) {
 	pods, err := p.ListPodStats(ctx)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, len(pods))
+	assert.Len(t, pods, 1)
 	// Validate Pod0 Results
 	checkEphemeralStats(t, "Pod0", []int{seedPod0Container0, seedPod0Container1}, nil, fakeStatsSlice, pods[0].EphemeralStorage)
 }

@@ -1283,7 +1283,7 @@ func TestFastStatusUpdateOnce(t *testing.T) {
 
 			actions := kubeClient.Actions()
 			if tc.wantPatches == 0 {
-				require.Len(t, actions, 0)
+				require.Empty(t, actions)
 				return
 			}
 

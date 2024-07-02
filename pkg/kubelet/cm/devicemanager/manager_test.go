@@ -365,7 +365,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.True(ok)
 	as.Equal(int64(3), resource1Capacity.Value())
 	as.Equal(int64(2), resource1Allocatable.Value())
-	as.Equal(0, len(removedResources))
+	as.Empty(removedResources)
 
 	// Deletes an unhealthy device should NOT change allocatable but change capacity.
 	devs1 := devs[:len(devs)-1]
@@ -377,7 +377,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.True(ok)
 	as.Equal(int64(2), resource1Capacity.Value())
 	as.Equal(int64(2), resource1Allocatable.Value())
-	as.Equal(0, len(removedResources))
+	as.Empty(removedResources)
 
 	// Updates a healthy device to unhealthy should reduce allocatable by 1.
 	devs[1].Health = pluginapi.Unhealthy
@@ -389,7 +389,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.True(ok)
 	as.Equal(int64(3), resource1Capacity.Value())
 	as.Equal(int64(1), resource1Allocatable.Value())
-	as.Equal(0, len(removedResources))
+	as.Empty(removedResources)
 
 	// Deletes a healthy device should reduce capacity and allocatable by 1.
 	devs2 := devs[1:]
@@ -401,7 +401,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.True(ok)
 	as.Equal(int64(0), resource1Allocatable.Value())
 	as.Equal(int64(2), resource1Capacity.Value())
-	as.Equal(0, len(removedResources))
+	as.Empty(removedResources)
 
 	// Tests adding another resource.
 	resourceName2 := "resource2"
@@ -410,14 +410,14 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
 	callback(resourceName2, devs)
 	capacity, allocatable, removedResources = testManager.GetCapacity()
-	as.Equal(2, len(capacity))
+	as.Len(capacity, 2)
 	resource2Capacity, ok := capacity[v1.ResourceName(resourceName2)]
 	as.True(ok)
 	resource2Allocatable, ok := allocatable[v1.ResourceName(resourceName2)]
 	as.True(ok)
 	as.Equal(int64(3), resource2Capacity.Value())
 	as.Equal(int64(1), resource2Allocatable.Value())
-	as.Equal(0, len(removedResources))
+	as.Empty(removedResources)
 
 	// Expires resourceName1 endpoint. Verifies testManager.GetCapacity() reports that resourceName1
 	// is removed from capacity and it no longer exists in healthyDevices after the call.
@@ -432,7 +432,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.NotContains(testManager.healthyDevices, resourceName1)
 	as.NotContains(testManager.unhealthyDevices, resourceName1)
 	as.NotContains(testManager.endpoints, resourceName1)
-	as.Equal(1, len(testManager.endpoints))
+	as.Len(testManager.endpoints, 1)
 
 	// Stops resourceName2 endpoint. Verifies its stopTime is set, allocate and
 	// preStartContainer calls return errors.
@@ -464,7 +464,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	testManager.unhealthyDevices = make(map[string]sets.Set[string])
 	err = testManager.readCheckpoint()
 	as.Nil(err)
-	as.Equal(1, len(testManager.endpoints))
+	as.Len(testManager.endpoints, 1)
 	as.Contains(testManager.endpoints, resourceName2)
 	capacity, allocatable, removed = testManager.GetCapacity()
 	val, ok = capacity[v1.ResourceName(resourceName2)]
@@ -506,7 +506,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	testManager.genericDeviceUpdateCallback(resourceName2, resource2Devs)
 
 	allocatableDevs := testManager.GetAllocatableDevices()
-	as.Equal(2, len(allocatableDevs))
+	as.Len(allocatableDevs, 2)
 
 	devInstances1, ok := allocatableDevs[resourceName1]
 	as.True(ok)
@@ -543,7 +543,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
 
 	allocatableDevs := testManager.GetAllocatableDevices()
-	as.Equal(1, len(allocatableDevs))
+	as.Len(allocatableDevs, 1)
 	devInstances, ok := allocatableDevs[resourceName1]
 	as.True(ok)
 	checkAllocatableDevicesConsistsOf(as, devInstances, []string{"R1Device1", "R1Device2"})
@@ -557,7 +557,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
 
 	allocatableDevs = testManager.GetAllocatableDevices()
-	as.Equal(1, len(allocatableDevs))
+	as.Len(allocatableDevs, 1)
 	devInstances, ok = allocatableDevs[resourceName1]
 	as.True(ok)
 	checkAllocatableDevicesConsistsOf(as, devInstances, []string{"R1Device1", "R1Device2", "R1Device3"})
@@ -1293,9 +1293,9 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	// when pod is in activePods, GetDeviceRunContainerOptions should return
 	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
 	as.Nil(err)
-	as.Equal(len(runContainerOpts.Devices), 3)
-	as.Equal(len(runContainerOpts.Mounts), 2)
-	as.Equal(len(runContainerOpts.Envs), 2)
+	as.Len(runContainerOpts.Devices, 3)
+	as.Len(runContainerOpts.Mounts, 2)
+	as.Len(runContainerOpts.Envs, 2)
 
 	activePods = []*v1.Pod{pod2}
 	podsStub.updateActivePods(activePods)
@@ -1643,7 +1643,7 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"})
 	as.Nil(err)
-	as.Equal(1, len(expectedResps.ContainerResponses))
+	as.Len(expectedResps.ContainerResponses, 1)
 	expectedResp := expectedResps.ContainerResponses[0]
 	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
 	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))

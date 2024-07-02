@@ -107,11 +107,11 @@ func TestShrink(t *testing.T) {
 		verifyPop(t, i, true, &queue)
 	}
 	require.Equal(t, 0, queue.Len())
-	require.Equal(t, normalSize, len(queue.elements))
+	require.Len(t, queue.elements, normalSize)
 
 	// Still usable after shrinking?
 	queue.Push(42)
 	verifyPop(t, 42, true, &queue)
 	require.Equal(t, 0, queue.Len())
-	require.Equal(t, normalSize, len(queue.elements))
+	require.Len(t, queue.elements, normalSize)
 }

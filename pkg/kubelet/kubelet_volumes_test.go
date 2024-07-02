@@ -471,7 +471,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
 
-	assert.Len(t, podVolumes, 0,
+	assert.Empty(t, podVolumes,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
 
 	assert.NoError(t, volumetest.VerifyTearDownCallCount(
@@ -667,7 +667,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		util.GetUniquePodName(pod))
 	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
-	assert.Len(t, podVolumes, 0,
+	assert.Empty(t, podVolumes,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
 
 	assert.NoError(t, volumetest.VerifyTearDownCallCount(

@@ -1990,7 +1990,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
-			assert.Len(t, pod.Annotations, 0)
+			assert.Empty(t, pod.Annotations)
 		},
 	}, {
 		description: "Container security context not nil",
@@ -2003,7 +2003,7 @@ func TestApplyAppArmorVersionSkew(t *testing.T) {
 			},
 		},
 		validation: func(t *testing.T, pod *api.Pod) {
-			assert.Len(t, pod.Annotations, 0)
+			assert.Empty(t, pod.Annotations)
 		},
 	}, {
 		description: "Container field RuntimeDefault and no annotation present",

@@ -43,7 +43,7 @@ func TestPullImage(t *testing.T) {
 
 	images, err := fakeManager.ListImages(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(images))
+	assert.Len(t, images, 1)
 	assert.Equal(t, images[0].RepoTags, []string{"busybox"})
 }
 
@@ -64,7 +64,7 @@ func TestPullImageWithError(t *testing.T) {
 
 	images, err := fakeManager.ListImages(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(images))
+	assert.Empty(t, images)
 }
 
 func TestPullImageWithInvalidImageName(t *testing.T) {
@@ -198,11 +198,11 @@ func TestRemoveImage(t *testing.T) {
 
 	_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(fakeImageService.Images))
+	assert.Len(t, fakeImageService.Images, 1)
 
 	err = fakeManager.RemoveImage(ctx, kubecontainer.ImageSpec{Image: "busybox"})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(fakeImageService.Images))
+	assert.Empty(t, fakeImageService.Images)
 }
 
 func TestRemoveImageNoOpIfImageNotLocal(t *testing.T) {
@@ -221,13 +221,13 @@ func TestRemoveImageWithError(t *testing.T) {
 
 	_, err = fakeManager.PullImage(ctx, kubecontainer.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(fakeImageService.Images))
+	assert.Len(t, fakeImageService.Images, 1)
 
 	fakeImageService.InjectError("RemoveImage", fmt.Errorf("test-failure"))
 
 	err = fakeManager.RemoveImage(ctx, kubecontainer.ImageSpec{Image: "busybox"})
 	assert.Error(t, err)
-	assert.Equal(t, 1, len(fakeImageService.Images))
+	assert.Len(t, fakeImageService.Images, 1)
 }
 
 func TestImageStats(t *testing.T) {
@@ -381,7 +381,7 @@ func TestPullWithSecretsWithError(t *testing.T) {
 
 			images, err := fakeManager.ListImages(ctx)
 			assert.NoError(t, err)
-			assert.Equal(t, 0, len(images))
+			assert.Empty(t, images)
 		})
 	}
 }
@@ -403,6 +403,6 @@ func TestPullThenListWithAnnotations(t *testing.T) {
 
 	images, err := fakeManager.ListImages(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(images))
+	assert.Len(t, images, 1)
 	assert.Equal(t, images[0].Spec, imageSpec)
 }
