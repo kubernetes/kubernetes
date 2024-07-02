@@ -3154,6 +3154,16 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		},
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
+	desiredStateWithInitContainer := v1.PodSpec{
+		NodeName: "machine",
+		InitContainers: []v1.Container{
+			{Name: "init-1"},
+		},
+		Containers: []v1.Container{
+			{Name: "containerA"},
+		},
+		RestartPolicy: v1.RestartPolicyAlways,
+	}
 	now := metav1.Now()
 
 	tests := []struct {
@@ -3214,6 +3224,41 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				waitingWithLastTerminationUnknown("containerA", 1),
 				waitingWithLastTerminationUnknown("containerB", 1),
 			},
+		},
+		{
+			name: "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+			pod: &v1.Pod{
+				Spec: desiredStateWithInitContainer,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{
+				ContainerStatuses: []*kubecontainer.Status{
+					{
+						ID:        kubecontainer.ContainerID{ID: "foo"},
+						Name:      "containerA",
+						StartedAt: time.Unix(1, 0).UTC(),
+						State:     kubecontainer.ContainerStateRunning,
+					},
+				},
+			},
+			previousStatus: []v1.ContainerStatus{},
+			containers:     desiredStateWithInitContainer.InitContainers,
+			expected: []v1.ContainerStatus{
+				{
+					Name: "init-1",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							Reason:   "Completed",
+							Message:  "Unable to get init container status from container runtime and pod has been initialized, treat it as exited normally",
+							ExitCode: 0,
+						},
+					},
+				},
+			},
+			hasInitContainers: true,
+			isInitContainer:   true,
 		},
 	}
 	for _, test := range tests {

@@ -978,6 +978,19 @@ func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStat
 	return false
 }
 
+// IsPodInitialized return true if pod has initialized
+func IsPodInitialized(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	hasInitialized := false
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
+	} else {
+		// If there is any regular container, it means all init containers have
+		// been initialized.
+		hasInitialized = hasAnyRegularContainerCreated(pod, podStatus)
+	}
+	return hasInitialized
+}
+
 // computeInitContainerActions sets the actions on the given changes that need
 // to be taken for the init containers. This includes actions to initialize the
 // init containers and actions to keep restartable init containers running.
