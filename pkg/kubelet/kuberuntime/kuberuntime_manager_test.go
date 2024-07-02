@@ -1969,6 +1969,33 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 				EphemeralContainersToStart: []int{0},
 			},
 		},
+		"Ephemeral container status not found in PodStatus(cri runtime) but existed in pod.status; leave it alone": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Status.EphemeralContainerStatuses = []v1.ContainerStatus{{Name: "debug"}} },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:4]
+			},
+			actions: noAction,
+		},
+		"First ephemeral container status not found in PodStatus(cri runtime) but existed in pod.status, add second ephemeral container; start second": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Status.EphemeralContainerStatuses = []v1.ContainerStatus{{Name: "debug"}}
+				pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, v1.EphemeralContainer{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:  "debug2",
+						Image: "busybox",
+					},
+				})
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = status.ContainerStatuses[:4]
+			},
+			actions: podActions{
+				SandboxID:                  baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart:          []int{},
+				ContainersToKill:           map[kubecontainer.ContainerID]containerToKillInfo{},
+				EphemeralContainersToStart: []int{1},
+			},
+		},
 		"Create a new pod sandbox if the pod sandbox is dead, init container failed and RestartPolicy == OnFailure": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
