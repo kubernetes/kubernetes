@@ -57,7 +57,8 @@ func TestLoadExecCredential(t *testing.T) {
 						CertificateAuthorityData: []byte("some-ca-data"),
 						ProxyURL:                 "https://some-proxy-url:12345",
 						Config: runtime.RawExtension{
-							Raw: []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							Raw:         []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							ContentType: runtime.ContentTypeJSON,
 						},
 					},
 				},
@@ -75,7 +76,8 @@ func TestLoadExecCredential(t *testing.T) {
 						CertificateAuthorityData: []byte("some-ca-data"),
 						ProxyURL:                 "https://some-proxy-url:12345",
 						Config: runtime.RawExtension{
-							Raw: []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							Raw:         []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							ContentType: runtime.ContentTypeJSON,
 						},
 					},
 				},
@@ -101,7 +103,8 @@ func TestLoadExecCredential(t *testing.T) {
 						CertificateAuthorityData: []byte("some-ca-data"),
 						ProxyURL:                 "https://some-proxy-url:12345",
 						Config: runtime.RawExtension{
-							Raw: []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							Raw:         []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							ContentType: runtime.ContentTypeJSON,
 						},
 					},
 				},
@@ -119,7 +122,8 @@ func TestLoadExecCredential(t *testing.T) {
 						CertificateAuthorityData: []byte("some-ca-data"),
 						ProxyURL:                 "https://some-proxy-url:12345",
 						Config: runtime.RawExtension{
-							Raw: []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							Raw:         []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"names":["marshmallow","zelda"]}}`),
+							ContentType: runtime.ContentTypeJSON,
 						},
 					},
 				},

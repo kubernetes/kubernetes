@@ -76,8 +76,6 @@ option go_package = "k8s.io/apimachinery/pkg/runtime";
 // +k8s:openapi-gen=true
 message RawExtension {
   // Raw is the underlying serialization of this object.
-  //
-  // TODO: Determine how to detect ContentType and ContentEncoding of 'Raw' data.
   optional bytes raw = 1;
 }
 
