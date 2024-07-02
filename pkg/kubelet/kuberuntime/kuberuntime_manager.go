@@ -712,7 +712,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			}
 		}
 		if newPodCgLimValue < currPodCgLimValue {
-			err = setPodCgroupConfig(rName, true)
+			if err = setPodCgroupConfig(rName, true); err != nil {
+				return err
+			}
 		}
 		if newPodCgReqValue < currPodCgReqValue {
 			if err = setPodCgroupConfig(rName, false); err != nil {
