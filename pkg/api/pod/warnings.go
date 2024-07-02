@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,6 +31,11 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/pods"
 	"k8s.io/kubernetes/pkg/features"
+)
+
+var (
+	// minimum memory value, reference: https://github.com/moby/moby/blob/cd08d377c5e0348984d1f46d196337d895ec47ad/daemon/daemon_unix.go#L67-L68
+	minMemory = resource.NewQuantity(6*1024*1024, resource.BinarySI) // 6Mi
 )
 
 func GetWarningsForPod(ctx context.Context, pod, oldPod *api.Pod) []string {
@@ -242,6 +248,12 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 		if value, ok := c.Resources.Requests[api.ResourceMemory]; ok && value.MilliValue()%int64(1000) != int64(0) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "requests").Key(string(api.ResourceMemory)), value.String()))
+		}
+		if value, ok := c.Resources.Limits[api.ResourceMemory]; ok && value.MilliValue() < minMemory.MilliValue() {
+			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be at least %s to supply a reasonable functional container", p.Child("resources", "limits").Key(string(api.ResourceMemory)), value.String(), minMemory.String()))
+		}
+		if value, ok := c.Resources.Requests[api.ResourceMemory]; ok && value.MilliValue() < minMemory.MilliValue() {
+			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be at least %s to supply a reasonable functional container", p.Child("resources", "requests").Key(string(api.ResourceMemory)), value.String(), minMemory.String()))
 		}
 		if value, ok := c.Resources.Limits[api.ResourceEphemeralStorage]; ok && value.MilliValue()%int64(1000) != int64(0) {
 			warnings = append(warnings, fmt.Sprintf("%s: fractional byte value %q is invalid, must be an integer", p.Child("resources", "limits").Key(string(api.ResourceEphemeralStorage)), value.String()))
