@@ -846,13 +846,11 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
 
-	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
-		result[evictionapi.SignalMemoryAvailable] = signalObservation{
-			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
-			time:      memory.Time,
-		}
+	memoryAvailableSignal := makeMemoryAvailableSignalObservation(summary)
+	if memoryAvailableSignal != nil {
+		result[evictionapi.SignalMemoryAvailable] = *memoryAvailableSignal
 	}
+
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
 		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
 	} else {

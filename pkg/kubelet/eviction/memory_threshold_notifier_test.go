@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -58,8 +61,8 @@ func nodeSummary(available, workingSet, usage resource.Quantity, allocatable boo
 	}
 }
 
-func newTestMemoryThresholdNotifier(threshold evictionapi.Threshold, factory NotifierFactory, handler func(string)) *memoryThresholdNotifier {
-	return &memoryThresholdNotifier{
+func newTestMemoryThresholdNotifier(threshold evictionapi.Threshold, factory NotifierFactory, handler func(string)) *linuxMemoryThresholdNotifier {
+	return &linuxMemoryThresholdNotifier{
 		threshold:  threshold,
 		cgroupPath: testCgroupPath,
 		events:     make(chan struct{}),
@@ -245,7 +248,7 @@ func TestThresholdDescription(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			m := &memoryThresholdNotifier{
+			m := &linuxMemoryThresholdNotifier{
 				notifier:   &MockCgroupNotifier{},
 				threshold:  tc.evictionThreshold,
 				cgroupPath: testCgroupPath,
