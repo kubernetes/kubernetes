@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,9 +41,11 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/logs"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -82,17 +85,120 @@ func TestRemoveContainer(t *testing.T) {
 	expectedContainerLogPath := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log")
 	expectedContainerLogPathRotated := filepath.Join(podLogsDirectory, "new_bar_12345678", "foo", "0.log.20060102-150405")
 	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
+	resp, err := m.runtimeService.ContainerStatus(ctx, containerID, false)
+	require.NoError(t, err)
+	status := resp.Status
+	mounts := status.GetMounts()
+	var terminationLogName string
+	for _, mount := range mounts {
+		if mount.GetContainerPath() == v1.TerminationMessagePathDefault {
+			terminationLogName = filepath.Base(mount.GetHostPath())
+			break
+		}
+	}
 
+	const defaultRootDir = "/var/lib/kubelet"
+	expectedTerminationLogPath := filepath.Join(defaultRootDir,
+		config.DefaultKubeletPodsDirName,
+		"12345678",
+		config.DefaultKubeletContainersDirName,
+		"foo",
+		terminationLogName)
+
+	fakeOS.Create(expectedTerminationLogPath)
 	fakeOS.Create(expectedContainerLogPath)
 	fakeOS.Create(expectedContainerLogPathRotated)
 
-	err = m.removeContainer(ctx, containerID)
+	err = m.DeleteContainer(ctx, kubecontainer.ContainerID{ID: containerID})
 	assert.NoError(t, err)
 
 	// Verify container log is removed.
 	// We could not predict the order of `fakeOS.Removes`, so we use `assert.ElementsMatch` here.
 	assert.ElementsMatch(t,
-		[]string{expectedContainerLogSymlink, expectedContainerLogPath, expectedContainerLogPathRotated},
+		[]string{expectedContainerLogSymlink, expectedContainerLogPath, expectedContainerLogPathRotated, expectedTerminationLogPath},
+		fakeOS.Removes)
+	// Verify container is removed
+	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
+	containers, err := fakeRuntime.ListContainers(ctx, &runtimeapi.ContainerFilter{Id: containerID})
+	assert.NoError(t, err)
+	assert.Empty(t, containers)
+}
+
+// To make removeContainerLog fail deliberately
+type NewFakeOS struct {
+	containertest.FakeOS
+}
+
+func (f *NewFakeOS) Glob(pattern string) ([]string, error) {
+	return nil, errors.New("There is an error.")
+}
+
+// TestRemoveContainer tests removing the container and its corresponding container logs.
+func TestRemoveLogFail(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
+	}
+
+	// Create fake sandbox and container
+	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	assert.Equal(t, len(fakeContainers), 1)
+
+	containerID := fakeContainers[0].Id
+	fakeOS := m.osInterface.(*containertest.FakeOS)
+	fakeOS.GlobFn = func(pattern, path string) bool {
+		pattern = strings.Replace(pattern, "*", ".*", -1)
+		return regexp.MustCompile(pattern).MatchString(path)
+	}
+
+	ctx := context.Background()
+	resp, err := m.runtimeService.ContainerStatus(ctx, containerID, false)
+	require.NoError(t, err)
+	status := resp.Status
+	mounts := status.GetMounts()
+	var terminationLogName string
+	for _, mount := range mounts {
+		if mount.GetContainerPath() == v1.TerminationMessagePathDefault {
+			terminationLogName = filepath.Base(mount.GetHostPath())
+			break
+		}
+	}
+
+	const defaultRootDir = "/var/lib/kubelet"
+	expectedTerminationLogPath := filepath.Join(defaultRootDir,
+		config.DefaultKubeletPodsDirName,
+		"12345678",
+		config.DefaultKubeletContainersDirName,
+		"foo",
+		terminationLogName)
+
+	fakeOS.Create(expectedTerminationLogPath)
+
+	// use NewFakeOS to make removeContainerLog fail deliberately
+	m.logManager, err = logs.NewContainerLogManager(fakeRuntime, &NewFakeOS{}, "1", 2)
+	assert.NoError(t, err)
+
+	err = m.DeleteContainer(ctx, kubecontainer.ContainerID{ID: containerID})
+	// DeleteContainer do report failure information
+	assert.Error(t, err)
+
+	// Verify termination log is removed.
+	assert.ElementsMatch(t,
+		[]string{expectedTerminationLogPath},
 		fakeOS.Removes)
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
