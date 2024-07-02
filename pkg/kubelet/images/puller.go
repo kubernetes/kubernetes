@@ -18,6 +18,9 @@ package images
 
 import (
 	"context"
+	"sort"
+	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,7 +37,7 @@ type pullResult struct {
 }
 
 type imagePuller interface {
-	pullImage(context.Context, kubecontainer.ImageSpec, []v1.Secret, chan<- pullResult, *runtimeapi.PodSandboxConfig)
+	pullImage(context.Context, kubecontainer.ImageSpec, []v1.Secret, chan pullResult, *runtimeapi.PodSandboxConfig, v1.PullPolicy)
 }
 
 var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
@@ -42,21 +45,81 @@ var _, _ imagePuller = &parallelImagePuller{}, &serialImagePuller{}
 type parallelImagePuller struct {
 	imageService kubecontainer.ImageService
 	tokens       chan struct{}
+	pulls        sync.Map
+}
+
+type pullBroker struct {
+	subscribers sync.Map
+}
+
+func (p *pullBroker) subscribe(ch chan pullResult) {
+	p.subscribers.Store(ch, struct{}{})
+}
+
+func (p *pullBroker) publish(res pullResult) {
+	p.subscribers.Range(func(k, v any) bool {
+		ch, ok := k.(chan pullResult)
+		if !ok {
+			return false
+		}
+
+		select {
+		case ch <- res:
+		default:
+		}
+
+		return true
+	})
 }
 
 func newParallelImagePuller(imageService kubecontainer.ImageService, maxParallelImagePulls *int32) imagePuller {
 	if maxParallelImagePulls == nil || *maxParallelImagePulls < 1 {
-		return &parallelImagePuller{imageService, nil}
+		return &parallelImagePuller{imageService, nil, sync.Map{}}
 	}
-	return &parallelImagePuller{imageService, make(chan struct{}, *maxParallelImagePulls)}
+	return &parallelImagePuller{imageService, make(chan struct{}, *maxParallelImagePulls), sync.Map{}}
 }
 
-func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func pullKey(spec kubecontainer.ImageSpec) string {
+	res := []string{}
+	for _, annotation := range spec.Annotations {
+		res = append(res, annotation.Name+"-"+annotation.Value)
+	}
+	sort.Strings(res)
+	if spec.RuntimeHandler != "" {
+		res = append([]string{spec.RuntimeHandler}, res...)
+	}
+	if spec.Image != "" {
+		res = append([]string{spec.Image}, res...)
+	}
+	return strings.Join(res, "-")
+}
+
+func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, pullPolicy v1.PullPolicy) {
 	go func() {
+		key := pullKey(spec)
+
+		// Create a new pull broker.
+		value, loaded := pip.pulls.LoadOrStore(key, &pullBroker{})
+		broker, ok := value.(*pullBroker)
+		if !ok {
+			// should be unreachable
+			return
+		}
+
+		// Reuse existing pull broker if available. A pull policy of 'Always'
+		// will result in calling CRI's PullImage every time.
+		if pullPolicy != v1.PullAlways && loaded {
+			broker.subscribe(pullChan)
+			return
+		}
+
 		if pip.tokens != nil {
 			pip.tokens <- struct{}{}
 			defer func() { <-pip.tokens }()
 		}
+
+		broker.subscribe(pullChan)
+
 		startTime := time.Now()
 		imageRef, err := pip.imageService.PullImage(ctx, spec, pullSecrets, podSandboxConfig)
 		var size uint64
@@ -64,12 +127,15 @@ func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontaine
 			// Getting the image size with best effort, ignoring the error.
 			size, _ = pip.imageService.GetImageSize(ctx, spec)
 		}
-		pullChan <- pullResult{
+
+		broker.publish(pullResult{
 			imageRef:     imageRef,
 			imageSize:    size,
 			err:          err,
 			pullDuration: time.Since(startTime),
-		}
+		})
+
+		pip.pulls.Delete(key)
 	}()
 }
 
@@ -95,7 +161,7 @@ type imagePullRequest struct {
 	podSandboxConfig *runtimeapi.PodSandboxConfig
 }
 
-func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
+func (sip *serialImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, pullSecrets []v1.Secret, pullChan chan pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig, pullPolicy v1.PullPolicy) {
 	sip.pullRequests <- &imagePullRequest{
 		ctx:              ctx,
 		spec:             spec,

@@ -68,7 +68,9 @@ type FakeRuntime struct {
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
-	T                    TB
+	// Delay the image pulls by a certain amount of time.
+	DelayImagePulls time.Duration
+	T               TB
 }
 
 const FakeHost = "localhost:12345"
@@ -310,6 +312,9 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 
 func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	f.Lock()
+	if f.DelayImagePulls != 0 {
+		time.Sleep(f.DelayImagePulls)
+	}
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
 	if f.Err == nil {
 		i := kubecontainer.Image{
