@@ -35,6 +35,7 @@ import (
 	openapiv3controller "k8s.io/apiextensions-apiserver/pkg/controller/openapiv3"
 	"k8s.io/apiextensions-apiserver/pkg/controller/status"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
+	"k8s.io/apiextensions-apiserver/pkg/storageversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,11 +43,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	"k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+)
+
+const (
+	storageversionUpdateWorkers = 5
 )
 
 var (
@@ -107,6 +116,8 @@ type CustomResourceDefinitions struct {
 
 	// provided for easier embedding
 	Informers externalinformers.SharedInformerFactory
+
+	StorageVersionInformers informers.SharedInformerFactory
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -167,6 +178,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 	s.Informers = externalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
+	kubeclientset, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset for storage versions: %w", err)
+	}
+	s.StorageVersionInformers = informers.NewSharedInformerFactory(kubeclientset, time.Second)
+
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
 		delegateHandler = http.NotFoundHandler()
@@ -181,10 +198,20 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		delegate:  delegateHandler,
 	}
 	establishingController := establish.NewEstablishingController(s.Informers.Apiextensions().V1().CustomResourceDefinitions(), crdClient.ApiextensionsV1())
+
+	crdInformer := s.Informers.Apiextensions().V1().CustomResourceDefinitions()
+
+	var storageVersionManager *storageversion.Manager
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+		sc := kubeclientset.InternalV1alpha1().StorageVersions()
+		storageVersionManager = storageversion.NewManager(sc, c.GenericConfig.APIServerID, crdInformer)
+	}
+
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
-		s.Informers.Apiextensions().V1().CustomResourceDefinitions(),
+		crdInformer,
 		delegateHandler,
 		c.ExtraConfig.CRDRESTOptionsGetter,
 		c.GenericConfig.AdmissionControl,
@@ -197,6 +224,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		time.Duration(c.GenericConfig.MinRequestTimeout)*time.Second,
 		apiGroupInfo.StaticOpenAPISpec,
 		c.GenericConfig.MaxRequestBodyBytes,
+		storageVersionManager,
 	)
 	if err != nil {
 		return nil, err
@@ -221,6 +249,10 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
 		s.Informers.Start(context.StopCh)
+		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+			s.StorageVersionInformers.Start(context.StopCh)
+		}
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
@@ -245,6 +277,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go nonStructuralSchemaController.Run(5, context.StopCh)
 		go apiApprovalController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
+			utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+			go crdHandler.storageVersionManager.Sync(context.StopCh, storageversionUpdateWorkers)
+		}
 
 		discoverySyncedCh := make(chan struct{})
 		go discoveryController.Run(context.StopCh, discoverySyncedCh)
