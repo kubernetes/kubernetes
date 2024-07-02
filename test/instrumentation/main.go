@@ -78,10 +78,11 @@ func main() {
 		}
 		ms, es := searchPathForStableMetrics(arg)
 		for _, m := range ms {
-			if _, ok := stableMetricNames[m.Name]; !ok {
+			fqName := m.buildFQName()
+			if _, ok := stableMetricNames[fqName]; !ok {
 				stableMetrics = append(stableMetrics, m)
 			}
-			stableMetricNames[m.Name] = struct{}{}
+			stableMetricNames[fqName] = struct{}{}
 		}
 		errors = append(errors, es...)
 	}
