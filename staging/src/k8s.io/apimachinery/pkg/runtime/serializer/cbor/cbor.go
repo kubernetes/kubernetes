@@ -218,6 +218,16 @@ func (s *serializer) unmarshal(data []byte, into interface{}) (strict, lax error
 			}
 		}()
 		into = &content
+	} else {
+		// Decoding to Unstructured never produces values with dynamic type RawExtension, so
+		// the transcode step is only necessary for non-Unstructureds.
+
+		// TODO: Option to disable this behavior.
+		defer func() {
+			if err := transcodeRawTypes(into); err != nil {
+				strict, lax = nil, err
+			}
+		}()
 	}
 
 	if !s.options.strict {

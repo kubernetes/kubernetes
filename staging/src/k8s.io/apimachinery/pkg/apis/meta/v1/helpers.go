@@ -24,8 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 )
 
 // LabelSelectorAsSelector converts the LabelSelector api type into a struct that implements
@@ -280,13 +282,20 @@ func (f FieldsV1) MarshalJSON() ([]byte, error) {
 	if f.Raw == nil {
 		return []byte("null"), nil
 	}
-	return f.Raw, nil
+	if f.isJSON() {
+		return f.Raw, nil
+	}
+	var u interface{}
+	if err := cbor.Unmarshal(f.Raw, &u); err != nil {
+		return nil, fmt.Errorf("failed to transcode raw cbor to json: %w", err)
+	}
+	return utiljson.Marshal(u)
 }
 
 // UnmarshalJSON implements json.Unmarshaler
 func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	if f == nil {
-		return errors.New("metav1.Fields: UnmarshalJSON on nil pointer")
+		return errors.New("metav1.FieldsV1: UnmarshalJSON on nil pointer")
 	}
 	if !bytes.Equal(b, []byte("null")) {
 		f.Raw = append(f.Raw[0:0], b...)
@@ -294,5 +303,42 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// isJSON scans Raw and returns true unless its prefix indicates that it contains CBOR-encoded data.
+func (f FieldsV1) isJSON() bool {
+	c, unknown := cbor.Sniff(f.Raw)
+	if unknown {
+		if ok, _ := utiljson.Sniff(f.Raw); ok {
+			return true
+		}
+	}
+	return !c
+}
+
 var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
+
+func (f FieldsV1) MarshalCBOR() ([]byte, error) {
+	if f.Raw == nil {
+		return cbor.Marshal(nil)
+	}
+	if !f.isJSON() {
+		return f.Raw, nil
+	}
+	var u interface{}
+	if err := utiljson.Unmarshal(f.Raw, &u); err != nil {
+		return nil, fmt.Errorf("failed to transcode raw json to cbor: %w", err)
+	}
+	return cbor.Marshal(u)
+}
+
+var cborNull = []byte{0xf6}
+
+func (f *FieldsV1) UnmarshalCBOR(b []byte) error {
+	if f == nil {
+		return errors.New("metav1.FieldsV1: UnmarshalCBOR on nil pointer")
+	}
+	if !bytes.Equal(b, cborNull) {
+		f.Raw = append(f.Raw[0:0], b...)
+	}
+	return nil
+}

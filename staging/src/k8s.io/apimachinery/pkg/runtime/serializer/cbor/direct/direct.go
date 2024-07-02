@@ -20,6 +20,10 @@ limitations under the License.
 package direct
 
 import (
+	"bytes"
+	"errors"
+	"io"
+
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 
@@ -33,4 +37,30 @@ func Unmarshal(src []byte, dst interface{}) error {
 
 func Diagnose(src []byte) (string, error) {
 	return modes.Diagnostic.Diagnose(src)
+}
+
+// selfDescribedCBOR is the CBOR encoding of the head of the "self-described CBOR" tag.
+var selfDescribedCBOR = []byte{0xd9, 0xd9, 0xf7}
+
+// Sniff does a constant-time inspection of the provided bytes and returns whether or not they may
+// contain a CBOR data item. If unknown is true, the determination could be wrong.
+func Sniff(src []byte) (cbor bool, unknown bool) {
+	// Objects Outputs from the CBOR encoder will always have this prefix
+	if bytes.HasPrefix(src, selfDescribedCBOR) {
+		return true, true
+	}
+
+	if len(src) > 32 {
+		src = src[:32]
+	}
+	err := modes.DecodeLax.Wellformed(src)
+	switch {
+	case err == nil:
+		return true, false
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		// Ran out of input without seeing a wellformedness error.
+		return true, true
+	default:
+		return false, false
+	}
 }

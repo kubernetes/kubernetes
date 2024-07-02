@@ -417,3 +417,25 @@ func TestUnmarshalNil(t *testing.T) {
 		}
 	}
 }
+
+func TestSniff(t *testing.T) {
+	for _, tc := range []struct {
+		In      string
+		JSON    bool
+		Unknown bool
+	}{
+		{In: `                                {}`, JSON: false, Unknown: true},
+		{In: `{`, JSON: true, Unknown: true},
+		{In: `-1`, JSON: true, Unknown: true},
+		{In: `false`, JSON: true, Unknown: true},
+		{In: `true`, JSON: true, Unknown: true},
+		{In: `null`, JSON: true, Unknown: true},
+		{In: " \t\r\n{", JSON: true, Unknown: true},
+		{In: "\x00{", JSON: false, Unknown: false},
+	} {
+		cbor, unknown := Sniff([]byte(tc.In))
+		if cbor != tc.JSON || unknown != tc.Unknown {
+			t.Errorf("%s: got (%t, %t) want (%t, %t)", tc.In, cbor, unknown, tc.JSON, tc.Unknown)
+		}
+	}
+}

@@ -147,29 +147,6 @@ func TestRoundTrip(t *testing.T) {
 // objects produced by both encodings must be identical and be themselves roundtrippable to JSON and
 // CBOR.
 func TestRoundtripToUnstructured(t *testing.T) {
-	// These are GVKs that whose CBOR roundtrippability is blocked by a known issue that must be
-	// resolved as a prerequisite for alpha.
-	knownFailureReasons := map[string][]schema.GroupVersionKind{
-		// If a RawExtension's bytes are invalid JSON, its containing object can't be encoded to JSON.
-		"rawextension needs to work in programs that assume json": {
-			{Version: "v1", Kind: "List"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta1", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1beta2", Kind: "ControllerRevisionList"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevision"},
-			{Group: "apps", Version: "v1", Kind: "ControllerRevisionList"},
-			{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"},
-			{Group: "admission.k8s.io", Version: "v1", Kind: "AdmissionReview"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaim"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClaimParametersList"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParameters"},
-			{Group: "resource.k8s.io", Version: "v1alpha2", Kind: "ResourceClassParametersList"},
-		},
-	}
-
 	seed := int64(time.Now().Nanosecond())
 	if override := os.Getenv("TEST_RAND_SEED"); len(override) > 0 {
 		overrideSeed, err := strconv.ParseInt(override, 10, 64)
@@ -197,14 +174,6 @@ func TestRoundtripToUnstructured(t *testing.T) {
 		}
 
 		t.Run(subtestName, func(t *testing.T) {
-			for reason, gvks := range knownFailureReasons {
-				for _, each := range gvks {
-					if gvk == each {
-						t.Skip(reason)
-					}
-				}
-			}
-
 			fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
 
 			for i := 0; i < 50; i++ {
