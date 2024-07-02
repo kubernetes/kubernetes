@@ -37,7 +37,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newOverheadValidPod(name string, numContainers int, resources core.ResourceRequirements, setOverhead bool, setEmptyOverHead bool) *core.Pod {
+func setEmptyOverhead(pod *core.Pod) *core.Pod {
+	pod.Spec.Overhead = core.ResourceList{}
+	return pod
+}
+
+func newOverheadValidPod(name string, numContainers int, resources core.ResourceRequirements, setOverhead bool) *core.Pod {
 	pod := &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
 		Spec:       core.PodSpec{},
@@ -56,8 +61,6 @@ func newOverheadValidPod(name string, numContainers int, resources core.Resource
 			core.ResourceName(core.ResourceCPU):    resource.MustParse("100m"),
 			core.ResourceName(core.ResourceMemory): resource.MustParse("1"),
 		}
-	} else if setEmptyOverHead {
-		pod.Spec.Overhead = core.ResourceList{}
 	}
 	return pod
 }
@@ -101,9 +104,9 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
-			expectedPod: newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true, false),
+			expectedPod: newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 		},
 		{
 			name: "overhead, guaranteed pod",
@@ -117,9 +120,9 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("guaranteed", 1, getGuaranteedRequirements(), false, false),
+			pod:         newOverheadValidPod("guaranteed", 1, getGuaranteedRequirements(), false),
 			expectError: false,
-			expectedPod: newOverheadValidPod("guaranteed", 1, core.ResourceRequirements{}, true, false),
+			expectedPod: newOverheadValidPod("guaranteed", 1, core.ResourceRequirements{}, true),
 		},
 		{
 			name: "overhead, pod with differing overhead already set",
@@ -133,7 +136,7 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true, false),
+			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 			expectedPod: nil,
 		},
@@ -149,7 +152,7 @@ func TestSetOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true, false),
+			pod:         newOverheadValidPod("empty-requiremennts-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: false,
 			expectedPod: nil,
 		},
@@ -451,12 +454,12 @@ func TestValidate(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			name: "No Overhead in RunntimeClass, Overhead set in pod",
+			name: "No Overhead in RuntimeClass, Overhead set in pod",
 			runtimeClass: &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError: true,
 		},
 		{
@@ -471,7 +474,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 		},
 		{
@@ -486,7 +489,7 @@ func TestValidate(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
 		},
 	}
@@ -526,34 +529,34 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-requirements", 1, core.ResourceRequirements{}, false, false),
+			pod:         newOverheadValidPod("no-requirements", 1, core.ResourceRequirements{}, false),
 			expectError: false,
 		},
 		{
-			name: "No Overhead in RunntimeClass, Overhead set in pod",
+			name: "No Overhead in RuntimeClass, Overhead set in pod",
 			runtimeClass: &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError: true,
 		},
 		{
-			name:         "No RunntimeClass, Overhead set in pod",
+			name:         "No RuntimeClass, Overhead set in pod",
 			runtimeClass: nil,
-			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true, false),
+			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), true),
 			expectError:  true,
 		},
 		{
-			name:         "No RunntimeClass, empty Overhead set in pod",
+			name:         "No RuntimeClass, empty Overhead set in pod",
 			runtimeClass: nil,
-			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), false, true),
+			pod:          setEmptyOverhead(newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), false)),
 			expectError:  false,
 		},
 		{
-			name:         "No RunntimeClass, Overhead is nil in pod",
+			name:         "No RuntimeClass, Overhead is nil in pod",
 			runtimeClass: nil,
-			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), false, false),
+			pod:          newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), false),
 			expectError:  false,
 		},
 		{
@@ -568,7 +571,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: true,
 		},
 		{
@@ -583,7 +586,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false, true),
+			pod:         setEmptyOverhead(newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false)),
 			expectError: false,
 		},
 		{
@@ -598,7 +601,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false),
 			expectError: false,
 		},
 		{
@@ -613,7 +616,7 @@ func TestValidateOverhead(t *testing.T) {
 					},
 				},
 			},
-			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true, false),
+			pod:         newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, true),
 			expectError: false,
 		},
 	}
