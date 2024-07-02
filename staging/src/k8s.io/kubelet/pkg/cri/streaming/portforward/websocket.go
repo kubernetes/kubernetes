@@ -32,7 +32,6 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
@@ -184,16 +183,12 @@ func (h *websocketStreamHandler) run() {
 
 func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	ctx := context.Background()
-	defer p.dataStream.Close()
-	defer p.errorStream.Close()
+	defer p.dataStream.Close()  //nolint: errcheck
+	defer p.errorStream.Close() //nolint: errcheck
 
 	klog.V(5).InfoS("Connection invoking forwarder.PortForward for port", "connection", h.conn, "port", p.port)
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, p.port, p.dataStream)
 	klog.V(5).InfoS("Connection done invoking forwarder.PortForward for port", "connection", h.conn, "port", p.port)
 
-	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)
-		runtime.HandleError(msg)
-		fmt.Fprint(p.errorStream, msg.Error())
-	}
+	handleStreamPortForwardErr(err, h.pod, p.port, h.uid, "", h.conn, p.errorStream)
 }

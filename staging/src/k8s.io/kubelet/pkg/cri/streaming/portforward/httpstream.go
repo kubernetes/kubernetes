@@ -242,8 +242,8 @@ Loop:
 // function for the given stream pair.
 func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	ctx := context.Background()
-	defer p.dataStream.Close()
-	defer p.errorStream.Close()
+	defer p.dataStream.Close()  //nolint: errcheck
+	defer p.errorStream.Close() //nolint: errcheck
 
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
@@ -252,11 +252,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
 	klog.V(5).InfoS("Connection request done invoking forwarder.PortForward for port", "connection", h.conn, "request", p.requestID, "port", portString)
 
-	if err != nil {
-		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
-		utilruntime.HandleError(msg)
-		fmt.Fprint(p.errorStream, msg.Error())
-	}
+	handleStreamPortForwardErr(err, h.pod, int32(port), h.uid, p.requestID, h.conn, p.errorStream)
 }
 
 // httpStreamPair represents the error and data streams for a port
