@@ -169,6 +169,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Contains(t, fakeRuntime.Called, "RunPodSandbox")
 				assert.Equal(t, test.expectedHandler, fakeRuntime.Sandboxes[id].RuntimeHandler)
+				assert.Equal(t, test.expectedHandler, fakeRuntime.Sandboxes[id].Annotations["kubernetes.io/runtimehandler"])
 			}
 		})
 	}

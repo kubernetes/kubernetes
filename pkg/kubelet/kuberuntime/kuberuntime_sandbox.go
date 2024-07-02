@@ -66,6 +66,19 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 		}
 	}
 
+	// Set runtime handler annotation.  It's important to note that this
+	// piece of code is only getting in as a stop gap, till the KEP 4216 is
+	// fully implemented and widely available, as these bits are easier to
+	// be backported to previous versions of the project.
+	if podSandboxConfig.Annotations == nil {
+		podSandboxConfig.Annotations = make(map[string]string)
+	}
+
+	if _, ok := podSandboxConfig.Annotations["kubernetes.io/runtimehandler"]; !ok {
+		klog.V(2).InfoS("Adding the \"kubernetes.io/runtimehandler\" annotation to the pod sandbox config", "runtimeHandler", runtimeHandler)
+		podSandboxConfig.Annotations["kubernetes.io/runtimehandler"] = runtimeHandler
+	}
+
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
