@@ -110,7 +110,7 @@ func NewDesiredStateOfWorldPopulator(
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
-			processedPods: make(map[volumetypes.UniquePodName]bool)},
+			processedPods: make(map[volumetypes.UniquePodName]processedPodState)},
 		kubeContainerRuntime:     kubeContainerRuntime,
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
@@ -137,8 +137,13 @@ type desiredStateOfWorldPopulator struct {
 }
 
 type processedPods struct {
-	processedPods map[volumetypes.UniquePodName]bool
+	processedPods map[volumetypes.UniquePodName]processedPodState
 	sync.RWMutex
+}
+
+type processedPodState struct {
+	processed       bool
+	lastProcessedAt time.Time
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
@@ -189,12 +194,6 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
 	}
 
 	for _, pod := range dswp.podManager.GetPods() {
-		// Keep consistency of adding pod during reconstruction
-		if dswp.hasAddedPods && dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
-			// Do not (re)add volumes for pods that can't also be starting containers
-			continue
-		}
-
 		if !dswp.hasAddedPods && dswp.podStateProvider.ShouldPodRuntimeBeRemoved(pod.UID) {
 			// When kubelet restarts, we need to add pods to dsw if there is a possibility
 			// that the container may still be running
@@ -292,6 +291,15 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 
 	uniquePodName := util.GetUniquePodName(pod)
 	if dswp.podPreviouslyProcessed(uniquePodName) {
+		return
+	}
+
+	if dswp.podStateProvider.ShouldPodContainersBeTerminating(pod.UID) {
+		// If a Pod is terminating, we need to continue to refresh volumes.
+		// However, we don't need (or want) to set up new volumes for the pod.
+		// So we just call MarkRemountRequired and then bail out of this method.
+		dswp.actualStateOfWorld.MarkRemountRequired(uniquePodName)
+		dswp.markPodProcessed(uniquePodName)
 		return
 	}
 
@@ -411,14 +419,17 @@ func (dswp *desiredStateOfWorldPopulator) podPreviouslyProcessed(
 	dswp.pods.RLock()
 	defer dswp.pods.RUnlock()
 
-	return dswp.pods.processedPods[podName]
+	var entry = dswp.pods.processedPods[podName]
+	return entry.processed && time.Since(entry.lastProcessedAt) < time.Minute
 }
 
 // markPodProcessingFailed marks the specified pod from processedPods as false to indicate that it failed processing
 func (dswp *desiredStateOfWorldPopulator) markPodProcessingFailed(
 	podName volumetypes.UniquePodName) {
 	dswp.pods.Lock()
-	dswp.pods.processedPods[podName] = false
+	var entry = dswp.pods.processedPods[podName]
+	entry.processed = false
+	dswp.pods.processedPods[podName] = entry
 	dswp.pods.Unlock()
 }
 
@@ -439,7 +450,10 @@ func (dswp *desiredStateOfWorldPopulator) markPodProcessed(
 	dswp.pods.Lock()
 	defer dswp.pods.Unlock()
 
-	dswp.pods.processedPods[podName] = true
+	var entry = dswp.pods.processedPods[podName]
+	entry.processed = true
+	entry.lastProcessedAt = time.Now()
+	dswp.pods.processedPods[podName] = entry
 }
 
 // deleteProcessedPod removes the specified pod from processedPods
