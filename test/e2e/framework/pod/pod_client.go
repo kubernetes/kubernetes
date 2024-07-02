@@ -266,7 +266,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		}
 		// If the image policy is not PullAlways, the image must be in the pre-pull list and
 		// pre-pulled.
-		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image)
+		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
 		// Do not pull images during the tests because the images in pre-pull list should have
 		// been prepulled.
 		c.ImagePullPolicy = v1.PullNever
