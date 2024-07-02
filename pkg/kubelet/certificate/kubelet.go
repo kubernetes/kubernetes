@@ -94,8 +94,13 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 
 	getTemplate := func() *x509.CertificateRequest {
 		hostnames, ips := addressesToHostnamesAndIPs(getAddresses())
-		// don't return a template if we have no addresses to request for
-		if len(hostnames) == 0 && len(ips) == 0 {
+		// don't return a template if we have no addresses to request for.
+		// A Kubernetes Node requires to have at minimum one IP address
+		// because those are used on the Pods field HostIPs and in some cases,
+		// when pods uses hostNetwork: true, as PodIPs.
+		// Nodes that use IP addresses as Hostname are interpreted as an IP
+		// address, so it is possible that are nodes that don't have any DNS name.
+		if len(ips) == 0 {
 			return nil
 		}
 		return &x509.CertificateRequest{
