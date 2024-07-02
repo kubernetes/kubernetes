@@ -349,7 +349,7 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		KubernetesServiceNodePort: c.Extra.KubernetesServiceNodePort,
 	}, client, c.ControlPlane.Extra.VersionedInformers.Core().V1().Services())
 	s.ControlPlane.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-		kubernetesServiceCtrl.Start(hookContext.StopCh)
+		kubernetesServiceCtrl.Start(hookContext.Done())
 		return nil
 	})
 	s.ControlPlane.GenericAPIServer.AddPreShutdownHookOrDie("stop-kubernetes-service-controller", func() error {
