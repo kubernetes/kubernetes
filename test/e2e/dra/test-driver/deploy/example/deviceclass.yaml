@@ -1,0 +1,8 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourceClass
+metadata:
+  name: example
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == "test-driver.cdi.k8s.io"

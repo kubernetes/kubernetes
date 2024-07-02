@@ -40,14 +40,11 @@ func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) 
 }
 
 func TestValidateClaimTemplate(t *testing.T) {
-	validMode := resource.AllocationModeImmediate
-	invalidMode := resource.AllocationMode("invalid")
 	goodName := "foo"
 	badName := "!@#$%^"
 	goodNS := "ns"
 	goodClaimSpec := resource.ResourceClaimSpec{
 		ResourceClassName: goodName,
-		AllocationMode:    validMode,
 	}
 	now := metav1.Now()
 	badValue := "spaces not allowed"
@@ -198,14 +195,6 @@ func TestValidateClaimTemplate(t *testing.T) {
 				return template
 			}(),
 		},
-		"bad-mode": {
-			wantFailures: field.ErrorList{field.NotSupported(field.NewPath("spec", "spec", "allocationMode"), invalidMode, supportedAllocationModes.List())},
-			template: func() *resource.ResourceClaimTemplate {
-				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
-				template.Spec.Spec.AllocationMode = invalidMode
-				return template
-			}(),
-		},
 		"good-parameters": {
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, goodClaimSpec)
@@ -263,7 +252,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateClaimTemplate(scenario.template)
+			errs := ValidateResourceClaimTemplate(scenario.template)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}
@@ -277,7 +266,6 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 	}
 	validClaimTemplate := testClaimTemplate("foo", "ns", resource.ResourceClaimSpec{
 		ResourceClassName: name,
-		AllocationMode:    resource.AllocationModeImmediate,
 		ParametersRef:     parameters,
 	})
 
@@ -314,24 +302,12 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 				return template
 			},
 		},
-		"invalid-update-mode": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
-				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
-				return *spec
-			}(), "field is immutable")},
-			oldClaimTemplate: validClaimTemplate,
-			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.AllocationMode = resource.AllocationModeWaitForFirstConsumer
-				return template
-			},
-		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			scenario.oldClaimTemplate.ResourceVersion = "1"
-			errs := ValidateClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
+			errs := ValidateResourceClaimTemplateUpdate(scenario.update(scenario.oldClaimTemplate.DeepCopy()), scenario.oldClaimTemplate)
 			assert.Equal(t, scenario.wantFailures, errs)
 		})
 	}

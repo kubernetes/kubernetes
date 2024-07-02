@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -440,8 +441,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 				opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 			}
 		}
-
-		allocated, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string]())
+		allocated, err := m.devicesToAllocate(context.Background(), "podUID", "containerName", tc.resource, tc.request, sets.New[string]())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue
@@ -639,7 +639,7 @@ func TestGetPreferredAllocationParameters(t *testing.T) {
 			opts: &pluginapi.DevicePluginOptions{GetPreferredAllocationAvailable: true},
 		}
 
-		_, err := m.devicesToAllocate("podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
+		_, err := m.devicesToAllocate(context.Background(), "podUID", "containerName", tc.resource, tc.request, sets.New[string](tc.reusableDevices...))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 			continue

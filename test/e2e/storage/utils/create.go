@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -270,6 +271,13 @@ var factories = map[What]ItemFactory{
 	{"StorageClass"}:             &storageClassFactory{},
 	{"VolumeAttributesClass"}:    &volumeAttributesClassFactory{},
 	{"CustomResourceDefinition"}: &customResourceDefinitionFactory{},
+
+	// TODO (https://github.com/kubernetes/kubernetes/pull/122481 or similar):
+	// replace this entire create.go with some helper code that is a) shared
+	// between SIGs and b) uses discovery+generic client and thus supports
+	// arbitrary types. Adding more factories is a stop-gap solution.
+	{"ValidatingAdmissionPolicy"}:        &validatingAdmissionPolicyFactory{},
+	{"ValidatingAdmissionPolicyBinding"}: &validatingAdmissionPolicyBindingFactory{},
 }
 
 // PatchName makes the name of some item unique by appending the
@@ -380,6 +388,8 @@ func patchItemRecursively(f *framework.Framework, driverNamespace *v1.Namespace,
 		}
 	case *apiextensionsv1.CustomResourceDefinition:
 		// Do nothing. Patching name to all CRDs won't always be the expected behavior.
+	case *admissionregistrationv1.ValidatingAdmissionPolicy, *admissionregistrationv1.ValidatingAdmissionPolicyBinding:
+		// Do nothing.
 	default:
 		return fmt.Errorf("missing support for patching item of type %T", item)
 	}
@@ -711,6 +721,48 @@ func (*customResourceDefinitionFactory) Create(ctx context.Context, f *framework
 	}
 	return func(ctx context.Context) error {
 		return f.DynamicClient.Resource(gvr).Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+	}, nil
+}
+
+type validatingAdmissionPolicyFactory struct{}
+
+func (f *validatingAdmissionPolicyFactory) New() runtime.Object {
+	return &admissionregistrationv1.ValidatingAdmissionPolicy{}
+}
+
+func (*validatingAdmissionPolicyFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
+	item, ok := i.(*admissionregistrationv1.ValidatingAdmissionPolicy)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("create ValidatingAdmissionPolicy: %w", err)
+	}
+	return func(ctx context.Context) error {
+		return client.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
+	}, nil
+}
+
+type validatingAdmissionPolicyBindingFactory struct{}
+
+func (f *validatingAdmissionPolicyBindingFactory) New() runtime.Object {
+	return &admissionregistrationv1.ValidatingAdmissionPolicyBinding{}
+}
+
+func (*validatingAdmissionPolicyBindingFactory) Create(ctx context.Context, f *framework.Framework, ns *v1.Namespace, i interface{}) (func(ctx context.Context) error, error) {
+	item, ok := i.(*admissionregistrationv1.ValidatingAdmissionPolicyBinding)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings()
+	if _, err := client.Create(ctx, item, metav1.CreateOptions{}); err != nil {
+		return nil, fmt.Errorf("create ValidatingAdmissionPolicyBinding: %w", err)
+	}
+	return func(ctx context.Context) error {
+		return client.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 	}, nil
 }
 

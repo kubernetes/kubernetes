@@ -34,10 +34,14 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
@@ -66,14 +70,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	var kubeletPlugin, kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
-
 	f.Context("Resource Kubelet Plugin", f.WithSerial(), func() {
-		ginkgo.BeforeEach(func(ctx context.Context) {
-			kubeletPlugin = newKubeletPlugin(ctx, getNodeName(ctx, f), driverName)
-		})
-
 		ginkgo.It("must register after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			oldCalls := kubeletPlugin.GetGRPCCalls()
 			getNewCalls := func() []testdriver.GRPCCall {
 				calls := kubeletPlugin.GetGRPCCalls()
@@ -88,9 +88,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must register after plugin restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			ginkgo.By("restart Kubelet Plugin")
 			kubeletPlugin.Stop()
-			kubeletPlugin = newKubeletPlugin(ctx, getNodeName(ctx, f), driverName)
+			kubeletPlugin = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
@@ -98,6 +100,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		ginkgo.It("must process pod created when kubelet is not running", func(ctx context.Context) {
 			// Stop Kubelet
+			ginkgo.By("stop kubelet")
 			startKubelet := stopKubelet()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			// Pod must be in pending state
@@ -106,6 +109,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			})
 			framework.ExpectNoError(err)
 			// Start Kubelet
+			ginkgo.By("restart kubelet")
 			startKubelet()
 			// Pod should succeed
 			err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartShortTimeout)
@@ -113,6 +117,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must keep pod in pending state if NodePrepareResources times out", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			defer unblock()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
@@ -131,6 +137,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources fails and then succeeds", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -154,6 +162,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodeUnprepareResources fails and then succeeds", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -174,6 +184,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must retry NodePrepareResources after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodePrepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 
@@ -203,6 +215,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must retry NodeUnprepareResources after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{driverName})
 			ginkgo.By("wait for NodePrepareResources call to succeed")
@@ -228,6 +242,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -250,6 +266,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must call NodeUnprepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unset := kubeletPlugin.SetNodeUnprepareResourcesFailureMode()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -279,6 +297,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must not call NodePrepareResources for deleted pod after Kubelet restart", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
 
@@ -306,9 +326,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
+		var kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
+
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			kubeletPlugin1 = newKubeletPlugin(ctx, getNodeName(ctx, f), kubeletPlugin1Name)
-			kubeletPlugin2 = newKubeletPlugin(ctx, getNodeName(ctx, f), kubeletPlugin2Name)
+			kubeletPlugin1 = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), kubeletPlugin1Name)
+			kubeletPlugin2 = newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), kubeletPlugin2Name)
 
 			ginkgo.By("wait for Kubelet plugin registration")
 			gomega.Eventually(kubeletPlugin1.GetGRPCCalls()).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
@@ -378,6 +400,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources is in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
 			unblock := kubeletPlugin.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
@@ -423,10 +447,73 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			framework.ExpectNoError(err)
 		})
 	})
+
+	f.Context("ResourceSlice", f.WithSerial(), func() {
+		listResources := func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
+			slices, err := f.ClientSet.ResourceV1alpha3().ResourceSlices().List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			return slices.Items, nil
+		}
+
+		matchResourcesByNodeName := func(nodeName string) types.GomegaMatcher {
+			return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"NodeName": gomega.Equal(nodeName),
+			})
+		}
+
+		f.It("must be removed on kubelet startup", f.WithDisruptive(), func(ctx context.Context) {
+			gomega.Expect(listResources(ctx)).To(gomega.BeEmpty(), "ResourceSlices should have been deleted after previous test")
+
+			ginkgo.By("stop kubelet")
+			startKubelet := stopKubelet()
+			ginkgo.DeferCleanup(func() {
+				if startKubelet != nil {
+					startKubelet()
+				}
+			})
+
+			ginkgo.By("create some ResourceSlices")
+			nodeName := getNodeName(ctx, f)
+			otherNodeName := nodeName + "-other"
+			createTestResourceSlice(ctx, f.ClientSet, nodeName, driverName)
+			createTestResourceSlice(ctx, f.ClientSet, nodeName+"-other", driverName)
+
+			matchAll := gomega.ConsistOf(matchResourcesByNodeName(nodeName), matchResourcesByNodeName(otherNodeName))
+			matchOtherNode := gomega.ConsistOf(matchResourcesByNodeName(otherNodeName))
+
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchAll, "ResourceSlices without kubelet")
+
+			ginkgo.By("start kubelet")
+			startKubelet()
+			startKubelet = nil
+
+			ginkgo.By("wait for exactly the node's ResourceSlice to get deleted")
+			gomega.Eventually(ctx, listResources).Should(matchOtherNode, "ResourceSlices with kubelet")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchOtherNode, "ResourceSlices with kubelet")
+		})
+
+		f.It("must be removed after plugin unregistration", func(ctx context.Context) {
+			gomega.Expect(listResources(ctx)).To(gomega.BeEmpty(), "ResourceSlices should have been deleted after previous test")
+			nodeName := getNodeName(ctx, f)
+			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
+
+			ginkgo.By("start plugin and wait for ResourceSlice")
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+			gomega.Eventually(ctx, listResources).Should(matchNode, "ResourceSlice from kubelet plugin")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchNode, "ResourceSlice from kubelet plugin")
+
+			ginkgo.By("stop plugin and wait for ResourceSlice removal")
+			kubeletPlugin.Stop()
+			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
+		})
+	})
 })
 
 // Run Kubelet plugin and wait until it's registered
-func newKubeletPlugin(ctx context.Context, nodeName, pluginName string) *testdriver.ExamplePlugin {
+func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
 	ginkgo.By("start Kubelet plugin")
 	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+pluginName), "node", nodeName)
 	ctx = klog.NewContext(ctx, logger)
@@ -444,6 +531,7 @@ func newKubeletPlugin(ctx context.Context, nodeName, pluginName string) *testdri
 		ctx,
 		cdiDir,
 		pluginName,
+		clientSet,
 		"",
 		testdriver.FileOperations{},
 		kubeletplugin.PluginSocketPath(endpoint),
@@ -454,6 +542,11 @@ func newKubeletPlugin(ctx context.Context, nodeName, pluginName string) *testdri
 
 	gomega.Eventually(plugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
 
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		// kubelet should do this eventually, but better make sure.
+		// A separate test checks this explicitly.
+		framework.ExpectNoError(clientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "driverName=" + driverName}))
+	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
 	return plugin
@@ -463,33 +556,39 @@ func newKubeletPlugin(ctx context.Context, nodeName, pluginName string) *testdri
 // NOTE: as scheduler and controller manager are not running by the Node e2e,
 // the objects must contain all required data to be processed correctly by the API server
 // and placed on the node without involving the scheduler and the DRA controller
-func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, pluginNames []string) *v1.Pod {
-	// ResourceClass
-	class := &resourcev1alpha2.ResourceClass{
+func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, driverNames []string) *v1.Pod {
+	// DeviceClass
+	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
 		},
-		DriverName: "controller",
 	}
-	_, err := clientSet.ResourceV1alpha2().ResourceClasses().Create(ctx, class, metav1.CreateOptions{})
+	_, err := clientSet.ResourceV1alpha3().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha2().ResourceClasses().Delete, className, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().DeviceClasses().Delete, className, metav1.DeleteOptions{})
 
 	// ResourceClaim
 	podClaimName := "resource-claim"
-	claim := &resourcev1alpha2.ResourceClaim{
+	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: claimName,
 		},
-		Spec: resourcev1alpha2.ResourceClaimSpec{
-			ResourceClassName: className,
+		Spec: resourceapi.ResourceClaimSpec{
+			Requests: []resourceapi.Request{{
+				Name: "my-request",
+				RequestDetail: &resourceapi.RequestDetail{
+					Device: &resourceapi.DeviceRequest{
+						DeviceClassName: className,
+					},
+				},
+			}},
 		},
 	}
-	createdClaim, err := clientSet.ResourceV1alpha2().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
+	createdClaim, err := clientSet.ResourceV1alpha3().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha2().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
 
 	// Pod
 	containerName := "testcontainer"
@@ -527,25 +626,60 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	}
 
 	// Update claim status: set ReservedFor and AllocationResult
-	// NOTE: This is usually done by the DRA controller
-	resourceHandlers := make([]resourcev1alpha2.ResourceHandle, len(pluginNames))
-	for i, pluginName := range pluginNames {
-		resourceHandlers[i] = resourcev1alpha2.ResourceHandle{
-			DriverName: pluginName,
-			Data:       "{\"EnvVars\":{\"DRA_PARAM1\":\"PARAM1_VALUE\"},\"NodeName\":\"\"}",
+	// NOTE: This is usually done by the DRA controller or the scheduler.
+	results := make([]resourceapi.RequestAllocationResult, len(driverNames))
+	for i, driverName := range driverNames {
+		results[i] = resourceapi.RequestAllocationResult{
+			Driver: driverName,
+			Pool:   "some-pool",
+			Device: "some-device",
 		}
 	}
-	createdClaim.Status = resourcev1alpha2.ResourceClaimStatus{
-		DriverName: "controller",
-		ReservedFor: []resourcev1alpha2.ResourceClaimConsumerReference{
+
+	createdClaim.Status = resourceapi.ResourceClaimStatus{
+		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 			{Resource: "pods", Name: podName, UID: createdPod.UID},
 		},
-		Allocation: &resourcev1alpha2.AllocationResult{
-			ResourceHandles: resourceHandlers,
+		Allocation: &resourceapi.AllocationResult{
+			Results: results,
+			Config: []resourceapi.AllocationConfiguration{{
+				Configuration: resourceapi.Configuration{
+					Opaque: &resourceapi.OpaqueConfiguration{
+						Driver:     driverName,
+						Parameters: runtime.RawExtension{Raw: []byte(`{"EnvVars":{"DRA_PARAM1":"PARAM1_VALUE"}}`)},
+					},
+				},
+			}},
 		},
 	}
-	_, err = clientSet.ResourceV1alpha2().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
+	_, err = clientSet.ResourceV1alpha3().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
 
 	return pod
+}
+
+func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface, nodeName, driverName string) {
+	slice := &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name: nodeName,
+			},
+		},
+	}
+
+	ginkgo.By(fmt.Sprintf("Creating ResourceSlice %s", nodeName))
+	slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "create ResourceSlice")
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		ginkgo.By(fmt.Sprintf("Deleting ResourceSlice %s", nodeName))
+		err := clientSet.ResourceV1alpha3().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.ExpectNoError(err, "delete ResourceSlice")
+		}
+	})
 }

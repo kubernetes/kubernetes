@@ -3490,6 +3490,10 @@
             "default": "",
             "description": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
             "type": "string"
+          },
+          "requestName": {
+            "description": "A name set in claim.spec.requests[].name.",
+            "type": "string"
           }
         },
         "required": [
@@ -4959,7 +4963,7 @@
           {
             "group": "resource.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha2"
+            "version": "v1alpha3"
           },
           {
             "group": "scheduling.k8s.io",
@@ -5353,7 +5357,7 @@
           {
             "group": "resource.k8s.io",
             "kind": "Status",
-            "version": "v1alpha2"
+            "version": "v1alpha3"
           }
         ]
       },
@@ -5700,7 +5704,7 @@
           {
             "group": "resource.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha2"
+            "version": "v1alpha3"
           },
           {
             "group": "scheduling.k8s.io",

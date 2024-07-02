@@ -2082,8 +2082,9 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceClaim = map[string]string{
-	"":     "ResourceClaim references one entry in PodSpec.ResourceClaims.",
-	"name": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+	"":            "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+	"name":        "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+	"requestName": "A name set in claim.spec.requests[].name.",
 }
 
 func (ResourceClaim) SwaggerDoc() map[string]string {

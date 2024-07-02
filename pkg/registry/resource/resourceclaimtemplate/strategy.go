@@ -48,7 +48,7 @@ func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj r
 
 func (resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourceClaimTemplate := obj.(*resource.ResourceClaimTemplate)
-	return validation.ValidateClaimTemplate(resourceClaimTemplate)
+	return validation.ValidateResourceClaimTemplate(resourceClaimTemplate)
 }
 
 func (resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -66,8 +66,8 @@ func (resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, 
 }
 
 func (resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateClaimTemplate(obj.(*resource.ResourceClaimTemplate))
-	return append(errorList, validation.ValidateClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))...)
+	errorList := validation.ValidateResourceClaimTemplate(obj.(*resource.ResourceClaimTemplate))
+	return append(errorList, validation.ValidateResourceClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))...)
 }
 
 func (resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

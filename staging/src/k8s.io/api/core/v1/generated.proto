@@ -4960,6 +4960,11 @@ message ResourceClaim {
   // the Pod where this field is used. It makes that resource available
   // inside a container.
   optional string name = 1;
+
+  // A name set in claim.spec.requests[].name.
+  //
+  // +optional
+  optional string requestName = 2;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format

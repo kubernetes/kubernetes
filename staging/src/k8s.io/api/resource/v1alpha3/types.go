@@ -1,0 +1,1010 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1alpha3
+
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
+)
+
+const (
+	// Finalizer is the finalizer that gets set for claims
+	// which were allocated through a builtin controller.
+	// Reserved for use by Kubernetes, DRA driver controllers must
+	// use their own finalizer.
+	Finalizer = "dra.k8s.io/delete-protection"
+)
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
+
+// ResourceSlice represents one or more resources in a pool of similar resources,
+// managed by a given driver. A pool may span more than one ResourceSlice, and exactly how many
+// ResourceSlices comprise a pool is determined by the driver.
+//
+// At the moment, the only resource type are devices with attributes and capacities.
+// Each device in a given pool, regardless of how many ResourceSlices, must have a unique name.
+// The ResourceSlice in which a device gets published may change over time. The unique identifier
+// for a device is the tuple <driver name>, <pool name>, <device name>.
+//
+// Whenever a driver needs to update a pool, it increments the pool.Spec.Pool.Generation number
+// and updates all ResourceSlices with that new number and new resource definitions. A consumer
+// must only use ResourceSlices with the highest generation number and ignore all others.
+//
+// When allocating all resources in a pool matching certain criteria or when
+// looking for the best solution among several different alternatives, a
+// consumer should check the number of ResourceSlices in a pool (included in
+// each ResourceSlice) to determine whether its view of a pool is complete and
+// if not, should wait until the driver has completed updating the pool.
+//
+// For resources that are not local to a node, the node name is not set. Instead,
+// the driver may use a node selector to specify where the devices are available.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type ResourceSlice struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Contains the information published by the driver.
+	//
+	// Changing the spec increments the generation number.
+	Spec ResourceSliceSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
+type ResourceSliceSpec struct {
+	// Driver identifies the DRA driver providing the capacity information.
+	// A field selector can be used to list only ResourceSlice
+	// objects with a certain driver name.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
+	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
+
+	// Pool describes the pool that this ResourceSlice belongs to.
+	//
+	// +required
+	Pool ResourcePool `json:"pool" protobuf:"bytes,2,name=pool"`
+
+	// NodeName identifies the node which provides the devices.
+	// A field selector can be used to list only ResourceSlice
+	// objects belonging to a certain node.
+	//
+	// This field can be used to limit access from nodes to ResourceSlices with
+	// the same node name. It also indicates to autoscalers that adding
+	// new nodes of the same type as some old node might also make new
+	// devices available.
+	//
+	// Exactly one of NodeName and NodeSelector must be set.
+	//
+	// +optional
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+
+	// NodeSelector defines which nodes have access to the devices in the pool.
+	// If it is specified, but empty (has no terms), all nodes have access.
+	//
+	// Exactly one of NodeName and NodeSelector must be set.
+	//
+	// +optional
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,4,opt,name=nodeSelector"`
+
+	// Devices lists some or all of the devices in this pool.
+	//
+	// Must not have more than 128 entries.
+	//
+	// +optional
+	// +listType=atomic
+	Devices []Device `json:"devices" protobuf:"bytes,5,name=devices"`
+}
+
+// ResourcePool describes the pool that ResourceSlices belong to.
+type ResourcePool struct {
+	// Name is used to identify the pool. For node-local devices, this
+	// is often the node name, but this is not required.
+	//
+	// It must not be longer than 253 characters and must consist of one or more DNS sub-domains
+	// separated by slashes.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Generation gets incremented in all ResourceSlices of a pool whenever resource
+	// definitions change. A consumer must only use definitions from ResourceSlices
+	// with the highest generation number and ignore all others.
+	Generation int64 `json:"generation" protobuf:"bytes,2,name=generation"`
+
+	// ResourceSliceCount is the total number of ResourceSlices in the pool at this
+	// generation number.
+	//
+	// Consumers can use this to check whether they have seen all ResourceSlices
+	// belonging to the same pool.
+	ResourceSliceCount int64 `json:"resourceSliceCount" protobuf:"bytes,3,name=resourceSliceCount"`
+}
+
+const ResourceSliceMaxSharedCapacity = 128
+const ResourceSliceMaxDevices = 128
+const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+
+// Device represents one individual hardware instance that can be selected based
+// on its attributes.
+type Device struct {
+	// Name is unique identifier among all devices managed by
+	// the driver in the pool. It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Attributes defines the set of attributes for this device.
+	// The name of each attribute must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	// +listType=atomic
+	Attributes []DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,2,rep,name=attributes"`
+
+	// Capacities defines the set of capacities for this device.
+	// The name of each capacity must be unique in that set.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	// +listType=atomic
+	Capacities []DeviceCapacity `json:"capacities,omitempty" protobuf:"bytes,3,rep,name=capacities"`
+}
+
+// Limit for the sum of the number of entries in both ResourceSlices.
+const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
+
+// DeviceAttribute is a combination of an attribute name and its value.
+// Exactly one value must be set.
+type DeviceAttribute struct {
+	// Name is a unique identifier for this attribute, which will be
+	// referenced when selecting devices.
+	//
+	// Attributes are defined either by the owner of the specific driver
+	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+	// project). Because attributes are sometimes compared across devices,
+	// a given name is expected to mean the same thing and have the same
+	// type on all devices.
+	//
+	// Attribute names must be either a C identifier
+	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+	// followed by a C identifier
+	// (e.g. "example.com/theName"). Attributes whose name do not
+	// include the domain prefix are assumed to be part of the driver's
+	// domain. Attributes defined by 3rd parties must include the domain
+	// prefix.
+	//
+	// The maximum length for the DNS subdomain is 63 characters (same as
+	// for driver names) and the maximum length of the C identifier
+	// is 32.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// The Go field names below have a Value suffix to avoid a conflict between the
+	// field "String" and the corresponding method. That method is required.
+	// The Kubernetes API is defined without that suffix to keep it more natural.
+
+	// IntValue is a number.
+	//
+	// +optional
+	IntValue *int64 `json:"int,omitempty" protobuf:"varint,2,opt,name=int"`
+
+	// BoolValue is a true/false value.
+	//
+	// +optional
+	BoolValue *bool `json:"bool,omitempty" protobuf:"varint,3,opt,name=bool"`
+
+	// StringValue is a string. Must not be longer than 64 characters.
+	//
+	// +optional
+	StringValue *string `json:"string,omitempty" protobuf:"bytes,4,opt,name=string"`
+
+	// VersionValue is a semantic version according to semver.org spec 2.0.0.
+	// Must not be longer than 64 characters.
+	//
+	// +optional
+	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
+}
+
+// DeviceCapacity is a combination of a capacity name and its value.
+// Exactly one value must be set.
+type DeviceCapacity struct {
+	// Name is a unique identifier for this capacity, which will be
+	// referenced when selecting devices.
+	//
+	// Capacities are defined either by the owner of the specific driver
+	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+	// project). Because capacities are sometimes compared across devices,
+	// a given name is expected to mean the same thing and have the same
+	// type on all devices.
+	//
+	// Capacity names must be either a C identifier
+	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
+	// followed by a C identifier
+	// (e.g. "example.com/theName"). Capacities whose name do not
+	// include the domain prefix are assumed to be part of the driver's
+	// domain. Capacities defined by 3rd parties must include the domain
+	// prefix.
+	//
+	// The maximum length for the DNS subdomain is 63 characters (same as
+	// for driver names) and the maximum length of the C identifier
+	// is 32.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Quantity determines the size of the capacity.
+	//
+	// +required
+	Quantity *resource.Quantity `json:"quantity,omitempty" protobuf:"bytes,2,opt,name=quantity"`
+}
+
+// DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
+const DeviceMaxIDLength = 32
+
+// DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
+const DeviceAttributeMaxValueLength = 64
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
+
+// ResourceSliceList is a collection of ResourceSlices.
+type ResourceSliceList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"listMeta" protobuf:"bytes,1,opt,name=listMeta"`
+
+	// Items is the list of resource ResourceSlices.
+	Items []ResourceSlice `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ResourceClaim describes a request for access to resources in the cluster,
+// for use by workloads. For example, if a workload needs an accelerator device
+// with specific properties, this is how that request is expressed. The status
+// stanza tracks whether this claim has been satisfied and what specific
+// resources have been allocated.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type ResourceClaim struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec describes what is being requested and how to configure it.
+	// The spec is immutable.
+	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status describes whether the claim is ready to use and what has been allocated.
+	// +optional
+	Status ResourceClaimStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// ResourceClaimSpec defines how a resource is to be allocated.
+type ResourceClaimSpec struct {
+	// Requests represent individual requests for distinct resources which must all be satisfied.
+	// If empty, nothing needs to be allocated.
+	//
+	// +optional
+	// +listType=atomic
+	Requests []Request `json:"requests" protobuf:"bytes,1,name=requests"`
+
+	// These constraints must be satisfied by the set of devices that get
+	// allocated for the claim.
+	//
+	// +optional
+	// +listType=atomic
+	Constraints []Constraint `json:"constraints,omitempty" protobuf:"bytes,2,opt,name=constraints"`
+
+	// This field holds configuration for multiple potential drivers which
+	// could satisfy requests in this claim. It is ignored while allocating
+	// the claim.
+	//
+	// +optional
+	// +listType=atomic
+	Config []ClaimConfiguration `json:"config,omitempty" protobuf:"bytes,3,opt,name=config"`
+
+	// Controller is the name of the DRA driver that is meant
+	// to handle allocation of this claim. If empty, allocation is handled
+	// by the scheduler while scheduling a pod.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
+	// +optional
+	Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+}
+
+// Request is a request for one of many resources required for a claim.
+// This is typically a request for a single resource like a device, but can
+// also ask for several identical devices.
+type Request struct {
+	// The name can be used to reference this request in a pod.spec.containers[].resources.claims
+	// entry and in a constraint of the claim.
+	//
+	// Must be a DNS label.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	*RequestDetail `json:",inline" protobuf:"bytes,2,name=requestDetail"`
+}
+
+// RequestDetail is embedded inside Request. Exactly one field must be set.
+type RequestDetail struct {
+	// Device requests one or more devices.
+	//
+	// +optional
+	Device *DeviceRequest `json:"device,omitempty" protobuf:"bytes,1,opt,name=device"`
+}
+
+// DeviceRequest is currently the only permitted alternative in RequestDetail.
+type DeviceRequest struct {
+	// DeviceClassName references a specific DeviceClass, which can define
+	// additional configuration and selectors to be inherited by this
+	// request.
+	//
+	// A class is required. Which classes are available depends on the cluster.
+	//
+	// Administrators may use this to restrict which devices may get
+	// requested by only installing classes with selectors for permitted
+	// devices. If users are free to request anything without restrictions,
+	// then administrators can create an empty DeviceClass for users
+	// to reference.
+	//
+	// +required
+	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,1,name=deviceClassName"`
+
+	// Selectors define criteria which must be satisfied by a specific
+	// device in order for that device to be considered for this
+	// request. All selectors must be satisfied for a device to be
+	// considered.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []Selector `json:"selectors,omitempty" protobuf:"bytes,2,name=selectors"`
+
+	// CountMode and its related fields define how many devices are needed
+	// to satisfy this request. Supported values are:
+	//
+	// - All: This request is for all of the matching devices in a pool.
+	//   Allocation will fail if some devices are already allocated,
+	//   unless adminAccess is requested.
+	//
+	// - Exact: This request is for a specific number of devices. The exact
+	//   number is provided in the count field.
+	//
+	// If countMode is not specified, the default countMode is Exact. If
+	// countMode is Exact and count is not specified, the default count is
+	// one. Any other requests must specify this field.
+	//
+	// More modes may get added in the future. Clients must refuse to handle
+	// requests with unknown modes.
+	//
+	// +default="Exact"
+	CountMode CountMode `json:"countMode,omitempty" protobuf:"bytes,3,opt,name=countMode"`
+
+	// Count is used only when the count mode is "Exact". Must be greater than zero.
+	// If CountMode is Exact and this field is not specified, the default is one.
+	//
+	// +optional
+	Count int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
+
+	// AdminAccess indicates that this is a claim for administrative access
+	// to the device(s). Claims with AdminAccess are expected to be used for
+	// monitoring or other management services for a device.  They ignore
+	// all ordinary claims to the device with respect to access modes and
+	// any resource allocations.
+	//
+	// Default is false.
+	//
+	// +optional
+	AdminAccess bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
+}
+
+type CountMode string
+
+// Valid [DeviceRequest.CountMode] values.
+const (
+	CountModeExact = CountMode("Exact")
+	CountModeAll   = CountMode("All")
+)
+
+// Exactly one field must be set.
+type Selector struct {
+	// CEL contains a CEL expression for selecting a device.
+	//
+	// +required
+	CEL *CELSelector `json:"cel,omitempty" protobuf:"bytes,1,opt,name=cel"`
+}
+
+// CELSelector contains a CEL expression for selecting a device.
+type CELSelector struct {
+	// Expression is a CEL expression which evaluates a single device. It
+	// must evaluate to true when the device under consideration satisfies
+	// the desired criteria, and false when it does not. Any other result
+	// is an error and causes allocation of devices to abort.
+	//
+	// The expression's input is an object named "device", which carries
+	// the following properties:
+	//  - driver (string): the name of the driver which defines this device.
+	//  - attributes (map[string]object): the device's attributes, grouped by prefix
+	//    (e.g. device.attributes["example.com"] evaluates to an object with all
+	//    of the attributes which were prefixed by "dra.example.com".
+	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
+	//
+	// Example: Consider a device with driver="example.com", which exposes
+	// two attributes named "model" and "ext.example.com/family" and which
+	// exposes one capacity named "modules". This input to this expression
+	// would have the following fields:
+	//
+	//     device.driver
+	//     device.attributes["example.com"].model
+	//     device.attributes["ext.example.com"].family
+	//     device.capacity["example.com"].modules
+	//
+	// The device.driver field can be used to check for a specific driver,
+	// either as a high-level precondition (i.e. you only want to consider
+	// devices from this driver) or as part of a multi-clause expression
+	// that is meant to consider devices from different drivers.
+	//
+	// The value type of each attribute is defined by the device
+	// definition, and users who write these expressions must consult the
+	// documentation for their specific drivers. The value type of each
+	// capacity is Quantity.
+	//
+	// If an unknown prefix is used as a lookup in either device.attributes
+	// or device.capacity, an empty map will be returned. Any reference to
+	// an unknown field will cause an evaluation error and allocation to
+	// abort.
+	//
+	// A robust expression should check for the existence of attributes
+	// before referencing them.
+	//
+	// For ease of use, the cel.bind() function is enabled, and can be used
+	// to simplify expressions that access multiple attributes with the
+	// same domain. For example:
+	//
+	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
+	//
+	// +required
+	Expression string `json:"expression" protobuf:"bytes,1,name=expression"`
+}
+
+// Besides the request names, constraint must have exactly one field set.
+type Constraint struct {
+	// Requests is a list of the one or more requests in this claim which
+	// must co-satisfy this constraint. If a request is fulfilled by
+	// multiple devices, then all of the devices must satisfy the
+	// constraint. If this is not specified, this constraint applies to all
+	// requests in this claim.
+	//
+	// +optional
+	// +listType=atomic
+	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
+
+	// Device defines the constraint for devices.
+	//
+	// +optional
+	Device *DeviceConstraint `json:"device,omitempty" protobuf:"bytes,2,opt,name=device"`
+}
+
+// DeviceConstraint defines one constraint for devices.
+// Exactly one field must be set.
+type DeviceConstraint struct {
+	// The devices must have this attribute and its value must be the same.
+	//
+	// For example, if you specified "dra.example.com/numa" (a hypothetical example!),
+	// then only devices in the same NUMA node will be chosen. A device which
+	// does not have that attribute will not be chosen. All devices should
+	// use a value of the same type for this attribute because that is part of
+	// its specification, but if one device doesn't, then it also will not be
+	// chosen.
+	//
+	// +optional
+	MatchAttribute string `json:"matchAttribute,omitempty" protobuf:"bytes,1,opt,name=matchAttribute"`
+}
+
+// ClaimConfiguration is used for configuration parameters in ResourcClaimSpec.
+type ClaimConfiguration struct {
+	// Requests lists the names of requests where the configuration applies.
+	// If empty, its applies to all requests.
+	//
+	// +optional
+	// +listType=atomic
+	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
+
+	Configuration `json:",inline" protobuf:"bytes,2,name=configuration"`
+}
+
+// Configuration must have exactly one field set. It gets embedded
+// inline in some other structs which have other fields, so field names must
+// not conflict with those.
+type Configuration struct {
+	// Opaque provides driver-specific configuration parameters.
+	//
+	// +required
+	Opaque *OpaqueConfiguration `json:"opaque,omitempty" protobuf:"bytes,1,opt,name=opaque"`
+}
+
+// OpaqueConfiguration contains configuration parameters for a driver
+// in a format defined by the driver vendor.
+type OpaqueConfiguration struct {
+	// Driver is used to determine which kubelet plugin needs
+	// to be passed these configuration parameters.
+	//
+	// An admission policy provided by the driver developer could use this
+	// to decide whether it needs to validate them.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
+	Driver string `json:"driver" protobuf:"bytes,1,name=driver"`
+
+	// Parameters can contain arbitrary data. It is the responsibility of
+	// the driver developer to handle validation and versioning. Typically this
+	// includes self-identification and a version ("kind" + "apiVersion" for
+	// Kubernetes types), with conversion between different versions.
+	//
+	// +required
+	Parameters runtime.RawExtension `json:"parameters" protobuf:"bytes,2,name=parameters"`
+}
+
+// ResourceClaimStatus tracks whether the resource has been allocated and what
+// the result of that was.
+type ResourceClaimStatus struct {
+	// Allocation is set once the claim has been allocated successfully.
+	//
+	// +optional
+	Allocation *AllocationResult `json:"allocation,omitempty" protobuf:"bytes,1,opt,name=allocation"`
+
+	// ReservedFor indicates which entities are currently allowed to use
+	// the claim. A Pod which references a ResourceClaim which is not
+	// reserved for that Pod will not be started. A claim that is in
+	// use or might be in use because it has been reserved must not get
+	// deallocated.
+	//
+	// In a cluster with multiple scheduler instances, two pods might get
+	// scheduled concurrently by different schedulers. When they reference
+	// the same ResourceClaim which already has reached its maximum number
+	// of consumers, only one pod can be scheduled.
+	//
+	// Both schedulers try to add their pod to the claim.status.reservedFor
+	// field, but only the update that reaches the API server first gets
+	// stored. The other one fails with an error and the scheduler
+	// which issued it knows that it must put the pod back into the queue,
+	// waiting for the ResourceClaim to become usable again.
+	//
+	// There can be at most 32 such reservations. This may get increased in
+	// the future, but not reduced.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=uid
+	// +patchStrategy=merge
+	// +patchMergeKey=uid
+	ReservedFor []ResourceClaimConsumerReference `json:"reservedFor,omitempty" protobuf:"bytes,2,opt,name=reservedFor" patchStrategy:"merge" patchMergeKey:"uid"`
+
+	// Indicates that a claim is to be deallocated. While this is set,
+	// no new consumers may be added to ReservedFor.
+	//
+	// This is only used if the claim needs to be deallocated by a DRA driver.
+	// That driver then must deallocate this claim and reset the field
+	// together with clearing the Allocation field.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
+	// +optional
+	DeallocationRequested bool `json:"deallocationRequested,omitempty" protobuf:"bytes,3,opt,name=deallocationRequested"`
+}
+
+// ReservedForMaxSize is the maximum number of entries in
+// claim.status.reservedFor.
+const ResourceClaimReservedForMaxSize = 32
+
+// ResourceClaimConsumerReference contains enough information to let you
+// locate the consumer of a ResourceClaim. The user must be a resource in the same
+// namespace as the ResourceClaim.
+type ResourceClaimConsumerReference struct {
+	// APIGroup is the group for the resource being referenced. It is
+	// empty for the core API. This matches the group in the APIVersion
+	// that is used when creating the resources.
+	// +optional
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Resource is the type of resource being referenced, for example "pods".
+	Resource string `json:"resource" protobuf:"bytes,3,name=resource"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,4,name=name"`
+	// UID identifies exactly one incarnation of the resource.
+	UID types.UID `json:"uid" protobuf:"bytes,5,name=uid"`
+}
+
+// AllocationResult contains attributes of an allocated resource.
+type AllocationResult struct {
+	// Results lists all allocated devices.
+	//
+	// +optional
+	// +listType=atomic
+	Results []RequestAllocationResult `json:"results,omitempty" protobuf:"bytes,1,opt,name=results"`
+
+	// This field is a combination of all the claim and class configuration parameters.
+	// Drivers can distinguish between those based on a flag.
+	//
+	// This includes configuration parameters for drivers which have no allocated
+	// devices in the result because it is up to the drivers which configuration
+	// parameters they support. They can silently ignore unknown configuration
+	// parameters.
+	//
+	// +optional
+	// +listType=atomic
+	Config []AllocationConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
+
+	// Setting this field is optional. If unset, the allocated devices are available everywhere.
+	//
+	// +optional
+	AvailableOnNodes *v1.NodeSelector `json:"availableOnNodes,omitempty" protobuf:"bytes,3,opt,name=availableOnNodes"`
+
+	// Controller is the name of the DRA driver which handled the
+	// allocation. That driver is also responsible for deallocating the
+	// claim. It is empty when the claim can be deallocated without
+	// involving a driver.
+	//
+	// A driver may allocate devices provided by other drivers, so this
+	// driver name here can be different from the driver names listed for
+	// the results.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
+	// +optional
+	Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+}
+
+// AllocationResultsMaxSize represents the maximum number of
+// entries in allocation.results.
+const AllocationResultsMaxSize = 32
+
+// RequestAllocationResult contains the allocation result for one request.
+type RequestAllocationResult struct {
+	// Request is the name of the request in the claim which caused this
+	// device to be allocated. Multiple devices may have been allocated
+	// per request.
+	//
+	// +required
+	Request string `json:"request" protobuf:"bytes,1,name=request"`
+
+	// Driver specifies the name of the DRA driver whose kubelet
+	// plugin should be invoked to process the allocation once the claim is
+	// needed on a node.
+	//
+	// Must be a DNS subdomain and should end with a DNS domain owned by the
+	// vendor of the driver.
+	//
+	// +required
+	Driver string `json:"driver" protobuf:"bytes,2,name=driver"`
+
+	// This name together with the driver name and the device name field
+	// identify which device was allocated (`<driver name>/<pool name>/<device name>`).
+	//
+	// Must not be longer than 253 characters and may contain one or more
+	// DNS sub-domains separated by slashes.
+	//
+	// +required
+	Pool string `json:"pool" protobuf:"bytes,3,name=pool"`
+
+	// Device references one device instance via its name in the driver's
+	// resource pool. It must be a DNS label.
+	//
+	// +required
+	Device string `json:"device" protobuf:"bytes,4,name=device"`
+}
+
+// AllocationConfiguration gets embedded in an AllocationResult.
+type AllocationConfiguration struct {
+	// Source records whether the configuration comes from a class and thus
+	// is not something that a normal user would have been able to set
+	// or from a claim.
+	//
+	// +required
+	Source AllocationConfigSource `json:"source" protobuf:"bytes,1,name=source"`
+
+	// Requests lists the names of requests where the configuration applies.
+	// If empty, its applies to all requests.
+	//
+	// +optional
+	// +listType=atomic
+	Requests []string `json:"requests,omitempty" protobuf:"bytes,2,opt,name=requests"`
+
+	Configuration `json:",inline" protobuf:"bytes,3,name=configuration"`
+}
+
+type AllocationConfigSource string
+
+// Valid [AllocationConfiguration.Source] values.
+const (
+	AllocationConfigSourceClass = "FromClass"
+	AllocationConfigSourceClaim = "FromClaim"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ResourceClaimList is a collection of claims.
+type ResourceClaimList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource claims.
+	Items []ResourceClaim `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// PodSchedulingContext objects hold information that is needed to schedule
+// a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
+// mode.
+//
+// This is an alpha type and requires enabling the DRAControlPlaneController
+// feature gate.
+type PodSchedulingContext struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec describes where resources for the Pod are needed.
+	Spec PodSchedulingContextSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// Status describes where resources for the Pod can be allocated.
+	//
+	// +optional
+	Status PodSchedulingContextStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// PodSchedulingContextSpec describes where resources for the Pod are needed.
+type PodSchedulingContextSpec struct {
+	// SelectedNode is the node for which allocation of ResourceClaims that
+	// are referenced by the Pod and that use "WaitForFirstConsumer"
+	// allocation is to be attempted.
+	//
+	// +optional
+	SelectedNode string `json:"selectedNode,omitempty" protobuf:"bytes,1,opt,name=selectedNode"`
+
+	// PotentialNodes lists nodes where the Pod might be able to run.
+	//
+	// The size of this field is limited to 128. This is large enough for
+	// many clusters. Larger clusters may need more attempts to find a node
+	// that suits all pending resources. This may get increased in the
+	// future, but not reduced.
+	//
+	// +optional
+	// +listType=atomic
+	PotentialNodes []string `json:"potentialNodes,omitempty" protobuf:"bytes,2,opt,name=potentialNodes"`
+}
+
+// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
+type PodSchedulingContextStatus struct {
+	// ResourceClaims describes resource availability for each
+	// pod.spec.resourceClaim entry where the corresponding ResourceClaim
+	// uses "WaitForFirstConsumer" allocation mode.
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ResourceClaims []ResourceClaimSchedulingStatus `json:"resourceClaims,omitempty" protobuf:"bytes,1,opt,name=resourceClaims"`
+
+	// If there ever is a need to support other kinds of resources
+	// than ResourceClaim, then new fields could get added here
+	// for those other resources.
+}
+
+// ResourceClaimSchedulingStatus contains information about one particular
+// ResourceClaim with "WaitForFirstConsumer" allocation mode.
+type ResourceClaimSchedulingStatus struct {
+	// Name matches the pod.spec.resourceClaims[*].Name field.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// UnsuitableNodes lists nodes that the ResourceClaim cannot be
+	// allocated for.
+	//
+	// The size of this field is limited to 128, the same as for
+	// PodSchedulingSpec.PotentialNodes. This may get increased in the
+	// future, but not reduced.
+	//
+	// +optional
+	// +listType=atomic
+	UnsuitableNodes []string `json:"unsuitableNodes,omitempty" protobuf:"bytes,2,opt,name=unsuitableNodes"`
+}
+
+// PodSchedulingNodeListMaxSize defines the maximum number of entries in the
+// node lists that are stored in PodSchedulingContext objects. This limit is part
+// of the API.
+const PodSchedulingNodeListMaxSize = 128
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// PodSchedulingContextList is a collection of Pod scheduling objects.
+type PodSchedulingContextList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of PodSchedulingContext objects.
+	Items []PodSchedulingContext `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.31
+
+// DeviceClass is a vendor or admin-provided resource that contains
+// device configuration and selectors. It can be referenced in
+// the device requests of a claim to apply these presets.
+// Cluster scoped.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type DeviceClass struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec defines what can be allocated and how to configure it.
+	//
+	// This is mutable. Consumers have to be prepared for classes changing
+	// at any time, either because they get updated or replaced. Claim
+	// allocations are done once based on whatever was set in classes at
+	// the time of allocation.
+	//
+	// Changing the spec increments the generation number.
+	Spec DeviceClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+type DeviceClassSpec struct {
+	// Each selector must be satisfied by a device which is claimed via this class.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []Selector `json:"selectors,omitempty" protobuf:"bytes,1,opt,name=selectors"`
+
+	// Config defines configuration parameters that apply to each device that is claimed via this class.
+	// Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor
+	// configuration applies to exactly one driver.
+	//
+	// They are passed to the driver, but are not considered while allocating the claim.
+	//
+	// +optional
+	// +listType=atomic
+	Config []ClassConfiguration `json:"config,omitempty" protobuf:"bytes,2,opt,name=config"`
+
+	// Only nodes matching the selector will be considered by the scheduler
+	// when trying to find a Node that fits a Pod when that Pod uses
+	// a claim that has not been allocated yet *and* that claim
+	// gets allocated through a control plane controller. It is ignored
+	// when the claim does not use a control plane controller
+	// for allocation.
+	//
+	// Setting this field is optional. If unset, all Nodes are candidates.
+	//
+	// This is an alpha field and requires enabling the DRAControlPlaneController
+	// feature gate.
+	//
+	// +optional
+	SuitableNodes *v1.NodeSelector `json:"suitableNodes,omitempty" protobuf:"bytes,3,opt,name=suitableNodes"`
+}
+
+// ClassConfiguration is used in DeviceClass.
+type ClassConfiguration struct {
+	Configuration `json:",inline" protobuf:"bytes,1,opt,name=configuration"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// DeviceClassList is a collection of classes.
+type DeviceClassList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource classes.
+	Items []DeviceClass `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ResourceClaimTemplate is used to produce ResourceClaim objects.
+//
+// This is an alpha type and requires enabling the DynamicResourceAllocation
+// feature gate.
+type ResourceClaimTemplate struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Describes the ResourceClaim that is to be generated.
+	//
+	// This field is immutable. A ResourceClaim will get created by the
+	// control plane for a Pod when needed and then not get updated
+	// anymore.
+	Spec ResourceClaimTemplateSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
+type ResourceClaimTemplateSpec struct {
+	// ObjectMeta may contain labels and annotations that will be copied into the PVC
+	// when creating it. No other fields are allowed and will be rejected during
+	// validation.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec for the ResourceClaim. The entire content is copied unchanged
+	// into the ResourceClaim that gets created from this template. The
+	// same fields as in a ResourceClaim are also valid here.
+	Spec ResourceClaimSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ResourceClaimTemplateList is a collection of claim templates.
+type ResourceClaimTemplateList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource claim templates.
+	Items []ResourceClaimTemplate `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
