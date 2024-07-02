@@ -202,6 +202,7 @@ func TestAttacherAttach(t *testing.T) {
 	// attacher loop
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
@@ -289,6 +290,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 	// attacher loop
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("test case: %s", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
@@ -359,6 +361,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			fakeClient := fakeclient.NewSimpleClientset(
 				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
@@ -446,6 +449,7 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			fakeClient := fakeclient.NewSimpleClientset(
 				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
 				getTestCSIDriver("attachable", nil, &bTrue, nil),
@@ -532,6 +536,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -614,6 +619,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -703,6 +709,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -809,6 +816,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, nil)
 			defer os.RemoveAll(tmpDir)
 
@@ -880,6 +888,7 @@ func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			plug, tmpDir := newTestPlugin(t, nil)
 			defer os.RemoveAll(tmpDir)
 
@@ -956,6 +965,7 @@ func TestAttacherDetach(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("running test: %v", tc.name)
 			fakeClient := fakeclient.NewSimpleClientset()
 			plug, tmpDir := newTestPluginWithAttachDetachVolumeHost(t, fakeClient)
@@ -1055,36 +1065,39 @@ func TestAttacherGetDeviceMountPath(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("Running test case: %s", tc.testName)
-		var spec *volume.Spec
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
+			t.Logf("Running test case: %s", tc.testName)
+			var spec *volume.Spec
 
-		// Create spec
-		pv := makeTestPV(tc.pvName, 10, testDriver, tc.volumeId)
-		if tc.removeVolumeHandle {
-			pv.Spec.PersistentVolumeSource.CSI.VolumeHandle = ""
-		}
-		if tc.addVolSource {
-			spec = volume.NewSpecFromVolume(makeTestVol(tc.pvName, testDriver))
-		} else {
-			spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-			if tc.skipPVCSISource {
-				spec.PersistentVolume.Spec.CSI = nil
+			// Create spec
+			pv := makeTestPV(tc.pvName, 10, testDriver, tc.volumeId)
+			if tc.removeVolumeHandle {
+				pv.Spec.PersistentVolumeSource.CSI.VolumeHandle = ""
 			}
-		}
-		// Run
-		mountPath, err := csiAttacher.GetDeviceMountPath(spec)
+			if tc.addVolSource {
+				spec = volume.NewSpecFromVolume(makeTestVol(tc.pvName, testDriver))
+			} else {
+				spec = volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+				if tc.skipPVCSISource {
+					spec.PersistentVolume.Spec.CSI = nil
+				}
+			}
+			// Run
+			mountPath, err := csiAttacher.GetDeviceMountPath(spec)
 
-		// Verify
-		if err != nil && !tc.shouldFail {
-			t.Errorf("test should not fail, but error occurred: %v", err)
-		} else if err == nil {
-			expectedMountPath := filepath.Join(pluginDir, testDriver, generateSha(tc.volumeId), globalMountInGlobalPath)
-			if tc.shouldFail {
-				t.Errorf("test should fail, but no error occurred")
-			} else if mountPath != expectedMountPath {
-				t.Errorf("mountPath does not equal expectedMountPath. Got: %s. Expected: %s", mountPath, expectedMountPath)
+			// Verify
+			if err != nil && !tc.shouldFail {
+				t.Errorf("test should not fail, but error occurred: %v", err)
+			} else if err == nil {
+				expectedMountPath := filepath.Join(pluginDir, testDriver, generateSha(tc.volumeId), globalMountInGlobalPath)
+				if tc.shouldFail {
+					t.Errorf("test should fail, but no error occurred")
+				} else if mountPath != expectedMountPath {
+					t.Errorf("mountPath does not equal expectedMountPath. Got: %s. Expected: %s", mountPath, expectedMountPath)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -1277,6 +1290,7 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
 			if tc.skipOnWindows && goruntime.GOOS == "windows" {
 				t.Skipf("Skipping test case on Windows: %s", tc.testName)
 			}
@@ -1498,6 +1512,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("Running test case: %s", tc.testName)
 
 			// Setup
@@ -1644,6 +1659,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("Running test case: %s", tc.testName)
 			// Setup
 			// Create a new attacher
