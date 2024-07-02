@@ -692,6 +692,7 @@ const (
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	// beta: v1.29
+	// GA: v1.30
 	//
 	// Decouples Taint Eviction Controller, performing taint-based Pod eviction, from Node Lifecycle Controller.
 	SeparateTaintEvictionController featuregate.Feature = "SeparateTaintEvictionController"
@@ -1146,7 +1147,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SchedulerQueueingHints: {Default: false, PreRelease: featuregate.Beta},
 
-	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.Beta},
+	SeparateTaintEvictionController: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	ServiceAccountTokenJTI: {Default: true, PreRelease: featuregate.Beta},
 
