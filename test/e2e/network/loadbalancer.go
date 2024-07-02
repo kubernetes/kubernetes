@@ -1056,7 +1056,7 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 		ginkgo.By("reading clientIP using the TCP service's service port via its external VIP")
-		clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
+		clientIPPort, err := GetHTTPContent(ctx, ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, "/clientip")
 		framework.ExpectNoError(err)
 		framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIPPort)
 
@@ -1321,7 +1321,7 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 		ginkgo.By(fmt.Sprintf("checking source ip is NOT preserved through loadbalancer %v", ingressIP))
 		var clientIP string
 		pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, 3*e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
-			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+			clientIPPort, err := GetHTTPContent(ctx, ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			if err != nil {
 				return false, nil
 			}
@@ -1360,7 +1360,7 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 		framework.ExpectNoError(err)
 		loadBalancerPropagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(ctx, cs)
 		pollErr = wait.PollUntilContextTimeout(ctx, framework.PollShortTimeout, loadBalancerPropagationTimeout, true, func(ctx context.Context) (bool, error) {
-			clientIPPort, err := GetHTTPContent(ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
+			clientIPPort, err := GetHTTPContent(ctx, ingressIP, svcTCPPort, e2eservice.KubeProxyLagTimeout, path)
 			if err != nil {
 				return false, nil
 			}

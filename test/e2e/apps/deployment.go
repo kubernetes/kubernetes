@@ -691,7 +691,7 @@ func stopDeployment(ctx context.Context, c clientset.Interface, ns, deploymentNa
 	gomega.Expect(rss.Items).Should(gomega.BeEmpty())
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
-	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		pods, err = c.CoreV1().Pods(ns).List(ctx, options)
 		if err != nil {
 			return false, err
@@ -1558,7 +1558,7 @@ func waitForDeploymentOldRSsNum(ctx context.Context, c clientset.Interface, ns, 
 	var oldRSs []*appsv1.ReplicaSet
 	var d *appsv1.Deployment
 
-	pollErr := wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, poll, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		deployment, err := c.AppsV1().Deployments(ns).Get(ctx, deploymentName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

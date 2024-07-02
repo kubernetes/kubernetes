@@ -90,7 +90,7 @@ func (t *ServiceAccountAdmissionControllerMigrationTest) Teardown(ctx context.Co
 func inClusterClientMustWork(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
 	var logs string
 	since := time.Now()
-	if err := wait.PollImmediate(15*time.Second, 5*time.Minute, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(ctx, 15*time.Second, 5*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 		framework.Logf("Polling logs")
 		logs, err = e2epod.GetPodLogsSince(ctx, f.ClientSet, pod.Namespace, pod.Name, "inclusterclient", since)
 		if err != nil {

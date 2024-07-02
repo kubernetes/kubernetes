@@ -91,32 +91,38 @@ func (t *dnsNameserverTest) run(ctx context.Context, isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
+			ctx,
 			"abc.acme.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "2606:4700:4700::1111" },
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)
 		t.checkDNSRecordFrom(
+			ctx,
 			"def.acme.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "2606:4700:4700::2222" },
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)
 		t.checkDNSRecordFrom(
+			ctx,
 			"widget.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "2606:4700:4700::3333" },
 			"cluster-dns-ipv6",
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
+			ctx,
 			"abc.acme.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "1.1.1.1" },
 			"cluster-dns",
 			moreForeverTestTimeout)
 		t.checkDNSRecordFrom(
+			ctx,
 			"def.acme.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "2.2.2.2" },
 			"cluster-dns",
 			moreForeverTestTimeout)
 		t.checkDNSRecordFrom(
+			ctx,
 			"widget.local",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "3.3.3.3" },
 			"cluster-dns",
@@ -127,6 +133,7 @@ func (t *dnsNameserverTest) run(ctx context.Context, isIPv6 bool) {
 	// Wait for the deleted ConfigMap to take effect, otherwise the
 	// configuration can bleed into other tests.
 	t.checkDNSRecordFrom(
+		ctx,
 		"abc.acme.local",
 		func(actual []string) bool { return len(actual) == 0 },
 		"cluster-dns",
@@ -151,12 +158,14 @@ func (t *dnsPtrFwdTest) run(ctx context.Context, isIPv6 bool) {
 	// Should still be able to lookup public nameserver without explicit upstream nameserver set.
 	if isIPv6 {
 		t.checkDNSRecordFrom(
+			ctx,
 			"2001:4860:4860::8888",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDNSHostname+"." },
 			"ptr-record",
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
+			ctx,
 			"8.8.8.8",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == googleDNSHostname+"." },
 			"ptr-record",
@@ -186,6 +195,7 @@ func (t *dnsPtrFwdTest) run(ctx context.Context, isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
+			ctx,
 			"2001:db8::29",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "my.test." },
 			"ptr-record",
@@ -193,6 +203,7 @@ func (t *dnsPtrFwdTest) run(ctx context.Context, isIPv6 bool) {
 
 		t.restoreDNSConfigMap(ctx, originalConfigMapData)
 		t.checkDNSRecordFrom(
+			ctx,
 			"2001:db8::29",
 			func(actual []string) bool { return len(actual) == 0 },
 			"ptr-record",
@@ -200,6 +211,7 @@ func (t *dnsPtrFwdTest) run(ctx context.Context, isIPv6 bool) {
 
 	} else {
 		t.checkDNSRecordFrom(
+			ctx,
 			"192.0.2.123",
 			func(actual []string) bool { return len(actual) == 1 && actual[0] == "my.test." },
 			"ptr-record",
@@ -207,6 +219,7 @@ func (t *dnsPtrFwdTest) run(ctx context.Context, isIPv6 bool) {
 
 		t.restoreDNSConfigMap(ctx, originalConfigMapData)
 		t.checkDNSRecordFrom(
+			ctx,
 			"192.0.2.123",
 			func(actual []string) bool { return len(actual) == 0 },
 			"ptr-record",
@@ -254,6 +267,7 @@ func (t *dnsExternalNameTest) run(ctx context.Context, isIPv6 bool) {
 
 	if isIPv6 {
 		t.checkDNSRecordFrom(
+			ctx,
 			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
@@ -262,6 +276,7 @@ func (t *dnsExternalNameTest) run(ctx context.Context, isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
+			ctx,
 			fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 1 && actual[0] == googleDNSHostname+"."
@@ -292,6 +307,7 @@ func (t *dnsExternalNameTest) run(ctx context.Context, isIPv6 bool) {
 	}
 	if isIPv6 {
 		t.checkDNSRecordFrom(
+			ctx,
 			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) >= 2 && actual[0] == fooHostname+"." && actual[1] == "2001:db8::29"
@@ -300,6 +316,7 @@ func (t *dnsExternalNameTest) run(ctx context.Context, isIPv6 bool) {
 			moreForeverTestTimeout)
 	} else {
 		t.checkDNSRecordFrom(
+			ctx,
 			fmt.Sprintf("%s.%s.svc.%s", serviceNameLocal, f.Namespace.Name, framework.TestContext.ClusterDNSDomain),
 			func(actual []string) bool {
 				return len(actual) == 2 && actual[0] == fooHostname+"." && actual[1] == "192.0.2.123"

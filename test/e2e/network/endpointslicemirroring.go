@@ -84,7 +84,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(ctx, endpoints, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true, func(ctx context.Context) (bool, error) {
 				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
@@ -136,7 +136,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error updating Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true, func(ctx context.Context) (bool, error) {
 				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
@@ -183,7 +183,7 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true, func(ctx context.Context) (bool, error) {
 				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
@@ -281,8 +281,8 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			_, err := cs.CoreV1().Endpoints(f.Namespace.Name).Create(context.TODO(), endpoints, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true, func(ctx context.Context) (bool, error) {
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
@@ -314,8 +314,8 @@ var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error deleting Endpoints")
 
 			// Expect mirrored EndpointSlice resource to be updated.
-			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+			if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 12*time.Second, true, func(ctx context.Context) (bool, error) {
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(ctx, metav1.ListOptions{
 					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {

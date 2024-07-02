@@ -120,7 +120,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		})
 
 		// Expect Endpoints resource to be created.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -132,7 +132,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 
 		// Expect EndpointSlice resource to be created.
 		var endpointSlice discoveryv1.EndpointSlice
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})
@@ -164,7 +164,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		framework.ExpectNoError(err, "error deleting Service")
 
 		// Expect Endpoints resource to be deleted when Service is.
-		if err := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -181,7 +181,7 @@ var _ = common.SIGDescribe("EndpointSlice", func() {
 		// up to 90 seconds since garbage collector only polls every 30 seconds
 		// and may need to retry informer resync at some point during an e2e
 		// run.
-		if err := wait.PollImmediate(2*time.Second, 90*time.Second, func() (bool, error) {
+		if err := wait.PollUntilContextTimeout(ctx, 2*time.Second, 90*time.Second, true, func(ctx context.Context) (bool, error) {
 			endpointSliceList, err := cs.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + svc.Name,
 			})

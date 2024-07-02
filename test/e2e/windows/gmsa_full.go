@@ -361,7 +361,7 @@ func deployGmsaWebhook(ctx context.Context, f *framework.Framework) error {
 	e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	// Wait for the Webhook deployment to become ready. The deployer pod takes a few seconds to initialize and create resources
-	err := waitForDeployment(func() (*appsv1.Deployment, error) {
+	err := waitForDeployment(ctx, func() (*appsv1.Deployment, error) {
 		return f.ClientSet.AppsV1().Deployments(webHookNamespace).Get(ctx, webHookName, metav1.GetOptions{})
 	}, 10*time.Second, f.Timeouts.PodStart)
 	if err == nil {

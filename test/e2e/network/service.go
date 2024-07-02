@@ -192,7 +192,7 @@ func checkAffinity(ctx context.Context, cs clientset.Interface, execPod *v1.Pod,
 	}
 
 	var tracker affinityTracker
-	if pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	if pollErr := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(ctx context.Context) (bool, error) {
 		hosts := getHosts()
 		for _, host := range hosts {
 			if len(host) > 0 {
@@ -1149,7 +1149,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the service " + serviceName + " in namespace " + ns + " to disappear")
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.RespondingTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.RespondingTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -1704,7 +1704,7 @@ var _ = common.SIGDescribe("Services", func() {
 		hostExec := launchHostExecPod(ctx, f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
 			if err != nil {
@@ -1820,7 +1820,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("Check if pod is unreachable")
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/; test \"$?\" -ne \"0\"", svcName, port)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -1840,7 +1840,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("Check if terminating pod is available through service")
 		cmd = fmt.Sprintf("curl -q -s --connect-timeout 2 http://%s:%d/", svcName, port)
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			var err error
 			stdout, err = e2eoutput.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
@@ -2344,7 +2344,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
@@ -2400,7 +2400,7 @@ var _ = common.SIGDescribe("Services", func() {
 			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 		})
 
-		if epErr := wait.PollImmediate(framework.Poll, e2eservice.ServiceEndpointsTimeout, func() (bool, error) {
+		if epErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.ServiceEndpointsTimeout, true, func(ctx context.Context) (bool, error) {
 			endpoints, err := cs.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 			if err != nil {
 				framework.Logf("error fetching '%s/%s' Endpoints: %s", namespace, serviceName, err.Error())
@@ -2435,7 +2435,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v expected to be refused", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
-		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (bool, error) {
 			_, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 
 			if err != nil {
@@ -2748,7 +2748,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("connecting from the execpod to the NodePort on the endpoint's node")
 		cmd := fmt.Sprintf("curl -g -q -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(endpointNodeIP, nodePortStr))
 		var clientIP string
-		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
 			clientIPPort, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
 				framework.Logf("error connecting: %v", err)
@@ -2812,7 +2812,7 @@ var _ = common.SIGDescribe("Services", func() {
 		nodeIPs := e2enode.GetAddresses(&node0, v1.NodeInternalIP)
 		healthCheckNodePortAddr := net.JoinHostPort(nodeIPs[0], strconv.Itoa(int(svc.Spec.HealthCheckNodePort)))
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
-		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
@@ -3743,7 +3743,7 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
 		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
-		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+		validateEndpointsPortsWithProtocolsOrFail(ctx, cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
@@ -3866,7 +3866,7 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 
 		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
-		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+		validateEndpointsPortsWithProtocolsOrFail(ctx, cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
 
 		ginkgo.By("Checking if the Service forwards traffic to pods")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
@@ -4255,7 +4255,7 @@ func validateEndpointsPortsOrFail(ctx context.Context, c clientset.Interface, na
 		pollErr error
 		i       = 0
 	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
+	if pollErr = wait.PollUntilContextTimeout(ctx, time.Second, framework.ServiceStartTimeout, true, func(ctx context.Context) (bool, error) {
 		i++
 
 		ep, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
@@ -4339,7 +4339,7 @@ func restartComponent(ctx context.Context, cs clientset.Interface, cName, ns str
 }
 
 // validateEndpointsPortsWithProtocolsOrFail validates that the given service exists and is served by the given expectedEndpoints.
-func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints fullPortsByPodName) {
+func validateEndpointsPortsWithProtocolsOrFail(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectedEndpoints fullPortsByPodName) {
 	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	expectedPortsByPodUID, err := translatePortsByPodNameToPortsByPodUID(c, namespace, expectedEndpoints)
 	framework.ExpectNoError(err, "failed to translate pod name to UID, ns:%s, expectedEndpoints:%v", namespace, expectedEndpoints)
@@ -4348,10 +4348,10 @@ func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace,
 		pollErr error
 		i       = 0
 	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
+	if pollErr = wait.PollUntilContextTimeout(ctx, time.Second, framework.ServiceStartTimeout, true, func(ctx context.Context) (bool, error) {
 		i++
 
-		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		ep, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Failed go get Endpoints object: %v", err)
 			// Retry the error
@@ -4371,7 +4371,7 @@ func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace,
 			opts := metav1.ListOptions{
 				LabelSelector: "kubernetes.io/service-name=" + serviceName,
 			}
-			es, err := c.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), opts)
+			es, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, opts)
 			if err != nil {
 				framework.Logf("Failed go list EndpointSlice objects: %v", err)
 				// Retry the error
@@ -4389,7 +4389,7 @@ func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace,
 			serviceName, namespace, expectedEndpoints)
 		return true, nil
 	}); pollErr != nil {
-		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
+		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{}); err == nil {
 			for _, pod := range pods.Items {
 				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
 			}

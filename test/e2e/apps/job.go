@@ -131,7 +131,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job fails")
-		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
 	})
 
@@ -538,7 +538,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to fail as there are failed indexes")
-		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verifying the Job status fields to ensure all indexes were executed")
@@ -574,7 +574,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to fail as the number of max failed indexes is exceeded")
-		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verifying the Job status fields to ensure early termination of the job")
@@ -617,7 +617,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to fail as all indexes are failed")
-		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verifying the Job status fields to ensure the upper indexes didn't execute")

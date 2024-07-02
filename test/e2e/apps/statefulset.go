@@ -2554,7 +2554,7 @@ func verifyStatefulSetPVCsExist(ctx context.Context, c clientset.Interface, ss *
 	for _, id := range claimIds {
 		idSet[id] = struct{}{}
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
@@ -2599,7 +2599,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(ctx context.Context, c clientset.In
 	if setUID == "" {
 		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
-	return wait.PollImmediate(e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, e2estatefulset.StatefulSetPoll, e2estatefulset.StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)

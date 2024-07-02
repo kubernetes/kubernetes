@@ -243,7 +243,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(ctx, quota, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		quota, err = c.CoreV1().ResourceQuotas(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -265,7 +265,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has the desired failure condition set", name))
 	generation := rs.Generation
 	conditions := rs.Status.Conditions
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		rs, err = c.AppsV1().ReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -295,7 +295,7 @@ func testReplicaSetConditionCheck(ctx context.Context, f *framework.Framework) {
 	ginkgo.By(fmt.Sprintf("Checking replica set %q has no failure condition set", name))
 	generation = rs.Generation
 	conditions = rs.Status.Conditions
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		rs, err = c.AppsV1().ReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -343,7 +343,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the orphan pod is adopted")
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		// The Pod p should either be adopted or deleted by the ReplicaSet
 		if apierrors.IsNotFound(err) {
@@ -366,7 +366,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 	framework.ExpectNoError(err)
 
 	p = &pods.Items[0]
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
@@ -383,7 +383,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(ctx context.Context, f *framework.
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Then the pod is released")
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		p2, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		for _, owner := range p2.OwnerReferences {

@@ -115,7 +115,7 @@ func (t *KubeProxyDowngradeTest) Teardown(ctx context.Context, f *framework.Fram
 func waitForKubeProxyStaticPodsRunning(ctx context.Context, c clientset.Interface) error {
 	framework.Logf("Waiting up to %v for kube-proxy static pods running", defaultTestTimeout)
 
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		pods, err := getKubeProxyStaticPods(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to get kube-proxy static pods: %v", err)
@@ -142,7 +142,7 @@ func waitForKubeProxyStaticPodsRunning(ctx context.Context, c clientset.Interfac
 		return true, nil
 	}
 
-	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, defaultTestTimeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for kube-proxy static pods running: %w", err)
 	}
 	return nil
@@ -151,7 +151,7 @@ func waitForKubeProxyStaticPodsRunning(ctx context.Context, c clientset.Interfac
 func waitForKubeProxyStaticPodsDisappear(ctx context.Context, c clientset.Interface) error {
 	framework.Logf("Waiting up to %v for kube-proxy static pods disappear", defaultTestTimeout)
 
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		pods, err := getKubeProxyStaticPods(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to get kube-proxy static pods: %v", err)
@@ -165,7 +165,7 @@ func waitForKubeProxyStaticPodsDisappear(ctx context.Context, c clientset.Interf
 		return true, nil
 	}
 
-	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, defaultTestTimeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for kube-proxy static pods disappear: %w", err)
 	}
 	return nil
@@ -174,7 +174,7 @@ func waitForKubeProxyStaticPodsDisappear(ctx context.Context, c clientset.Interf
 func waitForKubeProxyDaemonSetRunning(ctx context.Context, f *framework.Framework, c clientset.Interface) error {
 	framework.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
 
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
@@ -189,7 +189,7 @@ func waitForKubeProxyDaemonSetRunning(ctx context.Context, f *framework.Framewor
 		return e2edaemonset.CheckRunningOnAllNodes(ctx, f, &daemonSets.Items[0])
 	}
 
-	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, defaultTestTimeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for kube-proxy DaemonSet running: %w", err)
 	}
 	return nil
@@ -198,7 +198,7 @@ func waitForKubeProxyDaemonSetRunning(ctx context.Context, f *framework.Framewor
 func waitForKubeProxyDaemonSetDisappear(ctx context.Context, c clientset.Interface) error {
 	framework.Logf("Waiting up to %v for kube-proxy DaemonSet disappear", defaultTestTimeout)
 
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(ctx, c)
 		if err != nil {
 			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
@@ -212,7 +212,7 @@ func waitForKubeProxyDaemonSetDisappear(ctx context.Context, c clientset.Interfa
 		return true, nil
 	}
 
-	if err := wait.PollImmediate(5*time.Second, defaultTestTimeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, 5*time.Second, defaultTestTimeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for kube-proxy DaemonSet disappear: %w", err)
 	}
 	return nil

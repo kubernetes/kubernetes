@@ -36,7 +36,7 @@ func WaitForSSHTunnels(ctx context.Context, namespace string) {
 	defer e2ekubectl.RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
 
 	// allow up to a minute for new ssh tunnels to establish
-	wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
+	_ = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 		_, err := e2ekubectl.RunKubectl(namespace, "logs", "ssh-tunnel-test")
 		return err == nil, nil
 	})

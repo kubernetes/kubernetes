@@ -92,6 +92,7 @@ var _ = common.SIGDescribe(feature.PerformanceDNS, framework.WithSerial(), func(
 			qname := fmt.Sprintf("%v.%v.svc.%v", s.Name, s.Namespace, framework.TestContext.ClusterDNSDomain)
 			framework.Logf("Querying %v expecting %v", qname, svc.Spec.ClusterIP)
 			dnsTest.checkDNSRecordFrom(
+				ctx,
 				qname,
 				func(actual []string) bool {
 					return len(actual) == 1 && actual[0] == svc.Spec.ClusterIP

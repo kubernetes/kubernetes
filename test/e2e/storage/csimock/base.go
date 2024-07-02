@@ -1109,9 +1109,9 @@ func anyOf(conditions ...wait.ConditionFunc) wait.ConditionFunc {
 	}
 }
 
-func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
-	waitErr := wait.PollImmediate(10*time.Second, csiPodUnschedulableTimeout, func() (bool, error) {
-		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+func waitForMaxVolumeCondition(ctx context.Context, pod *v1.Pod, cs clientset.Interface) error {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, csiPodUnschedulableTimeout, true, func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

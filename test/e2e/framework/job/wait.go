@@ -101,8 +101,8 @@ func WaitForJobSuspend(ctx context.Context, c clientset.Interface, ns, jobName s
 }
 
 // WaitForJobFailed uses c to wait for the Job jobName in namespace ns to fail
-func WaitForJobFailed(c clientset.Interface, ns, jobName string) error {
-	return wait.PollImmediate(framework.Poll, JobTimeout, func() (bool, error) {
+func WaitForJobFailed(ctx context.Context, c clientset.Interface, ns, jobName string) error {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, true, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(context.TODO(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

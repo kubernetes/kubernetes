@@ -110,7 +110,7 @@ func getStorageClass(
 
 func waitForDeploymentToRecreatePod(ctx context.Context, client kubernetes.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
-	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
 		podList, err := e2edeployment.GetPodsForDeployment(ctx, client, deployment)
 		if err != nil {
 			return false, fmt.Errorf("failed to get pods for deployment: %w", err)

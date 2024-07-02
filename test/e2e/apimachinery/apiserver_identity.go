@@ -147,9 +147,8 @@ var _ = SIGDescribe("kube-apiserver identity", feature.APIServerIdentity, func()
 
 			err = restartAPIServer(ctx, &node)
 			framework.ExpectNoError(err)
-
-			err = wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-				lease, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(context.TODO(), leaseName, metav1.GetOptions{})
+			err = wait.PollUntilContextTimeout(ctx, time.Second, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				lease, err = client.CoordinationV1().Leases(metav1.NamespaceSystem).Get(ctx, leaseName, metav1.GetOptions{})
 				if err != nil {
 					return false, nil
 				}
