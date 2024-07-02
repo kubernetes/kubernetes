@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1171,7 +1172,7 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+		allocDevices, err := testManager.devicesToAllocate(context.Background(), testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1239,7 +1240,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 		waitUpdateAllocatedDevicesChan <- struct{}{}
 	}()
 
-	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
+	set, err := testManager.devicesToAllocate(context.Background(), podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
 	assert.NoError(t, err)
 	assert.Equal(t, set, sets.New[string](deviceID))
 }

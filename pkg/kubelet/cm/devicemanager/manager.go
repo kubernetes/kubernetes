@@ -323,6 +323,12 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// being cleaned before the admission ended
 	m.setPodPendingAdmission(pod)
 
+	logger := klog.LoggerWithName(klog.Background(), "allocate")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "containerName", container.Name)
+	ctx := klog.NewContext(context.Background(), logger)
+	logger.Info("Allocate start")
+	defer logger.V(2).Info("Allocate end")
+
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
@@ -337,7 +343,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// ever change those semantics, this logic will need to be amended.
 	for _, initContainer := range pod.Spec.InitContainers {
 		if container.Name == initContainer.Name {
-			if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+			if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 				return err
 			}
 			if !types.IsRestartableInitContainer(&initContainer) {
@@ -351,7 +357,7 @@ func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
 			return nil
 		}
 	}
-	if err := m.allocateContainerResources(pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
+	if err := m.allocateContainerResources(ctx, pod, container, m.devicesToReuse[string(pod.UID)]); err != nil {
 		return err
 	}
 	m.podDevices.removeContainerAllocatedResources(string(pod.UID), container.Name, m.devicesToReuse[string(pod.UID)])
@@ -507,6 +513,8 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 		return
 	}
 
+	logger := klog.LoggerWithName(klog.Background(), "UpdateAllocatedDevices")
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -522,7 +530,7 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 	if len(podsToBeRemoved) <= 0 {
 		return
 	}
-	klog.V(3).InfoS("Pods to be removed", "podUIDs", sets.List(podsToBeRemoved))
+	logger.V(3).Info("Pods to be removed", "podUIDs", sets.List(podsToBeRemoved))
 	m.podDevices.delete(sets.List(podsToBeRemoved))
 	// Regenerated allocatedDevices after we update pod allocation information.
 	m.allocatedDevices = m.podDevices.devices()
@@ -530,15 +538,16 @@ func (m *ManagerImpl) UpdateAllocatedDevices() {
 
 // Returns list of device Ids we need to allocate with Allocate rpc call.
 // Returns empty list in case we don't need to issue the Allocate rpc call.
-func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, required int, reusableDevices sets.Set[string]) (sets.Set[string], error) {
+func (m *ManagerImpl) devicesToAllocate(ctx context.Context, podUID, contName, resource string, required int, reusableDevices sets.Set[string]) (sets.Set[string], error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	needed := required
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "devicesToAllocate")
 	// Gets list of devices that have already been allocated.
 	// This can happen if a container restarts for example.
 	devices := m.podDevices.containerDevices(podUID, contName, resource)
 	if devices != nil {
-		klog.V(3).InfoS("Found pre-allocated devices for resource on pod", "resourceName", resource, "containerName", contName, "podUID", podUID, "devices", sets.List(devices))
+		logger.V(3).Info("Found pre-allocated devices for resource on pod", "resourceName", resource, "containerName", contName, "podUID", string(podUID), "devices", sets.List(devices))
 		needed = needed - devices.Len()
 		// A pod's resource is not expected to change once admitted by the API server,
 		// so just fail loudly here. We can revisit this part if this no longer holds.
@@ -557,13 +566,12 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// Is this a simple kubelet restart (scenario 2)? To distinguish, we use the information we got for runtime. If we are asked to allocate devices for containers reported
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
-	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
-		klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(ctx, podUID, contName) {
+		logger.V(3).Info("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 		return nil, nil
 	}
-
 	// We dealt with scenario 2. If we got this far it's either scenario 3 (node reboot) or scenario 1 (steady state, normal flow).
-	klog.V(3).InfoS("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+	logger.V(3).Info("Need devices to allocate for pod", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 	healthyDevices, hasRegistered := m.healthyDevices[resource]
 
 	// The following checks are expected to fail only happen on scenario 3 (node reboot).
@@ -589,7 +597,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// We handled the known error paths in scenario 3 (node reboot), so from now on we can fall back in a common path.
 	// We cover container restart on kubelet steady state with the same flow.
 	if needed == 0 {
-		klog.V(3).InfoS("no devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+		logger.V(3).Info("no devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", string(podUID), "containerName", contName)
 		// No change, no work.
 		return nil, nil
 	}
@@ -639,7 +647,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// give the plugin the chance to influence which ones to allocate from that set.
 	if needed < aligned.Len() {
 		// First allocate from the preferred devices list (if available).
-		preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, aligned.Union(allocated), allocated, required)
+		preferred, err := m.callGetPreferredAllocationIfAvailable(ctx, podUID, contName, resource, aligned.Union(allocated), allocated, required)
 		if err != nil {
 			return nil, err
 		}
@@ -664,7 +672,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 
 	// Then give the plugin the chance to influence the decision on any
 	// remaining devices to allocate.
-	preferred, err := m.callGetPreferredAllocationIfAvailable(podUID, contName, resource, available.Union(allocated), allocated, required)
+	preferred, err := m.callGetPreferredAllocationIfAvailable(ctx, podUID, contName, resource, available.Union(allocated), allocated, required)
 	if err != nil {
 		return nil, err
 	}
@@ -786,11 +794,14 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 // plugin resources for the input container, issues an Allocate rpc request
 // for each new device resource requirement, processes their AllocateResponses,
 // and updates the cached containerDevices on success.
-func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string]) error {
+func (m *ManagerImpl) allocateContainerResources(ctx context.Context, pod *v1.Pod, container *v1.Container, devicesToReuse map[string]sets.Set[string]) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
 	needsUpdateCheckpoint := false
+
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "allocateContainerResources")
+
 	// Extended resources are not allowed to be overcommitted.
 	// Since device plugin advertises extended resources,
 	// therefore Requests must be equal to Limits and iterating
@@ -798,7 +809,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 	for k, v := range container.Resources.Limits {
 		resource := string(k)
 		needed := int(v.Value())
-		klog.V(3).InfoS("Looking for needed resources", "needed", needed, "resourceName", resource)
+		logger.V(3).Info("Looking for needed resources", "needed", needed, "resourceName", resource)
 		if !m.isDevicePluginResource(resource) {
 			continue
 		}
@@ -808,7 +819,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.UpdateAllocatedDevices()
 			allocatedDevicesUpdated = true
 		}
-		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
+		allocDevices, err := m.devicesToAllocate(ctx, podUID, contName, resource, needed, devicesToReuse[resource])
 		if err != nil {
 			return err
 		}
@@ -844,7 +855,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		devs := allocDevices.UnsortedList()
 		// TODO: refactor this part of code to just append a ContainerAllocationRequest
 		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
-		klog.V(3).InfoS("Making allocation request for device plugin", "devices", devs, "resourceName", resource)
+		logger.V(3).Info("Making allocation request for device plugin", "devices", devs, "resourceName", resource)
 		resp, err := eI.e.allocate(devs)
 		metrics.DevicePluginAllocationDuration.WithLabelValues(resource).Observe(metrics.SinceInSeconds(startRPCTime))
 		if err != nil {
@@ -958,7 +969,8 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 
 	m.mutex.Unlock()
 	devs := devices.UnsortedList()
-	klog.V(4).InfoS("Issuing a PreStartContainer call for container", "containerName", contName, "podUID", podUID)
+
+	klog.V(4).InfoS("Issuing a PreStartContainer call for container", "containerName", contName, "podUID", string(podUID))
 	_, err := eI.e.preStartContainer(devs)
 	if err != nil {
 		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %v", err)
@@ -969,19 +981,20 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 
 // callGetPreferredAllocationIfAvailable issues GetPreferredAllocation grpc
 // call for device plugin resource with GetPreferredAllocationAvailable option set.
-func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, resource string, available, mustInclude sets.Set[string], size int) (sets.Set[string], error) {
+func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(ctx context.Context, podUID, contName, resource string, available, mustInclude sets.Set[string], size int) (sets.Set[string], error) {
 	eI, ok := m.endpoints[resource]
 	if !ok {
 		return nil, fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
 	}
 
+	logger := klog.LoggerWithName(klog.FromContext(ctx), "GetPreferred")
 	if eI.opts == nil || !eI.opts.GetPreferredAllocationAvailable {
-		klog.V(4).InfoS("Plugin options indicate to skip GetPreferredAllocation for resource", "resourceName", resource)
+		logger.V(4).Info("Plugin options indicate to skip GetPreferredAllocation for resource", "resourceName", resource)
 		return nil, nil
 	}
 
 	m.mutex.Unlock()
-	klog.V(4).InfoS("Issuing a GetPreferredAllocation call for container", "containerName", contName, "podUID", podUID)
+	logger.V(4).Info("Issuing a GetPreferredAllocation call for container", "containerName", contName, "podUID", string(podUID))
 	resp, err := eI.e.getPreferredAllocation(available.UnsortedList(), mustInclude.UnsortedList(), size)
 	m.mutex.Lock()
 	if err != nil {
@@ -1069,10 +1082,11 @@ func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	m.pendingAdmissionPod = pod
 }
 
-func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
+func (m *ManagerImpl) isContainerAlreadyRunning(ctx context.Context, podUID, cntName string) bool {
+	logger := klog.FromContext(ctx)
 	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
 	if err != nil {
-		klog.V(4).InfoS("container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName, "err", err)
+		logger.V(4).Info("container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName, "err", err)
 		return false
 	}
 
@@ -1080,11 +1094,11 @@ func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
 	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
 	// This scenario should however be rare enough.
 	if !m.containerRunningSet.Has(cntID) {
-		klog.V(4).InfoS("container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+		logger.V(4).Info("container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 		return false
 	}
 
 	// Once we make it here we know we have a running container.
-	klog.V(4).InfoS("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	logger.V(4).Info("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 	return true
 }
