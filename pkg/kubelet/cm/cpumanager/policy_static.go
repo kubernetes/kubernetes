@@ -310,7 +310,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	}()
 
 	if p.options.FullPhysicalCPUsOnly {
-		CPUsPerCore := p.topology.CPUsPerCore()
+		CPUsPerCore := p.topology.MaxCPUsPerCore()
 		if (numCPUs % CPUsPerCore) != 0 {
 			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
 			// if the CPU requested is a multiple of the number of virtual cpus per physical cores.
@@ -486,7 +486,7 @@ func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) 
 	if p.options.DistributeCPUsAcrossNUMA {
 		cpuGroupSize := 1
 		if p.options.FullPhysicalCPUsOnly {
-			cpuGroupSize = p.topology.CPUsPerCore()
+			cpuGroupSize = p.topology.MaxCPUsPerCore()
 		}
 		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs, cpuGroupSize)
 	}
