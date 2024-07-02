@@ -401,6 +401,10 @@ type KubeletConfiguration struct {
 	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
 	// rather than being surprised when they are permanently removed in the release after that.
 	ShowHiddenMetricsForVersion string
+	// DisabledMetrics is a list of fully qualified metric names that should be disabled.
+	// Disabling metrics is higher in precedence than showing hidden metrics.
+	// +optional
+	DisabledMetrics []string
 	// Logging specifies the options of logging.
 	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
 	Logging logsapi.LoggingConfiguration

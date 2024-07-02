@@ -604,6 +604,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		metrics.SetShowHidden()
 	}
 
+	if len(s.DisabledMetrics) > 0 {
+		for _, metric := range s.DisabledMetrics {
+			metrics.SetDisabledMetric(metric)
+		}
+	}
+
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
 	if len(s.KubeConfig) > 0 {

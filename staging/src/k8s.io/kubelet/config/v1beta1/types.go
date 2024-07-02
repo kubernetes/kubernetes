@@ -659,6 +659,11 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion,omitempty"`
+	// disabledMetrics is a list of fully qualified metric names that should be disabled.
+	// Disabling metrics is higher in precedence than showing hidden metrics.
+	// Default: ""
+	// +optional
+	DisabledMetrics []string `json:"disabledMetrics,omitempty"`
 	// systemReservedCgroup helps the kubelet identify absolute name of top level CGroup used
 	// to enforce `systemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)

@@ -62233,6 +62233,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"disabledMetrics": {
+						SchemaProps: spec.SchemaProps{
+							Description: "disabledMetrics is a list of fully qualified metric names that should be disabled. Disabling metrics is higher in precedence than showing hidden metrics. Default: \"\"",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 					"systemReservedCgroup": {
 						SchemaProps: spec.SchemaProps{
 							Description: "systemReservedCgroup helps the kubelet identify absolute name of top level CGroup used to enforce `systemReserved` compute resource reservation for OS system daemons. Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) doc for more information. Default: \"\"",
