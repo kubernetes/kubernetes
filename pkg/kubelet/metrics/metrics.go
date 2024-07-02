@@ -72,6 +72,7 @@ const (
 	OrphanedRuntimePodTotalKey         = "orphaned_runtime_pods_total"
 	RestartedPodTotalKey               = "restarted_pods_total"
 	ImagePullDurationKey               = "image_pull_duration_seconds"
+	CgroupVersionKey                   = "cgroup_version"
 
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
@@ -899,6 +900,15 @@ var (
 		[]string{"image_size_in_bytes"},
 	)
 
+	CgroupVersion = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CgroupVersionKey,
+			Help:           "cgroup version on the hosts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
@@ -928,6 +938,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(NodeStartupPostRegistrationDuration)
 		legacyregistry.MustRegister(NodeStartupDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
+		legacyregistry.MustRegister(CgroupVersion)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(PodStatusSyncDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)
