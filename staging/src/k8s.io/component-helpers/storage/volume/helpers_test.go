@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	storageV1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
@@ -203,6 +204,112 @@ func TestCheckVolumeNodeAffinity(t *testing.T) {
 		}
 		if err == nil && !c.expectSuccess {
 			t.Errorf("CheckTopology %v returned success, expected error", c.name)
+		}
+	}
+}
+
+func testVolumeWithCSINodeDriverAffinity(t *testing.T, volumeSource *v1.CSIPersistentVolumeSource) *v1.PersistentVolume {
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-constraints"},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: volumeSource,
+			},
+		},
+	}
+}
+
+func testCSINode(t *testing.T, csiDrivers []storageV1.CSINodeDriver) *storageV1.CSINode {
+	return &storageV1.CSINode{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-csinodes"},
+		Spec: storageV1.CSINodeSpec{
+			Drivers: csiDrivers,
+		},
+	}
+}
+
+func TestCheckVolumeCSINodeDriverAffinity(t *testing.T) {
+	type csiNodeDriverAffinityTest struct {
+		name          string
+		expectSuccess bool
+		pv            *v1.PersistentVolume
+		csiNode       *storageV1.CSINode
+	}
+
+	cases := []csiNodeDriverAffinityTest{
+		{
+			name:          "valid-pv-nil",
+			expectSuccess: true,
+			pv:            testVolumeWithCSINodeDriverAffinity(t, nil),
+			csiNode: testCSINode(t, []storageV1.CSINodeDriver{
+				{
+					Name: "test-driver",
+				},
+				{
+					Name: "test-driver2",
+				},
+			}),
+		},
+		{
+			name:          "valid-csi-node-nil",
+			expectSuccess: false,
+			pv: testVolumeWithCSINodeDriverAffinity(t, &v1.CSIPersistentVolumeSource{
+				Driver:       "test-driver",
+				VolumeHandle: "diskId",
+			}),
+			csiNode: nil,
+		},
+		{
+			name:          "valid-pv-csinode-mismatch",
+			expectSuccess: false,
+			pv: testVolumeWithCSINodeDriverAffinity(t, &v1.CSIPersistentVolumeSource{
+				Driver:       "test-driver",
+				VolumeHandle: "diskId",
+			}),
+			csiNode: testCSINode(t, []storageV1.CSINodeDriver{
+				{
+					Name: "test-driver2",
+				},
+				{
+					Name: "test-driver3",
+				},
+			}),
+		},
+		{
+			name:          "valid-pv-csinode-match",
+			expectSuccess: true,
+			pv: testVolumeWithCSINodeDriverAffinity(t, &v1.CSIPersistentVolumeSource{
+				Driver:       "test-driver",
+				VolumeHandle: "diskId",
+			}),
+			csiNode: testCSINode(t, []storageV1.CSINodeDriver{
+				{
+					Name: "test-driver",
+				},
+				{
+					Name: "test-driver1",
+				},
+			}),
+		},
+		{
+			name:          "valid-pv-csinode-empty",
+			expectSuccess: false,
+			pv: testVolumeWithCSINodeDriverAffinity(t, &v1.CSIPersistentVolumeSource{
+				Driver:       "test-driver",
+				VolumeHandle: "diskId",
+			}),
+			csiNode: testCSINode(t, []storageV1.CSINodeDriver{}),
+		},
+	}
+
+	for _, c := range cases {
+		err := CheckCSINodeDriverAffinity(c.csiNode, c.pv)
+
+		if err != nil && c.expectSuccess {
+			t.Errorf("CheckCSINodeDriverAffinity %v returned error: %v", c.name, err)
+		}
+		if err == nil && !c.expectSuccess {
+			t.Errorf("CheckCSINodeDriverAffinity %v returned success, expected error", c.name)
 		}
 	}
 }

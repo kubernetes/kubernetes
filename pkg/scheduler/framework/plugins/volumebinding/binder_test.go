@@ -120,8 +120,8 @@ var (
 	node1Zone2    = makeNode("node1").withLabel("topology.gke.io/zone", "us-east-2").Node
 
 	// csiNode objects
-	csiNode1Migrated    = makeCSINode("node1", "kubernetes.io/gce-pd")
-	csiNode1NotMigrated = makeCSINode("node1", "")
+	csiNode1Migrated    = makeCSINode("node1", "kubernetes.io/gce-pd", "pd.csi.storage.gke.io")
+	csiNode1NotMigrated = makeCSINode("node1", "", "")
 
 	// node topology
 	nodeLabelKey   = "nodeKey"
@@ -733,8 +733,8 @@ func pvRemoveClaimUID(pv *v1.PersistentVolume) *v1.PersistentVolume {
 	return newPV
 }
 
-func makeCSINode(name, migratedPlugin string) *storagev1.CSINode {
-	return &storagev1.CSINode{
+func makeCSINode(name, migratedPlugin, csiNodeDriver string) *storagev1.CSINode {
+	csiNode := &storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
@@ -742,6 +742,17 @@ func makeCSINode(name, migratedPlugin string) *storagev1.CSINode {
 			},
 		},
 	}
+	if csiNodeDriver != "" {
+		spec := storagev1.CSINodeSpec{
+			Drivers: []storagev1.CSINodeDriver{
+				{
+					Name: csiNodeDriver,
+				},
+			},
+		}
+		csiNode.Spec = spec
+	}
+	return csiNode
 }
 
 func makeCSIDriver(name string, storageCapacity bool) *storagev1.CSIDriver {
