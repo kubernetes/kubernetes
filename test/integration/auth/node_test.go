@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
@@ -111,6 +112,13 @@ func TestNodeAuthorizer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := superuserClient.ResourceV1alpha2().ResourceClaims("ns").Create(context.TODO(), &v1alpha2.ResourceClaim{ObjectMeta: metav1.ObjectMeta{Name: "mytemplatizedresourceclaim"}, Spec: v1alpha2.ResourceClaimSpec{ResourceClassName: "example.com"}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	model := v1alpha2.ResourceModel{NamedResources: &v1alpha2.NamedResourcesResources{}}
+	if _, err := superuserClient.ResourceV1alpha2().ResourceSlices().Create(context.TODO(), &v1alpha2.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice1"}, NodeName: "node1", DriverName: "dra.example.com", ResourceModel: model}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := superuserClient.ResourceV1alpha2().ResourceSlices().Create(context.TODO(), &v1alpha2.ResourceSlice{ObjectMeta: metav1.ObjectMeta{Name: "myslice2"}, NodeName: "node2", DriverName: "dra.example.com", ResourceModel: model}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -193,6 +201,15 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mytemplatizedresourceclaim", metav1.GetOptions{})
 			return err
+		}
+	}
+	deleteResourceSliceCollection := func(client clientset.Interface, nodeName *string) func() error {
+		return func() error {
+			var listOptions metav1.ListOptions
+			if nodeName != nil {
+				listOptions.FieldSelector = "nodeName=" + *nodeName
+			}
+			return client.ResourceV1alpha2().ResourceSlices().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, listOptions)
 		}
 	}
 	addResourceClaimTemplateReference := func(client clientset.Interface) func() error {
@@ -640,6 +657,32 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, updateNode1CSINode(csiNode2Client))
 	expectForbidden(t, patchNode1CSINode(csiNode2Client))
 	expectForbidden(t, deleteNode1CSINode(csiNode2Client))
+
+	// Always allowed. Permission to delete specific objects is checked per object.
+	// Beware, this is destructive!
+	expectAllowed(t, deleteResourceSliceCollection(csiNode1Client, ptr.To("node1")))
+
+	// One slice must have been deleted, the other not.
+	slices, err := superuserClient.ResourceV1alpha2().ResourceSlices().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(slices.Items) != 1 {
+		t.Fatalf("unexpected slices: %v", slices.Items)
+	}
+	if slices.Items[0].NodeName != "node2" {
+		t.Fatal("wrong slice deleted")
+	}
+
+	// Superuser can delete.
+	expectAllowed(t, deleteResourceSliceCollection(superuserClient, nil))
+	slices, err = superuserClient.ResourceV1alpha2().ResourceSlices().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(slices.Items) != 0 {
+		t.Fatalf("unexpected slices: %v", slices.Items)
+	}
 }
 
 // expect executes a function a set number of times until it either returns the

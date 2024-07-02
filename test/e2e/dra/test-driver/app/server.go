@@ -21,6 +21,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -272,6 +273,7 @@ func NewCommand() *cobra.Command {
 	draAddress := fs.String("dra-address", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket that kubelet will connect to for dynamic resource allocation requests, in the filesystem of kubelet.")
 	fs = kubeletPluginFlagSets.FlagSet("CDI")
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
+	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
 	fs = kubeletPlugin.Flags()
 	for _, f := range kubeletPluginFlagSets.FlagSets {
 		fs.AddFlagSet(f)
@@ -287,7 +289,11 @@ func NewCommand() *cobra.Command {
 			return fmt.Errorf("create socket directory: %w", err)
 		}
 
-		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, "", FileOperations{},
+		if *nodeName == "" {
+			return errors.New("--node-name not set")
+		}
+
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{},
 			kubeletplugin.PluginSocketPath(*endpoint),
 			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
 			kubeletplugin.KubeletPluginSocketPath(*draAddress),

@@ -1607,7 +1607,8 @@ func TestAdmitResourceSlice(t *testing.T) {
 	apiResource := resourceapi.SchemeGroupVersion.WithResource("resourceslices")
 	nodename := "mynode"
 	mynode := &user.DefaultInfo{Name: "system:node:" + nodename, Groups: []string{"system:nodes"}}
-	err := "can only create ResourceSlice with the same NodeName as the requesting node"
+	createErr := "can only create ResourceSlice with the same NodeName as the requesting node"
+	deleteErr := "can only delete ResourceSlice with the same NodeName as the requesting node"
 
 	sliceNode := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1624,53 +1625,88 @@ func TestAdmitResourceSlice(t *testing.T) {
 
 	tests := map[string]struct {
 		operation      admission.Operation
-		obj            runtime.Object
+		options        runtime.Object
+		obj, oldObj    runtime.Object
 		featureEnabled bool
 		expectError    string
 	}{
 		"create allowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"create disallowed, enabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
-			expectError:    err,
+			expectError:    createErr,
 		},
 		"create allowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceNode,
 			featureEnabled: false,
 			expectError:    "",
 		},
 		"create disallowed, disabled": {
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: false,
-			expectError:    err,
+			expectError:    createErr,
 		},
 		"update allowed, same node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceNode,
 			featureEnabled: true,
 			expectError:    "",
 		},
 		"update allowed, other node": {
 			operation:      admission.Update,
+			options:        &metav1.UpdateOptions{},
 			obj:            sliceOtherNode,
 			featureEnabled: true,
 			expectError:    "",
+		},
+		"delete allowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: true,
+			expectError:    "",
+		},
+		"delete disallowed, enabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: true,
+			expectError:    deleteErr,
+		},
+		"delete allowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceNode,
+			featureEnabled: false,
+			expectError:    "",
+		},
+		"delete disallowed, disabled": {
+			operation:      admission.Delete,
+			options:        &metav1.DeleteOptions{},
+			oldObj:         sliceOtherNode,
+			featureEnabled: false,
+			expectError:    deleteErr,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			attributes := admission.NewAttributesRecord(
-				test.obj, nil, schema.GroupVersionKind{},
-				"", "foo", apiResource, "", test.operation, &metav1.CreateOptions{}, false, mynode)
+				test.obj, test.oldObj, schema.GroupVersionKind{},
+				"", "foo", apiResource, "", test.operation, test.options, false, mynode)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, test.featureEnabled)
 			a := &admitTestCase{
 				name:       name,
