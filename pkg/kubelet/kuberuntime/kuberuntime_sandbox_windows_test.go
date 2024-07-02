@@ -1,0 +1,292 @@
+//go:build windows
+// +build windows
+
+/*
+Copyright 2024 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package kuberuntime
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/features"
+)
+
+func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const containerName = "container"
+	gmsaCreds := "gmsa-creds"
+	userName := "SYSTEM"
+	trueVar := true
+	falseVar := false
+
+	testCases := []struct {
+		name                  string
+		podSpec               *v1.PodSpec
+		expectedWindowsConfig *runtimeapi.WindowsPodSandboxConfig
+		expectedError         error
+	}{
+		{
+			name: "Empty PodSecurityContext",
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "GMSACredentialSpec in PodSecurityContext",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						GMSACredentialSpec: &gmsaCreds,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					CredentialSpec: "gmsa-creds",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "RunAsUserName in PodSecurityContext",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						RunAsUserName: &userName,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					RunAsUsername: "SYSTEM",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Pod with HostProcess containers and non-HostProcess containers",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}, {
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers"),
+		},
+		{
+			name: "Pod with HostProcess containers and HostNetwork not set",
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers"),
+		},
+		{
+			name: "Pod with HostProcess containers and HostNetwork set",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					HostProcess: true,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "Pod's WindowsOptions.HostProcess set to false and pod has HostProcess containers",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false"),
+		},
+		{
+			name: "Pod's security context doesn't specify HostProcess containers but Container's security context does",
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					HostProcess: true,
+				},
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, false)
+			pod := &v1.Pod{}
+			pod.Spec = *testCase.podSpec
+
+			wc, err := m.generatePodSandboxWindowsConfig(pod)
+
+			assert.Equal(t, testCase.expectedWindowsConfig, wc)
+			assert.Equal(t, testCase.expectedError, err)
+		})
+	}
+}
+
+func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const containerName = "container"
+
+	testCases := []struct {
+		name                      string
+		hostNetworkFeatureEnabled bool
+		podSpec                   *v1.PodSpec
+		expectedWindowsConfig     *runtimeapi.WindowsPodSandboxConfig
+	}{
+		{
+			name:                      "feature disabled, hostNetwork=false",
+			hostNetworkFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				HostNetwork: false,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			},
+		},
+		{
+			name:                      "feature disabled, hostNetwork=true",
+			hostNetworkFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			}},
+		{
+			name:                      "feature enabled, hostNetwork=false",
+			hostNetworkFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: false,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					NamespaceOptions: &runtimeapi.WindowsNamespaceOption{
+						Network: runtimeapi.NamespaceMode_POD,
+					},
+				},
+			},
+		},
+		{
+			name:                      "feature enabled, hostNetwork=true",
+			hostNetworkFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				Containers:  []v1.Container{{Name: containerName}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					NamespaceOptions: &runtimeapi.WindowsNamespaceOption{
+						Network: runtimeapi.NamespaceMode_NODE,
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostNetwork, testCase.hostNetworkFeatureEnabled)
+			pod := &v1.Pod{}
+			pod.Spec = *testCase.podSpec
+
+			wc, err := m.generatePodSandboxWindowsConfig(pod)
+
+			assert.Equal(t, testCase.expectedWindowsConfig, wc)
+			assert.Equal(t, nil, err)
+		})
+	}
+}
