@@ -328,8 +328,7 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
-		// This PVC is required to exist to check its access modes.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
 	}
 }
 
