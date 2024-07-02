@@ -1932,56 +1932,97 @@ func expectInFlightPods(t *testing.T, q *PriorityQueue, uids ...types.UID) {
 // TestPriorityQueue_AssignedPodAdded tests AssignedPodAdded. It checks that
 // when a pod with pod affinity is in unschedulablePods and another pod with a
 // matching label is added, the unschedulable pod is moved to activeQ.
-func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	affinityPod := st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").Priority(mediumPriority).NominatedNodeName("node1").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj()
-	labelPod := st.MakePod().Name("lbp").Namespace(affinityPod.Namespace).Label("service", "securityscan").Node("node1").Obj()
-
-	c := testingclock.NewFakeClock(time.Now())
-	m := makeEmptyQueueingHintMapPerProfile()
-	m[""][AssignedPodAdd] = []*QueueingHintFunction{
+func TestPriorityQueue_AssignedPodAdded_(t *testing.T) {
+	tests := []struct {
+		name               string
+		unschedPod         *v1.Pod
+		unschedPlugin      string
+		updatedAssignedPod *v1.Pod
+		wantToRequeue      bool
+	}{
 		{
-			PluginName:     "fakePlugin",
-			QueueingHintFn: queueHintReturnQueue,
+			name:               "Pod rejected by pod affinity is requeued with matching Pod's update",
+			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
+			unschedPlugin:      names.InterPodAffinity,
+			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("ns1").Label("service", "securityscan").Node("node1").Obj(),
+			wantToRequeue:      true,
+		},
+		{
+			name:               "Pod rejected by pod affinity isn't requeued with unrelated Pod's update",
+			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
+			unschedPlugin:      names.InterPodAffinity,
+			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
+			wantToRequeue:      false,
+		},
+		{
+			name:               "Pod rejected by pod topology spread is requeued with Pod's update in the same namespace",
+			unschedPod:         st.MakePod().Name("tsp").Namespace("ns1").UID("tsp").SpreadConstraint(1, "node", v1.DoNotSchedule, nil, nil, nil, nil, nil).Obj(),
+			unschedPlugin:      names.PodTopologySpread,
+			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("ns1").Label("service", "securityscan").Node("node1").Obj(),
+			wantToRequeue:      true,
+		},
+		{
+			name:               "Pod rejected by pod topology spread isn't requeued with unrelated Pod's update",
+			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").PodAffinityExists("service", "region", st.PodAffinityWithRequiredReq).Obj(),
+			unschedPlugin:      names.PodTopologySpread,
+			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
+			wantToRequeue:      false,
+		},
+		{
+			name:               "Pod rejected by other plugins isn't requeued with any Pod's update",
+			unschedPod:         st.MakePod().Name("afp").Namespace("ns1").UID("afp").Annotation("annot2", "val2").Obj(),
+			unschedPlugin:      "fakePlugin",
+			updatedAssignedPod: st.MakePod().Name("lbp").Namespace("unrelated").Label("unrelated", "unrelated").Node("node1").Obj(),
+			wantToRequeue:      false,
 		},
 	}
-	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
-	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
-	q.activeQ.Add(q.newQueuedPodInfo(unschedulablePodInfo.Pod))
-	if p, err := q.Pop(logger); err != nil || p.Pod != unschedulablePodInfo.Pod {
-		t.Errorf("Expected: %v after Pop, but got: %v", unschedulablePodInfo.Pod.Name, p.Pod.Name)
-	}
-	q.activeQ.Add(q.newQueuedPodInfo(affinityPod))
-	if p, err := q.Pop(logger); err != nil || p.Pod != affinityPod {
-		t.Errorf("Expected: %v after Pop, but got: %v", affinityPod.Name, p.Pod.Name)
-	}
-	q.Add(logger, medPriorityPodInfo.Pod)
-	err := q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(unschedulablePodInfo.Pod, "fakePlugin"), q.SchedulingCycle())
-	if err != nil {
-		t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
-	}
-	err = q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(affinityPod, "fakePlugin"), q.SchedulingCycle())
-	if err != nil {
-		t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
-	}
 
-	// Move clock to make the unschedulable pods complete backoff.
-	c.Step(DefaultPodInitialBackoffDuration + time.Second)
-	// Simulate addition of an assigned pod. The pod has matching labels for
-	// affinityPod. So, affinityPod should go to activeQ.
-	q.AssignedPodAdded(logger, labelPod)
-	if getUnschedulablePod(q, affinityPod) != nil {
-		t.Error("affinityPod is still in the unschedulablePods.")
-	}
-	if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(affinityPod)); !exists {
-		t.Error("affinityPod is not moved to activeQ.")
-	}
-	// Check that the other pod is still in the unschedulablePods.
-	if getUnschedulablePod(q, unschedulablePodInfo.Pod) == nil {
-		t.Error("unschedulablePodInfo is not in the unschedulablePods.")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			c := testingclock.NewFakeClock(time.Now())
+			m := makeEmptyQueueingHintMapPerProfile()
+			m[""][AssignedPodAdd] = []*QueueingHintFunction{
+				{
+					PluginName:     "fakePlugin",
+					QueueingHintFn: queueHintReturnQueue,
+				},
+				{
+					PluginName:     names.InterPodAffinity,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+				{
+					PluginName:     names.PodTopologySpread,
+					QueueingHintFn: queueHintReturnQueue,
+				},
+			}
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
+
+			// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
+			if err := q.activeQ.Add(q.newQueuedPodInfo(tt.unschedPod)); err != nil {
+				t.Errorf("failed to add pod to activeQ: %v", err)
+			}
+			if p, err := q.Pop(logger); err != nil || p.Pod != tt.unschedPod {
+				t.Errorf("Expected: %v after Pop, but got: %v", tt.unschedPod.Name, p.Pod.Name)
+			}
+
+			err := q.AddUnschedulableIfNotPresent(logger, q.newQueuedPodInfo(tt.unschedPod, tt.unschedPlugin), q.SchedulingCycle())
+			if err != nil {
+				t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+			}
+
+			// Move clock to make the unschedulable pods complete backoff.
+			c.Step(DefaultPodInitialBackoffDuration + time.Second)
+
+			q.AssignedPodAdded(logger, tt.updatedAssignedPod)
+
+			if _, exists, _ := q.activeQ.Get(newQueuedPodInfoForLookup(tt.unschedPod)); exists != tt.wantToRequeue {
+				t.Fatalf("unexpected Pod move: Pod should be requeued: %v. Pod is actually requeued: %v", tt.wantToRequeue, exists)
+			}
+		})
 	}
 }
 
