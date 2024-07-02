@@ -121,6 +121,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MemoryThrottlingFactor = utilpointer.Float64(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
 			obj.PullImageSecretRecheckPeriod = metav1.Duration{}
+			obj.PullImageSecretRecheck = utilpointer.Bool(false)
 		},
 	}
 }

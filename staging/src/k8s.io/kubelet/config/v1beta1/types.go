@@ -860,10 +860,14 @@ type KubeletConfiguration struct {
 	// +optional
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 
-	// PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret.
-	// By default, the kubelet will not recheck the pull image secret.
-	// For security reasons, we recommend rechecking the pull image secret, ideally every 24 hours (1d).
-	PullImageSecretRecheckPeriod *metav1.Duration `json:"pullImageSecretRecheckPeriod"`
+	// PullImageSecretRecheck is a boolean that toggles this behavior.
+	// If false, the kubelet will fallback to the old behavior: only pull an image if it's not present.
+	PullImageSecretRecheck *bool
+
+	// PullImageSecretRecheckPeriod is the period after which the kubelet's cache will be invalidated,
+	// thus causing rechecks for all IfNotPresent images that are recreated.
+	// If set to 0s, or 0, but pullImageSecretRecheck is true, then the kubelet will never invalidate its cache, but will maintain one.
+	PullImageSecretRecheckPeriod metav1.Duration
 }
 
 type KubeletAuthorizationMode string

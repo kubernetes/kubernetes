@@ -62409,14 +62409,21 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
-					"pullImageSecretRecheckPeriod": {
+					"PullImageSecretRecheck": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PullImageSecretRecheckPeriod defines the duration to recheck the pull image secret. By default, the kubelet will not recheck the pull image secret. For security reasons, we recommend rechecking the pull image secret, ideally every 24 hours (1d).",
+							Description: "PullImageSecretRecheck is a boolean that toggles this behavior. If false, the kubelet will fallback to the old behavior: only pull an image if it's not present.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"PullImageSecretRecheckPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PullImageSecretRecheckPeriod is the period after which the kubelet's cache will be invalidated, thus causing rechecks for all IfNotPresent images that are recreated. If set to 0s, or 0, but pullImageSecretRecheck is true, then the kubelet will never invalidate its cache, but will maintain one.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
 				},
-				Required: []string{"containerRuntimeEndpoint", "pullImageSecretRecheckPeriod"},
+				Required: []string{"containerRuntimeEndpoint", "PullImageSecretRecheck", "PullImageSecretRecheckPeriod"},
 			},
 		},
 		Dependencies: []string{

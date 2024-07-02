@@ -269,6 +269,7 @@ var (
 		"ProtectKernelDefaults",
 		"ProviderID",
 		"PullImageSecretRecheckPeriod.Duration",
+		"PullImageSecretRecheck",
 		"ReadOnlyPort",
 		"RegisterNode",
 		"RegistryBurst",

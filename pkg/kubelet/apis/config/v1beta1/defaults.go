@@ -286,7 +286,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.PodLogsDir == "" {
 		obj.PodLogsDir = DefaultPodLogsDir
 	}
-	if obj.PullImageSecretRecheckPeriod == nil {
-		obj.PullImageSecretRecheckPeriod = &metav1.Duration{}
+	if obj.PullImageSecretRecheckPeriod == zeroDuration {
+		obj.PullImageSecretRecheckPeriod = metav1.Duration{}
+	}
+	if obj.PullImageSecretRecheck == nil {
+		obj.PullImageSecretRecheck = utilpointer.Bool(false)
 	}
 }

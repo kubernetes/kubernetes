@@ -131,7 +131,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{},
+				PullImageSecretRecheckPeriod:  metav1.Duration{},
+				PullImageSecretRecheck:        utilpointer.Bool(false),
 			},
 		},
 		{
@@ -263,7 +264,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                    utilpointer.Bool(false),
 				LocalStorageCapacityIsolation:   utilpointer.Bool(false),
 				PodLogsDir:                      "",
-				PullImageSecretRecheckPeriod:    nil,
+				PullImageSecretRecheckPeriod:    zeroDuration,
+				PullImageSecretRecheck:          utilpointer.Bool(false),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(false),
@@ -366,7 +368,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(false),
 				LocalStorageCapacityIsolation: utilpointer.Bool(false),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{},
+				PullImageSecretRecheckPeriod:  metav1.Duration{},
+				PullImageSecretRecheck:        utilpointer.Bool(false),
 			},
 		},
 		{
@@ -520,7 +523,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: 12 * time.Hour},
+				PullImageSecretRecheckPeriod:  metav1.Duration{Duration: 12 * time.Hour},
+				PullImageSecretRecheck:        utilpointer.Bool(true),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(true),
@@ -671,7 +675,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
-				PullImageSecretRecheckPeriod:  &metav1.Duration{Duration: 12 * time.Hour},
+				PullImageSecretRecheckPeriod:  metav1.Duration{Duration: 12 * time.Hour},
+				PullImageSecretRecheck:        utilpointer.Bool(true),
 			},
 		},
 		{
@@ -765,7 +770,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{},
+				PullImageSecretRecheckPeriod:  metav1.Duration{},
+				PullImageSecretRecheck:        utilpointer.Bool(false),
 			},
 		},
 		{
@@ -859,7 +865,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{},
+				PullImageSecretRecheckPeriod:  metav1.Duration{},
+				PullImageSecretRecheck:        utilpointer.Bool(false),
 			},
 		},
 		{
@@ -953,7 +960,8 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
-				PullImageSecretRecheckPeriod:  &metav1.Duration{},
+				PullImageSecretRecheckPeriod:  metav1.Duration{},
+				PullImageSecretRecheck:        utilpointer.Bool(false),
 			},
 		},
 	}
