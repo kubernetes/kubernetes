@@ -187,11 +187,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		}
 		if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(err); isLookupFailure {
 			// In partial discovery cases, preserve existing synced informers for resources in the failed groups, so resyncMonitors will only add informers for newly seen resources
-			for k, v := range oldResources {
-				if _, failed := groupLookupFailures[k.GroupVersion()]; failed && gc.dependencyGraphBuilder.IsResourceSynced(k) {
-					newResources[k] = v
-				}
-			}
+			newResources = gc.preserveFailedGroupResources(groupLookupFailures, oldResources, newResources)
 		}
 
 		// Decide whether discovery has reported a change.
@@ -207,7 +203,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 
 		// Once we get here, we should not unpause workers until we've successfully synced
 		attempt := 0
-		wait.PollImmediateUntilWithContext(ctx, 100*time.Millisecond, func(ctx context.Context) (bool, error) {
+		_ = wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			attempt++
 
 			// On a reattempt, check if available resources have changed
@@ -221,11 +217,7 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 				}
 				if groupLookupFailures, isLookupFailure := discovery.GroupDiscoveryFailedErrorGroups(err); isLookupFailure {
 					// In partial discovery cases, preserve existing synced informers for resources in the failed groups, so resyncMonitors will only add informers for newly seen resources
-					for k, v := range oldResources {
-						if _, failed := groupLookupFailures[k.GroupVersion()]; failed && gc.dependencyGraphBuilder.IsResourceSynced(k) {
-							newResources[k] = v
-						}
-					}
+					newResources = gc.preserveFailedGroupResources(groupLookupFailures, oldResources, newResources)
 				}
 			}
 
@@ -280,6 +272,19 @@ func (gc *GarbageCollector) Sync(ctx context.Context, discoveryClient discovery.
 		oldResources = newResources
 		logger.V(2).Info("synced garbage collector")
 	}, period)
+}
+
+// preserveFailedGroupResources preserves resources for failed groups.
+func (gc *GarbageCollector) preserveFailedGroupResources(
+	groupLookupFailures map[schema.GroupVersion]error,
+	oldResources map[schema.GroupVersionResource]struct{},
+	newResources map[schema.GroupVersionResource]struct{}) map[schema.GroupVersionResource]struct{} {
+	for k, v := range oldResources {
+		if _, failed := groupLookupFailures[k.GroupVersion()]; failed && gc.dependencyGraphBuilder.IsResourceSynced(k) {
+			newResources[k] = v
+		}
+	}
+	return newResources
 }
 
 // printDiff returns a human-readable summary of what resources were added and removed
