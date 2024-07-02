@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// TODO: KEP-4443
+
 // matchPodFailurePolicy returns information about matching a given failed pod
 // against the pod failure policy rules. The information is represented as an
 //   - optional job failure message (present in case the pod matched a 'FailJob' rule),
