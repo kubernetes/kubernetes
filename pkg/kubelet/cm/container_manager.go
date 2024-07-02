@@ -42,6 +42,11 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+const (
+	// Warning message for the users still using cgroup v1
+	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+)
+
 type ActivePodsFunc func() []*v1.Pod
 
 // Manages the containers running on a machine.
@@ -159,6 +164,7 @@ type NodeConfig struct {
 	CPUCFSQuotaPeriod                       time.Duration
 	TopologyManagerPolicy                   string
 	TopologyManagerPolicyOptions            map[string]string
+	CgroupVersion                           int
 }
 
 type NodeAllocatableConfig struct {

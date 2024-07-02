@@ -48,6 +48,11 @@ func NewCgroupV1Manager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager
 	}
 }
 
+// Version of the cgroup implementation on the host
+func (c *cgroupV1impl) Version() int {
+	return 1
+}
+
 // Validate checks if all subsystem cgroups are valid
 func (c *cgroupV1impl) Validate(name CgroupName) error {
 	// Get map of all cgroup paths on the system for the particular cgroup
