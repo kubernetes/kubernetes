@@ -3113,7 +3113,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		[]string{},
 		"",
 		false,
-		false,
 		metav1.Duration{Duration: time.Minute},
 		1024,
 		110,
