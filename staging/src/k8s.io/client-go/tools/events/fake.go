@@ -34,6 +34,14 @@ var _ EventRecorderLogger = &FakeRecorder{}
 
 // Eventf emits an event
 func (f *FakeRecorder) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	f.writeEvent(eventtype, reason, note, args...)
+}
+
+func (f *FakeRecorder) AnnotatedEventf(regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{}) {
+	f.writeEvent(eventtype, reason, note, args...)
+}
+
+func (f *FakeRecorder) writeEvent(eventtype, reason, note string, args ...any) {
 	if f.Events != nil {
 		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+note, args...)
 	}

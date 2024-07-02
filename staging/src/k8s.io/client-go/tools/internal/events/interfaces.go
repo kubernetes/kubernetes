@@ -41,6 +41,9 @@ type EventRecorder interface {
 	// take in regarding's name; it should be in UpperCamelCase format (starting with a capital letter).
 	// 'note' is intended to be human readable.
 	Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{})
+
+	// AnnotatedEventf is just like Eventf, but with annotations attached.
+	AnnotatedEventf(regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{})
 }
 
 // EventRecorderLogger extends EventRecorder such that a logger can

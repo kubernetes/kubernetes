@@ -299,7 +299,7 @@ func TestFinishSeries(t *testing.T) {
 	cache := map[eventKey]*eventsv1.Event{}
 	eventBroadcaster := newBroadcaster(&testEvents, 0, cache).(*eventBroadcasterImpl)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImplLogger)
-	cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
+	cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, nil, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
 	nonFinishedEvent := cachedEvent.DeepCopy()
 	nonFinishedEvent.ReportingController = "nonFinished-controller"
 	cachedEvent.Series = &eventsv1.EventSeries{
@@ -386,7 +386,7 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 		cache := map[eventKey]*eventsv1.Event{}
 		eventBroadcaster := newBroadcaster(&testEvents, 0, cache).(*eventBroadcasterImpl)
 		recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-foo").(*recorderImplLogger)
-		cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
+		cachedEvent := recorder.makeEvent(regarding, related, metav1.MicroTime{Time: time.Now()}, nil, v1.EventTypeNormal, "test", "some verbose message: 1", "eventTest", "eventTest-"+hostname, "started")
 		cachedEvent.Series = &eventsv1.EventSeries{
 			Count:            10,
 			LastObservedTime: LastObservedTime,
