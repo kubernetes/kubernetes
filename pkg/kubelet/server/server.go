@@ -753,6 +753,47 @@ func encodePods(pods []*v1.Pod) (data []byte, err error) {
 
 // getPods returns a list of pods bound to the Kubelet and their spec.
 func (s *Server) getPods(request *restful.Request, response *restful.Response) {
+	if watch := request.QueryParameter("watch"); len(watch) > 0 {
+		response.Header().Set("Transfer-Encoding", "chunked")
+		response.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
+		response.WriteHeader(http.StatusOK)
+		fw := flushwriter.Wrap(response.ResponseWriter)
+		ticker := time.NewTicker(1 * time.Second)
+		var lastPods []*v1.Pod
+		for {
+			select {
+			case <-ticker.C:
+				pods := s.host.GetPods()
+				var podUpdates []*v1.Pod
+				for _, pod := range pods {
+					found := false
+					// If pod same as in lastPods (same pod and status), ignore it.
+					// We only want to push changes
+					for _, lpod := range lastPods {
+						if pod == lpod {
+							found = true
+							break
+						}
+					}
+					if !found {
+						podUpdates = append(podUpdates, pod)
+					}
+				}
+				lastPods = pods
+				if len(podUpdates) > 0 {
+					data, err := encodePods(podUpdates)
+					if err != nil {
+						response.WriteError(http.StatusInternalServerError, err)
+						return
+					}
+					if _, err := fw.Write(data); err != nil {
+						klog.ErrorS(err, "Error writing response")
+						return
+					}
+				}
+			}
+		}
+	}
 	pods := s.host.GetPods()
 	data, err := encodePods(pods)
 	if err != nil {
