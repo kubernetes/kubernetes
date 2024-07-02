@@ -205,7 +205,7 @@ type ValidatingAdmissionPolicyList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of ValidatingAdmissionPolicy.
-	Items []ValidatingAdmissionPolicy `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Items []ValidatingAdmissionPolicy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.
@@ -466,7 +466,7 @@ type ValidatingAdmissionPolicyBindingList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// List of PolicyBinding.
-	Items []ValidatingAdmissionPolicyBinding `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Items []ValidatingAdmissionPolicyBinding `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.
