@@ -1637,7 +1637,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	// Start volume manager
-	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
+	go kl.volumeManager.Run(ctx, kl.sourcesReady)
 
 	if kl.kubeClient != nil {
 		// Start two go-routines to update the status.

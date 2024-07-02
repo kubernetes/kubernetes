@@ -90,7 +90,7 @@ const (
 // this node and makes it so.
 type VolumeManager interface {
 	// Starts the volume manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(ctx context.Context, sourcesReady config.SourcesReady)
 
 	// WaitForAttachAndMount processes the volumes referenced in the specified
 	// pod and blocks until they are all attached and mounted (reflected in
@@ -275,23 +275,23 @@ type volumeManager struct {
 	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
-func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
 	defer runtime.HandleCrash()
 
 	if vm.kubeClient != nil {
 		// start informer for CSIDriver
-		go vm.volumePluginMgr.Run(stopCh)
+		go vm.volumePluginMgr.Run(ctx.Done())
 	}
 
-	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
+	go vm.desiredStateOfWorldPopulator.Run(ctx, sourcesReady)
 	klog.V(2).InfoS("The desired_state_of_world populator starts")
 
 	klog.InfoS("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(stopCh)
+	go vm.reconciler.Run(ctx.Done())
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
-	<-stopCh
+	<-ctx.Done()
 	klog.InfoS("Shutting down Kubelet Volume Manager")
 }
 

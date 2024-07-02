@@ -23,6 +23,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -100,6 +102,7 @@ func TestGetFileShareInfo(t *testing.T) {
 
 func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewAzureFileCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	cases := []struct {
 		name         string
@@ -188,7 +191,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume, tc.podNamespace)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(logger, tc.volume, tc.podNamespace)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -205,6 +208,7 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 
 func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 	translator := NewAzureFileCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	secretNamespace := "secretnamespace"
 
@@ -367,7 +371,7 @@ func TestTranslateAzureFileInTreePVToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreePVToCSI(tc.volume)
+		got, err := translator.TranslateInTreePVToCSI(logger, tc.volume)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}

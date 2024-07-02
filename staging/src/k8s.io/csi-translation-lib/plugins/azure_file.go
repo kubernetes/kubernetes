@@ -59,13 +59,13 @@ func NewAzureFileCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassToCSI translates InTree Azure File storage class parameters to CSI storage class
-func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(logger klog.Logger, sc *storage.StorageClass) (*storage.StorageClass, error) {
 	return sc, nil
 }
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
-func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
+func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(logger klog.Logger, volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureFile == nil {
 		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
@@ -73,7 +73,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	azureSource := volume.AzureFile
 	accountName, err := getStorageAccountName(azureSource.SecretName)
 	if err != nil {
-		klog.V(5).Infof("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		logger.V(5).Info("getStorageAccountName returned with error", "secretName", azureSource.SecretName, "err", err)
 		accountName = azureSource.SecretName
 	}
 
@@ -112,7 +112,7 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 
 // TranslateInTreePVToCSI takes a PV with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
-func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (t *azureFileCSITranslator) TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	if pv == nil || pv.Spec.AzureFile == nil {
 		return nil, fmt.Errorf("pv is nil or Azure File source not defined on pv")
 	}
@@ -120,7 +120,7 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 	azureSource := pv.Spec.PersistentVolumeSource.AzureFile
 	accountName, err := getStorageAccountName(azureSource.SecretName)
 	if err != nil {
-		klog.V(5).Infof("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
+		logger.V(5).Info("getStorageAccountName returned with error", "secretName", azureSource.SecretName, "err", err)
 		accountName = azureSource.SecretName
 	}
 	resourceGroup := ""

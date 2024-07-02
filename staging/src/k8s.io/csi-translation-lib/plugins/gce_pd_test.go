@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func NewStorageClass(params map[string]string, allowedTopologies []v1.TopologySelectorTerm) *storage.StorageClass {
@@ -35,6 +37,7 @@ func NewStorageClass(params map[string]string, allowedTopologies []v1.TopologySe
 
 func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 	g := NewGCEPersistentDiskCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 
 	tcs := []struct {
 		name       string
@@ -86,7 +89,7 @@ func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Logf("Testing %v", tc.name)
-		gotOptions, err := g.TranslateInTreeStorageClassToCSI(tc.options)
+		gotOptions, err := g.TranslateInTreeStorageClassToCSI(logger, tc.options)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -266,7 +269,8 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 
 func TestInlineReadOnly(t *testing.T) {
 	g := NewGCEPersistentDiskCSITranslator()
-	pv, err := g.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+	logger, _ := ktesting.NewTestContext(t)
+	pv, err := g.TranslateInTreeInlineVolumeToCSI(logger, &v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 				PDName:   "foo",
@@ -298,6 +302,7 @@ func TestInlineReadOnly(t *testing.T) {
 
 func TestTranslateInTreePVToCSIVolIDFmt(t *testing.T) {
 	g := NewGCEPersistentDiskCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 	pdName := "pd-name"
 	tests := []struct {
 		desc               string
@@ -332,7 +337,7 @@ func TestTranslateInTreePVToCSIVolIDFmt(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			translatedPV, err := g.TranslateInTreePVToCSI(&v1.PersistentVolume{
+			translatedPV, err := g.TranslateInTreePVToCSI(logger, &v1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{tc.topologyLabelKey: tc.topologyLabelValue},
 				},

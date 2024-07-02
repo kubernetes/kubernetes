@@ -24,10 +24,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 	topologySelectorTerm := v1.TopologySelectorTerm{MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 		{
 			Key:    v1.LabelTopologyZone,
@@ -111,7 +114,7 @@ func TestTranslatevSphereInTreeStorageClassToCSI(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeStorageClassToCSI(tc.sc)
+		got, err := translator.TranslateInTreeStorageClassToCSI(logger, tc.sc)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -291,6 +294,7 @@ func TestTranslateVSphereCSIPVToInTree(t *testing.T) {
 
 func TestTranslateVSphereInTreePVToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 	cases := []struct {
 		name     string
 		intreePV *v1.PersistentVolume
@@ -462,7 +466,7 @@ func TestTranslateVSphereInTreePVToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreePVToCSI(tc.intreePV)
+		got, err := translator.TranslateInTreePVToCSI(logger, tc.intreePV)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
@@ -479,6 +483,7 @@ func TestTranslateVSphereInTreePVToCSI(t *testing.T) {
 
 func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 	translator := NewvSphereCSITranslator()
+	logger, _ := ktesting.NewTestContext(t)
 	cases := []struct {
 		name         string
 		inlinevolume *v1.Volume
@@ -523,7 +528,7 @@ func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inlinevolume, "")
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(logger, tc.inlinevolume, "")
 		if err == nil && tc.expErr {
 			t.Errorf("Expected error, but did not get one.")
 			continue

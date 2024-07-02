@@ -117,7 +117,7 @@ type PodVolumes struct {
 type InTreeToCSITranslator interface {
 	IsPVMigratable(pv *v1.PersistentVolume) bool
 	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
-	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+	TranslateInTreePVToCSI(logger klog.Logger, pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
 }
 
 // SchedulerVolumeBinder is used by the scheduler VolumeBinding plugin to
@@ -673,7 +673,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 			return false, nil
 		}
 
-		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 		if err != nil {
 			return false, fmt.Errorf("failed to translate pv to csi: %w", err)
 		}
@@ -732,7 +732,7 @@ func (b *volumeBinder) checkBindings(logger klog.Logger, pod *v1.Pod, bindings [
 				return false, fmt.Errorf("failed to get pv %q from cache: %w", pvc.Spec.VolumeName, err)
 			}
 
-			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+			pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 			if err != nil {
 				return false, err
 			}
@@ -881,7 +881,7 @@ func (b *volumeBinder) checkBoundClaims(logger klog.Logger, claims []*v1.Persist
 			return true, false, err
 		}
 
-		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
+		pv, err = b.tryTranslatePVToCSI(logger, pv, csiNode)
 		if err != nil {
 			return false, true, err
 		}
@@ -1128,7 +1128,7 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 }
 
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
-func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
+func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
 		return pv, nil
 	}
@@ -1146,7 +1146,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return pv, nil
 	}
 
-	transPV, err := b.translator.TranslateInTreePVToCSI(pv)
+	transPV, err := b.translator.TranslateInTreePVToCSI(logger, pv)
 	if err != nil {
 		return nil, fmt.Errorf("could not translate pv: %v", err)
 	}

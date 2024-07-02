@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/csi-translation-lib/plugins"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 var (
@@ -45,6 +47,7 @@ var (
 )
 
 func TestTranslationStability(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name string
 		pv   *v1.PersistentVolume
@@ -84,7 +87,7 @@ func TestTranslationStability(t *testing.T) {
 	for _, test := range testCases {
 		ctl := New()
 		t.Logf("Testing %v", test.name)
-		csiSource, err := ctl.TranslateInTreePVToCSI(test.pv)
+		csiSource, err := ctl.TranslateInTreePVToCSI(logger, test.pv)
 		if err != nil {
 			t.Errorf("Error when translating to CSI: %v", err)
 		}
@@ -99,6 +102,7 @@ func TestTranslationStability(t *testing.T) {
 }
 
 func TestTopologyTranslation(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		name                 string
 		key                  string
@@ -207,7 +211,7 @@ func TestTopologyTranslation(t *testing.T) {
 		t.Logf("Testing %v", test.name)
 
 		// Translate to CSI PV and check translated node affinity
-		newCSIPV, err := ctl.TranslateInTreePVToCSI(test.pv)
+		newCSIPV, err := ctl.TranslateInTreePVToCSI(logger, test.pv)
 		if err != nil {
 			t.Errorf("Error when translating to CSI: %v", err)
 		}
@@ -365,12 +369,13 @@ func makeTopology(key string, values ...string) *v1.NodeSelectorRequirement {
 func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 	for driverName := range inTreePlugins {
 		t.Run(driverName, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			ctl := New()
 			vs1, err := generateUniqueVolumeSource(driverName)
 			if err != nil {
 				t.Fatalf("Couldn't generate random source: %v", err)
 			}
-			pv1, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+			pv1, err := ctl.TranslateInTreeInlineVolumeToCSI(logger, &v1.Volume{
 				VolumeSource: vs1,
 			}, "")
 			if err != nil {
@@ -380,7 +385,7 @@ func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Couldn't generate random source: %v", err)
 			}
-			pv2, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+			pv2, err := ctl.TranslateInTreeInlineVolumeToCSI(logger, &v1.Volume{
 				VolumeSource: vs2,
 			}, "")
 			if err != nil {
