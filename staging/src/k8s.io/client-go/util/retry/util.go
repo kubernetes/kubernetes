@@ -17,6 +17,7 @@ limitations under the License.
 package retry
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -42,13 +43,19 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// OnError allows the caller to retry fn in case the error returned by fn is retriable
-// according to the provided function. backoff defines the maximum retries and the wait
-// interval between two retries.
+// OnError wraps [OnErrorWithContext] using [context.Background].
 func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
+	return OnErrorWithContext(context.Background(), backoff, retriable, func(context.Context) error { return fn() })
+}
+
+// OnErrorWithContext allows the caller to retry fn in case the error returned by fn is retriable
+// according to the provided function. backoff defines the maximum retries and the wait
+// interval between two retries. An error will be returned if the context is done (the context
+// was canceled or the context's deadline passed).
+func OnErrorWithContext(ctx context.Context, backoff wait.Backoff, retriable func(error) bool, fn func(context.Context) error) error {
 	var lastErr error
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := fn()
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		err := fn(ctx)
 		switch {
 		case err == nil:
 			return true, nil
@@ -65,16 +72,21 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 	return err
 }
 
-// RetryOnConflict is used to make an update to a resource when you have to worry about
-// conflicts caused by other code making unrelated updates to the resource at the same
+// RetryOnConflict wraps [RetryOnConflictWithContext] using [context.Background].
+func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
+	return RetryOnConflictWithContext(context.Background(), backoff, func(context.Context) error { return fn() })
+}
+
+// RetryOnConflictWithContext is used to make an update to a resource when you have to worry
+// about conflicts caused by other code making unrelated updates to the resource at the same
 // time. fn should fetch the resource to be modified, make appropriate changes to it, try
 // to update it, and return (unmodified) the error from the update function. On a
-// successful update, RetryOnConflict will return nil. If the update function returns a
-// "Conflict" error, RetryOnConflict will wait some amount of time as described by
+// successful update, RetryOnConflictWithContext will return nil. If the update function returns a
+// "Conflict" error, RetryOnConflictWithContext will wait some amount of time as described by
 // backoff, and then try again. On a non-"Conflict" error, or if it retries too many times
-// and gives up, RetryOnConflict will return an error to the caller.
+// and gives up, RetryOnConflictWithContext will return an error to the caller.
 //
-//	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+//	err := retry.RetryOnConflictWithContext(retry.DefaultRetry, func() error {
 //	    // Fetch the resource here; you need to refetch it on every try, since
 //	    // if you got a conflict on the last update attempt then you need to get
 //	    // the current version before making your own changes.
@@ -100,6 +112,6 @@ func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) 
 //	...
 //
 // TODO: Make Backoff an interface?
-func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
-	return OnError(backoff, errors.IsConflict, fn)
+func RetryOnConflictWithContext(ctx context.Context, backoff wait.Backoff, fn func(context.Context) error) error {
+	return OnErrorWithContext(ctx, backoff, errors.IsConflict, fn)
 }
