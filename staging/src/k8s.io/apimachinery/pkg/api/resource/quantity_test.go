@@ -1313,7 +1313,7 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 10},
 		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * 10000},
 		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * 100000000},
-		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) / float64(10)},
 		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(100000000)},
 
 		{decQuantity(1024, 0, DecimalSI), 1024},
@@ -1322,7 +1322,7 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(7*1024*1024, 1, DecimalSI), (7 * 1024 * 1024) * 10},
 		{decQuantity(7*1024*1024, 4, DecimalSI), (7 * 1024 * 1024) * 10000},
 		{decQuantity(7*1024*1024, 8, DecimalSI), (7 * 1024 * 1024) * 100000000},
-		{decQuantity(7*1024*1024, -1, DecimalSI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -1, DecimalSI), (7 * 1024 * 1024) / float64(10)},
 		{decQuantity(7*1024*1024, -8, DecimalSI), (7 * 1024 * 1024) / float64(100000000)},
 
 		{decQuantity(1024, 0, DecimalExponent), 1024},
@@ -1331,7 +1331,7 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(7*1024*1024, 1, DecimalExponent), (7 * 1024 * 1024) * 10},
 		{decQuantity(7*1024*1024, 4, DecimalExponent), (7 * 1024 * 1024) * 10000},
 		{decQuantity(7*1024*1024, 8, DecimalExponent), (7 * 1024 * 1024) * 100000000},
-		{decQuantity(7*1024*1024, -1, DecimalExponent), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -1, DecimalExponent), (7 * 1024 * 1024) / float64(10)},
 		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
 
 		// very large numbers
@@ -1344,11 +1344,11 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(-12, 500, DecimalSI), math.Inf(-1)},
 	}
 
-	for _, item := range table {
+	for i, item := range table {
 		t.Run(fmt.Sprintf("%s %s", item.in.Format, item.in.String()), func(t *testing.T) {
 			out := item.in.AsApproximateFloat64()
 			if out != item.out {
-				t.Fatalf("expected %v, got %v", item.out, out)
+				t.Fatalf("test %d expected %v, got %v", i+1, item.out, out)
 			}
 			if item.in.d.Dec != nil {
 				if i, ok := item.in.AsInt64(); ok {
