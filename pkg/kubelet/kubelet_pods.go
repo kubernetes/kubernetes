@@ -2084,6 +2084,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
 		}
+
+		convertCustomResources := func(inResources, outResources v1.ResourceList) {
+			for resourceName, resourceQuantity := range inResources {
+				if resourceName == v1.ResourceCPU || resourceName == v1.ResourceMemory ||
+					resourceName == v1.ResourceStorage || resourceName == v1.ResourceEphemeralStorage {
+					continue
+				}
+				outResources[resourceName] = resourceQuantity
+			}
+		}
+
 		// Convert Limits
 		if container.Resources.Limits != nil {
 			limits = make(v1.ResourceList)
@@ -2100,6 +2111,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if ephemeralStorage, found := container.Resources.Limits[v1.ResourceEphemeralStorage]; found {
 				limits[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
+
+			convertCustomResources(container.Resources.Limits, limits)
 		}
 		// Convert Requests
 		if status.AllocatedResources != nil {
@@ -2115,9 +2128,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			if ephemeralStorage, found := status.AllocatedResources[v1.ResourceEphemeralStorage]; found {
 				requests[v1.ResourceEphemeralStorage] = ephemeralStorage.DeepCopy()
 			}
+
+			convertCustomResources(status.AllocatedResources, requests)
 		}
-		//TODO(vinaykul,derekwaynecarr,InPlacePodVerticalScaling): Update this to include extended resources in
-		// addition to CPU, memory, ephemeral storage. Add test case for extended resources.
+
 		resources := &v1.ResourceRequirements{
 			Limits:   limits,
 			Requests: requests,
