@@ -563,7 +563,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should have session affinity work for LoadBalancer service with Local traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should have session affinity work for LoadBalancer service with Local traffic policy", f.WithSlow(), func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp")
@@ -573,7 +573,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should be able to switch session affinity for LoadBalancer service with Local traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to switch session affinity for LoadBalancer service with Local traffic policy", f.WithSlow(), func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-esipp-transition")
@@ -583,7 +583,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should have session affinity work for LoadBalancer service with Cluster traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should have session affinity work for LoadBalancer service with Cluster traffic policy", f.WithSlow(), func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb")
@@ -593,7 +593,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	// [LinuxOnly]: Windows does not support session affinity.
-	f.It("should be able to switch session affinity for LoadBalancer service with Cluster traffic policy", f.WithSlow(), "[LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to switch session affinity for LoadBalancer service with Cluster traffic policy", f.WithSlow(), func(ctx context.Context) {
 		// FIXME: some cloud providers do not support k8s-compatible affinity
 
 		svc := getServeHostnameService("affinity-lb-transition")

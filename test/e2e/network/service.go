@@ -986,9 +986,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should preserve source pod IP for traffic thru service cluster IP", func(ctx context.Context) {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		serviceName := "sourceip-test"
 		ns := f.Namespace.Name
@@ -2155,7 +2154,7 @@ var _ = common.SIGDescribe("Services", func() {
 		execAffinityTestForNonLBService(ctx, f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
+	ginkgo.It("should have session affinity timeout work for service with type clusterIP", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip-timeout")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForSessionAffinityTimeout(ctx, f, cs, svc)
@@ -2171,7 +2170,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to switch session affinity for service with type clusterIP", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-clusterip-transition")
 		svc.Spec.Type = v1.ServiceTypeClusterIP
 		execAffinityTestForNonLBServiceWithTransition(ctx, f, cs, svc)
@@ -2186,13 +2185,13 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should have session affinity work for NodePort service [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should have session affinity work for NodePort service", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBService(ctx, f, cs, svc)
 	})
 
-	ginkgo.It("should have session affinity timeout work for NodePort service [LinuxOnly]", func(ctx context.Context) {
+	ginkgo.It("should have session affinity timeout work for NodePort service", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport-timeout")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForSessionAffinityTimeout(ctx, f, cs, svc)
@@ -2208,7 +2207,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
 	*/
-	framework.ConformanceIt("should be able to switch session affinity for NodePort service [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should be able to switch session affinity for NodePort service", func(ctx context.Context) {
 		svc := getServeHostnameService("affinity-nodeport-transition")
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		execAffinityTestForNonLBServiceWithTransition(ctx, f, cs, svc)
@@ -2452,10 +2451,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod to Pod", func(ctx context.Context) {
+	framework.ConformanceIt("should respect internalTrafficPolicy=Local Pod to Pod", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2520,10 +2518,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod", func(ctx context.Context) {
+	framework.ConformanceIt("should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2590,10 +2587,9 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true)", func(ctx context.Context) {
+	framework.ConformanceIt("should respect internalTrafficPolicy=Local Pod and Node, to Pod (hostNetwork: true)", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		// TODO: remove this skip when windows-based proxies implement internalTrafficPolicy
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2857,9 +2853,8 @@ var _ = common.SIGDescribe("Services", func() {
 		execHostnameTest(*pausePod0, nodePortAddress, webserverPod0.Name)
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster", func(ctx context.Context) {
+	framework.ConformanceIt("should fallback to terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -2930,9 +2925,8 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local", func(ctx context.Context) {
+	framework.ConformanceIt("should fallback to local terminating endpoints when there are no ready endpoints with internalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -3008,9 +3002,8 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster", func(ctx context.Context) {
+	framework.ConformanceIt("should fallback to terminating endpoints when there are no ready endpoints with externallTrafficPolicy=Cluster", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)
@@ -3083,9 +3076,8 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
-	ginkgo.It("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local", func(ctx context.Context) {
+	framework.ConformanceIt("should fallback to local terminating endpoints when there are no ready endpoints with externalTrafficPolicy=Local", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err)

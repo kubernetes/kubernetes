@@ -91,7 +91,7 @@ var _ = common.SIGDescribe("DNS", func() {
 	})
 
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
-	ginkgo.It("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func(ctx context.Context) {
 		// All the names we need to be able to resolve.
 		namesToResolve := []string{
 			"kubernetes.default",
@@ -604,7 +604,7 @@ var _ = common.SIGDescribe("DNS HostNetwork", func() {
 	f := framework.NewDefaultFramework("hostnetworkdns")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	ginkgo.It("should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet [LinuxOnly]", func(ctx context.Context) {
+	framework.ConformanceIt("should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy: ClusterFirstWithHostNet", func(ctx context.Context) {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{

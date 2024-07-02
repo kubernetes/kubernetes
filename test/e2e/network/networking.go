@@ -93,7 +93,6 @@ var _ = common.SIGDescribe("Networking", func() {
 
 	f.It("should provide Internet connection for containers", feature.NetworkingIPv6, "[Experimental][LinuxOnly]", func(ctx context.Context) {
 		// IPv6 is not supported on Windows.
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
 			checkConnectivityToHost(ctx, f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
