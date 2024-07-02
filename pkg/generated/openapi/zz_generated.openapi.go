@@ -26749,6 +26749,7 @@ func schema_k8sio_api_core_v1_PodIP(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 				},
+				Required: []string{"ip"},
 			},
 		},
 	}
