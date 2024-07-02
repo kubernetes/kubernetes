@@ -64,6 +64,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/server/routine"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storageversion"
@@ -1061,7 +1062,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	// handler in current goroutine to minimize the stack memory usage. It must be
 	// after WithPanicRecover() to be protected from panics.
 	if c.FeatureGate.Enabled(genericfeatures.APIServingWithRoutine) {
-		handler = genericfilters.WithRoutine(handler, c.LongRunningFunc)
+		handler = routine.WithRoutine(handler, c.LongRunningFunc)
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)

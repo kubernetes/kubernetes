@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package filters
+package routine
 
 import (
 	"context"
@@ -33,6 +33,20 @@ type Task struct {
 
 func WithTask(parent context.Context, t *Task) context.Context {
 	return request.WithValue(parent, taskKey, t)
+}
+
+// AppendTask appends a task executed after completion of existing task.
+// It is a no-op if there is no existing task.
+func AppendTask(ctx context.Context, t *Task) bool {
+	if existTask := TaskFrom(ctx); existTask != nil && existTask.Func != nil {
+		existFunc := existTask.Func
+		existTask.Func = func() {
+			existFunc()
+			t.Func()
+		}
+		return true
+	}
+	return false
 }
 
 func TaskFrom(ctx context.Context) *Task {
