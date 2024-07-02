@@ -1765,6 +1765,139 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			pod:          getPod("pod1", "container1", requirementsGuaranteed),
 			topologyHint: &topologymanager.TopologyHint{Preferred: true},
 		},
+		{
+			description: "should succeed when NUMA affinity provided under the topology manager hint satisfies container requirements and should not change the current grouping algorithm",
+			assignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         2 * gb,
+						},
+					},
+				},
+			},
+			expectedAssignments: state.ContainerMemoryAssignments{
+				"pod1": map[string][]state.Block{
+					"container1": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         2 * gb,
+						},
+					},
+				},
+				"pod2": map[string][]state.Block{
+					"container2": {
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         v1.ResourceMemory,
+							Size:         gb,
+						},
+						{
+							NUMAAffinity: []int{0, 1},
+							Type:         hugepages1Gi,
+							Size:         gb,
+						},
+					},
+				},
+			},
+			machineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1.5 * gb,
+							Free:           0,
+							Reserved:       1.5 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1.5 * gb,
+							Free:           gb,
+							Reserved:       0.5 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 1,
+				},
+			},
+			expectedMachineState: state.NUMANodeMap{
+				0: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1.5 * gb,
+							Free:           0,
+							Reserved:       1.5 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           0,
+							Reserved:       gb,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 3,
+				},
+				1: &state.NUMANodeState{
+					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
+						v1.ResourceMemory: {
+							Allocatable:    1.5 * gb,
+							Free:           0,
+							Reserved:       1.5 * gb,
+							SystemReserved: 512 * mb,
+							TotalMemSize:   2 * gb,
+						},
+						hugepages1Gi: {
+							Allocatable:    gb,
+							Free:           gb,
+							Reserved:       0,
+							SystemReserved: 0,
+							TotalMemSize:   gb,
+						},
+					},
+					Cells:               []int{0, 1},
+					NumberOfAssignments: 3,
+				},
+			},
+			systemReserved: systemReservedMemory{
+				0: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+				1: map[v1.ResourceName]uint64{
+					v1.ResourceMemory: 512 * mb,
+				},
+			},
+			pod:          getPod("pod2", "container2", requirementsGuaranteed),
+			topologyHint: &topologymanager.TopologyHint{NUMANodeAffinity: newNUMAAffinity(1), Preferred: false},
+		},
 	}
 
 	for _, testCase := range testCases {
