@@ -451,19 +451,27 @@ func TestStatusEquality(t *testing.T) {
 	pod := v1.Pod{
 		Spec: v1.PodSpec{},
 	}
-	containerStatus := []v1.ContainerStatus{}
-	for i := 0; i < 10; i++ {
-		s := v1.ContainerStatus{
-			Name: fmt.Sprintf("container%d", i),
+	getContainerStatus := func() []v1.ContainerStatus {
+		containerStatus := []v1.ContainerStatus{}
+		for i := 0; i < 10; i++ {
+			s := v1.ContainerStatus{
+				Name: fmt.Sprintf("container%d", i),
+			}
+			containerStatus = append(containerStatus, s)
 		}
-		containerStatus = append(containerStatus, s)
+		return containerStatus
 	}
+
 	podStatus := v1.PodStatus{
-		ContainerStatuses: containerStatus,
+		ContainerStatuses:          getContainerStatus(),
+		InitContainerStatuses:      getContainerStatus(),
+		EphemeralContainerStatuses: getContainerStatus(),
 	}
 	for i := 0; i < 10; i++ {
 		oldPodStatus := v1.PodStatus{
-			ContainerStatuses: shuffle(podStatus.ContainerStatuses),
+			ContainerStatuses:          shuffle(podStatus.ContainerStatuses),
+			InitContainerStatuses:      shuffle(podStatus.InitContainerStatuses),
+			EphemeralContainerStatuses: shuffle(podStatus.EphemeralContainerStatuses),
 		}
 		normalizeStatus(&pod, &oldPodStatus)
 		normalizeStatus(&pod, &podStatus)
@@ -507,8 +515,9 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 		containerStatus = append(containerStatus, s)
 	}
 	podStatus := v1.PodStatus{
-		InitContainerStatuses: containerStatus[:24],
-		ContainerStatuses:     containerStatus[24:],
+		InitContainerStatuses:      containerStatus[:16],
+		ContainerStatuses:          containerStatus[16:32],
+		EphemeralContainerStatuses: containerStatus[32:],
 	}
 	result := normalizeStatus(&pod, &podStatus)
 	count := 0
@@ -521,6 +530,49 @@ func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {
 	}
 	if count > kubecontainer.MaxPodTerminationMessageLogLength {
 		t.Errorf("message length not truncated")
+	}
+}
+
+func TestStatusNormalizeTimeStamp(t *testing.T) {
+	pod := v1.Pod{
+		Spec: v1.PodSpec{},
+	}
+
+	now := metav1.Now()
+	podStatus := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+		InitContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+		EphemeralContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: now}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: now, FinishedAt: now}}},
+		},
+	}
+
+	expectedTime := now.DeepCopy().Rfc3339Copy()
+	expectedPodStatus := v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+		InitContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+		EphemeralContainerStatuses: []v1.ContainerStatus{
+			{State: v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: expectedTime}}},
+			{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{StartedAt: expectedTime, FinishedAt: expectedTime}}},
+		},
+	}
+
+	normalizedStatus := normalizeStatus(&pod, &podStatus)
+	if !isPodStatusByKubeletEqual(&expectedPodStatus, normalizedStatus) {
+		t.Fatalf("The timestamp is not correctly converted to RFC3339 format.")
 	}
 }
 
