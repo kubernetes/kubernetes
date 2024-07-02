@@ -61,17 +61,17 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 
 	switch pluginName {
 	case csilibplugins.AWSEBSInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginAWSUnregister)
+		return true
 	case csilibplugins.GCEPDInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginGCEUnregister)
+		return true
 	case csilibplugins.AzureFileInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginAzureFileUnregister)
+		return true
 	case csilibplugins.AzureDiskInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginAzureDiskUnregister)
+		return true
 	case csilibplugins.CinderInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginOpenStackUnregister)
+		return true
 	case csilibplugins.VSphereInTreePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginvSphereUnregister)
+		return true
 	case csilibplugins.PortworxVolumePluginName:
 		return pm.featureGate.Enabled(features.InTreePluginPortworxUnregister)
 	default:
