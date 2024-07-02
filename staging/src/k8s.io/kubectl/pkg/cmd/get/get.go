@@ -79,8 +79,9 @@ type GetOptions struct {
 
 	ServerPrint bool
 
-	NoHeaders      bool
-	IgnoreNotFound bool
+	NoHeaders       bool
+	IgnoreNotFound  bool
+	IgnoreForbidden bool
 
 	genericiooptions.IOStreams
 }
@@ -186,6 +187,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
+	cmd.Flags().BoolVar(&o.IgnoreForbidden, "ignore-forbidden", o.IgnoreForbidden, "If the requested object is forbidden, the command will not return the forbidden object.")
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	addServerPrintColumnFlags(cmd, o)
@@ -236,7 +238,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if (len(*o.PrintFlags.OutputFormat) == 0 && len(templateArg) == 0) || *o.PrintFlags.OutputFormat == "wide" {
 		o.IsHumanReadablePrinter = true
 	}
-
 	o.ToPrinter = func(mapping *meta.RESTMapping, outputObjects *bool, withNamespace bool, withKind bool) (printers.ResourcePrinterFunc, error) {
 		// make a new copy of current flags / opts before mutating
 		printFlags := o.PrintFlags.Copy()
@@ -259,7 +260,6 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		if err != nil {
 			return nil, err
 		}
-
 		if len(o.SortBy) > 0 {
 			printer = &SortingPrinter{Delegate: printer, SortField: o.SortBy}
 		}
@@ -464,7 +464,6 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		// to gather all results, then sort them all at the end to reduce server load.
 		chunkSize = 0
 	}
-
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -483,6 +482,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 	if o.IgnoreNotFound {
 		r.IgnoreErrors(apierrors.IsNotFound)
 	}
+
+	if o.IgnoreForbidden {
+		r.IgnoreErrors(apierrors.IsForbidden)
+	}
+
 	if err := r.Err(); err != nil {
 		return err
 	}
