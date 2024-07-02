@@ -713,8 +713,14 @@ func (s ByLogging) Less(i, j int) bool {
 		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
-		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	regularRestartsI, sidecarRestartsI := maxContainerRestarts(s[i])
+	regularRestartsJ, sidecarRestartsJ := maxContainerRestarts(s[j])
+	if regularRestartsI != regularRestartsJ {
+		return regularRestartsI > regularRestartsJ
+	}
+	// If pods have the same restart count, an attempt is made to compare the restart counts of sidecar containers.
+	if sidecarRestartsI != sidecarRestartsJ {
+		return sidecarRestartsI > sidecarRestartsJ
 	}
 	// 6. older pods < newer pods < empty timestamp pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
@@ -756,8 +762,14 @@ func (s ActivePods) Less(i, j int) bool {
 		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
-		return maxContainerRestarts(s[i]) > maxContainerRestarts(s[j])
+	regularRestartsI, sidecarRestartsI := maxContainerRestarts(s[i])
+	regularRestartsJ, sidecarRestartsJ := maxContainerRestarts(s[j])
+	if regularRestartsI != regularRestartsJ {
+		return regularRestartsI > regularRestartsJ
+	}
+	// If pods have the same restart count, an attempt is made to compare the restart counts of sidecar containers.
+	if sidecarRestartsI != sidecarRestartsJ {
+		return sidecarRestartsI > sidecarRestartsJ
 	}
 	// 6. Empty creation time pods < newer pods < older pods
 	if !s[i].CreationTimestamp.Equal(&s[j].CreationTimestamp) {
@@ -878,8 +890,14 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		}
 	}
 	// 7. Pods with containers with higher restart counts < lower restart counts
-	if maxContainerRestarts(s.Pods[i]) != maxContainerRestarts(s.Pods[j]) {
-		return maxContainerRestarts(s.Pods[i]) > maxContainerRestarts(s.Pods[j])
+	regularRestartsI, sidecarRestartsI := maxContainerRestarts(s.Pods[i])
+	regularRestartsJ, sidecarRestartsJ := maxContainerRestarts(s.Pods[j])
+	if regularRestartsI != regularRestartsJ {
+		return regularRestartsI > regularRestartsJ
+	}
+	// If pods have the same restart count, an attempt is made to compare the restart counts of sidecar containers.
+	if sidecarRestartsI != sidecarRestartsJ {
+		return sidecarRestartsI > sidecarRestartsJ
 	}
 	// 8. Empty creation time pods < newer pods < older pods
 	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
@@ -936,12 +954,22 @@ func podReadyTime(pod *v1.Pod) *metav1.Time {
 	return &metav1.Time{}
 }
 
-func maxContainerRestarts(pod *v1.Pod) int {
-	maxRestarts := 0
+func maxContainerRestarts(pod *v1.Pod) (regularRestarts, sidecarRestarts int) {
 	for _, c := range pod.Status.ContainerStatuses {
-		maxRestarts = max(maxRestarts, int(c.RestartCount))
+		regularRestarts = max(regularRestarts, int(c.RestartCount))
 	}
-	return maxRestarts
+	names := sets.New[string]()
+	for _, c := range pod.Spec.InitContainers {
+		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
+			names.Insert(c.Name)
+		}
+	}
+	for _, c := range pod.Status.InitContainerStatuses {
+		if names.Has(c.Name) {
+			sidecarRestarts = max(sidecarRestarts, int(c.RestartCount))
+		}
+	}
+	return
 }
 
 // FilterActivePods returns pods that have not terminated.
