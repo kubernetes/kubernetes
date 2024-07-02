@@ -19,9 +19,10 @@ package resourcelock
 import (
 	"context"
 	"fmt"
+	"time"
+
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,6 +120,7 @@ type LeaderElectionRecord struct {
 	AcquireTime          metav1.Time `json:"acquireTime"`
 	RenewTime            metav1.Time `json:"renewTime"`
 	LeaderTransitions    int         `json:"leaderTransitions"`
+	EndOfTerm            bool        `json:"endOfTerm"`
 }
 
 // EventRecorder records a change in the ResourceLock.
@@ -164,13 +166,26 @@ type Interface interface {
 
 // Manufacture will create a lock of a given type according to the input parameters
 func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
-	leaseLock := &LeaseLock{
-		LeaseMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-		Client:     coordinationClient,
-		LockConfig: rlc,
+	var leaseLock Interface
+	if lockType == "coordinatedLeases" {
+		leaseLock = &CoordinatedLeaseLock{
+			LeaseMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     coordinationClient,
+			LockConfig: rlc,
+		}
+		return leaseLock, nil
+	} else {
+		leaseLock = &LeaseLock{
+			LeaseMeta: metav1.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			Client:     coordinationClient,
+			LockConfig: rlc,
+		}
 	}
 	switch lockType {
 	case endpointsResourceLock:

@@ -50,3 +50,28 @@ func ValidateLeaseSpec(spec *coordination.LeaseSpec, fldPath *field.Path) field.
 	}
 	return allErrs
 }
+
+// ValidateLeaseCandidate validates a LeaseCandidate.
+func ValidateLeaseCandidate(lease *coordination.LeaseCandidate) field.ErrorList {
+	allErrs := validation.ValidateObjectMeta(&lease.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateLeaseCandidateSpec(&lease.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateLeaseCandidateUpdate validates an update of LeaseCandidate object.
+func ValidateLeaseCandidateUpdate(lease, oldLeaseCandidate *coordination.LeaseCandidate) field.ErrorList {
+	allErrs := validation.ValidateObjectMetaUpdate(&lease.ObjectMeta, &oldLeaseCandidate.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateLeaseCandidateSpec(&lease.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateLeaseCandidateSpec validates spec of LeaseCandidate.
+func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if spec.LeaseDurationSeconds != nil && *spec.LeaseDurationSeconds <= 0 {
+		fld := fldPath.Child("leaseDurationSeconds")
+		allErrs = append(allErrs, field.Invalid(fld, spec.LeaseDurationSeconds, "must be greater than 0"))
+	}
+	return allErrs
+}

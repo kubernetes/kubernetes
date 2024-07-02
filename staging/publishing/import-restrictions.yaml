@@ -91,6 +91,7 @@
   ignoredSubTrees:
   - "./staging/src/k8s.io/client-go/tools/cache/testing"
   - "./staging/src/k8s.io/client-go/tools/leaderelection/resourcelock"
+  - "./staging/src/k8s.io/client-go/tools/leaderelection"
   - "./staging/src/k8s.io/client-go/tools/portforward"
   - "./staging/src/k8s.io/client-go/tools/record"
   - "./staging/src/k8s.io/client-go/tools/events"

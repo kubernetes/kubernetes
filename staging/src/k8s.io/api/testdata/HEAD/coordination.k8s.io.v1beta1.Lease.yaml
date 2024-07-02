@@ -38,3 +38,4 @@ spec:
   leaseDurationSeconds: 2
   leaseTransitions: 5
   renewTime: "2004-01-01T01:01:01.000004Z"
+  strategy: strategyValue

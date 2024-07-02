@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
@@ -84,6 +85,7 @@ var _ = SIGDescribe("Lease", func() {
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
 				LeaseTransitions:     pointer.Int32(0),
+				Strategy:             ptr.To(coordinationv1.NoCoordination),
 			},
 		}
 
@@ -102,6 +104,7 @@ var _ = SIGDescribe("Lease", func() {
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(20 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
 			LeaseTransitions:     pointer.Int32(1),
+			Strategy:             ptr.To(coordinationv1.NoCoordination),
 		}
 
 		_, err = leaseClient.Update(ctx, createdLease, metav1.UpdateOptions{})
@@ -120,6 +123,7 @@ var _ = SIGDescribe("Lease", func() {
 			AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(50 * time.Second)},
 			RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(70 * time.Second)},
 			LeaseTransitions:     pointer.Int32(2),
+			Strategy:             ptr.To(coordinationv1.NoCoordination),
 		}
 		patchBytes, err := getPatchBytes(readLease, patchedLease)
 		framework.ExpectNoError(err, "creating patch failed")
@@ -145,6 +149,7 @@ var _ = SIGDescribe("Lease", func() {
 				AcquireTime:          &metav1.MicroTime{Time: time.Time{}.Add(2 * time.Second)},
 				RenewTime:            &metav1.MicroTime{Time: time.Time{}.Add(5 * time.Second)},
 				LeaseTransitions:     pointer.Int32(0),
+				Strategy:             ptr.To(coordinationv1.NoCoordination),
 			},
 		}
 		_, err = leaseClient.Create(ctx, lease2, metav1.CreateOptions{})
