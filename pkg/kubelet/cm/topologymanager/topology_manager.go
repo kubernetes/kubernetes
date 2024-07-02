@@ -151,7 +151,7 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
 
-	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > maxAllowableNUMANodes {
+	if len(numaInfo.Nodes) > maxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
