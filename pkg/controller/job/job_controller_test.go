@@ -289,7 +289,6 @@ func TestControllerSyncJob(t *testing.T) {
 		// features
 		podIndexLabelDisabled   bool
 		jobPodReplacementPolicy bool
-		jobPodFailurePolicy     bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -412,7 +411,6 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:          2,
 			failedPods:          0,
 			terminatingPods:     4,
-			jobPodFailurePolicy: true,
 			podFailurePolicy:    &batch.PodFailurePolicy{},
 			expectedTerminating: nil,
 			expectedReady:       ptr.To[int32](0),
@@ -1161,7 +1159,6 @@ func TestControllerSyncJob(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobPodFailurePolicy)
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
@@ -1184,9 +1181,7 @@ func TestControllerSyncJob(t *testing.T) {
 			if tc.jobPodReplacementPolicy {
 				job.Spec.PodReplacementPolicy = tc.podReplacementPolicy
 			}
-			if tc.jobPodFailurePolicy {
-				job.Spec.PodFailurePolicy = tc.podFailurePolicy
-			}
+			job.Spec.PodFailurePolicy = tc.podFailurePolicy
 			if tc.initialStatus != nil {
 				startTime := metav1.Now()
 				job.Status.StartTime = &startTime
@@ -2708,7 +2703,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobPodFailurePolicy     bool
 		enablePodDisruptionConditions bool
 		enableJobPodReplacementPolicy bool
 		job                           batch.Job
@@ -2720,7 +2714,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 		wantStatusTerminating         *int32
 	}{
 		"default handling for pod failure if the container matching the exit codes does not match the containerName restriction": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -2784,7 +2777,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 		},
 		"running pod should not result in job fail based on OnExitCodes": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -2822,7 +2814,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"fail job based on OnExitCodes": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -2873,7 +2864,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"job marked already as failure target with failed pod": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -2934,7 +2924,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"job marked already as failure target with failed pod, message based on already deleted pod": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -2994,47 +2983,7 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusFailed:    1,
 			wantStatusSucceeded: 0,
 		},
-		"default handling for a failed pod when the feature is disabled even, despite matching rule": {
-			enableJobPodFailurePolicy: false,
-			job: batch.Job{
-				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:     validSelector,
-					Template:     validTemplate,
-					Parallelism:  ptr.To[int32](1),
-					Completions:  ptr.To[int32](1),
-					BackoffLimit: ptr.To[int32](6),
-					PodFailurePolicy: &batch.PodFailurePolicy{
-						Rules: onExitCodeRules,
-					},
-				},
-			},
-			pods: []v1.Pod{
-				{
-					Status: v1.PodStatus{
-						Phase: v1.PodFailed,
-						ContainerStatuses: []v1.ContainerStatus{
-							{
-								Name: "main-container",
-								State: v1.ContainerState{
-									Terminated: &v1.ContainerStateTerminated{
-										ExitCode:   5,
-										FinishedAt: testFinishedAt,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			wantConditions:      nil,
-			wantStatusActive:    1,
-			wantStatusFailed:    1,
-			wantStatusSucceeded: 0,
-		},
 		"fail job with multiple pods": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3090,7 +3039,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"fail indexed job based on OnExitCodes": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3142,7 +3090,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"fail job based on OnExitCodes with NotIn operator": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3201,7 +3148,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"default handling job based on OnExitCodes with NotIn operator": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3248,7 +3194,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"fail job based on OnExitCodes for InitContainer": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3309,7 +3254,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"ignore pod failure; both rules are matching, the first is executed only": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3355,7 +3299,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"ignore pod failure based on OnExitCodes": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3392,7 +3335,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"default job based on OnExitCodes": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3436,7 +3378,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"count pod failure based on OnExitCodes; both rules are matching, the first is executed only": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3489,7 +3430,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"count pod failure based on OnPodConditions; both rules are matching, the first is executed only": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3555,7 +3495,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"ignore pod failure based on OnPodConditions": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3599,7 +3538,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"ignore pod failure based on OnPodConditions, ignored failures delays pod recreation": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3646,7 +3584,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"fail job based on OnPodConditions": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3703,7 +3640,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			wantStatusSucceeded: 0,
 		},
 		"terminating Pod considered failed when PodDisruptionConditions is disabled": {
-			enableJobPodFailurePolicy: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -3736,7 +3672,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 			},
 		},
 		"terminating Pod not considered failed when PodDisruptionConditions is enabled": {
-			enableJobPodFailurePolicy:     true,
 			enablePodDisruptionConditions: true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
@@ -3775,7 +3710,6 @@ func TestSyncJobWithJobPodFailurePolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 
@@ -3858,7 +3792,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobFailurePolicy        bool
 		enableBackoffLimitPerIndex    bool
 		enableJobSuccessPolicy        bool
 		enableJobPodReplacementPolicy bool
@@ -3965,7 +3898,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		"job with podFailurePolicy and successPolicy; jobPodReplacementPolicy feature enabled; job has SuccessCriteriaMet condition if job meets to successPolicy and doesn't meet to podFailurePolicy": {
 			enableJobSuccessPolicy:        true,
-			enableJobFailurePolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4023,7 +3955,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		"job with podFailurePolicy and successPolicy; jobPodReplacementPolicy feature disabled; job has SuccessCriteriaMet condition if job meets to successPolicy and doesn't meet to podFailurePolicy": {
 			enableJobSuccessPolicy:        true,
-			enableJobFailurePolicy:        true,
 			enableJobPodReplacementPolicy: false,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4254,7 +4185,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		"job with successPolicy and podFailurePolicy; jobPodReplacementPolicy feature enabled; job has a failed condition when job meets to both successPolicy and podFailurePolicy": {
 			enableJobSuccessPolicy:        true,
-			enableJobFailurePolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4404,7 +4334,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		"job with successPolicy and podFailurePolicy; jobPodReplacementPolicy feature enabled; job with SuccessCriteriaMet has never been transitioned to FailureTarget and Failed even if job meets podFailurePolicy": {
 			enableJobSuccessPolicy:        true,
-			enableJobFailurePolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4607,7 +4536,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		"job with successPolicy and podFailureTarget; jobPodReplacementPolicy feature enabled; job with FailureTarget has never been transitioned to SuccessCriteriaMet even if job meets successPolicy": {
 			enableJobSuccessPolicy:        true,
-			enableJobFailurePolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4717,7 +4645,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableBackoffLimitPerIndex)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
@@ -4788,7 +4715,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 
 	testCases := map[string]struct {
 		enableJobBackoffLimitPerIndex bool
-		enableJobPodFailurePolicy     bool
 		job                           batch.Job
 		pods                          []v1.Pod
 		wantStatus                    batch.JobStatus
@@ -4908,7 +4834,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 		},
 		"single failed index due to FailIndex action, the job continues": {
 			enableJobBackoffLimitPerIndex: true,
-			enableJobPodFailurePolicy:     true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -4957,7 +4882,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 		},
 		"job failed index due to FailJob action": {
 			enableJobBackoffLimitPerIndex: true,
-			enableJobPodFailurePolicy:     true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -5021,7 +4945,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 		},
 		"job pod failure ignored due to matching Ignore action": {
 			enableJobBackoffLimitPerIndex: true,
-			enableJobPodFailurePolicy:     true,
 			job: batch.Job{
 				TypeMeta:   metav1.TypeMeta{Kind: "Job"},
 				ObjectMeta: validObjectMeta,
@@ -5213,7 +5136,6 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			fakeClock := clocktesting.NewFakeClock(now)
 			manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
