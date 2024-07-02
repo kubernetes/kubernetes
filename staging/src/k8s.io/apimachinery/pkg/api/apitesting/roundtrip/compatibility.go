@@ -181,10 +181,10 @@ func (c *CompatibilityTestOptions) Complete(t *testing.T) *CompatibilityTestOpti
 	}
 
 	if c.JSON == nil {
-		c.JSON = json.NewSerializer(json.DefaultMetaFactory, c.Scheme, c.Scheme, true)
+		c.JSON = json.NewSerializerWithOptions(json.DefaultMetaFactory, c.Scheme, c.Scheme, json.SerializerOptions{Pretty: true})
 	}
 	if c.YAML == nil {
-		c.YAML = json.NewYAMLSerializer(json.DefaultMetaFactory, c.Scheme, c.Scheme)
+		c.YAML = json.NewSerializerWithOptions(json.DefaultMetaFactory, c.Scheme, c.Scheme, json.SerializerOptions{Yaml: true})
 	}
 	if c.Proto == nil {
 		c.Proto = protobuf.NewSerializer(c.Scheme, c.Scheme)
