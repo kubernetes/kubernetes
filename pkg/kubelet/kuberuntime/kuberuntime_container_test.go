@@ -142,7 +142,7 @@ func TestKillContainer(t *testing.T) {
 // different states.
 func TestToKubeContainerStatus(t *testing.T) {
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
-	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 0}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
 	var (
 		createdAt  int64 = 327
@@ -229,7 +229,8 @@ func TestToKubeContainerStatus(t *testing.T) {
 			},
 		},
 	} {
-		actual := toKubeContainerStatus(test.input, cid.Type)
+		annotatedInfo := getContainerInfoFromAnnotations(test.input.Annotations)
+		actual := toKubeContainerStatus(test.input, cid.Type, annotatedInfo)
 		assert.Equal(t, test.expected, actual, desc)
 	}
 }
@@ -239,7 +240,7 @@ func TestToKubeContainerStatus(t *testing.T) {
 func TestToKubeContainerStatusWithResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
-	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 0}
 	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
 	var (
 		createdAt int64 = 327
@@ -363,7 +364,8 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 				// TODO: remove skip once the failing test has been fixed.
 				t.Skip("Skip failing test on Windows.")
 			}
-			actual := toKubeContainerStatus(test.input, cid.Type)
+			annotatedInfo := getContainerInfoFromAnnotations(test.input.Annotations)
+			actual := toKubeContainerStatus(test.input, cid.Type, annotatedInfo)
 			assert.Equal(t, test.expected, actual, desc)
 		})
 	}
