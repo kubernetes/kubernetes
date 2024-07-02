@@ -568,19 +568,19 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			}
 		}
 	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && IsJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
 	}
-	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
+	if IsJobSuccessCriteriaMet(job) && IsJobFailed(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and Failed=true conditions"))
 	}
-	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
+	if IsJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
 	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
+	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && IsJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
 	}
-	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
+	if job.Spec.SuccessPolicy != nil && !IsJobSuccessCriteriaMet(job) && IsJobComplete(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True for Job with SuccessPolicy unless SuccessCriteriaMet=True"))
 	}
 	return allErrs
@@ -683,10 +683,10 @@ func ValidateJobStatusUpdate(job, oldJob *batch.Job, opts JobStatusValidationOpt
 			allErrs = append(allErrs, field.Required(statusFld.Child("startTime"), "startTime cannot be removed for unsuspended job"))
 		}
 	}
-	if isJobSuccessCriteriaMet(oldJob) && !isJobSuccessCriteriaMet(job) {
+	if IsJobSuccessCriteriaMet(oldJob) && !IsJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(statusFld.Child("conditions"), field.OmitValueType{}, "cannot disable the SuccessCriteriaMet=True condition"))
 	}
-	if IsJobComplete(oldJob) && !isJobSuccessCriteriaMet(oldJob) && isJobSuccessCriteriaMet(job) {
+	if IsJobComplete(oldJob) && !IsJobSuccessCriteriaMet(oldJob) && IsJobSuccessCriteriaMet(job) {
 		allErrs = append(allErrs, field.Invalid(statusFld.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job already has Complete=true conditions"))
 	}
 	return allErrs
@@ -883,7 +883,7 @@ func IsJobFailed(job *batch.Job) bool {
 	return IsConditionTrue(job.Status.Conditions, batch.JobFailed)
 }
 
-func isJobSuccessCriteriaMet(job *batch.Job) bool {
+func IsJobSuccessCriteriaMet(job *batch.Job) bool {
 	return IsConditionTrue(job.Status.Conditions, batch.JobSuccessCriteriaMet)
 }
 

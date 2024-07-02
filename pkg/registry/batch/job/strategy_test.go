@@ -3054,6 +3054,37 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
+		"valid update of Job if SuccessCriteriaMet already present for NonIndexed Jobs; JobSuccessPolicy enabled, while JobManagedBy and JobPodReplacementPolicy disabled": {
+			enableJobSuccessPolicy:        true,
+			enableJobManagedBy:            false,
+			enableJobPodReplacementPolicy: false,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec:       batch.JobSpec{},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: api.ConditionTrue,
+					}},
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec:       batch.JobSpec{},
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
 		"invalid addition of SuccessCriteriaMet for Job with Failed": {
 			enableJobSuccessPolicy: true,
 			job: &batch.Job{
