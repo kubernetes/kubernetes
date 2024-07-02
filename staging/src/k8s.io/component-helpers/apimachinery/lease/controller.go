@@ -40,6 +40,10 @@ const (
 	maxUpdateRetries = 5
 	// maxBackoff is the maximum sleep time during backoff (e.g. in backoffEnsureLease)
 	maxBackoff = 7 * time.Second
+	// FixedLeaseRenewPolicy
+	FixedLeaseRenewPolicy = "fixed"
+	// DynamicLeaseRenewPolicy
+	DynamicLeaseRenewPolicy = "dynamic"
 )
 
 // Controller manages creating and renewing the lease for this component (kube-apiserver, kubelet, etc.)
@@ -57,6 +61,7 @@ type controller struct {
 	leaseName                  string
 	leaseNamespace             string
 	leaseDurationSeconds       int32
+	leaseRenewPolicy           string
 	renewInterval              time.Duration
 	clock                      clock.Clock
 	onRepeatedHeartbeatFailure func()
@@ -71,7 +76,7 @@ type controller struct {
 }
 
 // NewController constructs and returns a controller
-func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseName, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc) Controller {
+func NewController(clock clock.Clock, client clientset.Interface, holderIdentity string, leaseDurationSeconds int32, onRepeatedHeartbeatFailure func(), renewInterval time.Duration, leaseName, leaseNamespace string, newLeasePostProcessFunc ProcessLeaseFunc, leaseRenewPolicy string) Controller {
 	var leaseClient coordclientset.LeaseInterface
 	if client != nil {
 		leaseClient = client.CoordinationV1().Leases(leaseNamespace)
@@ -87,6 +92,7 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
 		newLeasePostProcessFunc:    newLeasePostProcessFunc,
+		leaseRenewPolicy:           leaseRenewPolicy,
 	}
 }
 
@@ -96,10 +102,44 @@ func (c *controller) Run(ctx context.Context) {
 		klog.FromContext(ctx).Info("lease controller has nil lease client, will not claim or renew leases")
 		return
 	}
-	wait.JitterUntilWithContext(ctx, c.sync, c.renewInterval, 0.04, true)
+	if c.leaseRenewPolicy == DynamicLeaseRenewPolicy {
+		c.runDynamicLease(ctx, nil)
+	} else {
+		wait.JitterUntilWithContext(ctx, func(ctx context.Context) { _ = c.sync(ctx) }, c.renewInterval, 0.04, true)
+	}
 }
 
-func (c *controller) sync(ctx context.Context) {
+func (c *controller) runDynamicLease(ctx context.Context, syncFunc func(context.Context) bool) {
+	f := c.sync
+	// syncFunc is used for testing
+	if syncFunc != nil {
+		f = syncFunc
+	}
+
+	d := float64(time.Duration(c.leaseDurationSeconds) * time.Second)
+	initialInterval := time.Duration(d * 0.5)
+	// when backoff occurs, it means there was one failed update already
+	// so we further reduce the interval here for second lease update interval.
+	backoffInitialInterval := time.Duration(d * 0.25)
+	backoff := wait.Backoff{
+		Duration: backoffInitialInterval,
+		Factor:   0.5,
+		Jitter:   0.04,
+		Steps:    3,
+	}
+	wait.JitterUntilWithContext(ctx, func(ctx context.Context) {
+		c.renewInterval = backoffInitialInterval
+		_ = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+			success := f(ctx)
+			if !success {
+				c.renewInterval = time.Duration(float64(c.renewInterval) * 0.5)
+			}
+			return success, nil
+		})
+	}, initialInterval, 0.04, true)
+}
+
+func (c *controller) sync(ctx context.Context) bool {
 	if c.latestLease != nil {
 		// As long as the lease is not (or very rarely) updated by any other agent than the component itself,
 		// we can optimistically assume it didn't change since our last update and try updating
@@ -110,7 +150,7 @@ func (c *controller) sync(ctx context.Context) {
 		// GET/PUT - at this point this whole "if" should be removed.
 		err := c.retryUpdateLease(ctx, c.latestLease)
 		if err == nil {
-			return
+			return true
 		}
 		klog.FromContext(ctx).Info("failed to update lease using latest lease, fallback to ensure lease", "err", err)
 	}
@@ -121,8 +161,10 @@ func (c *controller) sync(ctx context.Context) {
 	if !created && lease != nil {
 		if err := c.retryUpdateLease(ctx, lease); err != nil {
 			klog.FromContext(ctx).Error(err, "Will retry updating lease", "interval", c.renewInterval)
+			return false
 		}
 	}
+	return true
 }
 
 // backoffEnsureLease attempts to create the lease if it does not exist,

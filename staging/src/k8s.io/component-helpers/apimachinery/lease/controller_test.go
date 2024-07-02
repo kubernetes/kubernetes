@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -455,6 +456,86 @@ func TestUpdateUsingLatestLease(t *testing.T) {
 				if c.latestLease != nil {
 					t.Fatalf("unexpected latestLease: %v", c.latestLease)
 				}
+			}
+		})
+	}
+}
+
+func TestUpdateDynamicLease(t *testing.T) {
+	leaseDuration := time.Second
+	cases := []struct {
+		desc         string
+		syncResults  []bool
+		updates      int
+		testDuration time.Duration
+	}{
+		{
+			desc:         "Update only once within leaseDurationSeconds * 0.1",
+			syncResults:  []bool{false, false, false},
+			updates:      1, // Updates at [0s]
+			testDuration: time.Duration(float64(leaseDuration) * 0.1),
+		},
+		{
+			desc:         "Update only twice within leaseDurationSeconds * 0.254 with failures",
+			syncResults:  []bool{false, false, false},
+			updates:      2, // Updates at [0, 0.25]
+			testDuration: time.Duration(float64(leaseDuration) * 0.25),
+		},
+		{
+			desc:         "Update only thrice within leaseDurationSeconds * 0.4 with failures",
+			syncResults:  []bool{false, false, false},
+			updates:      3, // Updates at [0, 0.25, 0.125]
+			testDuration: time.Duration(float64(leaseDuration) * 0.4),
+		},
+		{
+			desc:         "Update only 4 times within leaseDurationSeconds in consecutive failures",
+			syncResults:  []bool{false, false, false, false},
+			updates:      4, // Updates at [0, 0.25, 0.125, 0.125 + 0.5]
+			testDuration: time.Duration(float64(leaseDuration)),
+		},
+		{
+			desc:         "Update only twice within leaseDurationSeconds * 0.5",
+			syncResults:  []bool{true, true},
+			updates:      2, // Updates at [0, 0.5]
+			testDuration: time.Duration(float64(leaseDuration) * 0.5),
+		},
+		{
+			desc:         "Update only 4 times within leaseDurationSeconds * 1.5",
+			syncResults:  []bool{true, true, true, true, true},
+			updates:      4, // Updates at [0, 0.5, 1, 1.5]
+			testDuration: time.Duration(float64(leaseDuration) * 1.5),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+
+			updates, i := 0, 0
+			fakeSync := func(_ context.Context) bool {
+				updates += 1
+				r := tc.syncResults[i]
+				i += 1
+				return r
+			}
+
+			c := &controller{
+				leaseDurationSeconds: int32(leaseDuration.Seconds()),
+			}
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				c.runDynamicLease(ctx, fakeSync)
+				wg.Done()
+			}()
+			// add .08 for jitter
+			time.Sleep(time.Duration(float64(tc.testDuration) * 1.08))
+			cancel()
+			wg.Wait()
+
+			if tc.updates != updates {
+				t.Errorf("unexpected updates, got %d, expected %d", updates, tc.updates)
 			}
 		})
 	}
