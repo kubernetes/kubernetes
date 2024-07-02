@@ -49,3 +49,8 @@ const IPVSConnReuseModeFixedKernelVersion = "5.9"
 const UserNamespacesSupportKernelVersion = "6.3"
 
 const TmpfsNoswapSupportKernelVersion = "6.4"
+
+// NFTablesKubeProxyKernelVersion is the lowest kernel version kube-proxy supports using
+// nftables mode with by default. This is not directly related to any specific kernel
+// commit; see https://issues.k8s.io/122743#issuecomment-1893922424
+const NFTablesKubeProxyKernelVersion = "5.13"
