@@ -18,7 +18,6 @@ package watch
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -115,24 +114,24 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 		return false, 0
 
 	case io.ErrUnexpectedEOF:
-		klog.V(1).InfoS("Watch closed with unexpected EOF", "err", err)
+		klog.V(1).InfoS("Watch closed with unexpected EOF", "err", err, "resourceVersion", rw.lastResourceVersion)
 		return false, 0
 
 	default:
 		msg := "Watch failed"
 		if net.IsProbableEOF(err) || net.IsTimeout(err) {
-			klog.V(5).InfoS(msg, "err", err)
+			klog.V(5).InfoS(msg, "err", err, "resourceVersion", rw.lastResourceVersion)
 			// Retry
 			return false, 0
 		}
 
-		klog.ErrorS(err, msg)
+		klog.ErrorS(err, msg, "resourceVersion", rw.lastResourceVersion)
 		// Retry
 		return false, 0
 	}
 
 	if watcher == nil {
-		klog.ErrorS(nil, "Watch returned nil watcher")
+		klog.ErrorS(nil, "Watch returned nil watcher", "resourceVersion", rw.lastResourceVersion)
 		// Retry
 		return false, 0
 	}
@@ -143,7 +142,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 	for {
 		select {
 		case <-rw.stopChan:
-			klog.V(4).InfoS("Stopping RetryWatcher.")
+			klog.V(4).InfoS("Stopping RetryWatcher.", "resourceVersion", rw.lastResourceVersion)
 			return true, 0
 		case event, ok := <-ch:
 			if !ok {
@@ -158,7 +157,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				if !ok {
 					_ = rw.send(watch.Event{
 						Type:   watch.Error,
-						Object: &apierrors.NewInternalError(errors.New("retryWatcher: doesn't support resourceVersion")).ErrStatus,
+						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s doesn't support resourceVersion", dump.Pretty(event.Object))).ErrStatus,
 					})
 					// We have to abort here because this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 					return true, 0
@@ -168,7 +167,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				if resourceVersion == "" {
 					_ = rw.send(watch.Event{
 						Type:   watch.Error,
-						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %#v doesn't support resourceVersion", event.Object)).ErrStatus,
+						Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s doesn't support resourceVersion", dump.Pretty(event.Object))).ErrStatus,
 					})
 					// We have to abort here because this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 					return true, 0
@@ -190,7 +189,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				errObject := apierrors.FromObject(event.Object)
 				statusErr, ok := errObject.(*apierrors.StatusError)
 				if !ok {
-					klog.Error(fmt.Sprintf("Received an error which is not *metav1.Status but %s", dump.Pretty(event.Object)))
+					klog.ErrorS(errObject, "Received an error which is not *metav1.Status", "eventObject", event.Object)
 					// Retry unknown errors
 					return false, 0
 				}
@@ -219,17 +218,17 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(fmt.Sprintf("Retrying after unexpected error: %s", dump.Pretty(event.Object)))
+					klog.V(5).InfoS("Retrying after unexpected error", "error", errObject, "eventObject", event.Object)
 
 					// Retry
 					return false, statusDelay
 				}
 
 			default:
-				klog.Errorf("Failed to recognize Event type %q", event.Type)
+				klog.ErrorS(nil, "Failed to recognize Event type", "eventType", event.Type, "eventObject", event.Object)
 				_ = rw.send(watch.Event{
 					Type:   watch.Error,
-					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher failed to recognize Event type %q", event.Type)).ErrStatus,
+					Object: &apierrors.NewInternalError(fmt.Errorf("retryWatcher: object %s failed to recognize Event type %q", dump.Pretty(event.Object), event.Type)).ErrStatus,
 				})
 				// We are unable to restart the watch and have to stop the loop or this might cause lastResourceVersion inconsistency by skipping a potential RV with valid data!
 				return true, 0
@@ -275,7 +274,7 @@ func (rw *RetryWatcher) receive() {
 		case <-timer.C:
 		}
 
-		klog.V(4).Infof("Restarting RetryWatcher at RV=%q", rw.lastResourceVersion)
+		klog.V(4).InfoS("Restarting RetryWatcher", "lastResourceVersion", rw.lastResourceVersion)
 	}, rw.minRestartDelay)
 }
 
