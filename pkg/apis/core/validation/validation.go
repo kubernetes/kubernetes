@@ -1790,6 +1790,10 @@ func ValidationOptionsForPersistentVolume(pv, oldPv *core.PersistentVolume) Pers
 func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName string, validateInlinePersistentVolumeSpec bool, fldPath *field.Path, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if spec.PersistentVolumeSource.HostPath != nil && containsAccessModeRWX(spec.AccessModes) {
+        allErrs = append(allErrs, field.Invalid(fldPath.Child("accessModes"), spec.AccessModes, "ReadWriteMany access mode is not supported for hostPath volumes"))
+    }
+
 	if validateInlinePersistentVolumeSpec {
 		if pvSpec.ClaimRef != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("claimRef"), "may not be specified in the context of inline volumes"))
@@ -2084,11 +2088,20 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	return allErrs
 }
 
-func ValidatePersistentVolume(pv *core.PersistentVolume, opts PersistentVolumeSpecValidationOptions) field.ErrorList {
-	metaPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
-	allErrs = append(allErrs, ValidatePersistentVolumeSpec(&pv.Spec, pv.ObjectMeta.Name, false, field.NewPath("spec"), opts)...)
-	return allErrs
+// containsAccessModeRWX checks if the provided AccessModes contain ReadWriteMany
+func containsAccessModeRWX(modes []core.PersistentVolumeAccessMode) bool {
+    for _, mode := range modes {
+        if mode == core.ReadWriteMany {
+            return true
+        }
+    }
+    return false
+}
+
+// ValidatePersistentVolume validates a PersistentVolume and returns an ErrorList with any errors.
+func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
+    allErrs := ValidatePersistentVolumeSpec(&pv.Spec, field.NewPath("spec"))
+    return allErrs
 }
 
 // ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
