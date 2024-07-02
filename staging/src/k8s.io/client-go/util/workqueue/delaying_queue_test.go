@@ -29,13 +29,17 @@ import (
 
 func TestSimpleQueue(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	mp := &testMetricsProvider{}
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Name: "test-simple", Clock: fakeClock, MetricsProvider: mp})
 
 	first := "foo"
 
 	q.AddAfter(first, 50*time.Millisecond)
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 
 	if q.Len() != 0 {
@@ -46,6 +50,9 @@ func TestSimpleQueue(t *testing.T) {
 
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ := q.Get()
 	q.Done(item)
@@ -71,7 +78,8 @@ func TestSimpleQueue(t *testing.T) {
 
 func TestDeduping(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	mp := &testMetricsProvider{}
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Name: "test-dedupe", Clock: fakeClock, MetricsProvider: mp})
 
 	first := "foo"
 
@@ -83,6 +91,9 @@ func TestDeduping(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
+	}
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
@@ -91,6 +102,9 @@ func TestDeduping(t *testing.T) {
 	fakeClock.Step(60 * time.Millisecond)
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ := q.Get()
 	q.Done(item)
@@ -107,6 +121,9 @@ func TestDeduping(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
+	}
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
@@ -114,6 +131,9 @@ func TestDeduping(t *testing.T) {
 	fakeClock.Step(40 * time.Millisecond)
 	if err := waitForAdded(q, 1); err != nil {
 		t.Errorf("should have added")
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	item, _ = q.Get()
 	q.Done(item)
@@ -127,7 +147,8 @@ func TestDeduping(t *testing.T) {
 
 func TestAddTwoFireEarly(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	mp := &testMetricsProvider{}
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Name: "test-addtwofireeearly", Clock: fakeClock, MetricsProvider: mp})
 
 	first := "foo"
 	second := "bar"
@@ -138,6 +159,9 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 2 {
+		t.Fatalf("expected %v, got %v", 2, val)
+	}
 
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
@@ -147,6 +171,9 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
 	}
 	item, _ := q.Get()
 	if !reflect.DeepEqual(item, second) {
@@ -159,6 +186,9 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 1 {
+		t.Fatalf("expected %v, got %v", 1, val)
+	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, first) {
 		t.Errorf("expected %v, got %v", first, item)
@@ -168,6 +198,9 @@ func TestAddTwoFireEarly(t *testing.T) {
 	if err := waitForAdded(q, 1); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 3, val)
+	}
 	item, _ = q.Get()
 	if !reflect.DeepEqual(item, third) {
 		t.Errorf("expected %v, got %v", third, item)
@@ -176,7 +209,8 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 func TestCopyShifting(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Clock: fakeClock})
+	mp := &testMetricsProvider{}
+	q := NewDelayingQueueWithConfig(DelayingQueueConfig{Name: "test-copyshift", Clock: fakeClock, MetricsProvider: mp})
 
 	first := "foo"
 	second := "bar"
@@ -188,6 +222,9 @@ func TestCopyShifting(t *testing.T) {
 	if err := waitForWaitingQueueToFill(q); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 3 {
+		t.Fatalf("expected %v, got %v", 3, val)
+	}
 
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
@@ -197,6 +234,9 @@ func TestCopyShifting(t *testing.T) {
 
 	if err := waitForAdded(q, 3); err != nil {
 		t.Fatalf("unexpected err: %v", err)
+	}
+	if val := mp.waitingForDepth.gaugeValue(); val != 0 {
+		t.Fatalf("expected %v, got %v", 0, val)
 	}
 	actualFirst, _ := q.Get()
 	if !reflect.DeepEqual(actualFirst, third) {
