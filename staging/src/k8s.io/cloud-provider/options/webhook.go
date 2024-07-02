@@ -17,18 +17,29 @@ limitations under the License.
 package options
 
 import (
+	"bytes"
 	"context"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/cloud-provider/config"
+	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
@@ -39,6 +50,14 @@ const (
 type WebhookOptions struct {
 	// Webhooks is the list of webhook names that should be enabled or disabled
 	Webhooks []string
+	// ValidatingWebhookConfigFilePath is the file containing the validating webhook configuration details
+	ValidatingWebhookConfigFilePath string
+	// ValidatingWebhookConfiguration is the decoded data from the file to be used during validation
+	ValidatingWebhookConfiguration *admissionregistrationv1.ValidatingWebhookConfiguration
+	// MutatingWebhookConfigFilePath is the file containing the mutating webhook configuration details
+	MutatingWebhookConfigFilePath string
+	// MutatingWebhookConfiguration is the decoded data from the file to be used during validation
+	MutatingWebhookConfiguration *admissionregistrationv1.MutatingWebhookConfiguration
 }
 
 func NewWebhookOptions() *WebhookOptions {
@@ -51,12 +70,17 @@ func (o *WebhookOptions) AddFlags(fs *pflag.FlagSet, allWebhooks, disabledByDefa
 		"A list of webhooks to enable. '*' enables all on-by-default webhooks, 'foo' enables the webhook "+
 		"named 'foo', '-foo' disables the webhook named 'foo'.\nAll webhooks: %s\nDisabled-by-default webhooks: %s",
 		strings.Join(allWebhooks, ", "), strings.Join(disabledByDefaultWebhooks, ", ")))
+	fs.StringVar(&o.ValidatingWebhookConfigFilePath, "validating-webhook-config-file", o.ValidatingWebhookConfigFilePath,
+		"Path to a kubeconfig formatted file that defines the validating webhook configuration.")
+	fs.StringVar(&o.MutatingWebhookConfigFilePath, "mutating-webhook-config-file", o.MutatingWebhookConfigFilePath,
+		"Path to a kubeconfig formatted file that defines the mutating webhook configuration.")
 }
 
-func (o *WebhookOptions) Validate(allWebhooks, disabledByDefaultWebhooks []string) []error {
+func (o *WebhookOptions) Validate(validatingWebhooks, mutatingWebhooks, disabledByDefaultWebhooks []string) []error {
 	allErrors := []error{}
 
-	allWebhooksSet := sets.NewString(allWebhooks...)
+	validatingWebhooksSet := sets.NewString(validatingWebhooks...)
+	mutatingWebhookSet := sets.NewString(mutatingWebhooks...)
 	toValidate := sets.NewString(o.Webhooks...)
 	toValidate.Insert(disabledByDefaultWebhooks...)
 	for _, webhook := range toValidate.List() {
@@ -64,11 +88,64 @@ func (o *WebhookOptions) Validate(allWebhooks, disabledByDefaultWebhooks []strin
 			continue
 		}
 		webhook = strings.TrimPrefix(webhook, "-")
-		if !allWebhooksSet.Has(webhook) {
+		if !validatingWebhooksSet.Has(webhook) && !mutatingWebhookSet.Has(webhook) {
 			allErrors = append(allErrors, fmt.Errorf("%q is not in the list of known webhooks", webhook))
 		}
 	}
+	enabledValidationWebhooks := o.getEnabledWebhooks(validatingWebhooks, disabledByDefaultWebhooks)
+	if len(enabledValidationWebhooks) > 0 && o.ValidatingWebhookConfigFilePath == "" {
+		allErrors = append(allErrors, fmt.Errorf("webhooks %v are enabled but the validating webhook configuration path is empty", enabledValidationWebhooks))
+	}
+	if o.ValidatingWebhookConfiguration != nil {
+		if o.ValidatingWebhookConfiguration.Name == "" {
+			allErrors = append(allErrors, errors.New("validating webhook configuration name can't be empty"))
+		}
+		webhookConfigs := sets.New[string]()
+		for _, webhookConfig := range o.ValidatingWebhookConfiguration.Webhooks {
+			webhookConfigs.Insert(webhookConfig.Name)
+		}
+		allErrors = append(allErrors, o.validateWebhookConfiguration(webhookConfigs, enabledValidationWebhooks)...)
+	}
+	enabledMutatingWebhooks := o.getEnabledWebhooks(mutatingWebhooks, disabledByDefaultWebhooks)
+	if len(enabledMutatingWebhooks) > 0 && o.MutatingWebhookConfigFilePath == "" {
+		allErrors = append(allErrors, fmt.Errorf("webhooks %v are enabled but the mutating webhook configuration path is empty", enabledMutatingWebhooks))
+	}
+	if o.MutatingWebhookConfiguration != nil {
+		if o.MutatingWebhookConfiguration.Name == "" {
+			allErrors = append(allErrors, errors.New("mutating webhook configuration name can't be empty"))
+		}
+		webhookConfigs := sets.New[string]()
+		for _, webhookConfig := range o.MutatingWebhookConfiguration.Webhooks {
+			webhookConfigs.Insert(webhookConfig.Name)
+		}
+		allErrors = append(allErrors, o.validateWebhookConfiguration(webhookConfigs, enabledMutatingWebhooks)...)
+	}
 
+	return allErrors
+}
+
+func (o *WebhookOptions) getEnabledWebhooks(webhooks, disabledByDefaultWebhooks []string) []string {
+	enabledWebhooks := []string{}
+	for _, name := range webhooks {
+		if genericcontrollermanager.IsControllerEnabled(name, sets.NewString(disabledByDefaultWebhooks...), o.Webhooks) {
+			enabledWebhooks = append(enabledWebhooks, name)
+		}
+	}
+	return enabledWebhooks
+}
+
+func (o *WebhookOptions) validateWebhookConfiguration(webhookConfigs sets.Set[string], webhooks []string) []error {
+	allErrors := []error{}
+	for _, name := range webhooks {
+		if !webhookConfigs.Has(name) {
+			allErrors = append(allErrors, fmt.Errorf("webhook %s is enabled but is not present in the webhook configuration", name))
+		} else {
+			webhookConfigs.Delete(name)
+		}
+	}
+	if webhookConfigs.Len() != 0 {
+		allErrors = append(allErrors, fmt.Errorf("webhook configuration is present for webhooks %v but the webhooks are not present/disabled", webhookConfigs))
+	}
 	return allErrors
 }
 
@@ -76,13 +153,52 @@ func (o *WebhookOptions) ApplyTo(cfg *config.WebhookConfiguration) error {
 	if o == nil {
 		return nil
 	}
-
 	cfg.Webhooks = o.Webhooks
+
+	if o.ValidatingWebhookConfigFilePath != "" {
+		config := &admissionregistrationv1.ValidatingWebhookConfiguration{}
+		err := LoadConfigurationFromFile(o.ValidatingWebhookConfigFilePath, config)
+		if err != nil {
+			return fmt.Errorf("%v: from file %v", err.Error(), o.ValidatingWebhookConfigFilePath)
+		}
+		cfg.ValidatingWebhookConfiguration = config
+		o.ValidatingWebhookConfiguration = config
+	}
+
+	if o.MutatingWebhookConfigFilePath != "" {
+		config := &admissionregistrationv1.MutatingWebhookConfiguration{}
+		err := LoadConfigurationFromFile(o.MutatingWebhookConfigFilePath, config)
+		if err != nil {
+			return fmt.Errorf("%v: from file %v", err.Error(), o.ValidatingWebhookConfigFilePath)
+		}
+		cfg.MutatingWebhookConfiguration = config
+		o.MutatingWebhookConfiguration = config
+	}
 
 	return nil
 }
 
+func LoadConfigurationFromFile(path string, config runtime.Object) error {
+	configDef, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file path %q: %w", path, err)
+	}
+
+	decoder := serializer.NewCodecFactory(runtime.NewScheme()).UniversalDecoder(admissionregistrationv1.SchemeGroupVersion)
+	_, gvk, err := decoder.Decode(configDef, nil, config)
+	if err != nil {
+		return fmt.Errorf("failed decoding validating webhook configuration: %w", err)
+	}
+
+	if gvk.Group != admissionregistrationv1.SchemeGroupVersion.Group || gvk.Version != admissionregistrationv1.SchemeGroupVersion.Version {
+		return fmt.Errorf("unknown group version field %v in validating webhook configuration", gvk)
+	}
+	klog.V(4).Infoln("Load validation webhook configuration success")
+	return nil
+}
+
 type WebhookServingOptions struct {
+	CACertFile string
 	*apiserveroptions.SecureServingOptions
 }
 
@@ -136,6 +252,9 @@ func (o *WebhookServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.ServerCert.CertKey.KeyFile, "webhook-tls-private-key-file", o.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
+
+	fs.StringVar(&o.CACertFile, "webhook-ca-cert-file", o.CACertFile, ""+
+		"File containing the root CA Certificate  matching --tls-cert-file ")
 }
 
 func (o *WebhookServingOptions) Validate() []error {
@@ -148,10 +267,14 @@ func (o *WebhookServingOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("cert/key file and in-memory certificate cannot both be set"))
 	}
 
+	if (len(o.ServerCert.CertKey.CertFile) != 0 || len(o.ServerCert.CertKey.KeyFile) != 0) && len(o.CACertFile) == 0 {
+		allErrors = append(allErrors, fmt.Errorf("ca file needed when cert/key file are provided"))
+	}
+
 	return allErrors
 }
 
-func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo) error {
+func (o *WebhookServingOptions) ApplyTo(webhookCfg *config.WebhookConfiguration, cfg **server.SecureServingInfo) error {
 	if o == nil {
 		return nil
 	}
@@ -159,6 +282,16 @@ func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo) error {
 	if o.BindPort <= 0 {
 		return nil
 	}
+
+	webhookCfg.WebhookAddress = o.BindAddress.String()
+	if webhookCfg.WebhookAddress == "0.0.0.0" {
+		ip, err := netutil.ChooseHostInterface()
+		if err != nil {
+			return fmt.Errorf("failed to get host ip %w", err)
+		}
+		webhookCfg.WebhookAddress = ip.String()
+	}
+	webhookCfg.WebhookPort = int32(o.BindPort)
 
 	var err error
 	var listener net.Listener
@@ -182,8 +315,34 @@ func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo) error {
 		if err != nil {
 			return err
 		}
-	} else if o.ServerCert.GeneratedCert != nil {
+		caCert, err := os.ReadFile(o.CACertFile)
+		if err != nil {
+			return err
+		}
+		webhookCfg.CaBundle = string(caCert)
+	} else {
+		if err := o.MaybeDefaultWithSelfSignedCerts(webhookCfg.WebhookAddress, nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
+			return fmt.Errorf("error creating self-signed certificates for webhook: %w", err)
+		}
 		(*cfg).Cert = o.ServerCert.GeneratedCert
+
+		cert, _ := o.ServerCert.GeneratedCert.CurrentCertKeyContent()
+		certs, err := certutil.ParseCertsPEM(cert)
+		if err != nil {
+			return fmt.Errorf("error parsing the certs %w", err)
+		}
+		if len(certs) < 2 {
+			return fmt.Errorf("generated cert doesn't have the root cert, has only %v certs", len(certs))
+		}
+		caPEM := new(bytes.Buffer)
+		err = pem.Encode(caPEM, &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: certs[1].Raw,
+		})
+		if err != nil {
+			return fmt.Errorf("error encoding ca cert %w", err)
+		}
+		webhookCfg.CaBundle = caPEM.String()
 	}
 
 	return nil

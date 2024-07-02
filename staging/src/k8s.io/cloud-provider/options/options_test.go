@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverapis "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserver "k8s.io/apiserver/pkg/server"
@@ -336,6 +337,7 @@ func TestCreateConfig(t *testing.T) {
 
 	args := []string{
 		"--webhooks=foo,bar,-baz",
+		"--validating-webhook-config-file=testdata/validatingwebhookconfiguration.yaml",
 		"--allocate-node-cidrs=true",
 		"--authorization-always-allow-paths=",
 		"--bind-address=0.0.0.0",
@@ -374,9 +376,11 @@ func TestCreateConfig(t *testing.T) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
 
-	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
+	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar"}, []string{"baz"}, []string{})
 	assert.Nil(t, err, "unexpected error: %s", err)
 
+	failurePolicy := admissionregistrationv1.Fail
+	webhookScope := admissionregistrationv1.AllScopes
 	expected := &appconfig.Config{
 		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
 			Generic: cmconfig.GenericControllerManagerConfiguration{
@@ -424,6 +428,33 @@ func TestCreateConfig(t *testing.T) {
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook: cpconfig.WebhookConfiguration{
 				Webhooks: []string{"foo", "bar", "-baz"},
+				ValidatingWebhookConfiguration: &admissionregistrationv1.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "cloud-controller-validating-webhook",
+					},
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "ValidatingWebhookConfiguration",
+						APIVersion: "admissionregistration.k8s.io/v1",
+					},
+					Webhooks: []admissionregistrationv1.ValidatingWebhook{
+						{
+							Name: "validating-webhook.aws.io",
+							Rules: []admissionregistrationv1.RuleWithOperations{
+								{
+									Operations: []admissionregistrationv1.OperationType{"CREATE"},
+									Rule: admissionregistrationv1.Rule{
+										APIGroups:   []string{""},
+										APIVersions: []string{"v1"},
+										Resources:   []string{"pods"},
+										Scope:       &webhookScope,
+									},
+								},
+							},
+							FailurePolicy:           &failurePolicy,
+							AdmissionReviewVersions: []string{"v1"},
+						},
+					},
+				},
 			},
 		},
 		SecureServing:        nil,
@@ -445,6 +476,9 @@ func TestCreateConfig(t *testing.T) {
 	c.Kubeconfig = nil
 	c.Client = nil
 	c.LoopbackClientConfig = nil
+	c.ComponentConfig.Webhook.WebhookPort = 0
+	c.ComponentConfig.Webhook.WebhookAddress = ""
+	c.ComponentConfig.Webhook.CaBundle = ""
 
 	if !reflect.DeepEqual(expected, c) {
 		t.Errorf("Got different config than expected.\nDifference detected on:\n%s", cmp.Diff(expected, c))
@@ -474,7 +508,7 @@ func TestCloudControllerManagerAliases(t *testing.T) {
 		"cloud-node-lifecycle": "cloud-node-lifecycle-controller",
 	}
 
-	if err := opts.Validate(allControllers, disabledByDefaultControllers, controllerAliases, nil, nil); err != nil {
+	if err := opts.Validate(allControllers, disabledByDefaultControllers, controllerAliases, nil, nil, nil); err != nil {
 		t.Errorf("expected no error, error found %v", err)
 	}
 

@@ -38,4 +38,30 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
 	SetDefaults_CloudControllerManagerConfiguration(in)
 	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+	if in.Webhook.ValidatingWebhookConfiguration != nil {
+		for i := range in.Webhook.ValidatingWebhookConfiguration.Webhooks {
+			a := &in.Webhook.ValidatingWebhookConfiguration.Webhooks[i]
+			SetDefaults_ValidatingWebhook(a)
+			if a.ClientConfig.Service != nil {
+				SetDefaults_ServiceReference(a.ClientConfig.Service)
+			}
+			for j := range a.Rules {
+				b := &a.Rules[j]
+				SetDefaults_Rule(&b.Rule)
+			}
+		}
+	}
+	if in.Webhook.MutatingWebhookConfiguration != nil {
+		for i := range in.Webhook.MutatingWebhookConfiguration.Webhooks {
+			a := &in.Webhook.MutatingWebhookConfiguration.Webhooks[i]
+			SetDefaults_MutatingWebhook(a)
+			if a.ClientConfig.Service != nil {
+				SetDefaults_ServiceReference(a.ClientConfig.Service)
+			}
+			for j := range a.Rules {
+				b := &a.Rules[j]
+				SetDefaults_Rule(&b.Rule)
+			}
+		}
+	}
 }

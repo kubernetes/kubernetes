@@ -201,7 +201,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 		}
 	}
 	if o.WebhookServing != nil {
-		if err = o.WebhookServing.ApplyTo(&c.WebhookSecureServing); err != nil {
+		if err = o.WebhookServing.ApplyTo(&c.ComponentConfig.Webhook, &c.WebhookSecureServing); err != nil {
 			return err
 		}
 	}
@@ -248,7 +248,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 }
 
 // Validate is used to validate config before launching the cloud controller manager
-func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) error {
+func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, validatingWebhooks, mutatingWebhooks, disabledByDefaultWebhooks []string) error {
 	errors := []error{}
 
 	errors = append(errors, o.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
@@ -259,7 +259,7 @@ func (o *CloudControllerManagerOptions) Validate(allControllers []string, disabl
 	errors = append(errors, o.Authorization.Validate()...)
 
 	if o.Webhook != nil {
-		errors = append(errors, o.Webhook.Validate(allWebhooks, disabledByDefaultWebhooks)...)
+		errors = append(errors, o.Webhook.Validate(validatingWebhooks, mutatingWebhooks, disabledByDefaultWebhooks)...)
 	}
 	if o.WebhookServing != nil {
 		errors = append(errors, o.WebhookServing.Validate()...)
@@ -284,19 +284,13 @@ func resyncPeriod(c *config.Config) func() time.Duration {
 }
 
 // Config return a cloud controller manager config objective
-func (o *CloudControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, allWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
-	if err := o.Validate(allControllers, disabledByDefaultControllers, controllerAliases, allWebhooks, disabledByDefaultWebhooks); err != nil {
+func (o *CloudControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string, validatingWebhooks, mutatingWebhooks, disabledByDefaultWebhooks []string) (*config.Config, error) {
+	if err := o.Validate(allControllers, disabledByDefaultControllers, controllerAliases, validatingWebhooks, mutatingWebhooks, disabledByDefaultWebhooks); err != nil {
 		return nil, err
 	}
 
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
-	}
-
-	if o.WebhookServing != nil {
-		if err := o.WebhookServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
-			return nil, fmt.Errorf("error creating self-signed certificates for webhook: %v", err)
-		}
 	}
 
 	c := &config.Config{}

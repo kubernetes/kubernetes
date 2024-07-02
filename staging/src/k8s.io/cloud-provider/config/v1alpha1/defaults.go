@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"time"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	nodeconfigv1alpha1 "k8s.io/cloud-provider/controllers/node/config/v1alpha1"
@@ -67,5 +68,80 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 	}
 	if obj.RouteReconciliationPeriod == zero {
 		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}
+	}
+}
+
+// SetDefaults_ValidatingWebhook sets defaults for webhook validating. This function
+// is duplicated from "k8s.io/kubernetes/pkg/apis/admissionregistration/v1/defaults.go"
+// in order for in-tree cloud providers to not depend on internal packages.
+func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhook) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1.Fail
+		obj.FailurePolicy = &policy
+	}
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1.Equivalent
+		obj.MatchPolicy = &policy
+	}
+	if obj.NamespaceSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.NamespaceSelector = &selector
+	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = new(int32)
+		*obj.TimeoutSeconds = 10
+	}
+}
+
+// SetDefaults_MutatingWebhook sets defaults for webhook mutating This function
+// is duplicated from "k8s.io/kubernetes/pkg/apis/admissionregistration/v1/defaults.go"
+// in order for in-tree cloud providers to not depend on internal packages.
+func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1.Fail
+		obj.FailurePolicy = &policy
+	}
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1.Equivalent
+		obj.MatchPolicy = &policy
+	}
+	if obj.NamespaceSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.NamespaceSelector = &selector
+	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = new(int32)
+		*obj.TimeoutSeconds = 10
+	}
+	if obj.ReinvocationPolicy == nil {
+		never := admissionregistrationv1.NeverReinvocationPolicy
+		obj.ReinvocationPolicy = &never
+	}
+}
+
+// SetDefaults_Rule sets defaults for webhook rule This function
+// is duplicated from "k8s.io/kubernetes/pkg/apis/admissionregistration/v1/defaults.go"
+// in order for in-tree cloud providers to not depend on internal packages.
+func SetDefaults_Rule(obj *admissionregistrationv1.Rule) {
+	if obj.Scope == nil {
+		s := admissionregistrationv1.AllScopes
+		obj.Scope = &s
+	}
+}
+
+// SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference This function
+// is duplicated from "k8s.io/kubernetes/pkg/apis/admissionregistration/v1/defaults.go"
+// in order for in-tree cloud providers to not depend on internal packages.
+func SetDefaults_ServiceReference(obj *admissionregistrationv1.ServiceReference) {
+	if obj.Port == nil {
+		obj.Port = utilpointer.Int32(443)
 	}
 }

@@ -22,6 +22,7 @@ limitations under the License.
 package config
 
 import (
+	v1 "k8s.io/api/admissionregistration/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -99,6 +100,16 @@ func (in *WebhookConfiguration) DeepCopyInto(out *WebhookConfiguration) {
 		in, out := &in.Webhooks, &out.Webhooks
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.ValidatingWebhookConfiguration != nil {
+		in, out := &in.ValidatingWebhookConfiguration, &out.ValidatingWebhookConfiguration
+		*out = new(v1.ValidatingWebhookConfiguration)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MutatingWebhookConfiguration != nil {
+		in, out := &in.MutatingWebhookConfiguration, &out.MutatingWebhookConfiguration
+		*out = new(v1.MutatingWebhookConfiguration)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }
