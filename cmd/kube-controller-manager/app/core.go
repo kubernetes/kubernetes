@@ -680,11 +680,6 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 		return nil, true, err
 	}
 
-	ignoredResources := make(map[schema.GroupResource]struct{})
-	for _, r := range controllerContext.ComponentConfig.GarbageCollectorController.GCIgnoredResources {
-		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
-	}
-
 	garbageCollector, err := garbagecollector.NewComposedGarbageCollector(
 		ctx,
 		gcClientset,
