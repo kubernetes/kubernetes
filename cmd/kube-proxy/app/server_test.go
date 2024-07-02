@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -634,61 +635,76 @@ func makeNodeWithAddress(name, primaryIP string) *v1.Node {
 	return node
 }
 
-// Test that getNodeIPs retries on failure
-func Test_getNodeIPs(t *testing.T) {
-	var chans [3]chan error
-
-	client := clientsetfake.NewSimpleClientset(
-		// node1 initially has no IP address.
-		makeNodeWithAddress("node1", ""),
-
-		// node2 initially has an invalid IP address.
-		makeNodeWithAddress("node2", "invalid-ip"),
-
-		// node3 initially does not exist.
-	)
-
-	for i := range chans {
-		chans[i] = make(chan error)
-		ch := chans[i]
-		nodeName := fmt.Sprintf("node%d", i+1)
-		expectIP := fmt.Sprintf("192.168.0.%d", i+1)
-		go func() {
-			_, ctx := ktesting.NewTestContext(t)
-			ips := getNodeIPs(ctx, client, nodeName)
-			if len(ips) == 0 {
-				ch <- fmt.Errorf("expected IP %s for %s but got nil", expectIP, nodeName)
-			} else if ips[0].String() != expectIP {
-				ch <- fmt.Errorf("expected IP %s for %s but got %s", expectIP, nodeName, ips[0].String())
-			} else if len(ips) != 1 {
-				ch <- fmt.Errorf("expected IP %s for %s but got multiple IPs", expectIP, nodeName)
-			}
-			close(ch)
-		}()
+// Test that waitForNodeIPs retries on failure
+func Test_waitForNodeIPs(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldNode    *v1.Node
+		newNode    *v1.Node
+		expectedIP string
+	}{
+		{
+			name:       "empty IP",
+			oldNode:    makeNodeWithAddress("node1", ""),
+			newNode:    makeNodeWithAddress("node1", "192.168.0.1"),
+			expectedIP: "192.168.0.1",
+		},
+		{
+			name:       "invalid IP",
+			oldNode:    makeNodeWithAddress("node2", ""),
+			newNode:    makeNodeWithAddress("node2", "192.168.0.2"),
+			expectedIP: "192.168.0.2",
+		},
+		{
+			name:       "non-exist node",
+			newNode:    makeNodeWithAddress("node3", "192.168.0.3"),
+			expectedIP: "192.168.0.3",
+		},
 	}
 
-	// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
-	time.Sleep(1200 * time.Millisecond)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := []runtime.Object{}
+			if tc.oldNode != nil {
+				objects = append(objects, tc.oldNode)
+			}
+			client := clientsetfake.NewSimpleClientset(objects...)
+			nodeName := tc.newNode.Name
+			ch := make(chan error)
+			go func() {
+				_, ctx := ktesting.NewTestContext(t)
+				ips := waitForNodeIPs(ctx, client, nodeName)
+				if len(ips) == 0 {
+					ch <- fmt.Errorf("expected IP %s for %s but got nil", tc.expectedIP, nodeName)
+				} else if ips[0].String() != tc.expectedIP {
+					ch <- fmt.Errorf("expected IP %s for %s but got %s", tc.expectedIP, nodeName, ips[0].String())
+				} else if len(ips) != 1 {
+					ch <- fmt.Errorf("expected IP %s for %s but got multiple IPs", tc.expectedIP, nodeName)
+				}
+				close(ch)
+			}()
 
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node1", "192.168.0.1"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
-		makeNodeWithAddress("node2", "192.168.0.2"),
-		metav1.UpdateOptions{},
-	)
-	_, _ = client.CoreV1().Nodes().Create(context.TODO(),
-		makeNodeWithAddress("node3", "192.168.0.3"),
-		metav1.CreateOptions{},
-	)
+			// Give the goroutines time to fetch the bad/non-existent nodes, then fix them.
+			time.Sleep(1200 * time.Millisecond)
 
-	// Ensure each getNodeIP completed as expected
-	for i := range chans {
-		err := <-chans[i]
-		if err != nil {
-			t.Error(err.Error())
-		}
+			if tc.oldNode == nil {
+				_, _ = client.CoreV1().Nodes().Create(context.TODO(),
+					tc.newNode,
+					metav1.CreateOptions{},
+				)
+			} else {
+				_, _ = client.CoreV1().Nodes().UpdateStatus(context.TODO(),
+					tc.newNode,
+					metav1.UpdateOptions{},
+				)
+			}
+
+			// Ensure each getNodeIP completed as expected
+			err := <-ch
+			if err != nil {
+				t.Error(err.Error())
+			}
+		})
 	}
 }
 
