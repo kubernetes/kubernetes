@@ -185,13 +185,6 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 				pod.Name, pod.UID, *claimName, resourceClaim.UID)
 		}
 
-		// If no container actually uses the claim, then we don't need
-		// to prepare it.
-		if !claimIsUsedByPod(podClaim, pod) {
-			klog.V(5).InfoS("Skipping unused resource", "claim", claimName, "pod", pod.Name)
-			continue
-		}
-
 		// Atomically perform some operations on the claimInfo cache.
 		err = m.cache.withLock(func() error {
 			// Get a reference to the claim info for this claim from the cache.
@@ -322,34 +315,6 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 		}
 	}
 	return nil
-}
-
-func claimIsUsedByPod(podClaim *v1.PodResourceClaim, pod *v1.Pod) bool {
-	if claimIsUsedByContainers(podClaim, pod.Spec.InitContainers) {
-		return true
-	}
-	if claimIsUsedByContainers(podClaim, pod.Spec.Containers) {
-		return true
-	}
-	return false
-}
-
-func claimIsUsedByContainers(podClaim *v1.PodResourceClaim, containers []v1.Container) bool {
-	for i := range containers {
-		if claimIsUsedByContainer(podClaim, &containers[i]) {
-			return true
-		}
-	}
-	return false
-}
-
-func claimIsUsedByContainer(podClaim *v1.PodResourceClaim, container *v1.Container) bool {
-	for _, c := range container.Resources.Claims {
-		if c.Name == podClaim.Name {
-			return true
-		}
-	}
-	return false
 }
 
 // GetResources gets a ContainerInfo object from the claimInfo cache.
