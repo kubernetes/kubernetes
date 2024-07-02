@@ -50,6 +50,7 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	registerDeprecated(global, local, "boot_id_file", deprecated)
 	registerDeprecated(global, local, "container_hints", deprecated)
 	registerDeprecated(global, local, "containerd", deprecated)
+	registerDeprecated(global, local, "env_metadata_whitelist", deprecated)
 	registerDeprecated(global, local, "enable_load_reader", deprecated)
 	registerDeprecated(global, local, "event_storage_age_limit", deprecated)
 	registerDeprecated(global, local, "event_storage_event_limit", deprecated)
