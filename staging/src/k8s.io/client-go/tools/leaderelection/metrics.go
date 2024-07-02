@@ -29,10 +29,17 @@ type leaderMetricsAdapter interface {
 	slowpathExercised(name string)
 }
 
-// LeaderMetric instruments metrics used in leader election.
-type LeaderMetric interface {
+// SwitchMetric represents a single numerical value that can arbitrarily go up
+// and down.
+// Deprecated: Use LeaderMetric instead.
+type SwitchMetric interface {
 	On(name string)
 	Off(name string)
+}
+
+// LeaderMetric instruments metrics used in leader election.
+type LeaderMetric interface {
+	SwitchMetric
 	SlowpathExercised(name string)
 }
 
