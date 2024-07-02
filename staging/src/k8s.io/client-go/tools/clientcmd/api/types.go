@@ -41,11 +41,11 @@ type Config struct {
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
 	Preferences Preferences `json:"preferences"`
-	// Clusters is a map of referencable names to cluster configs
+	// Clusters is a map of referenceable names to cluster configs
 	Clusters map[string]*Cluster `json:"clusters"`
-	// AuthInfos is a map of referencable names to user configs
+	// AuthInfos is a map of referenceable names to user configs
 	AuthInfos map[string]*AuthInfo `json:"users"`
-	// Contexts is a map of referencable names to context configs
+	// Contexts is a map of referenceable names to context configs
 	Contexts map[string]*Context `json:"contexts"`
 	// CurrentContext is the name of the context that you would like to use by default
 	CurrentContext string `json:"current-context"`
