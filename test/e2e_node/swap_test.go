@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"math/big"
 	"path/filepath"
 	"strconv"
@@ -83,6 +84,48 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, func() {
 			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
 			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
 		)
+
+		ginkgo.It("NodeSwap node condition", func() {
+			ginkgo.By("Fetching the current NodeSwap condition")
+			node, isReady := getLocalTestNode(context.Background(), f)
+			gomega.Expect(isReady).To(gomega.BeTrueBecause("node is expected to be ready"))
+
+			var condition *v1.NodeCondition
+			for _, cond := range node.Status.Conditions {
+				if cond.Type == v1.NodeSwap {
+					condition = cond.DeepCopy()
+					break
+				}
+			}
+
+			if !isSwapFeatureGateEnabled() {
+				gomega.Expect(condition).To(gomega.BeNil(), "condition should not appear when feature gate it disabled")
+				return
+			}
+
+			gomega.Expect(condition).ToNot(gomega.BeNil(), "couldn't find the NodeSwap condition")
+
+			ginkgo.By("Fetching information about node swap's status")
+			kubeletConfig, err := getCurrentKubeletConfig(context.Background())
+			framework.ExpectNoError(err)
+
+			swapBehavior := kubeletConfig.MemorySwap.SwapBehavior
+			isSwapOn, err := swap.IsSwapOn()
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("Validating that NodeSwap condition is set as expected. swapBehavior: %s, isSwapOn: %t", swapBehavior, isSwapOn))
+			conditionMessage := fmt.Sprintf("is swap provisioned on node: %t. swapBehavior: %s", isSwapOn, swapBehavior)
+
+			if isSwapOn && swapBehavior != types.NoSwap {
+				gomega.Expect(condition.Status).To(gomega.Equal(v1.ConditionTrue))
+				gomega.Expect(condition.Reason).To(gomega.Equal("SwapEnabled"))
+			} else {
+				gomega.Expect(condition.Status).To(gomega.Equal(v1.ConditionFalse))
+				gomega.Expect(condition.Reason).To(gomega.Equal("SwapDisabled"))
+			}
+
+			gomega.Expect(condition.Message).To(gomega.Equal(conditionMessage))
+		})
 	})
 
 	f.Context(framework.WithSerial(), func() {
