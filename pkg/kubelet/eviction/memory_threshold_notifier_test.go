@@ -148,6 +148,47 @@ func TestUpdateThreshold(t *testing.T) {
 	}
 }
 
+func TestUpdateThresholdWithInvalidSummary(t *testing.T) {
+	testCases := []struct {
+		description                  string
+		summary                      *statsapi.Summary
+		allocatableEvictionThreshold bool
+	}{
+		{
+			description: "incomplete summary",
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					Memory: &statsapi.MemoryStats{},
+				},
+			},
+		},
+		{
+			description:                  "system container not found in metrics",
+			allocatableEvictionThreshold: true,
+			summary: &statsapi.Summary{
+				Node: statsapi.NodeStats{
+					SystemContainers: []statsapi.ContainerStats{
+						{
+							Name: "invalid",
+						},
+					},
+					Memory: &statsapi.MemoryStats{},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			m := newTestMemoryThresholdNotifier(evictionapi.Threshold{}, nil, nil)
+			if tc.allocatableEvictionThreshold {
+				m.threshold.Signal = evictionapi.SignalAllocatableMemoryAvailable
+			}
+			if err := m.UpdateThreshold(tc.summary); err == nil {
+				t.Errorf("Expected error updating threshold, but got nil")
+			}
+		})
+	}
+}
 func TestStart(t *testing.T) {
 	noResources := resource.MustParse("0")
 	threshold := evictionapi.Threshold{

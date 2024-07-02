@@ -110,6 +110,22 @@ func TestGetReclaimableThreshold(t *testing.T) {
 			t.Errorf("Didn't find reclaimable threshold, test: %v", testName)
 		}
 	}
+	cornerCases := map[string]struct {
+		thresholds []evictionapi.Threshold
+	}{
+		"no thresholds": {thresholds: []evictionapi.Threshold{}},
+		"threshold was crossed but reclaim not implemented (invalid signal)": {thresholds: []evictionapi.Threshold{
+			{
+				Signal: "mem.available",
+			},
+		}},
+	}
+	for testName, testCase := range cornerCases {
+		_, _, ok := getReclaimableThreshold(testCase.thresholds)
+		if ok {
+			t.Errorf("Shouldn't have found reclaimable threshold, test: %v", testName)
+		}
+	}
 }
 
 func TestParseThresholdConfig(t *testing.T) {
@@ -455,6 +471,78 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectErr:               true,
 			expectThresholds:        []evictionapi.Threshold{},
 		},
+		"min-reclaim-invalid-signal": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{"mem.available": "300Mi"},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"min-reclaim-empty-value": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{"memory.available": ""},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"min-reclaim-negative-percentage": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{"memory.available": "-15%"},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"min-reclaim-invalid-percentage": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{"memory.available": "10..5%"},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"hard-signal-empty-eviction-value": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{"memory.available": ""},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"hard-signal-invalid-float-percentage": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{"memory.available": "10..5%"},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"soft-grace-period-invalid-signal": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{"memory.available": "150Mi"},
+			evictionSoftGracePeriod: map[string]string{"mem.available": "30s"},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"soft-invalid-grace-period": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{},
+			evictionSoft:            map[string]string{"memory.available": "150Mi"},
+			evictionSoftGracePeriod: map[string]string{"memory.available": "30mins"},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
 	}
 	for testName, testCase := range testCases {
 		thresholds, err := ParseThresholdConfig(testCase.allocatableConfig, testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
@@ -643,6 +731,50 @@ func TestAddAllocatableThresholds(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			if !thresholdsEqual(testCase.expected, addAllocatableThresholds(testCase.thresholds)) {
 				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, cmp.Diff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
+			}
+		})
+	}
+}
+
+func TestFallbackResourcesUsage(t *testing.T) {
+	for _, test := range []struct {
+		description   string
+		usageFuncName string
+		usageFunc     func() int64
+	}{
+		{
+			description:   "disk usage, fallback value",
+			usageFuncName: "diskUsage",
+			usageFunc: func() int64 {
+				return diskUsage(&statsapi.FsStats{}).Value()
+			},
+		},
+		{
+			description:   "inode usage, fallback value",
+			usageFuncName: "inodeUsage",
+			usageFunc: func() int64 {
+				return inodeUsage(&statsapi.FsStats{}).Value()
+			},
+		},
+		{
+			description:   "memory usage, fallback value",
+			usageFuncName: "memoryUsage",
+			usageFunc: func() int64 {
+				return memoryUsage(&statsapi.MemoryStats{}).Value()
+			},
+		},
+		{
+			description:   "process usage, fallback value",
+			usageFuncName: "processUsage",
+			usageFunc: func() int64 {
+				return int64(processUsage(&statsapi.ProcessStats{}))
+			},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			value := test.usageFunc()
+			if value != 0 {
+				t.Errorf("expected '%s' to have a fallback value equal to 0, but got %d", test.usageFuncName, value)
 			}
 		})
 	}
@@ -3246,6 +3378,55 @@ func TestEvictonMessageWithResourceResize(t *testing.T) {
 				if strings.Contains(msg, "which exceeds its request") {
 					t.Errorf("Found 'exceeds memory' eviction message which was not expected.")
 				}
+			}
+		})
+	}
+}
+
+func TestStatsNotFoundForPod(t *testing.T) {
+	pod1 := newPod("fake-pod1", defaultPriority, []v1.Container{
+		newContainer("fake-container1", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, nil)
+	pod2 := newPod("fake-pod2", defaultPriority, []v1.Container{
+		newContainer("fake-container2", newResourceList("", "", ""), newResourceList("", "", "")),
+	}, nil)
+	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
+		return statsapi.PodStats{}, false
+	}
+
+	for _, test := range []struct {
+		description string
+		compFunc    func(stats statsFunc) cmpFunc
+	}{
+		{
+			description: "process",
+			compFunc:    process,
+		},
+		{
+			description: "memory",
+			compFunc:    memory,
+		},
+		{
+			description: "exceedMemoryRequests",
+			compFunc:    exceedMemoryRequests,
+		},
+		{
+			description: "exceedDiskRequests",
+			compFunc: func(stats statsFunc) cmpFunc {
+				return exceedDiskRequests(stats, nil, "")
+			},
+		},
+		{
+			description: "disk",
+			compFunc: func(stats statsFunc) cmpFunc {
+				return disk(stats, nil, "")
+			},
+		},
+	} {
+		t.Run(test.description, func(t *testing.T) {
+			result := test.compFunc(statsFn)(pod1, pod2)
+			if result != 0 {
+				t.Errorf("expected 0 but got %d", result)
 			}
 		})
 	}
