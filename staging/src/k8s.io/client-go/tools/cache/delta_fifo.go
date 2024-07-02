@@ -55,6 +55,9 @@ type DeltaFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// Name for the queue. If unnamed, the metrics will not be registered.
+	Name string
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -136,6 +139,8 @@ type DeltaFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
+
+	fifoMetrics fifoMetricsInterface
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -253,6 +258,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
+		fifoMetrics:           fifoGlobalMetricsFactory.newFifoMetrics(opts.Name),
 	}
 	f.cond.L = &f.lock
 	return f
@@ -275,6 +281,7 @@ func (f *DeltaFIFO) Close() {
 	defer f.lock.Unlock()
 	f.closed = true
 	f.cond.Broadcast()
+	f.fifoMetrics.cleanUp()
 }
 
 // KeyOf exposes f's keyFunc, but also detects the key of a Deltas object or
@@ -391,6 +398,7 @@ func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
 	}
 
 	f.queue = append(f.queue, id)
+	f.fifoMetrics.add()
 	f.items[id] = deltas
 	f.cond.Broadcast()
 }
@@ -479,6 +487,7 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 	if len(newDeltas) > 0 {
 		if _, exists := f.items[id]; !exists {
 			f.queue = append(f.queue, id)
+			f.fifoMetrics.add()
 		}
 		f.items[id] = newDeltas
 		f.cond.Broadcast()
@@ -601,6 +610,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			continue
 		}
 		delete(f.items, id)
+		f.fifoMetrics.pop()
 		// Only log traces if the queue depth is greater than 10 and it takes more than
 		// 100 milliseconds to process one item from the queue.
 		// Queue depth never goes high because processing an item is locking the queue,
