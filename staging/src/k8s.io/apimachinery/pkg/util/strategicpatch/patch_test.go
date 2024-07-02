@@ -400,8 +400,10 @@ testCases:
           $patch: delete
     modified:
       mergingList:
+        - name: 1
         - name: 2
           value: a
+        - name: 3
   - description: retainKeys map can add a field when no retainKeys directive present
     original:
       retainKeysMap:

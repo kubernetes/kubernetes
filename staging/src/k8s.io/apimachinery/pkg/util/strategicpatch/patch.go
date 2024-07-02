@@ -1584,17 +1584,14 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 	return original, patchWithoutSpecialElements, nil
 }
 
-// delete all matching entries (based on merge key) from a merging list
+// delete matching entry (based on merge key) from a merging list
 func deleteMatchingEntries(original []interface{}, mergeKey string, mergeValue interface{}) ([]interface{}, error) {
-	for {
-		_, originalKey, found, err := findMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
-		if err != nil {
-			return nil, err
-		}
+	_, originalKey, found, err := findLastMapInSliceBasedOnKeyValue(original, mergeKey, mergeValue)
+	if err != nil {
+		return nil, err
+	}
 
-		if !found {
-			break
-		}
+	if found {
 		// Delete the element at originalKey.
 		original = append(original[:originalKey], original[originalKey+1:]...)
 	}
@@ -1648,6 +1645,34 @@ func deleteFromSlice(current, toDelete []interface{}) []interface{} {
 		}
 	}
 	return processed
+}
+
+// This method no longer panics if any element of the slice is not a map.
+func findLastMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{}) (map[string]interface{}, int, bool, error) {
+	found := false
+	returnTypedV := map[string]interface{}{}
+	returnKeyIndex := 0
+
+	for keyIndex, v := range m {
+		typedV, ok := v.(map[string]interface{})
+		if !ok {
+			return nil, 0, false, fmt.Errorf("value for key %v is not a map", keyIndex)
+		}
+
+		valueToMatch, ok := typedV[key]
+		if ok && valueToMatch == value {
+			returnTypedV = typedV
+			returnKeyIndex = keyIndex
+			found = true
+			continue
+		}
+	}
+
+	if found {
+		return returnTypedV, returnKeyIndex, true, nil
+	}
+
+	return nil, 0, false, nil
 }
 
 // This method no longer panics if any element of the slice is not a map.
