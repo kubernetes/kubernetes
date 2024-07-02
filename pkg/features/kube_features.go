@@ -422,6 +422,13 @@ const (
 	// Enables cleaning up of secret-based service account tokens.
 	LegacyServiceAccountTokenCleanUp featuregate.Feature = "LegacyServiceAccountTokenCleanUp"
 
+	// owner: @HirazawaUi
+	// kep: http://kep.k8s.io/4580
+	// alpha: v1.31
+	//
+	// Deprecate & remove Kubelet RunOnce mode.
+	LegacyNodeRunOnceMode featuregate.Feature = "LegacyNodeRunOnceMode"
+
 	// owner: @RobertKrawitz
 	// alpha: v1.15
 	//
@@ -1079,6 +1086,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeProxyDrainingTerminatingNodes: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31; remove in 1.33
 
 	LegacyServiceAccountTokenCleanUp: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
+
+	LegacyNodeRunOnceMode: {Default: true, PreRelease: featuregate.Alpha},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
