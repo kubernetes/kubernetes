@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"path"
 	"strconv"
 
@@ -31,7 +32,7 @@ import (
 )
 
 // NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
-func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdConfig(restClientGetter genericclioptions.RESTClientGetter, pathOptions *clientcmd.PathOptions, streams genericiooptions.IOStreams) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
@@ -58,7 +59,7 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, streams genericiooptions.I
 	cmd.AddCommand(NewCmdConfigView(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetCredentials(streams.Out, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetContext(restClientGetter, streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSet(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUnset(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigCurrentContext(streams.Out, pathOptions))

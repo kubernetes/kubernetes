@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/spf13/cobra"
 
@@ -53,7 +54,7 @@ var (
 )
 
 // NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
-func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigSetContext(restClientGetter genericclioptions.RESTClientGetter, out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -79,6 +80,12 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
+	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"namespace",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return completion.CompGetResource(cmdutil.NewFactory(restClientGetter), "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+		},
+	))
 
 	return cmd
 }
