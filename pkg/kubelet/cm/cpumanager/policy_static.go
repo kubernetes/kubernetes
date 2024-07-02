@@ -42,6 +42,8 @@ const (
 	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
+	// ErrorInconsistentCPUAllocation represent the type of an inconsistentCPUAllocationError
+	ErrorInconsistentCPUAllocation = "inconsistentCPUAllocationError"
 )
 
 // SMTAlignmentError represents an error due to SMT alignment
@@ -61,6 +63,33 @@ func (e SMTAlignmentError) Error() string {
 // Type returns human-readable type of this error. Used in the admission control to populate Admission Failure reason.
 func (e SMTAlignmentError) Type() string {
 	return ErrorSMTAlignment
+}
+
+// inconsistentCPUAllocationError represents an error due to an
+// attempt to either move a container from exclusively allocated
+// pool to shared pool or move a container from shared pool to
+// exclusively allocated pool.
+type inconsistentCPUAllocationError struct {
+	RequestedCPUs    string
+	AllocatedCPUs    string
+	Shared2Exclusive bool
+}
+
+func (e inconsistentCPUAllocationError) Error() string {
+	if e.RequestedCPUs == e.AllocatedCPUs {
+		return fmt.Sprintf("inconsistentCPUAllocation Error: Skip resize, nothing to be done, (requested CPUs = %s equal to allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
+	}
+	if e.Shared2Exclusive {
+		return fmt.Sprintf("inconsistentCPUAllocation Error: Not allowed to move a container from shared pool to exclusively allocated pool, (requested CPUs = %s, allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
+	} else {
+		return fmt.Sprintf("inconsistentCPUAllocation Error: Not allowed to move a container from  exclusively allocated pool to shared pool, not allowed (requested CPUs = %s, allocated CPUs = %s)", e.RequestedCPUs, e.AllocatedCPUs)
+	}
+}
+
+// Type returns human-readable type of this error.
+// Used in the HandlePodResourcesResize to populate Failure reason
+func (e inconsistentCPUAllocationError) Type() string {
+	return ErrorInconsistentCPUAllocation
 }
 
 // staticPolicy is a CPU manager policy that does not change CPU
@@ -295,6 +324,15 @@ func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, c
 
 func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) (rerr error) {
 	numCPUs := p.guaranteedCPUs(pod, container)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// During a pod resize, handle corner cases
+		err := p.validateInPlacePodVerticalScaling(pod, container)
+		if err != nil {
+			klog.ErrorS(err, "Static policy: Unable to resize allocated CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
+			return err
+		}
+	}
+
 	if numCPUs == 0 {
 		// container belongs in the shared pool (nothing to do; use default cpuset)
 		return nil
@@ -329,6 +367,12 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 		availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+				cpuAllocatedQuantity := cs.AllocatedResources[v1.ResourceCPU]
+				availablePhysicalCPUs += int(cpuAllocatedQuantity.Value())
+			}
+		}
 		// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
 		// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
 		// all the core siblings of the reserved CPUs as unavailable when computing the free CPUs, before to start the actual allocation.
@@ -342,9 +386,36 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 	}
 	if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
-		p.updateCPUsToReuse(pod, container, cpuset)
-		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-		return nil
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			klog.InfoS("Static policy: container already present in state, attempting InPlacePodVerticalScaling", "pod", klog.KObj(pod), "containerName", container.Name)
+			cpusInUse := getAssignedCPUsOfSiblings(s, string(pod.UID), container.Name)
+			s.Delete(string(pod.UID), container.Name)
+			toRelease := cpuset.Difference(cpusInUse)
+			previousdefaultcpuset := s.GetDefaultCPUSet()
+			s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+			p.updateCPUsToReuse(pod, container, cpuset)
+
+			// Call Topology Manager to get the aligned socket affinity across all hint providers.
+			hint := p.affinity.GetAffinity(string(pod.UID), container.Name)
+			klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
+
+			// Allocate CPUs according to the NUMA affinity contained in the hint.
+			allocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
+			if err != nil {
+				s.SetCPUSet(string(pod.UID), container.Name, cpuset)
+				s.SetDefaultCPUSet(previousdefaultcpuset)
+				p.updateCPUsToReuse(pod, container, cpuset)
+				klog.ErrorS(err, "Static policy: Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
+				return err
+			}
+			s.SetCPUSet(string(pod.UID), container.Name, allocatedcpuset)
+			p.updateCPUsToReuse(pod, container, allocatedcpuset)
+			return nil
+		} else {
+			p.updateCPUsToReuse(pod, container, cpuset)
+			klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+			return nil
+		}
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
@@ -430,15 +501,6 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
-			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
-		}
-	}
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
 		return 0
 	}
@@ -701,4 +763,56 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 	}
 
 	return alignedCPUs
+}
+
+func (p *staticPolicy) validateInPlacePodVerticalScaling(pod *v1.Pod, container *v1.Container) error {
+
+	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+		return nil
+	}
+	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
+	if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+		allocatedCPUQuantity := cs.AllocatedResources[v1.ResourceCPU]
+		if allocatedCPUQuantity == cpuQuantity {
+			// Skip resize, nothing to be done
+			return inconsistentCPUAllocationError{
+				RequestedCPUs: cpuQuantity.String(),
+				AllocatedCPUs: allocatedCPUQuantity.String(),
+			}
+		}
+		if allocatedCPUQuantity.Value() > 0 {
+			if allocatedCPUQuantity.Value()*1000 == allocatedCPUQuantity.MilliValue() {
+				// container belongs in exclusive pool
+				if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
+					// container move to shared pool not allowed
+					return inconsistentCPUAllocationError{
+						RequestedCPUs:    cpuQuantity.String(),
+						AllocatedCPUs:    allocatedCPUQuantity.String(),
+						Shared2Exclusive: false,
+					}
+				}
+			} else {
+				// container belongs in shared pool
+				if cpuQuantity.Value()*1000 == cpuQuantity.MilliValue() {
+					// container move to exclusive pool not allowed
+					return inconsistentCPUAllocationError{
+						RequestedCPUs:    cpuQuantity.String(),
+						AllocatedCPUs:    allocatedCPUQuantity.String(),
+						Shared2Exclusive: true,
+					}
+				}
+			}
+		} else {
+			// container belongs in shared pool
+			if cpuQuantity.Value()*1000 == cpuQuantity.MilliValue() {
+				// container move to exclusive pool not allowed
+				return inconsistentCPUAllocationError{
+					RequestedCPUs:    cpuQuantity.String(),
+					AllocatedCPUs:    allocatedCPUQuantity.String(),
+					Shared2Exclusive: true,
+				}
+			}
+		}
+	}
+	return nil
 }
