@@ -251,10 +251,34 @@ func (g *GenericPLEG) Relist() {
 	for pid := range g.podRecords {
 		oldPod := g.podRecords.getOld(pid)
 		pod := g.podRecords.getCurrent(pid)
+
+		var cachePodStatus *kubecontainer.PodStatus
+		var podStatus *kubecontainer.PodStatus
+
+		// get cachePodStatus and runtimePodStatus to help distinguish the resized pod.
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if !g.cacheEnabled() {
+				klog.ErrorS(err, "GenericPLEG: Cache is not enabled")
+				return
+			}
+			cachePodStatus, err = g.cache.Get(pid)
+			if err != nil {
+				klog.ErrorS(err, "GenericPLEG: Unable to retrieve pods", "pid", pid)
+				return
+			}
+			if pod != nil {
+				podStatus, err = g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)
+				if err != nil {
+					klog.ErrorS(err, "GenericPLEG: Unable to retrieve runtime pod status", "pod", pod)
+					continue
+				}
+			}
+		}
+
 		// Get all containers in the old and the new pod.
 		allContainers := getContainersFromPods(oldPod, pod)
 		for _, container := range allContainers {
-			events := computeEvents(oldPod, pod, &container.ID)
+			events := computeEvents(oldPod, pod, cachePodStatus, podStatus, &container.ID)
 			for _, e := range events {
 				updateEvents(eventsByPodID, e)
 			}
@@ -309,7 +333,10 @@ func (g *GenericPLEG) Relist() {
 		for i := range events {
 			// Filter out events that are not reliable and no other components use yet.
 			if events[i].Type == ContainerChanged {
-				continue
+				// resized pods can not be skipped, pass through the eventChannel to make sure it get synced.
+				if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+					continue
+				}
 			}
 			select {
 			case g.eventChannel <- events[i]:
@@ -386,7 +413,7 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 	return containers
 }
 
-func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
+func computeEvents(oldPod, newPod *kubecontainer.Pod, cachedPodStatus, podStatus *kubecontainer.PodStatus, cid *kubecontainer.ContainerID) []*PodLifecycleEvent {
 	var pid types.UID
 	if oldPod != nil {
 		pid = oldPod.ID
@@ -395,7 +422,32 @@ func computeEvents(oldPod, newPod *kubecontainer.Pod, cid *kubecontainer.Contain
 	}
 	oldState := getContainerState(oldPod, cid)
 	newState := getContainerState(newPod, cid)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && oldPod != nil && newPod != nil && cachedPodStatus != nil && podStatus != nil {
+		oldContainerStatus := cachedPodStatus.FindContainerStatusByContainerID(cid)
+		newContainerStatus := podStatus.FindContainerStatusByContainerID(cid)
+		if oldContainerStatus != nil && newContainerStatus != nil && !containerResourceSame(oldContainerStatus.Resources, newContainerStatus.Resources) {
+			klog.V(5).InfoS("resize pods triggers the plegContainerUnknown event", "oldContainerStatus", oldContainerStatus, "newContainerStatus", newContainerStatus)
+			return generateEvents(pid, cid.ID, oldState, plegContainerUnknown)
+		}
+	}
+
 	return generateEvents(pid, cid.ID, oldState, newState)
+}
+
+// TODO: use more elegant way to compare the resources
+func containerResourceSame(r1 *kubecontainer.ContainerResources, r2 *kubecontainer.ContainerResources) bool {
+	if r1 == nil && r2 == nil {
+		return true
+	}
+
+	cpuRequestsSame := (r1.CPURequest == nil && r2.CPURequest == nil) || (r1.CPURequest != nil && r2.CPURequest != nil && r1.CPURequest.Equal(*r2.CPURequest))
+	cpuLimitsSame := (r1.CPULimit == nil && r2.CPULimit == nil) || (r1.CPULimit != nil && r2.CPULimit != nil && r1.CPULimit.Equal(*r2.CPULimit))
+	memoryRequestsSame := (r1.MemoryRequest == nil && r2.MemoryRequest == nil) || (r1.MemoryRequest != nil && r2.MemoryRequest != nil && r1.MemoryRequest.Equal(*r2.MemoryRequest))
+	memoryLimitsSame := (r1.MemoryLimit == nil && r2.MemoryLimit == nil) || (r1.MemoryLimit != nil && r2.MemoryLimit != nil && r1.MemoryLimit.Equal(*r2.MemoryLimit))
+
+	// The container resources are the same only if all attributes are the same
+	return cpuRequestsSame && cpuLimitsSame && memoryRequestsSame && memoryLimitsSame
 }
 
 func (g *GenericPLEG) cacheEnabled() bool {

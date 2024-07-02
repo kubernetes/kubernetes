@@ -36,6 +36,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -421,6 +425,71 @@ func TestRemoveCacheEntry(t *testing.T) {
 	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
 	assert.Equal(t, &kubecontainer.PodStatus{ID: pods[0].ID}, actualStatus)
 	assert.Equal(t, nil, actualErr)
+}
+
+func TestRelistingWithResourcesChange(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+
+	ctx := context.Background()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	runtimeMock := containertest.NewMockRuntime(mockCtrl)
+	pleg := newTestGenericPLEGWithRuntimeMock(runtimeMock)
+	ch := pleg.Watch()
+
+	pods, statuses, events := createTestPodsStatusesAndEvents(1)
+	// add resources to statuses
+	for _, status := range statuses {
+		status.ContainerStatuses[0].Resources = &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(100, resource.DecimalSI),
+			CPULimit: resource.NewMilliQuantity(100, resource.DecimalSI),
+			MemoryRequest: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+			MemoryLimit: resource.NewQuantity(100*1024*1024, resource.BinarySI),
+		}
+	}
+	runtimeMock.EXPECT().GetPods(ctx, true).Return(pods, nil).Times(1)
+	// call two times on pod status. 1. get exist pod status; 2. update cache 
+	runtimeMock.EXPECT().GetPodStatus(ctx, pods[0].ID, "", "").Return(statuses[0], nil).Times(2)
+	// Does a relist to populate the cache.
+	pleg.Relist()
+
+	// verify cache is set correctly
+	actualStatus, actualErr := pleg.cache.Get(pods[0].ID)
+	assert.Equal(t, statuses[0], actualStatus)
+	assert.Equal(t, nil, actualErr)
+
+	// verify event is generated correctly
+	actualEvents := getEventsFromChannel(ch)
+	assert.Exactly(t, []*PodLifecycleEvent{events[0]}, actualEvents)
+
+	// Update pod status. Verify event for InPlaceUpdateVerticalScaling is created
+	updatedPods, updatedStatuses, updatedEvents := createTestPodsStatusesAndEvents(1)
+	// set updated status 
+	for _, status := range updatedStatuses {
+		status.ContainerStatuses[0].Resources = &kubecontainer.ContainerResources{
+			CPURequest: resource.NewMilliQuantity(200, resource.DecimalSI),
+			CPULimit: resource.NewMilliQuantity(200, resource.DecimalSI),
+			MemoryRequest: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+			MemoryLimit: resource.NewQuantity(200*1024*1024, resource.BinarySI),
+		}
+	}
+	// set updated events
+	for _, event := range updatedEvents {
+		event.Type = ContainerChanged
+	} 
+
+	runtimeMock.EXPECT().GetPods(ctx, true).Return(updatedPods, nil).Times(1)
+	runtimeMock.EXPECT().GetPodStatus(ctx, pods[0].ID, "", "").Return(updatedStatuses[0], nil).Times(2)
+	pleg.Relist()
+
+	// verify cache is updated correctly
+	actualUpdatedStatus, actualUpdatedErr := pleg.cache.Get(pods[0].ID)
+	assert.Equal(t, updatedStatuses[0], actualUpdatedStatus)
+	assert.Equal(t, nil, actualUpdatedErr)
+
+	// verify event is generated correctly
+	actualUpdatedEvents := getEventsFromChannel(ch)
+	assert.Exactly(t, []*PodLifecycleEvent{updatedEvents[0]}, actualUpdatedEvents)
 }
 
 func TestHealthy(t *testing.T) {
