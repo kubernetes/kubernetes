@@ -31,6 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/generated/openapi"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newValidatingAdmissionPolicyStatusControllerDescriptor())
+}
+
 func newValidatingAdmissionPolicyStatusControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ValidatingAdmissionPolicyStatusController,

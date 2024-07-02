@@ -29,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newServiceCIDRsControllerDescriptor())
+}
+
 func newServiceCIDRsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ServiceCIDRController,

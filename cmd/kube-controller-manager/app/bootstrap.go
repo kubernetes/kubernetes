@@ -25,6 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/bootstrap"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newBootstrapSignerControllerDescriptor())
+}
+
 func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                names.BootstrapSignerController,
@@ -45,6 +49,10 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 	}
 	go bsc.Run(ctx)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newTokenCleanerControllerDescriptor())
 }
 
 func newTokenCleanerControllerDescriptor() *ControllerDescriptor {

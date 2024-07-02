@@ -33,6 +33,10 @@ import (
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newCertificateSigningRequestSigningControllerDescriptor())
+}
+
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestSigningController,
@@ -157,6 +161,10 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 	return config.ClusterSigningCertFile, config.ClusterSigningKeyFile
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newCertificateSigningRequestApprovingControllerDescriptor())
+}
+
 func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestApprovingController,
@@ -164,6 +172,7 @@ func newCertificateSigningRequestApprovingControllerDescriptor() *ControllerDesc
 		initFunc: startCertificateSigningRequestApprovingController,
 	}
 }
+
 func startCertificateSigningRequestApprovingController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	approver := approver.NewCSRApprovingController(
 		ctx,
@@ -175,6 +184,10 @@ func startCertificateSigningRequestApprovingController(ctx context.Context, cont
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newCertificateSigningRequestCleanerControllerDescriptor())
+}
+
 func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.CertificateSigningRequestCleanerController,
@@ -182,6 +195,7 @@ func newCertificateSigningRequestCleanerControllerDescriptor() *ControllerDescri
 		initFunc: startCertificateSigningRequestCleanerController,
 	}
 }
+
 func startCertificateSigningRequestCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
@@ -189,6 +203,10 @@ func startCertificateSigningRequestCleanerController(ctx context.Context, contro
 	)
 	go cleaner.Run(ctx, 1)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newRootCACertificatePublisherControllerDescriptor())
 }
 
 func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {

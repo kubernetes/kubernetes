@@ -82,6 +82,10 @@ const (
 	defaultNodeMaskCIDRIPv6 = 64
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newServiceLBControllerDescriptor())
+}
+
 func newServiceLBControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                      cpnames.ServiceLBController,
@@ -108,6 +112,11 @@ func startServiceLBController(ctx context.Context, controllerContext ControllerC
 	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs), controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
+
+func init() {
+	DefaultControllerDescRegistry.Register(newNodeIpamControllerDescriptor())
+}
+
 func newNodeIpamControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.NodeIpamController,
@@ -192,6 +201,10 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newNodeLifecycleControllerDescriptor())
+}
+
 func newNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.NodeLifecycleController,
@@ -224,6 +237,10 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newTaintEvictionControllerDescriptor())
+}
+
 func newTaintEvictionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.TaintEvictionController,
@@ -248,6 +265,10 @@ func startTaintEvictionController(ctx context.Context, controllerContext Control
 	}
 	go taintEvictionController.Run(ctx)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newCloudNodeLifecycleControllerDescriptor())
 }
 
 func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
@@ -277,6 +298,10 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 
 	go cloudNodeLifecycleController.Run(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newNodeRouteControllerDescriptor())
 }
 
 func newNodeRouteControllerDescriptor() *ControllerDescriptor {
@@ -318,6 +343,10 @@ func startNodeRouteController(ctx context.Context, controllerContext ControllerC
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newPersistentVolumeBinderControllerDescriptor())
+}
+
 func newPersistentVolumeBinderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.PersistentVolumeBinderController,
@@ -350,6 +379,10 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 	}
 	go volumeController.Run(ctx)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newPersistentVolumeAttachDetachControllerDescriptor())
 }
 
 func newPersistentVolumeAttachDetachControllerDescriptor() *ControllerDescriptor {
@@ -396,6 +429,10 @@ func startPersistentVolumeAttachDetachController(ctx context.Context, controller
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newPersistentVolumeExpanderControllerDescriptor())
+}
+
 func newPersistentVolumeExpanderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.PersistentVolumeExpanderController,
@@ -428,6 +465,10 @@ func startPersistentVolumeExpanderController(ctx context.Context, controllerCont
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newEphemeralVolumeControllerDescriptor())
+}
+
 func newEphemeralVolumeControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EphemeralVolumeController,
@@ -450,6 +491,10 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 }
 
 const defaultResourceClaimControllerWorkers = 10
+
+func init() {
+	DefaultControllerDescRegistry.Register(newResourceClaimControllerDescriptor())
+}
 
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -477,6 +522,10 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newEndpointsControllerDescriptor())
+}
+
 func newEndpointsControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.EndpointsController,
@@ -495,6 +544,10 @@ func startEndpointsController(ctx context.Context, controllerContext ControllerC
 		controllerContext.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
 	).Run(ctx, int(controllerContext.ComponentConfig.EndpointController.ConcurrentEndpointSyncs))
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newReplicationControllerDescriptor())
 }
 
 func newReplicationControllerDescriptor() *ControllerDescriptor {
@@ -516,6 +569,10 @@ func startReplicationController(ctx context.Context, controllerContext Controlle
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newPodGarbageCollectorControllerDescriptor())
+}
+
 func newPodGarbageCollectorControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.PodGarbageCollectorController,
@@ -533,6 +590,10 @@ func startPodGarbageCollectorController(ctx context.Context, controllerContext C
 		int(controllerContext.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
 	).Run(ctx)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newResourceQuotaControllerDescriptor())
 }
 
 func newResourceQuotaControllerDescriptor() *ControllerDescriptor {
@@ -572,6 +633,10 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 	go resourceQuotaController.Sync(ctx, discoveryFunc, 30*time.Second)
 
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newNamespaceControllerDescriptor())
 }
 
 func newNamespaceControllerDescriptor() *ControllerDescriptor {
@@ -616,6 +681,10 @@ func startModifiedNamespaceController(ctx context.Context, controllerContext Con
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newServiceAccountControllerDescriptor())
+}
+
 func newServiceAccountControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.ServiceAccountController,
@@ -638,6 +707,10 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newTTLControllerDescriptor())
+}
+
 func newTTLControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.TTLController,
@@ -653,6 +726,10 @@ func startTTLController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.ClientBuilder.ClientOrDie("ttl-controller"),
 	).Run(ctx, 5)
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newGarbageCollectorControllerDescriptor())
 }
 
 func newGarbageCollectorControllerDescriptor() *ControllerDescriptor {
@@ -707,6 +784,10 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 	return garbageCollector, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newPersistentVolumeClaimProtectionControllerDescriptor())
+}
+
 func newPersistentVolumeClaimProtectionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.PersistentVolumeClaimProtectionController,
@@ -729,6 +810,10 @@ func startPersistentVolumeClaimProtectionController(ctx context.Context, control
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newPersistentVolumeProtectionControllerDescriptor())
+}
+
 func newPersistentVolumeProtectionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.PersistentVolumeProtectionController,
@@ -746,6 +831,10 @@ func startPersistentVolumeProtectionController(ctx context.Context, controllerCo
 	return nil, true, nil
 }
 
+func init() {
+	DefaultControllerDescRegistry.Register(newTTLAfterFinishedControllerDescriptor())
+}
+
 func newTTLAfterFinishedControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.TTLAfterFinishedController,
@@ -761,6 +850,10 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
 	).Run(ctx, int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs))
 	return nil, true, nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 }
 
 func newLegacyServiceAccountTokenCleanerControllerDescriptor() *ControllerDescriptor {
@@ -904,6 +997,10 @@ func setNodeCIDRMaskSizes(cfg nodeipamconfig.NodeIPAMControllerConfiguration, cl
 		ipv6Mask = int(cfg.NodeCIDRMaskSizeIPv6)
 	}
 	return sortedSizes(ipv4Mask, ipv6Mask), nil
+}
+
+func init() {
+	DefaultControllerDescRegistry.Register(newStorageVersionGarbageCollectorControllerDescriptor())
 }
 
 func newStorageVersionGarbageCollectorControllerDescriptor() *ControllerDescriptor {

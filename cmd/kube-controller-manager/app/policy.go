@@ -29,6 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 )
 
+func init() {
+	DefaultControllerDescRegistry.Register(newDisruptionControllerDescriptor())
+}
+
 func newDisruptionControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:     names.DisruptionController,
