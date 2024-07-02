@@ -275,6 +275,12 @@ const (
 	// deletion ordering.
 	HonorPVReclaimPolicy featuregate.Feature = "HonorPVReclaimPolicy"
 
+	// owner: @olderTaoist
+	// alpha: v1.30.0
+	//
+	// --image-gc-high-threshold should less than 100 - imagefs.available.
+	ImageGCHighThresholdAccurate featuregate.Feature = "ImageGCHighThresholdAccurate"
+
 	// owner: @leakingtapan
 	// alpha: v1.21
 	//
@@ -1039,6 +1045,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HonorPVReclaimPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	ImageMaximumGCAge: {Default: true, PreRelease: featuregate.Beta},
+
+	ImageGCHighThresholdAccurate: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
