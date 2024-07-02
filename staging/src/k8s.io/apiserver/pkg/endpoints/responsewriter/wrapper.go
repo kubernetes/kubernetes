@@ -18,8 +18,12 @@ package responsewriter
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 	"net/http"
+	"runtime"
+
+	"k8s.io/klog/v2"
 )
 
 // UserProvidedDecorator represensts a user (client that uses this package)
@@ -56,6 +60,12 @@ type UserProvidedDecorator interface {
 //     may or may not implement http.CloseNotifier, http.Flusher or http.Hijacker.
 //   - "inner": the ResponseWriter that the user-provided decorator extends.
 func WrapForHTTP1Or2(decorator UserProvidedDecorator) http.ResponseWriter {
+	// An http.ResponseWriter decorator should not be using 'Flush' method,
+	// instead a decorator should use FlushError method.
+	if _, ok := decorator.(http.Flusher); ok {
+		panic(fmt.Errorf("Flush not allowed, use FlushError function instead"))
+	}
+
 	// from go net/http documentation:
 	// The default HTTP/1.x and HTTP/2 ResponseWriter implementations support Flusher
 	// Handlers should always test for this ability at runtime.
@@ -72,16 +82,18 @@ func WrapForHTTP1Or2(decorator UserProvidedDecorator) http.ResponseWriter {
 	// New code should use Request.Context instead.
 	inner := decorator.Unwrap()
 	if innerNotifierFlusher, ok := inner.(CloseNotifierFlusher); ok {
-		// for HTTP/2 request, the default ResponseWriter object (http2responseWriter)
-		// implements Flusher and CloseNotifier.
+		// for HTTP/2 request, the default ResponseWriter object
+		// (http2responseWriter) implements http.Flusher, FlusherError,
+		// and CloseNotifier.
 		outerHTTP2 := outerWithCloseNotifyAndFlush{
 			UserProvidedDecorator:     decorator,
 			InnerCloseNotifierFlusher: innerNotifierFlusher,
 		}
 
 		if innerHijacker, hijackable := inner.(http.Hijacker); hijackable {
-			// for HTTP/1.x request the default implementation of ResponseWriter
-			// also implement CloseNotifier, Flusher and Hijacker
+			// for HTTP/1.x request the default implementation of
+			// ResponseWriter also implement CloseNotifier,
+			// http.Flusher, Hijacker, and FlusherError.
 			return &outerWithCloseNotifyFlushAndHijack{
 				outerWithCloseNotifyAndFlush: outerHTTP2,
 				InnerHijacker:                innerHijacker,
@@ -92,14 +104,30 @@ func WrapForHTTP1Or2(decorator UserProvidedDecorator) http.ResponseWriter {
 	}
 
 	// we should never be here for either http/1.x or http2 request
+
+	// TODO: debug only, remove
+	const size = 64 << 10
+	buf := make([]byte, size)
+	buf = buf[:runtime.Stack(buf, false)]
+	klog.Infof("ResponseWriter object is not a CloseNotifierFlusher: %T, call stack: %s", inner, buf)
+
 	return decorator
 }
 
-// CloseNotifierFlusher is a combination of http.CloseNotifier and http.Flusher
+// Alternative of Flush returning an error, the initial http.ResponseWriter
+// object created by net/http implements this interface for both
+// http/1.x and http2.
+type FlusherError interface {
+	FlushError() error
+}
+
+// CloseNotifierFlusher is a combination of http.CloseNotifier,
+// http.Flusher, and FlusherError.
 // This applies to both http/1.x and http2 requests.
 type CloseNotifierFlusher interface {
 	http.CloseNotifier
 	http.Flusher
+	FlusherError
 }
 
 // GetOriginal goes through the chain of wrapped http.ResponseWriter objects
@@ -123,11 +151,13 @@ func GetOriginal(w http.ResponseWriter) http.ResponseWriter {
 //nolint:staticcheck // SA1019
 var _ http.CloseNotifier = outerWithCloseNotifyAndFlush{}
 var _ http.Flusher = outerWithCloseNotifyAndFlush{}
+var _ FlusherError = outerWithCloseNotifyAndFlush{}
 var _ http.ResponseWriter = outerWithCloseNotifyAndFlush{}
 var _ UserProvidedDecorator = outerWithCloseNotifyAndFlush{}
 
 // outerWithCloseNotifyAndFlush is the outer object that extends the
-// user provied decorator with http.CloseNotifier and http.Flusher only.
+// user provied decorator with http.CloseNotifier,
+// http.Flusher, and FlusherError.
 type outerWithCloseNotifyAndFlush struct {
 	// UserProvidedDecorator is the user-provided object, it decorates
 	// an inner ResponseWriter object.
@@ -152,6 +182,18 @@ func (wr outerWithCloseNotifyAndFlush) Flush() {
 	}
 
 	wr.InnerCloseNotifierFlusher.Flush()
+}
+
+func (wr outerWithCloseNotifyAndFlush) FlushError() error {
+	switch t := wr.UserProvidedDecorator.(type) {
+	case FlusherError:
+		return t.FlushError()
+	case http.Flusher:
+		t.Flush()
+		return nil
+	}
+
+	return wr.InnerCloseNotifierFlusher.FlushError()
 }
 
 //lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier

@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"sync"
 	"testing"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	responsewritertesting "k8s.io/apiserver/pkg/endpoints/responsewriter/testing"
 )
 
 type fakeAuditSink struct {
@@ -74,46 +76,108 @@ func (s *fakeAuditSink) Pop(timeout time.Duration) (*auditinternal.Event, error)
 	return result, err
 }
 
-func TestConstructResponseWriter(t *testing.T) {
-	inner := &responsewriter.FakeResponseWriter{}
-	actual := decorateResponseWriter(context.Background(), inner, nil, nil, nil)
-	switch v := actual.(type) {
+func TestResponseWriterDecoratorShouldNotUseFlush(t *testing.T) {
+	var decorator interface{} = &auditResponseWriter{}
+	if _, ok := decorator.(http.Flusher); ok {
+		t.Errorf("decorator should not use Flush method, use FlushError instead")
+	}
+}
+
+func TestResponseWriterDecoratorConstruction(t *testing.T) {
+	inner1 := &responsewritertesting.FakeResponseWriter{}
+	outer := decorateResponseWriter(context.Background(), inner1, nil, nil, nil)
+	switch v := outer.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
-	if innerGot := actual.(responsewriter.UserProvidedDecorator).Unwrap(); inner != innerGot {
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner1 != innerGot {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifier{}, nil, nil, nil)
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := actual.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
+	// simulate http2
+	inner2 := &responsewritertesting.FakeResponseWriterFlusherCloseNotifier{FakeResponseWriter: inner1}
+	outer = decorateResponseWriter(context.Background(), inner2, nil, nil, nil)
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner2 != innerGot {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
-	if _, ok := actual.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
+	responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner2, outer)
+
+	// simulate http/1x
+	inner3 := &responsewritertesting.FakeResponseWriterFlusherCloseNotifierHijacker{FakeResponseWriterFlusherCloseNotifier: inner2}
+	outer = decorateResponseWriter(context.Background(), inner3, nil, nil, nil)
+	if innerGot := outer.(responsewriter.UserProvidedDecorator).Unwrap(); inner3 != innerGot {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
-	if _, ok := actual.(http.Hijacker); ok {
-		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
+	responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner3, outer)
+}
+
+func TestResponseWriterDecoratorWithHTTPServer(t *testing.T) {
+	tests := []struct {
+		name  string
+		http2 bool
+	}{
+		{
+			name: "http/1.x",
+		},
+		{
+			name:  "http2",
+			http2: true,
+		},
 	}
 
-	actual = decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker{}, nil, nil, nil)
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	if _, ok := actual.(http.CloseNotifier); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
-	}
-	if _, ok := actual.(http.Flusher); !ok {
-		t.Errorf("Expected the wrapper to implement http.Flusher")
-	}
-	if _, ok := actual.(http.Hijacker); !ok {
-		t.Errorf("Expected http.ResponseWriter to implement http.Hijacker")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var inner http.ResponseWriter
+			chain := func(h http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					inner = w
+					w = decorateResponseWriter(r.Context(), w, nil, nil, nil)
+					h.ServeHTTP(w, r)
+				})
+			}
+
+			invokedCh := make(chan struct{}, 1)
+			handler := chain(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(invokedCh)
+				responsewritertesting.AssertResponseWriterInterfaceCompatibility(t, inner, w)
+			}))
+
+			server := httptest.NewUnstartedServer(handler)
+			defer server.Close()
+			if test.http2 {
+				server.EnableHTTP2 = true
+			}
+			server.StartTLS()
+			if _, err := url.Parse(server.URL); err != nil {
+				t.Errorf("Expected the server to have a valid URL, but got: %s", server.URL)
+				return
+			}
+			req, err := http.NewRequest("GET", server.URL, nil)
+			if err != nil {
+				t.Errorf("error creating request: %v", err)
+				return
+			}
+
+			client := server.Client()
+			client.Timeout = wait.ForeverTestTimeout
+			_, err = client.Do(req)
+			if err != nil {
+				t.Errorf("Unexpected error from the server: %v", err)
+			}
+
+			select {
+			case <-invokedCh:
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Errorf("Expected the handler to be invoked")
+			}
+		})
 	}
 }
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.WriteHeader(42)
@@ -127,7 +191,7 @@ func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 
 func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, nil, nil)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.Write([]byte("foo"))
@@ -142,7 +206,7 @@ func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 func TestDecorateResponseWriterChannel(t *testing.T) {
 	sink := &fakeAuditSink{}
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(context.Background(), &responsewriter.FakeResponseWriter{}, ev, sink, nil)
+	actual := decorateResponseWriter(context.Background(), &responsewritertesting.FakeResponseWriter{}, ev, sink, nil)
 
 	done := make(chan struct{})
 	go func() {
