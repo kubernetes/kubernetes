@@ -106,6 +106,10 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) {
 		node.Status.RuntimeHandlers = nil
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+		node.Status.Features = nil
+	}
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)

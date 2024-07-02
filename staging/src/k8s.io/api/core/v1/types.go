@@ -5871,7 +5871,9 @@ type NodeDaemonEndpoints struct {
 	KubeletEndpoint DaemonEndpoint `json:"kubeletEndpoint,omitempty" protobuf:"bytes,1,opt,name=kubeletEndpoint"`
 }
 
-// NodeRuntimeHandlerFeatures is a set of runtime features.
+// NodeRuntimeHandlerFeatures is a set of features implementedy by the runtime handler.
+// THE FEATURES CONTAINED IN THE NodeRuntimeHandlerFeatures SHOULD DEPEND ON THE RUNTIME HANDLERS,
+// (I.E. DEPENDENT TO THE INFORMATION EXPOSED BY OCI RUNTIME-SPEC'S FEATURES).
 type NodeRuntimeHandlerFeatures struct {
 	// RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
 	// +featureGate=RecursiveReadOnlyMounts
@@ -5889,6 +5891,15 @@ type NodeRuntimeHandler struct {
 	// Supported features.
 	// +optional
 	Features *NodeRuntimeHandlerFeatures `json:"features,omitempty" protobuf:"bytes,2,opt,name=features"`
+}
+
+// NodeFeatures describes the set of implemented features implemented by the CRI implementation.
+// THE FEATURES CONTAINED IN THE NodeFeatures SHOULD DEPEND ON ONLY CRI IMPLEMENTATION, BE INDEPENDENT ON RUNTIME HANDLERS,
+// (I.E. IT SHOULD NOT REQUIRE TO INSPECT TO ANY INFORMATION FROM OCI RUNTIME-SPEC'S FEATURES).
+type NodeFeatures struct {
+	// SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+	// +optional
+	SupplementalGroupsPolicy *bool `json:"supplementalGroupsPolicy,omitempty" protobuf:"varint,1,opt,name=supplementalGroupsPolicy"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -6032,6 +6043,10 @@ type NodeStatus struct {
 	// +optional
 	// +listType=atomic
 	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`
+	// Features describes the set of features implemented by the CRI implementation.
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	Features *NodeFeatures `json:"features,omitempty" protobuf:"bytes,13,rep,name=features"`
 }
 
 type UniqueVolumeName string
