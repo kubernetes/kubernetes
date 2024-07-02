@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -566,6 +567,88 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 		t.Fatalf("Error waiting for EndpointSlices to have no hints: %v", err)
 	}
 	logsBuffer.Reset()
+}
+
+func Test_TrafficDistribution_FeatureGateEnableDisable(t *testing.T) {
+
+	////////////////////////////////////////////////////////////////////////////
+	// Start kube-apiserver with ServiceTrafficDistribution feature-gate
+	// enabled.
+	////////////////////////////////////////////////////////////////////////////
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
+
+	sharedEtcd := framework.SharedEtcd()
+	server1 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+
+	client1, err := clientset.NewForConfig(server1.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Create a Service and set `trafficDistribution: PreferLocal` field.
+	//
+	// Assert that the field is present in the created Service.
+	////////////////////////////////////////////////////////////////////////////
+
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+
+	ns := framework.CreateNamespaceOrDie(client1, "test-service-traffic-distribution", t)
+
+	trafficDist := corev1.ServiceTrafficDistributionPreferClose
+	svcToCreate := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-service",
+			Namespace: ns.GetName(),
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"app": "v1",
+			},
+			Ports: []corev1.ServicePort{
+				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
+			},
+			TrafficDistribution: &trafficDist,
+		},
+	}
+	svc, err := client1.CoreV1().Services(ns.Name).Create(ctx, svcToCreate, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test service: %v", err)
+	}
+
+	if diff := cmp.Diff(svcToCreate.Spec.TrafficDistribution, svc.Spec.TrafficDistribution); diff != "" {
+		t.Fatalf("Unexpected diff found in service .spec.trafficDistribution after creation: (-want, +got)\n:%v", diff)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Restart the kube-apiserver with ServiceTrafficDistribution feature-gate
+	// disabled. Update the test service.
+	//
+	// Assert that updating the service does not drop the field since it was
+	// being used previously.
+	////////////////////////////////////////////////////////////////////////////
+
+	server1.TearDownFn()
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, false)
+	server2 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+	defer server2.TearDownFn()
+	client2, err := clientset.NewForConfig(server2.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	svcToUpdate := svcToCreate.DeepCopy()
+	svcToUpdate.Spec.Selector = map[string]string{"app": "v2"}
+	svc, err = client2.CoreV1().Services(ns.Name).Update(ctx, svcToUpdate, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test service: %v", err)
+	}
+
+	if diff := cmp.Diff(svcToUpdate.Spec.TrafficDistribution, svc.Spec.TrafficDistribution); diff != "" {
+		t.Fatalf("Unexpected diff found in service .spec.trafficDistribution after update: (-want, +got)\n:%v", diff)
+	}
 }
 
 func Test_ServiceClusterIPSelector(t *testing.T) {
