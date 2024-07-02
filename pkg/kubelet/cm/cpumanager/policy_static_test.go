@@ -97,15 +97,15 @@ func TestStaticPolicyStart(t *testing.T) {
 			numReservedCPUs: 1,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(),
-			expCSet:         cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expCSet:         cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
-			description:     "reserved cores 0 & 6 are not present in available cpuset",
+			description:     "reserved cores 0 & 6 present in available cpuset",
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 2,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1),
-			expErr:          fmt.Errorf("not all reserved cpus: \"0,6\" are present in defaultCpuSet: \"0-1\""),
+			expErr:          fmt.Errorf("none of the reserved cpus: \"0,6\" should be present in defaultCpuSet: \"0-1\""),
 		},
 		{
 			description: "assigned core 2 is still present in available cpuset",
@@ -128,7 +128,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10, 11, 12),
-			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-12\""),
+			expErr:          fmt.Errorf("topology CPU set \"0-11\" doesn't match all known CPU set from current CPU state \"0-12\""),
 		},
 		{
 			description: "core 11 is present in topology but is not in state cpuset",
@@ -140,7 +140,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				},
 			},
 			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10),
-			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-10\""),
+			expErr:          fmt.Errorf("topology CPU set \"0-11\" doesn't match all known CPU set from current CPU state \"0-10\""),
 		},
 	}
 	for _, testCase := range testCases {
@@ -171,7 +171,9 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
 			}
-
+			if !policy.GetAvailableCPUs(st).Equals(st.GetDefaultCPUSet()) {
+				t.Errorf("None of the reserved CPUs should be present in defaultCPUSet, and therefore available CPUs should be the same as defaultCPUSet. Available CPUs: %q, defaultCPUSet: %q", policy.GetAvailableCPUs(st), st.GetDefaultCPUSet())
+			}
 		})
 	}
 }
@@ -206,7 +208,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 					"fakeContainer100": cpuset.New(2, 3, 6, 7),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
+			stDefaultCPUSet: cpuset.New(1, 4, 5),
 			pod:             makePod("fakePod", "fakeContainer3", "2000m", "2000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -236,7 +238,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 					"fakeContainer100": cpuset.New(1, 5),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("fakePod", "fakeContainer3", "6000m", "6000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -266,7 +268,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 					"fakeContainer100": cpuset.New(4, 5),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 1, 3, 6, 7),
+			stDefaultCPUSet: cpuset.New(1, 3, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer1", "4000m", "4000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -281,7 +283,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 					"fakeContainer100": cpuset.New(2),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			stDefaultCPUSet: cpuset.New(1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			pod:             makePod("fakePod", "fakeContainer3", "8000m", "8000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -370,7 +372,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -397,7 +399,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7"),
 			expCPUAlloc:     false,
@@ -442,7 +444,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 					"fakeContainer100": cpuset.New(1, 2, 3, 4, 5, 6),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 7),
+			stDefaultCPUSet: cpuset.New(7),
 			pod:             makePod("fakePod", "fakeContainer5", "2000m", "2000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=2, available=1"),
 			expCPUAlloc:     false,
@@ -477,7 +479,7 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			numReservedCPUs: 1,
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
 			expErr:          SMTAlignmentError{RequestedCPUs: 1, CpusPerCore: 2},
 			expCPUAlloc:     false,
@@ -961,16 +963,16 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			reserved:        cpuset.New(0, 1),
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(),
-			expCSet:         cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expCSet:         cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
-			description:     "reserved cores 0 & 1 are not present in available cpuset",
+			description:     "cpus 6-11 are missing from current known CPU set",
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 2,
 			reserved:        cpuset.New(0, 1),
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(2, 3, 4, 5),
-			expErr:          fmt.Errorf("not all reserved cpus: \"0-1\" are present in defaultCpuSet: \"2-5\""),
+			expErr:          fmt.Errorf("topology CPU set \"0-11\" doesn't match all known CPU set from current CPU state \"0-5\""),
 		},
 		{
 			description:     "inconsistency between numReservedCPUs and reserved",
@@ -1010,7 +1012,9 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
 			}
-
+			if !policy.GetAvailableCPUs(st).Equals(st.GetDefaultCPUSet()) {
+				t.Errorf("None of the reserved CPUs should be present in defaultCPUSet, and therefore available CPUs should be the same as defaultCPUSet. Available CPUs: %q, defaultCPUSet: %q", policy.GetAvailableCPUs(st), st.GetDefaultCPUSet())
+			}
 		})
 	}
 }
@@ -1024,7 +1028,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			numReservedCPUs: 1,
 			reserved:        cpuset.New(0),
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "8000m", "8000m"),
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request: requested=8, available=7"),
 			expCPUAlloc:     false,
@@ -1036,7 +1040,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			numReservedCPUs: 2,
 			reserved:        cpuset.New(0, 1),
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7),
 			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
@@ -1052,7 +1056,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 					"fakeContainer100": cpuset.New(2, 3, 6, 7),
 				},
 			},
-			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
+			stDefaultCPUSet: cpuset.New(4, 5),
 			pod:             makePod("fakePod", "fakeContainer3", "2000m", "2000m"),
 			expErr:          nil,
 			expCPUAlloc:     true,
