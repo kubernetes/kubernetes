@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
 )
@@ -54,6 +55,10 @@ type perPodState struct {
 	observedRunningTime time.Time
 	// log, if pod latency was already Observed
 	metricRecorded bool
+	// if the pod latency for ready state was already Observed. This
+	// is different than metricRecorded where metricRecorded records
+	// the latency when the pod becomes running instead ready
+	readyMetricRecorded bool
 }
 
 // NewPodStartupLatencyTracker creates an instance of PodStartupLatencyTracker
@@ -91,12 +96,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		return
 	}
 
-	if state.metricRecorded {
-		// skip, pod's latency already recorded
-		return
-	}
-
-	if hasPodStartedSLO(pod) {
+	if !state.metricRecorded && hasPodStartedSLO(pod) {
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
 		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
@@ -120,6 +120,12 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			metrics.FirstNetworkPodStartSLIDuration.Set(podStartSLOduration)
 			p.firstNetworkPodSeen = true
 		}
+	}
+
+	if !state.readyMetricRecorded && podutil.IsPodReadyConditionTrue(pod.Status) {
+		podReadyDuration := when.Sub(pod.CreationTimestamp.Time)
+		metrics.PodFullStartupDuration.WithLabelValues(pod.Namespace, pod.Name, pod.Spec.NodeName, string(pod.UID)).Set(podReadyDuration.Seconds())
+		state.readyMetricRecorded = true
 	}
 }
 

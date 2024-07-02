@@ -43,6 +43,7 @@ const (
 	PodStartDurationKey                = "pod_start_duration_seconds"
 	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
 	PodStartTotalDurationKey           = "pod_start_total_duration_seconds"
+	PodFullStartupDurationKey          = "pod_full_startup_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -237,6 +238,18 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{},
+	)
+
+	// PodFullStartupDuration is a Gauge that tracks the duration (in seconds) it takes for a single pod to become
+	// ready for the first time since creation, including the time for image pulling.
+	PodFullStartupDuration = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodFullStartupDurationKey,
+			Help:           "Duration in seconds to start a pod since creation, including time to pull images and run init containers, measured from pod creation timestamp to when the pod is reported as ready for the first time and observed via watch",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"namespace", "pod", "node", "uid"},
 	)
 
 	// FirstNetworkPodStartSLIDuration is a gauge that tracks the duration (in seconds) it takes for the first network pod to run,
@@ -921,6 +934,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PodStartDuration)
 		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(PodStartTotalDuration)
+		legacyregistry.MustRegister(PodFullStartupDuration)
 		legacyregistry.MustRegister(ImagePullDuration)
 		legacyregistry.MustRegister(NodeStartupPreKubeletDuration)
 		legacyregistry.MustRegister(NodeStartupPreRegistrationDuration)
