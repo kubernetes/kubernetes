@@ -77,6 +77,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
+	"k8s.io/component-base/statusz"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -1092,6 +1093,8 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	}
 
 	if c.EnableMetrics {
+		statuzOpts := statuszOptions()
+		statusz.Statusz{}.Install(s.Handler.NonGoRestfulMux, statuzOpts)
 		if c.EnableProfiling {
 			routes.MetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
 			slis.SLIMetricsWithReset{}.Install(s.Handler.NonGoRestfulMux)
@@ -1182,5 +1185,12 @@ func SetHostnameFuncForTests(name string) {
 		host = name
 		err = nil
 		return
+	}
+}
+
+func statuszOptions() statusz.Options {
+	return statusz.Options{
+		ComponentName: "apiserver",
+		StartTime:     time.Now(),
 	}
 }
