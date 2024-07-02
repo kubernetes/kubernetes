@@ -1275,10 +1275,10 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleUpEvents,
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinChangePolicySelect {
 		result = math.MaxInt32
-		selectPolicyFn = min // For scaling up, the lowest change ('min' policy) produces a minimum value
+		selectPolicyFn = minInt32 // For scaling up, the lowest change ('min' policy) produces a minimum value
 	} else {
 		result = math.MinInt32
-		selectPolicyFn = max // Use the default policy otherwise to produce a highest possible change
+		selectPolicyFn = maxInt32 // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
 		replicasAddedInCurrentPeriod := getReplicasChangePerPeriod(policy.PeriodSeconds, scaleUpEvents)
@@ -1304,10 +1304,10 @@ func calculateScaleDownLimitWithBehaviors(currentReplicas int32, scaleUpEvents, 
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinChangePolicySelect {
 		result = math.MinInt32
-		selectPolicyFn = max // For scaling down, the lowest change ('min' policy) produces a maximum value
+		selectPolicyFn = maxInt32 // For scaling down, the lowest change ('min' policy) produces a maximum value
 	} else {
 		result = math.MaxInt32
-		selectPolicyFn = min // Use the default policy otherwise to produce a highest possible change
+		selectPolicyFn = minInt32 // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
 		replicasAddedInCurrentPeriod := getReplicasChangePerPeriod(policy.PeriodSeconds, scaleUpEvents)
@@ -1434,16 +1434,12 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	return resList
 }
 
-func max(a, b int32) int32 {
-	if a >= b {
-		return a
-	}
-	return b
+// minInt32 is a wrapper around the min builtin to be used as a function value.
+func minInt32(a, b int32) int32 {
+	return min(a, b)
 }
 
-func min(a, b int32) int32 {
-	if a <= b {
-		return a
-	}
-	return b
+// maxInt32 is a wrapper around the max builtin to be used as a function value.
+func maxInt32(a, b int32) int32 {
+	return max(a, b)
 }
