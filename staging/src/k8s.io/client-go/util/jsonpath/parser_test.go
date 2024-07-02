@@ -17,6 +17,7 @@ limitations under the License.
 package jsonpath
 
 import (
+	"regexp"
 	"testing"
 )
 
@@ -44,6 +45,9 @@ var parserTests = []parserTest{
 	{"filter", `{[?(@.price<3)]}`,
 		[]Node{newList(), newFilter(newList(), newList(), "<"),
 			newList(), newField("price"), newList(), newInt(3)}, false},
+	{"regex", `{[?(@.name=~/Tom/i)]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=~"),
+			newList(), newField("name"), newList(), newRegex(*regexp.MustCompile("(?i)Tom"))}, false},
 	{"recursive", `{..}`, []Node{newList(), newRecursive()}, false},
 	{"recurField", `{..price}`,
 		[]Node{newList(), newRecursive(), newField("price")}, false},

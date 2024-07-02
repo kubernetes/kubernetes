@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"k8s.io/client-go/third_party/forked/golang/template"
@@ -218,6 +219,8 @@ func (j *JSONPath) walk(value []reflect.Value, node Node) ([]reflect.Value, erro
 		return j.evalWildcard(value, node)
 	case *RecursiveNode:
 		return j.evalRecursive(value, node)
+	case *RegexNode:
+		return j.evalRegex(value, node)
 	case *UnionNode:
 		return j.evalUnion(value, node)
 	case *IdentifierNode:
@@ -241,6 +244,15 @@ func (j *JSONPath) evalFloat(input []reflect.Value, node *FloatNode) ([]reflect.
 	result := make([]reflect.Value, len(input))
 	for i := range input {
 		result[i] = reflect.ValueOf(node.Value)
+	}
+	return result, nil
+}
+
+// evalRegex evaluates RegexNode
+func (j *JSONPath) evalRegex(input []reflect.Value, node *RegexNode) ([]reflect.Value, error) {
+	result := make([]reflect.Value, len(input))
+	for i := range input {
+		result[i] = reflect.ValueOf(node.Regex)
 	}
 	return result, nil
 }
@@ -553,6 +565,8 @@ func (j *JSONPath) evalFilter(input []reflect.Value, node *FilterNode) ([]reflec
 				pass, err = template.LessEqual(left, right)
 			case ">=":
 				pass, err = template.GreaterEqual(left, right)
+			case "=~":
+				pass, err = Regex(left, right)
 			default:
 				return results, fmt.Errorf("unrecognized filter operator %s", node.Operator)
 			}
@@ -579,4 +593,11 @@ func (j *JSONPath) evalToText(v reflect.Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	fmt.Fprint(&buffer, iface)
 	return buffer.Bytes(), nil
+}
+
+// Regex evaluates a regex in the form a =~ /b/
+func Regex(arg1, arg2 interface{}) (bool, error) {
+	input := arg1.(string)
+	regex := arg2.(regexp.Regexp)
+	return regex.MatchString(input), nil
 }

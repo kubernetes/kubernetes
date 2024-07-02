@@ -601,6 +601,41 @@ func TestFilterPartialMatchesSometimesMissingAnnotations(t *testing.T) {
 	testJSONPath(
 		[]jsonpathTest{
 			{
+				"filter, should match 'pod2 pod4' by regex",
+				`{.items[?(@.metadata.name =~ /POD[24]/i)].metadata.name}`,
+				data,
+				"pod2 pod4",
+				false, // expect no error
+			},
+			{
+				"filter, should match 'pod1 pod3' by regex",
+				`{.items[?(@.metadata.name =~ /POD[13]/i)].metadata.name}`,
+				data,
+				"pod1 pod3",
+				false, // expect no error
+			},
+			{
+				"filter, regex invalid flags",
+				`{.items[?(@.metadata.name =~ /POD[13]/b)].metadata.name}`,
+				data,
+				"pod1 pod3",
+				true, // expect error
+			},
+			{
+				"filter, regex no flags",
+				`{.items[?(@.metadata.name =~ /.{3}[13]/)].metadata.name}`,
+				data,
+				"pod1 pod3",
+				false, // expect no error
+			},
+		},
+		true, // allow missing keys
+		t,
+	)
+
+	testJSONPath(
+		[]jsonpathTest{
+			{
 				"filter, should only match a subset, some items don't have annotations, error on missing items",
 				`{.items[?(@.metadata.annotations.color=="blue")].metadata.name}`,
 				data,

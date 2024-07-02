@@ -149,6 +149,7 @@ func (p *Parser) parseInsideAction(cur *ListNode) error {
 		rightDelim: p.parseRightDelim,
 		"[?(":      p.parseFilter,
 		"..":       p.parseRecursive,
+		"/":        p.parseRegexp,
 	}
 	for prefix, parseFunc := range prefixMap {
 		if strings.HasPrefix(p.input[p.pos:], prefix) {
@@ -373,7 +374,7 @@ Loop:
 	if p.next() != ']' {
 		return fmt.Errorf("unclosed array expect ]")
 	}
-	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
+	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=~]+)(.+?)$`)
 	text := p.consumeText()
 	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)
@@ -431,6 +432,49 @@ func (p *Parser) parseField(cur *ListNode) error {
 	} else {
 		cur.append(newField(strings.Replace(value, "\\", "", -1)))
 	}
+	return p.parseInsideAction(cur)
+}
+
+// parseRegexp parses a regex expression
+func (p *Parser) parseRegexp(cur *ListNode) error {
+	// skip the first / of the regex value
+	p.next()
+	p.consumeText()
+
+Loop1:
+	for {
+		switch p.next() {
+		case eof, '\n':
+			return fmt.Errorf("unterminated quoted string")
+		case '/':
+			if p.input[p.pos-2] != '\\' {
+				p.pos -= 1
+				break Loop1
+			}
+		}
+	}
+	value := p.consumeText()
+
+	// skip the terminating / of the regex value
+	p.next()
+	p.consumeText()
+
+Loop2:
+	for {
+		switch p.next() {
+		case '\n':
+			return fmt.Errorf("unterminated regex")
+		case eof:
+			p.pos--
+			break Loop2
+		case 'i', 'm', 's', 'u', '}':
+		default:
+			return fmt.Errorf("invalid regex flags specified %c: 'imsu' are supported", p.input[p.pos])
+		}
+	}
+	flags := p.consumeText()
+	regex := regexp.MustCompile(fmt.Sprintf("(?%s)%s", flags, value))
+	cur.append(newRegex(*regex))
 	return p.parseInsideAction(cur)
 }
 
