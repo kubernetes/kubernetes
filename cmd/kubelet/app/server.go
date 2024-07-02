@@ -527,7 +527,23 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	if kubeDeps.Recorder != nil {
 		return
 	}
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	// Use custom CorrelatorOptions instead of the default one to support spam events by container
+	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx),
+		record.WithCorrelatorOptions(record.CorrelatorOptions{
+			SpamKeyFunc: func(event *v1.Event) string {
+				return strings.Join([]string{
+					event.Source.Component,
+					event.Source.Host,
+					event.InvolvedObject.Kind,
+					event.InvolvedObject.Namespace,
+					event.InvolvedObject.Name,
+					event.InvolvedObject.FieldPath,
+					string(event.InvolvedObject.UID),
+					event.InvolvedObject.APIVersion,
+				},
+					"")
+			},
+		}))
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {

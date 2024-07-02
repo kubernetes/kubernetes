@@ -136,10 +136,13 @@ func TestEventAggregatorByReasonFunc(t *testing.T) {
 	event1 := makeEvent("end-of-world", "it was fun", makeObjectReference("Pod", "pod1", "other"))
 	event2 := makeEvent("end-of-world", "it was awful", makeObjectReference("Pod", "pod1", "other"))
 	event3 := makeEvent("nevermind", "it was a bug", makeObjectReference("Pod", "pod1", "other"))
+	event4 := makeEvent("end-of-world", "it was fun", makeObjectReference("Pod", "pod1", "other"))
 
+	event4.InvolvedObject.FieldPath = "spec.containers{container1}"
 	aggKey1, localKey1 := EventAggregatorByReasonFunc(&event1)
 	aggKey2, localKey2 := EventAggregatorByReasonFunc(&event2)
 	aggKey3, _ := EventAggregatorByReasonFunc(&event3)
+	aggKey4, _ := EventAggregatorByReasonFunc(&event4)
 
 	if aggKey1 != aggKey2 {
 		t.Errorf("Expected %v equal %v", aggKey1, aggKey2)
@@ -149,6 +152,9 @@ func TestEventAggregatorByReasonFunc(t *testing.T) {
 	}
 	if aggKey1 == aggKey3 {
 		t.Errorf("Expected %v to not equal %v", aggKey1, aggKey3)
+	}
+	if aggKey1 == aggKey4 {
+		t.Errorf("Expected %v to not equal %v", aggKey1, aggKey4)
 	}
 }
 
@@ -173,6 +179,7 @@ func TestEventCorrelator(t *testing.T) {
 	similarButDifferentContainerEvent := similarEvent
 	similarButDifferentContainerEvent.InvolvedObject.FieldPath = "spec.containers{container2}"
 	scenario := map[string]struct {
+		options         CorrelatorOptions
 		previousEvents  []v1.Event
 		newEvent        v1.Event
 		expectedEvent   v1.Event
@@ -222,10 +229,36 @@ func TestEventCorrelator(t *testing.T) {
 			intervalSeconds: 5,
 		},
 		"events-from-different-containers-do-not-aggregate": {
-			previousEvents:  makeEvents(1, similarButDifferentContainerEvent),
+			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents, similarButDifferentContainerEvent, similarButDifferentContainerEvent.Message),
 			newEvent:        similarEvent,
 			expectedEvent:   setCount(similarEvent, 1),
 			intervalSeconds: 5,
+		},
+		"events-from-different-containers-is-spam-with-default-spamkey": {
+			previousEvents:  makeEvents(defaultSpamBurst+1, duplicateEvent),
+			newEvent:        similarEvent,
+			expectedSkip:    true,
+			intervalSeconds: 1,
+		},
+		"events-from-different-containers-is-not-spam-with-fieldpath-in-spamkey": {
+			options: CorrelatorOptions{SpamKeyFunc: func(event *v1.Event) string {
+				return strings.Join([]string{
+					event.Source.Component,
+					event.Source.Host,
+					event.InvolvedObject.Kind,
+					event.InvolvedObject.Namespace,
+					event.InvolvedObject.Name,
+					event.InvolvedObject.FieldPath,
+					string(event.InvolvedObject.UID),
+					event.InvolvedObject.APIVersion,
+				},
+					"")
+			}},
+			previousEvents:  makeEvents(defaultSpamBurst+1, duplicateEvent),
+			newEvent:        similarEvent,
+			expectedEvent:   similarEvent,
+			expectedSkip:    false,
+			intervalSeconds: 1,
 		},
 		"similar-events-whose-interval-is-greater-than-aggregate-interval-do-not-aggregate": {
 			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
@@ -238,7 +271,8 @@ func TestEventCorrelator(t *testing.T) {
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
 		clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelator(&clock)
+		testInput.options.Clock = &clock
+		correlator := NewEventCorrelatorWithOptions(testInput.options)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
 			now := metav1.NewTime(clock.Now())
