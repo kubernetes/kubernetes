@@ -698,8 +698,6 @@ func emptyInvariants(set *apps.StatefulSet, om *fakeObjectManager) error {
 }
 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)
-
 	simpleSetFn := func() *apps.StatefulSet {
 		statefulSet := newStatefulSet(3)
 		statefulSet.Spec.Ordinals = &apps.StatefulSetOrdinals{Start: int32(2)}
