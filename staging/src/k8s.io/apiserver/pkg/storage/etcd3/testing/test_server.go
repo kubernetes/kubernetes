@@ -30,12 +30,12 @@ type EtcdTestServer struct {
 	V3Client *clientv3.Client
 }
 
-func (e *EtcdTestServer) Terminate(t *testing.T) {
+func (e *EtcdTestServer) Terminate(t testing.TB) {
 	// no-op, server termination moved to test cleanup
 }
 
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
-func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+func NewUnsecuredEtcd3TestClientServer(t testing.TB) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{}
 	server.V3Client = testserver.RunEtcd(t, nil)
 	config := &storagebackend.Config{

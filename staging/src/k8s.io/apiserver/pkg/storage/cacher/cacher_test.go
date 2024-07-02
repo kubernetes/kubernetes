@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,7 +39,9 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -396,6 +400,7 @@ type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
+	indexers       cache.Indexers
 	clock          clock.WithTicker
 }
 
@@ -425,6 +430,12 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 			return pod.Spec.NodeName
 		},
 	}
+	options.indexers = map[string]cache.IndexFunc{
+		"f:spec.nodeName": func(obj interface{}) ([]string, error) {
+			pod := obj.(*example.Pod)
+			return []string{pod.Spec.NodeName}, nil
+		},
+	}
 }
 
 func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tearDownFunc) {
@@ -432,7 +443,7 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tea
 	return ctx, cacher, tearDown
 }
 
-func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -456,6 +467,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		NewFunc:        newPod,
 		NewListFunc:    newPodList,
 		IndexerFuncs:   setupOpts.indexerFuncs,
+		Indexers:       &setupOpts.indexers,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          setupOpts.clock,
 	}
@@ -520,4 +532,25 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		}
 		return true, nil
 	})
+}
+
+func BenchmarkStoreListCreate(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	b.Run("RV=NotOlderThan", func(b *testing.B) {
+		ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+		b.Cleanup(terminate)
+		storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, metav1.ResourceVersionMatchNotOlderThan)
+	})
+	b.Run("RV=ExactMatch", func(b *testing.B) {
+		ctx, cacher, _, terminate := testSetupWithEtcdServer(b)
+		b.Cleanup(terminate)
+		storagetesting.RunBenchmarkStoreListCreate(ctx, b, cacher, metav1.ResourceVersionMatchExact)
+	})
+}
+
+func BenchmarkStoreList(b *testing.B) {
+	klog.SetLogger(logr.Discard())
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(b, withSpecNodeNameIndexerFuncs)
+	b.Cleanup(terminate)
+	storagetesting.RunBenchmarkStoreList(ctx, b, cacher)
 }
