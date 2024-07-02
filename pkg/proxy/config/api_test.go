@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"reflect"
 	"testing"
 	"time"
@@ -207,26 +208,28 @@ func TestInitialSync(t *testing.T) {
 	defer close(stopCh)
 	sharedInformers.Start(stopCh)
 
-	err := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
-		svcHandler.lock.Lock()
-		defer svcHandler.lock.Unlock()
-		if reflect.DeepEqual(svcHandler.state, expectedSvcState) {
-			return true, nil
-		}
-		return false, nil
-	})
+	err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			svcHandler.lock.Lock()
+			defer svcHandler.lock.Unlock()
+			if reflect.DeepEqual(svcHandler.state, expectedSvcState) {
+				return true, nil
+			}
+			return false, nil
+		})
 	if err != nil {
 		t.Fatal("Timed out waiting for the completion of handler `OnServiceAdd`")
 	}
 
-	err = wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
-		epsHandler.lock.Lock()
-		defer epsHandler.lock.Unlock()
-		if reflect.DeepEqual(epsHandler.state, expectedEpsState) {
-			return true, nil
-		}
-		return false, nil
-	})
+	err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*10, wait.ForeverTestTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			epsHandler.lock.Lock()
+			defer epsHandler.lock.Unlock()
+			if reflect.DeepEqual(epsHandler.state, expectedEpsState) {
+				return true, nil
+			}
+			return false, nil
+		})
 	if err != nil {
 		t.Fatal("Timed out waiting for the completion of handler `OnEndpointsAdd`")
 	}
