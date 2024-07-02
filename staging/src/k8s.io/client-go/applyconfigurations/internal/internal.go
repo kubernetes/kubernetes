@@ -6301,6 +6301,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.OCIVolumeSource
+  map:
+    fields:
+    - name: pullPolicy
+      type:
+        scalar: string
+    - name: reference
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.ObjectFieldSelector
   map:
     fields:
@@ -8205,6 +8215,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nfs
       type:
         namedType: io.k8s.api.core.v1.NFSVolumeSource
+    - name: oci
+      type:
+        namedType: io.k8s.api.core.v1.OCIVolumeSource
     - name: persistentVolumeClaim
       type:
         namedType: io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource

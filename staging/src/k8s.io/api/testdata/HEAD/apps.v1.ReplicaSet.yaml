@@ -1103,6 +1103,9 @@ spec:
           path: pathValue
           readOnly: true
           server: serverValue
+        oci:
+          pullPolicy: pullPolicyValue
+          reference: referenceValue
         persistentVolumeClaim:
           claimName: claimNameValue
           readOnly: true

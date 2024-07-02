@@ -75,13 +75,13 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 
 // shouldPullImage returns whether we should pull an image according to
 // the presence and pull policy of the image.
-func shouldPullImage(container *v1.Container, imagePresent bool) bool {
-	if container.ImagePullPolicy == v1.PullNever {
+func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent bool) bool {
+	if pullPolicy == v1.PullNever {
 		return false
 	}
 
-	if container.ImagePullPolicy == v1.PullAlways ||
-		(container.ImagePullPolicy == v1.PullIfNotPresent && (!imagePresent)) {
+	if pullPolicy == v1.PullAlways ||
+		(pullPolicy == v1.PullIfNotPresent && (!imagePresent)) {
 		return true
 	}
 
@@ -99,17 +99,36 @@ func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, 
 
 // EnsureImageExists pulls the image for the specified pod and container, and returns
 // (imageRef, error message, error).
-func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string) (string, string, error) {
-	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
+func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, container *v1.Container, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (string, string, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		klog.ErrorS(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 
-	// If the image contains no tag or digest, a default tag should be applied.
-	image, err := applyDefaultImageTag(container.Image)
+	imageRef, message, err := m.EnsureOCIObject(ctx, "image", ref, pod, container.Image, pullSecrets, podSandboxConfig, podRuntimeHandler, pullPolicy)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to apply default image tag %q: %v", container.Image, err)
+		return "", "", err
+	}
+	return imageRef, message, nil
+}
+
+func (m *imageManager) EnsureOCIObject(
+	ctx context.Context,
+	pullType string,
+	ref *v1.ObjectReference,
+	pod *v1.Pod,
+	ociReference string,
+	pullSecrets []v1.Secret,
+	podSandboxConfig *runtimeapi.PodSandboxConfig,
+	podRuntimeHandler string,
+	pullPolicy v1.PullPolicy,
+) (imageRef, message string, err error) {
+	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, ociReference)
+
+	// If the image contains no tag or digest, a default tag should be applied.
+	image, err := applyDefaultImageTag(ociReference)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to apply default %s tag %q: %v", pullType, ociReference, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 		return "", msg, ErrInvalidImageName
 	}
@@ -128,60 +147,61 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, pod *v1.Pod, conta
 		RuntimeHandler: podRuntimeHandler,
 	}
 
-	imageRef, err := m.imageService.GetImageRef(ctx, spec)
+	imageRef, err = m.imageService.GetImageRef(ctx, spec)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
+		msg := fmt.Sprintf("Failed to inspect %s %q: %v", pullType, ociReference, err)
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 		return "", msg, ErrImageInspect
 	}
 
 	present := imageRef != ""
-	if !shouldPullImage(container, present) {
+	if !shouldPullImage(pullPolicy, present) {
 		if present {
-			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
+			msg := fmt.Sprintf("Container %s %q already present on machine", pullType, ociReference)
 			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
 			return imageRef, "", nil
 		}
-		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
+		msg := fmt.Sprintf("Container %s %q is not present with pull policy of Never", pullType, ociReference)
 		m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, klog.Warning)
 		return "", msg, ErrImageNeverPull
 	}
 
-	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
+	backOffKey := fmt.Sprintf("%s_%s", pod.UID, ociReference)
 	if m.backOff.IsInBackOffSinceUpdate(backOffKey, m.backOff.Clock.Now()) {
-		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
+		msg := fmt.Sprintf("Back-off pulling %s %q", pullType, ociReference)
 		m.logIt(ref, v1.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, klog.Info)
 		return "", msg, ErrImagePullBackOff
 	}
 	m.podPullingTimeRecorder.RecordImageStartedPulling(pod.UID)
-	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling %s %q", pullType, ociReference), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
 	m.puller.pullImage(ctx, spec, pullSecrets, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
-		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
+		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull %s %q: %v", pullType, ociReference, imagePullResult.err), klog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
 
-		msg, err := evalCRIPullErr(container, imagePullResult.err)
+		msg, err := evalCRIPullErr(pullType, ociReference, imagePullResult.err)
 		return "", msg, err
 	}
 	m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
 	imagePullDuration := time.Since(startTime).Truncate(time.Millisecond)
-	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v (%v including waiting). Image size: %v bytes.",
-		container.Image, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
+	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled %s %q in %v (%v including waiting). Size: %v bytes.",
+		pullType, ociReference, imagePullResult.pullDuration.Truncate(time.Millisecond), imagePullDuration, imagePullResult.imageSize), klog.Info)
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 	return imagePullResult.imageRef, "", nil
 }
 
-func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes error) {
+func evalCRIPullErr(pullType, ociReference string, err error) (errMsg string, errRes error) {
 	// Error assertions via errors.Is is not supported by gRPC (remote runtime) errors right now.
 	// See https://github.com/grpc/grpc-go/issues/3616
 	if strings.HasPrefix(err.Error(), crierrors.ErrRegistryUnavailable.Error()) {
 		errMsg = fmt.Sprintf(
-			"image pull failed for %s because the registry is unavailable%s",
-			container.Image,
+			"%s pull failed for %s because the registry is unavailable%s",
+			pullType,
+			ociReference,
 			// Trim the error name from the message to convert errors like:
 			// "RegistryUnavailable: a more detailed explanation" to:
 			// "...because the registry is unavailable: a more detailed explanation"
@@ -192,8 +212,9 @@ func evalCRIPullErr(container *v1.Container, err error) (errMsg string, errRes e
 
 	if strings.HasPrefix(err.Error(), crierrors.ErrSignatureValidationFailed.Error()) {
 		errMsg = fmt.Sprintf(
-			"image pull failed for %s because the signature validation failed%s",
-			container.Image,
+			"%s pull failed for %s because the signature validation failed%s",
+			pullType,
+			ociReference,
 			// Trim the error name from the message to convert errors like:
 			// "SignatureValidationFailed: a more detailed explanation" to:
 			// "...because the signature validation failed: a more detailed explanation"

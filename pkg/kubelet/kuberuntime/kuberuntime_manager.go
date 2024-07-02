@@ -1218,6 +1218,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		return
 	}
 
+	ociVolumes, err := m.getOCIVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+	if err != nil {
+		result.Fail(err)
+		return
+	}
+
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a description used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
@@ -1240,7 +1246,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
+		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, ociVolumes); err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
 			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
@@ -1313,6 +1319,39 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return
+}
+
+func (m *kubeGenericRuntimeManager) getOCIVolumes(ctx context.Context, pod *v1.Pod, podSandboxConfig *runtimeapi.PodSandboxConfig, pullSecrets []v1.Secret) (map[string]string, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.OCIVolume) {
+		return nil, nil
+	}
+
+	ociVolumes := map[string]string{}
+	podRuntimeHandler, err := m.getPodRuntimeHandler(pod)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get pod runtime handler", "pod", klog.KObj(pod))
+		return nil, err
+	}
+
+	for _, volume := range pod.Spec.Volumes {
+		if volume.OCI == nil {
+			continue
+		}
+
+		objectRef, _ := ref.GetReference(legacyscheme.Scheme, pod) // objectRef can be nil, no error check required
+		ref, _, err := m.imagePuller.EnsureOCIObject(
+			ctx, "OCI object", objectRef, pod, volume.OCI.Reference, pullSecrets, podSandboxConfig, podRuntimeHandler, volume.OCI.PullPolicy,
+		)
+		if err != nil {
+			klog.ErrorS(err, "Failed to ensure OCI object", "pod", klog.KObj(pod))
+			return nil, err
+		}
+
+		klog.V(4).InfoS("Pulled OCI object", "ref", ref, "pod", klog.KObj(pod))
+		ociVolumes[volume.Name] = ref
+	}
+
+	return ociVolumes, nil
 }
 
 // If a container is still in backoff, the function will return a brief backoff error and
@@ -1509,6 +1548,14 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		ContainerStatuses: containerStatuses,
 		TimeStamp:         timestamp,
 	}, nil
+}
+
+func (m *kubeGenericRuntimeManager) GetContainerStatus(ctx context.Context, id kubecontainer.ContainerID) (*kubecontainer.Status, error) {
+	resp, err := m.runtimeService.ContainerStatus(ctx, id.ID, false)
+	if err != nil {
+		return nil, fmt.Errorf("runtime container status: %w", err)
+	}
+	return m.convertToKubeContainerStatus(resp.GetStatus()), nil
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.

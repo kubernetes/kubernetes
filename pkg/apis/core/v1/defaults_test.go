@@ -165,6 +165,7 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode":                 `"Filesystem"`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
+		".Spec.Volumes[0].VolumeSource.OCI.PullPolicy":                                                `"IfNotPresent"`,
 		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].DownwardAPI.Items[0].FieldRef.APIVersion": `"v1"`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].ServiceAccountToken.ExpirationSeconds":    `3600`,
@@ -174,6 +175,9 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if !featuresEnabled {
+		delete(expectedDefaults, ".Spec.Volumes[0].VolumeSource.OCI.PullPolicy")
 	}
 	t.Run("empty PodTemplateSpec", func(t *testing.T) {
 		rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
@@ -353,6 +357,7 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.Ephemeral.VolumeClaimTemplate.Spec.VolumeMode":                 `"Filesystem"`,
 		".Spec.Volumes[0].VolumeSource.HostPath.Type":                                                 `""`,
 		".Spec.Volumes[0].VolumeSource.ISCSI.ISCSIInterface":                                          `"default"`,
+		".Spec.Volumes[0].VolumeSource.OCI.PullPolicy":                                                `"IfNotPresent"`,
 		".Spec.Volumes[0].VolumeSource.Projected.DefaultMode":                                         `420`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].DownwardAPI.Items[0].FieldRef.APIVersion": `"v1"`,
 		".Spec.Volumes[0].VolumeSource.Projected.Sources[0].ServiceAccountToken.ExpirationSeconds":    `3600`,
@@ -362,6 +367,9 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if !featuresEnabled {
+		delete(expectedDefaults, ".Spec.Volumes[0].VolumeSource.OCI.PullPolicy")
 	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {
@@ -2302,6 +2310,29 @@ func TestSetDefaultResizePolicy(t *testing.T) {
 			pod2 := output.(*v1.Pod)
 			if !cmp.Equal(pod2.Spec.Containers[0].ResizePolicy, tc.expectedResizePolicy) {
 				t.Errorf("expected resize policy %+v, but got %+v", tc.expectedResizePolicy, pod2.Spec.Containers[0].ResizePolicy)
+			}
+		})
+	}
+}
+
+func TestSetDefaults_Volume(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.OCIVolume, true)
+	for desc, tc := range map[string]struct {
+		given, expected *v1.Volume
+	}{
+		"defaults to emptyDir": {
+			given:    &v1.Volume{},
+			expected: &v1.Volume{VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}},
+		},
+		"default OCI volume source pull policy is IfNotPresent": {
+			given:    &v1.Volume{VolumeSource: v1.VolumeSource{OCI: &v1.OCIVolumeSource{}}},
+			expected: &v1.Volume{VolumeSource: v1.VolumeSource{OCI: &v1.OCIVolumeSource{PullPolicy: v1.PullIfNotPresent}}},
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			corev1.SetDefaults_Volume(tc.given)
+			if !cmp.Equal(tc.given, tc.expected) {
+				t.Errorf("expected volume %+v, but got %+v", tc.expected, tc.given)
 			}
 		})
 	}

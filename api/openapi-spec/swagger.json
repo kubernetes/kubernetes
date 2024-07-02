@@ -8543,6 +8543,23 @@
       ],
       "type": "object"
     },
+    "io.k8s.api.core.v1.OCIVolumeSource": {
+      "description": "OCIVolumeSource represents a OCI volume resource.",
+      "properties": {
+        "pullPolicy": {
+          "description": "Policy for pulling OCI objects. Defaults to IfNotPresent",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Required: Image or artifact reference to be used.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.core.v1.ObjectFieldSelector": {
       "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
       "properties": {
@@ -11701,6 +11718,10 @@
         "nfs": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource",
           "description": "nfs represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
+        },
+        "oci": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.OCIVolumeSource",
+          "description": "oci represents a OCI object (image or artifact) pulled and mounted on the kubelet's host machine."
         },
         "persistentVolumeClaim": {
           "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource",

@@ -516,3 +516,11 @@ func (f *FakeContainerCommandRunner) RunInContainer(_ context.Context, container
 
 	return []byte(f.Stdout), f.Err
 }
+
+func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.ContainerID) (status *kubecontainer.Status, err error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
+	return nil, f.Err
+}
