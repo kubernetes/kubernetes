@@ -175,8 +175,7 @@ func (p *streamProtocolV2) stream(conn streamCreator) error {
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
-
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV2{})
+	errorChan := watchErrorStream(p.errorStream, &errorDecoderV2{}, true)
 
 	p.copyStdin()
 
