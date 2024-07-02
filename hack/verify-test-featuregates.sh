@@ -41,19 +41,20 @@ if [[ -n "${direct_sets}" ]]; then
   rc=1
 fi
 
+function verify_no_new_unversioned_feature_gates {
+  local new_features_file=$1
+  local old_features_file="__masterbranch/${new_features_file}"
+  mkdir -p "$(dirname "${old_features_file}")"
+  git show master:"${new_features_file}" > "${old_features_file}"
+  go run test/static_analysis/main.go feature-gates verify-no-new-unversioned --new-features-file="${new_features_file}" --old-features-file="${old_features_file}"
+}
+
+verify_no_new_unversioned_feature_gates pkg/features/kube_features.go
 
 # ensure all generic features are added in alphabetic order
-lines=$(git grep 'genericfeatures[.].*:' -- pkg/features/kube_features.go)
-sorted_lines=$(echo "$lines" | sort -f)
-if [[ "$lines" != "$sorted_lines" ]]; then
-  echo "Generic features in pkg/features/kube_features.go not sorted" >&2
-  echo >&2
-  echo "Expected:" >&2
-  echo "$sorted_lines" >&2
-  echo >&2
-  echo "Got:" >&2
-  echo "$lines" >&2
-  rc=1
-fi
+go run test/static_analysis/main.go feature-gates verify-alphabetic-order --features-file=pkg/features/kube_features.go --package-prefix="genericfeatures."
+
+# ensure all versioned features are added in alphabetic order
+go run test/static_analysis/main.go feature-gates verify-alphabetic-order --features-file=pkg/features/versioned_kube_features.go
 
 exit $rc
