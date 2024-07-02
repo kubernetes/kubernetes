@@ -31,6 +31,8 @@ type FakeVolumeManager struct {
 	reportedInUse map[v1.UniqueVolumeName]bool
 }
 
+var _ VolumeManager = &FakeVolumeManager{}
+
 // NewFakeVolumeManager creates a new VolumeManager test instance
 func NewFakeVolumeManager(initialVolumes []v1.UniqueVolumeName) *FakeVolumeManager {
 	volumes := map[v1.UniqueVolumeName]bool{}
@@ -54,6 +56,11 @@ func (f *FakeVolumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.P
 
 // WaitForUnmount is not implemented
 func (f *FakeVolumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {
+	return nil
+}
+
+// WaitForAllPodsUnmount is not implemented
+func (f *FakeVolumeManager) WaitForAllPodsUnmount(ctx context.Context, pods []*v1.Pod) error {
 	return nil
 }
 

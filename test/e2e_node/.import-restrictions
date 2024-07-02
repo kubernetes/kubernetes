@@ -7,6 +7,8 @@ rules:
       - k8s.io/kubernetes/test/e2e/feature
       - k8s.io/kubernetes/test/e2e/framework
       - k8s.io/kubernetes/test/e2e/storage/utils
+      - k8s.io/kubernetes/test/e2e/storage/drivers
+      - k8s.io/kubernetes/test/e2e/storage/framework
       - k8s.io/kubernetes/test/e2e/network/common
       - k8s.io/kubernetes/test/e2e/nodefeature
       - k8s.io/kubernetes/test/e2e/perftype

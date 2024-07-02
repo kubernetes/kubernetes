@@ -86,7 +86,11 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("can't make a temp dir: %v", err)
 			}
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				if err := os.RemoveAll(tmpDir); err != nil {
+					t.Fatalf("failed to remove temp dir: %v", err)
+				}
+			}()
 			podManager := kubepod.NewBasicPodManager()
 
 			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
@@ -545,4 +549,78 @@ func runVolumeManager(manager VolumeManager) chan struct{} {
 	sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 	go manager.Run(sourcesReady, stopCh)
 	return stopCh
+}
+
+func TestWaitForAllPodsUnmount(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Fatalf("failed to remove temp dir: %v", err)
+		}
+	}()
+	podManager := kubepod.NewBasicPodManager()
+
+	tests := []struct {
+		name           string
+		pods           []*v1.Pod
+		expectedErrors []string
+	}{
+		{
+			name: "single pod with no errors",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod1",
+					},
+					Spec: v1.PodSpec{
+						Volumes: []v1.Volume{
+							{
+								Name: "vol1",
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "claim1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			node, _, _, _ := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+			kubeClient := fake.NewSimpleClientset(node)
+			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
+
+			for _, pod := range test.pods {
+				podManager.AddPod(pod)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			err := manager.WaitForAllPodsUnmount(ctx, test.pods)
+			if test.expectedErrors == nil {
+				if err != nil {
+					t.Errorf("Expected no error, got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Expected error, got nil")
+				} else {
+					var actualErrors []string
+					if !reflect.DeepEqual(test.expectedErrors, actualErrors) {
+						t.Errorf("Expected errors: %v, got: %v", test.expectedErrors, actualErrors)
+					}
+				}
+			}
+		})
+	}
 }
