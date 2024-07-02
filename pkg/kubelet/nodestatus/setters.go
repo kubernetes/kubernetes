@@ -286,6 +286,7 @@ func MachineInfo(nodeName string,
 			// See if the test should be updated instead.
 			node.Status.Capacity[v1.ResourceCPU] = *resource.NewMilliQuantity(0, resource.DecimalSI)
 			node.Status.Capacity[v1.ResourceMemory] = resource.MustParse("0Gi")
+			node.Status.Capacity[v1.ResourceSwapMemory] = resource.MustParse("0Gi")
 			node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(int64(maxPods), resource.DecimalSI)
 			klog.ErrorS(err, "Error getting machine info")
 		} else {

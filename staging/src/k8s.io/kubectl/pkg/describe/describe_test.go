@@ -5908,6 +5908,10 @@ func TestDescribeNode(t *testing.T) {
 		getHugePageResourceList("1Gi", "0"),
 	)
 
+	swapResource := resource.MustParse("10Gi")
+	nodeCapacity[corev1.ResourceSwapMemory] = swapResource
+	nodeAllocatable[corev1.ResourceSwapMemory] = swapResource
+
 	fake := fake.NewSimpleClientset(
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -6018,9 +6022,22 @@ func TestDescribeNode(t *testing.T) {
   memory             1Gi (8%)     2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)
+Events:`,
 		`Node bar status is now: NodeHasNoDiskPressure`,
-		`Node bar status is now: NodeReady`}
+		`Node bar status is now: NodeReady`,
+		`Capacity:
+  cpu:            8
+  hugepages-1Gi:  0
+  hugepages-2Mi:  4Gi
+  memory:         24Gi
+  swap:           10Gi
+Allocatable:
+  cpu:            4
+  hugepages-1Gi:  0
+  hugepages-2Mi:  2Gi
+  memory:         12Gi
+  swap:           10Gi`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

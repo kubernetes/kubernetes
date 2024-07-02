@@ -796,6 +796,7 @@ func TestMachineInfo(t *testing.T) {
 				SystemUUID:     "SystemUUID",
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -804,14 +805,16 @@ func TestMachineInfo(t *testing.T) {
 						SystemUUID: "SystemUUID",
 					},
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 				},
 			},
@@ -824,18 +827,21 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(8, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(8, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(8, resource.DecimalSI),
 					},
 				},
 			},
@@ -848,18 +854,21 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(10, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(10, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(10, resource.DecimalSI),
 					},
 				},
 			},
@@ -871,6 +880,7 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			nodeAllocatableReservation: v1.ResourceList{
 				// reserve 1 unit for each resource
@@ -882,14 +892,16 @@ func TestMachineInfo(t *testing.T) {
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(1999, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1023, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(109, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(1999, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1023, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(109, resource.DecimalSI),
 					},
 				},
 			},
@@ -909,12 +921,14 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:                   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:               *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1, resource.BinarySI),
 						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
 					},
@@ -922,6 +936,7 @@ func TestMachineInfo(t *testing.T) {
 						v1.ResourceCPU: *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						// memory has 1-unit difference for hugepages reservation
 						v1.ResourceMemory:                   *resource.NewQuantity(1023, resource.BinarySI),
+						v1.ResourceSwapMemory:               *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1, resource.BinarySI),
 						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
 					},
@@ -941,20 +956,23 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:      *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:   *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:     *resource.NewQuantity(110, resource.DecimalSI),
-						"negative-resource": *resource.NewQuantity(-1, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"negative-resource":   *resource.NewQuantity(-1, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:      *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:   *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:     *resource.NewQuantity(110, resource.DecimalSI),
-						"negative-resource": *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"negative-resource":   *resource.NewQuantity(0, resource.BinarySI),
 					},
 				},
 			},
@@ -972,18 +990,21 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:                   *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:               *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1025, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:                      *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:                   *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourceSwapMemory:               *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:                     *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceHugePagesPrefix + "test": *resource.NewQuantity(1025, resource.BinarySI),
 					},
@@ -997,6 +1018,7 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			capacity: v1.ResourceList{
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
@@ -1006,12 +1028,14 @@ func TestMachineInfo(t *testing.T) {
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
@@ -1025,6 +1049,7 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			capacity: v1.ResourceList{
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
@@ -1034,12 +1059,14 @@ func TestMachineInfo(t *testing.T) {
 					Capacity: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
 						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
 						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory:       *resource.NewQuantity(512, resource.BinarySI),
 						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
 						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 					},
@@ -1054,6 +1081,7 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			devicePluginResourceCapacity: dprc{
 				capacity: v1.ResourceList{
@@ -1066,16 +1094,18 @@ func TestMachineInfo(t *testing.T) {
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"device-plugin":   *resource.NewQuantity(1, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"device-plugin":       *resource.NewQuantity(1, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"device-plugin":   *resource.NewQuantity(1, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"device-plugin":       *resource.NewQuantity(1, resource.BinarySI),
 					},
 				},
 			},
@@ -1093,6 +1123,7 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			devicePluginResourceCapacity: dprc{
 				inactive: []string{"inactive"},
@@ -1100,16 +1131,18 @@ func TestMachineInfo(t *testing.T) {
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"inactive":            *resource.NewQuantity(0, resource.BinarySI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
-						"inactive":        *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
+						"inactive":            *resource.NewQuantity(0, resource.BinarySI),
 					},
 				},
 			},
@@ -1127,18 +1160,21 @@ func TestMachineInfo(t *testing.T) {
 			machineInfo: &cadvisorapiv1.MachineInfo{
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 				},
 			},
@@ -1153,14 +1189,16 @@ func TestMachineInfo(t *testing.T) {
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
-						v1.ResourceMemory: resource.MustParse("0Gi"),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory:     resource.MustParse("0Gi"),
+						v1.ResourceSwapMemory: resource.MustParse("0Gi"),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
-						v1.ResourceMemory: resource.MustParse("0Gi"),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory:     resource.MustParse("0Gi"),
+						v1.ResourceSwapMemory: resource.MustParse("0Gi"),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 				},
 			},
@@ -1179,6 +1217,7 @@ func TestMachineInfo(t *testing.T) {
 				BootID:         "bar",
 				NumCores:       2,
 				MemoryCapacity: 1024,
+				SwapCapacity:   512,
 			},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
@@ -1186,14 +1225,16 @@ func TestMachineInfo(t *testing.T) {
 						BootID: "bar",
 					},
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+						v1.ResourceCPU:        *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:     *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourceSwapMemory: *resource.NewQuantity(512, resource.BinarySI),
+						v1.ResourcePods:       *resource.NewQuantity(110, resource.DecimalSI),
 					},
 				},
 			},

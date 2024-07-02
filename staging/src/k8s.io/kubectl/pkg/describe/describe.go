@@ -4246,7 +4246,7 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	for resource := range allocatable {
 		if resourcehelper.IsHugePageResourceName(resource) {
 			hugePageResources = append(hugePageResources, string(resource))
-		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods && resource != corev1.ResourceSwapMemory {
 			extResources = append(extResources, string(resource))
 		}
 	}
