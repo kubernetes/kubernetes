@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	resourcehelper "k8s.io/component-helpers/resource"
 )
 
 func TestFindPort(t *testing.T) {
@@ -200,12 +201,12 @@ func TestFindPort(t *testing.T) {
 }
 
 func TestVisitContainers(t *testing.T) {
-	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
+	setAllFeatureEnabledContainersDuringTest := resourcehelper.ContainerType(0)
 	testCases := []struct {
 		desc           string
 		spec           *v1.PodSpec
 		wantContainers []string
-		mask           ContainerType
+		mask           resourcehelper.ContainerType
 	}{
 		{
 			desc:           "empty podspec",
@@ -230,7 +231,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"c1", "c2"},
-			mask:           Containers,
+			mask:           resourcehelper.Containers,
 		},
 		{
 			desc: "init containers",
@@ -249,7 +250,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2"},
-			mask:           InitContainers,
+			mask:           resourcehelper.InitContainers,
 		},
 		{
 			desc: "ephemeral containers",
@@ -268,7 +269,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"e1", "e2"},
-			mask:           EphemeralContainers,
+			mask:           resourcehelper.EphemeralContainers,
 		},
 		{
 			desc: "all container types",
@@ -336,7 +337,7 @@ func TestVisitContainers(t *testing.T) {
 			}
 
 			gotContainers := []string{}
-			VisitContainers(tc.spec, tc.mask, func(c *v1.Container, containerType ContainerType) bool {
+			VisitContainers(tc.spec, tc.mask, func(c *v1.Container, containerType resourcehelper.ContainerType) bool {
 				gotContainers = append(gotContainers, c.Name)
 				if c.SecurityContext != nil {
 					c.SecurityContext = nil

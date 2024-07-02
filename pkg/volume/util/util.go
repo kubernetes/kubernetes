@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	resourcehelper "k8s.io/component-helpers/resource"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -601,7 +602,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[s
 	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType resourcehelper.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
 		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
@@ -633,7 +634,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[s
 // attributes.
 func FsUserFrom(pod *v1.Pod) *int64 {
 	var fsUser *int64
-	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
+	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType resourcehelper.ContainerType) bool {
 		runAsUser, ok := securitycontext.DetermineEffectiveRunAsUser(pod, container)
 		// One container doesn't specify user or there are more than one
 		// non-root UIDs.

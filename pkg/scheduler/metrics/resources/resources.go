@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
+	resourcehelper "k8s.io/component-helpers/resource"
 
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
@@ -196,7 +196,7 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		return
 	}
 
-	reqs = v1resource.PodRequests(pod, v1resource.PodResourcesOptions{Reuse: reuseReqs})
-	limits = v1resource.PodLimits(pod, v1resource.PodResourcesOptions{Reuse: reuseLimits})
+	reqs = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{Reuse: reuseReqs})
+	limits = resourcehelper.PodLimits(pod, resourcehelper.PodResourcesOptions{Reuse: reuseLimits})
 	return
 }
