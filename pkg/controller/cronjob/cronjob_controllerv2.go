@@ -444,21 +444,25 @@ func (jm *ControllerV2) syncCronJob(
 			// This could happen if we crashed right after creating the Job and before updating the status,
 			// or if our jobs list is newer than our cj status after a relist, or if someone intentionally created
 			// a job that they wanted us to adopt.
-		} else if found && jobutil.IsJobFinished(j) {
-			_, condition := jobutil.FinishedCondition(j)
-			deleteFromActiveList(cronJob, j.ObjectMeta.UID)
-			jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, condition: %v", j.Name, condition)
-			updateStatus = true
-		} else if jobutil.IsJobSucceeded(j) {
-			// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
-			if cronJob.Status.LastSuccessfulTime == nil {
-				cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
+		} else if jobutil.IsJobFinished(j) {
+			if found {
+				_, condition := jobutil.FinishedCondition(j)
+				deleteFromActiveList(cronJob, j.ObjectMeta.UID)
+				jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, condition: %v", j.Name, condition)
 				updateStatus = true
 			}
-			if j.Status.CompletionTime != nil && j.Status.CompletionTime.After(cronJob.Status.LastSuccessfulTime.Time) {
-				cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
-				updateStatus = true
+			if jobutil.IsJobSucceeded(j) {
+				// a job does not have to be in active list, as long as it has completed successfully, we will process the timestamp
+				if cronJob.Status.LastSuccessfulTime == nil {
+					cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
+					updateStatus = true
+				}
+				if j.Status.CompletionTime != nil && j.Status.CompletionTime.After(cronJob.Status.LastSuccessfulTime.Time) {
+					cronJob.Status.LastSuccessfulTime = j.Status.CompletionTime
+					updateStatus = true
+				}
 			}
+
 		}
 	}
 
