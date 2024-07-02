@@ -1154,7 +1154,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ctx context.Context, ds *
 			// Sort the daemon pods by creation time, so that the oldest is first.
 			daemonPods, _ := nodeToDaemonPods[node.Name]
 			sort.Sort(podByCreationTimestampAndPhase(daemonPods))
-			pod := daemonPods[0]
+			pod := daemonPods[len(daemonPods)-1]
 			if podutil.IsPodReady(pod) {
 				numberReady++
 				if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
