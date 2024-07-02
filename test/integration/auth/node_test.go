@@ -183,6 +183,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
+	watchVolumeAttachment := func(client clientset.Interface) func() error {
+		return func() error {
+			watcher, err := client.StorageV1().VolumeAttachments().Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: "myattachment"}))
+			if err != nil {
+				return err
+			}
+			watcher.Stop()
+			return nil
+		}
+	}
 	getResourceClaim := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.ResourceV1alpha2().ResourceClaims("ns").Get(context.TODO(), "mynamedresourceclaim", metav1.GetOptions{})
@@ -606,7 +616,9 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Enabled CSIPersistentVolume feature
 	expectForbidden(t, getVolumeAttachment(node1ClientExternal))
+	expectForbidden(t, watchVolumeAttachment(node1ClientExternal))
 	expectAllowed(t, getVolumeAttachment(node2ClientExternal))
+	expectAllowed(t, watchVolumeAttachment(node2ClientExternal))
 
 	// create node2 again
 	expectAllowed(t, createNode2(node2Client))

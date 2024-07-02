@@ -41,7 +41,7 @@ import (
 // NodeAuthorizer authorizes requests from kubelets, with the following logic:
 //  1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
 //  2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
-//  3. If a request is for a secret, configmap, persistent volume, resource claim, or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//  3. If a request is for a secret, configmap, persistent volume, resource claim, volume attachment, or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
 //     node <- configmap
 //     node <- pod
 //     node <- pod <- secret
@@ -49,7 +49,8 @@ import (
 //     node <- pod <- pvc
 //     node <- pod <- pvc <- pv
 //     node <- pod <- pvc <- pv <- secret
-//     node <- pod <- ResourceClaim
+//     node <- pod <- resourceclaim
+//     node <- volumeattachment
 //  4. If a request is for a resourceslice, then authorize access if there is an
 //     edge from the existing slice object to the node, which is the case if the
 //     existing object has the node in its NodeName field. For create, the access gets
@@ -116,9 +117,9 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		requestResource := schema.GroupResource{Group: attrs.GetAPIGroup(), Resource: attrs.GetResource()}
 		switch requestResource {
 		case secretResource:
-			return r.authorizeReadNamespacedObject(nodeName, secretVertexType, attrs)
+			return r.authorizeReadObject(nodeName, secretVertexType, attrs, true)
 		case configMapResource:
-			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
+			return r.authorizeReadObject(nodeName, configMapVertexType, attrs, true)
 		case pvcResource:
 			if attrs.GetSubresource() == "status" {
 				return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
@@ -129,7 +130,7 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case resourceClaimResource:
 			return r.authorizeGet(nodeName, resourceClaimVertexType, attrs)
 		case vaResource:
-			return r.authorizeGet(nodeName, vaVertexType, attrs)
+			return r.authorizeReadObject(nodeName, vaVertexType, attrs, false)
 		case svcAcctResource:
 			return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 		case leaseResource:
@@ -180,9 +181,9 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 	return r.authorize(nodeName, startingType, attrs)
 }
 
-// authorizeReadNamespacedObject authorizes "get", "list" and "watch" requests to single objects of a
+// authorizeReadObject authorizes "get", "list" and "watch" requests to single objects of a
 // specified types if they are related to the specified node.
-func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *NodeAuthorizer) authorizeReadObject(nodeName string, startingType vertexType, attrs authorizer.Attributes, requireNamespace bool) (authorizer.Decision, string, error) {
 	switch attrs.GetVerb() {
 	case "get", "list", "watch":
 		//ok
@@ -195,10 +196,11 @@ func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, starting
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
 	}
-	if len(attrs.GetNamespace()) == 0 {
+	if requireNamespace && len(attrs.GetNamespace()) == 0 {
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read namespaced object of this type", nil
 	}
+
 	return r.authorize(nodeName, startingType, attrs)
 }
 
