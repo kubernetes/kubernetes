@@ -1,0 +1,10 @@
+# Each non-blank line is a regular expression. All tests in directories
+# matched by one of them run without race detection.
+
+# https://github.com/kubernetes/kubernetes/issues/117052
+test/integration/apiserver/admissionwebhook
+test/integration/etcd
+test/integration/scheduler/plugins
+
+# https://github.com/kubernetes/kubernetes/issues/123172
+test/integration/apiserver/discovery

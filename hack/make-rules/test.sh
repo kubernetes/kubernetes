@@ -72,7 +72,7 @@ KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 # use KUBE_RACE="" to disable the race detector
 # this is defaulted to "-race" in make test as well
 # NOTE: DO NOT ADD A COLON HERE. KUBE_RACE="" is meaningful!
-KUBE_RACE=${KUBE_RACE-"-race"}
+KUBE_RACE="-race"
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # once we have multiple group supports
@@ -167,10 +167,6 @@ if [[ ${#testcases[@]} -eq 0 ]]; then
 fi
 set -- "${testcases[@]+${testcases[@]}}"
 
-if [[ -n "${KUBE_RACE}" ]] ; then
-  goflags+=("${KUBE_RACE}")
-fi
-
 junitFilenamePrefix() {
   if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
     echo ""
@@ -207,6 +203,16 @@ produceJUnitXMLReport() {
   kube::log::status "Saved JUnit XML test report to ${junit_xml_filename}"
 }
 
+# -v as first parameter returns tests which support race detection, empty string
+# those which don't.
+filterRaceDetectionTests() {
+  local enabled
+  enabled="$1"
+  shift
+  # shellcheck disable=SC2086
+  printf "%s\n" "$@" | grep ${enabled} -f <(grep -v -e '^ *#' -e '^ *$' "${KUBE_ROOT}/hack/.test_race_detection_failures") || true
+}
+
 runTests() {
   local junit_filename_prefix
   junit_filename_prefix=$(junitFilenamePrefix)
@@ -218,18 +224,46 @@ runTests() {
   # If we're not collecting coverage, run all requested tests with one 'go test'
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
-    kube::log::status "Running tests without code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-    # shellcheck disable=SC2031
-    go test "${goflags[@]:+${goflags[@]}}" \
-     "${KUBE_TIMEOUT}" "${targets[@]}" \
-     "${testargs[@]:+${testargs[@]}}" \
-     | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
+    if [[ -z "${KUBE_RACE}" ]]; then
+      kube::log::status "Running tests without code coverage and without race detection"
+      # shellcheck disable=SC2031
+      go test "${goflags[@]:+${goflags[@]}}" \
+       "${KUBE_TIMEOUT}" "${targets[@]}" \
+       "${testargs[@]:+${testargs[@]}}" \
+       | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
+       | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
+    else
+      rc=0
+      # shellcheck disable=SC2031
+      kube::util::read-array without_race < <(filterRaceDetectionTests "" "${targets[@]}")
+      # shellcheck disable=SC2031
+      kube::util::read-array with_race < <(filterRaceDetectionTests "-v" "${targets[@]}")
+      if [[ -n "${with_race:-}" ]]; then
+        kube::log::status "Running tests without code coverage and with race detection"
+        if ! go test -race "${goflags[@]:+${goflags[@]}}" \
+         "${KUBE_TIMEOUT}" "${with_race[@]}" \
+         "${testargs[@]:+${testargs[@]}}" \
+         | tee ${junit_filename_prefix:+"${junit_filename_prefix}_with_race.stdout"} \
+         | grep --binary-files=text "${go_test_grep_pattern}"; then
+          rc=1
+        fi
+      fi
+      if [[ -n "${without_race:-}" ]]; then
+        kube::log::status "Running tests without code coverage and without race detection because these tests have known races: ${without_race[*]}"
+        if ! go test "${goflags[@]:+${goflags[@]}}" \
+         "${KUBE_TIMEOUT}" "${without_race[@]}" \
+         "${testargs[@]:+${testargs[@]}}" \
+         | tee ${junit_filename_prefix:+"${junit_filename_prefix}_without_race.stdout"} \
+         | grep --binary-files=text "${go_test_grep_pattern}"; then
+          rc=1
+        fi
+      fi
+    fi
     produceJUnitXMLReport "${junit_filename_prefix}"
     return "${rc}"
   fi
 
-  kube::log::status "Running tests with code coverage ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
+  kube::log::status "Running tests with code coverage and without race detection"
 
   # Create coverage report directories.
   if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
