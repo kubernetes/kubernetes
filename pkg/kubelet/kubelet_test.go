@@ -345,7 +345,7 @@ func newTestKubeletWithImageList(
 	}
 	// setup eviction manager
 	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
-		killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
+		kubelet.podWorkers, kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
@@ -357,7 +357,7 @@ func newTestKubeletWithImageList(
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     kubelet.podManager.GetPods,
-		KillPodFunc:                     killPodNow(kubelet.podWorkers, fakeRecorder),
+		Terminator:                      kubelet.podWorkers,
 		SyncNodeStatusFunc:              func() {},
 		ShutdownGracePeriodRequested:    0,
 		ShutdownGracePeriodCriticalPods: 0,
@@ -1938,7 +1938,7 @@ func TestGenerateAPIPodStatusWithSortedContainers(t *testing.T) {
 		ContainerStatuses: cStatuses,
 	}
 	for i := 0; i < 5; i++ {
-		apiStatus := kubelet.generateAPIPodStatus(pod, status, false)
+		apiStatus := kubelet.generateAPIPodStatus(pod, status, false, false, nil)
 		for i, c := range apiStatus.ContainerStatuses {
 			if expectedOrder[i] != c.Name {
 				t.Fatalf("Container status not sorted, expected %v at index %d, but found %v", expectedOrder[i], i, c.Name)
@@ -2152,7 +2152,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Spec.Containers = test.containers
 		pod.Status.ContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false, false, nil)
 		verifyContainerStatuses(t, apiStatus.ContainerStatuses, test.expectedState, test.expectedLastTerminationState, fmt.Sprintf("case %d", i))
 	}
 
@@ -2165,7 +2165,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 		pod.Spec.InitContainers = test.containers
 		pod.Status.InitContainerStatuses = test.oldStatuses
 		podStatus.ContainerStatuses = test.statuses
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false, false, nil)
 		expectedState := test.expectedState
 		if test.expectedInitState != nil {
 			expectedState = test.expectedInitState
@@ -2304,14 +2304,14 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 		pod.Spec.RestartPolicy = test.restartPolicy
 		// Test normal containers
 		pod.Spec.Containers = containers
-		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus := kubelet.generateAPIPodStatus(pod, podStatus, false, false, nil)
 		expectedState, expectedLastTerminationState := test.expectedState, test.expectedLastTerminationState
 		verifyContainerStatuses(t, apiStatus.ContainerStatuses, expectedState, expectedLastTerminationState, fmt.Sprintf("case %d", c))
 		pod.Spec.Containers = nil
 
 		// Test init containers
 		pod.Spec.InitContainers = containers
-		apiStatus = kubelet.generateAPIPodStatus(pod, podStatus, false)
+		apiStatus = kubelet.generateAPIPodStatus(pod, podStatus, false, false, nil)
 		if test.expectedInitState != nil {
 			expectedState = test.expectedInitState
 		}
@@ -2791,7 +2791,7 @@ func TestGenerateAPIPodStatusInvokesPodSyncHandlers(t *testing.T) {
 		Name:      pod.Name,
 		Namespace: pod.Namespace,
 	}
-	apiStatus := kubelet.generateAPIPodStatus(pod, status, false)
+	apiStatus := kubelet.generateAPIPodStatus(pod, status, false, false, nil)
 	require.Equal(t, v1.PodFailed, apiStatus.Phase)
 	require.Equal(t, "Evicted", apiStatus.Reason)
 	require.Equal(t, "because", apiStatus.Message)
@@ -2812,10 +2812,9 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 	kl.podManager.SetPods(pods)
 	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
 	gracePeriodOverride := int64(0)
-	err := kl.SyncTerminatingPod(context.Background(), pod, podStatus, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
-		podStatus.Phase = v1.PodFailed
-		podStatus.Reason = "reason"
-		podStatus.Message = "message"
+	err := kl.SyncTerminatingPod(context.Background(), pod, podStatus, &gracePeriodOverride, &kubetypes.TerminatePodOptions{
+		Reason:  "reason",
+		Message: "message",
 	})
 	require.NoError(t, err)
 

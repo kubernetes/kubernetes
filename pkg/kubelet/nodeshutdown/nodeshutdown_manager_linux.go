@@ -22,16 +22,18 @@ package nodeshutdown
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"sync"
+	"syscall"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -41,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/clock"
 )
 
@@ -76,7 +79,7 @@ type managerImpl struct {
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 
 	getPods        eviction.ActivePodsFunc
-	killPodFunc    eviction.KillPodFunc
+	terminator     PodTerminator
 	syncNodeStatus func()
 
 	dbusCon     dbusInhibiter
@@ -95,6 +98,7 @@ type managerImpl struct {
 func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
 		m := managerStub{}
+		conf.Logger.Info("Node graceful shutdown feature is disabled, node shutdown will be immediate")
 		return m, m
 	}
 
@@ -108,6 +112,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 	// Disable if the configuration is empty
 	if len(shutdownGracePeriodByPodPriority) == 0 {
 		m := managerStub{}
+		conf.Logger.Info("No graceful configuration specified, node shutdown will be immediate")
 		return m, m
 	}
 
@@ -125,7 +130,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		recorder:                         conf.Recorder,
 		nodeRef:                          conf.NodeRef,
 		getPods:                          conf.GetPodsFunc,
-		killPodFunc:                      conf.KillPodFunc,
+		terminator:                       conf.Terminator,
 		syncNodeStatus:                   conf.SyncNodeStatusFunc,
 		shutdownGracePeriodByPodPriority: shutdownGracePeriodByPodPriority,
 		clock:                            conf.Clock,
@@ -248,6 +253,10 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
 	}
 
+	unifiedCh := make(chan bool, 1)
+	sigUSR1 := make(chan os.Signal, 1)
+	signal.Notify(sigUSR1, syscall.SIGUSR1)
+
 	stop := make(chan struct{})
 	go func() {
 		// Monitor for shutdown events. This follows the logind Inhibit Delay pattern described on https://www.freedesktop.org/wiki/Software/systemd/inhibit/
@@ -256,12 +265,19 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
+
+			case <-sigUSR1:
+				m.logger.V(1).Info("Received shutdown signal from USR1")
+				unifiedCh <- true
 			case isShuttingDown, ok := <-events:
 				if !ok {
 					m.logger.Error(err, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
+				unifiedCh <- isShuttingDown
+
+			case isShuttingDown := <-unifiedCh:
 				m.logger.V(1).Info("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
 
 				var shutdownType string
@@ -374,21 +390,22 @@ func (m *managerImpl) processShutdownEvent() error {
 
 				m.logger.V(1).Info("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
-				if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
-					// set the pod status to failed (unless it was already in a successful terminal phase)
-					if status.Phase != v1.PodSucceeded {
-						status.Phase = v1.PodFailed
-					}
-					status.Message = nodeShutdownMessage
-					status.Reason = nodeShutdownReason
-					if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-						podutil.UpdatePodCondition(status, &v1.PodCondition{
-							Type:    v1.DisruptionTarget,
-							Status:  v1.ConditionTrue,
-							Reason:  v1.PodReasonTerminationByKubelet,
-							Message: nodeShutdownMessage,
-						})
-					}
+				var conditions []v1.PodCondition
+				if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+					conditions = append(conditions, v1.PodCondition{
+						Type:    v1.DisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonTerminationByKubelet,
+						Message: nodeShutdownMessage,
+					})
+				}
+
+				if err := m.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
+					GracePeriodSecondsOverride: &gracePeriodOverride,
+
+					Reason:     nodeShutdownReason,
+					Message:    nodeShutdownMessage,
+					Conditions: conditions,
 				}); err != nil {
 					m.logger.V(1).Info("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {

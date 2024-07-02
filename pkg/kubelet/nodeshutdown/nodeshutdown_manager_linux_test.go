@@ -45,9 +45,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
+
+type TerminatePodAbnormallyAndWaitFunc func(pod *v1.Pod, options kubetypes.TerminatePodOptions) error
+
+func (fn TerminatePodAbnormallyAndWaitFunc) TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
+	return fn(pod, options)
+}
 
 // lock is to prevent systemDbus from being modified in the case of concurrency.
 var lock sync.Mutex
@@ -314,12 +321,15 @@ func TestManager(t *testing.T) {
 			}
 
 			podKillChan := make(chan PodKillInfo, 1)
-			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(podStatus *v1.PodStatus)) error {
+			terminator := func(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 				var gracePeriod int64
-				if gracePeriodOverride != nil {
-					gracePeriod = *gracePeriodOverride
+				if options.GracePeriodSecondsOverride != nil {
+					gracePeriod = *options.GracePeriodSecondsOverride
 				}
-				fn(&pod.Status)
+				pod.Status.Phase = v1.PodFailed
+				pod.Status.Reason = options.Reason
+				pod.Status.Message = options.Message
+				pod.Status.Conditions = options.Conditions
 				podKillChan <- PodKillInfo{Name: pod.Name, GracePeriod: gracePeriod}
 				return nil
 			}
@@ -343,7 +353,7 @@ func TestManager(t *testing.T) {
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
-				KillPodFunc:                     killPodsFunc,
+				Terminator:                      TerminatePodAbnormallyAndWaitFunc(terminator),
 				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
@@ -433,7 +443,7 @@ func TestFeatureEnabled(t *testing.T) {
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
-			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+			terminator := func(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 				return nil
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
@@ -448,7 +458,7 @@ func TestFeatureEnabled(t *testing.T) {
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
-				KillPodFunc:                     killPodsFunc,
+				Terminator:                      TerminatePodAbnormallyAndWaitFunc(terminator),
 				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: 0,
@@ -473,7 +483,7 @@ func TestRestart(t *testing.T) {
 	activePodsFunc := func() []*v1.Pod {
 		return nil
 	}
-	killPodsFunc := func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+	terminator := func(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 		return nil
 	}
 	syncNodeStatus := func() {}
@@ -504,7 +514,7 @@ func TestRestart(t *testing.T) {
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     activePodsFunc,
-		KillPodFunc:                     killPodsFunc,
+		Terminator:                      TerminatePodAbnormallyAndWaitFunc(terminator),
 		SyncNodeStatusFunc:              syncNodeStatus,
 		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
@@ -739,7 +749,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		probeManager                     prober.Manager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
-		killPodFunc                      eviction.KillPodFunc
+		terminator                       PodTerminator
 		syncNodeStatus                   func()
 		dbusCon                          dbusInhibiter
 		inhibitLock                      systemd.InhibitLock
@@ -774,10 +784,10 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 						makePod("critical-pod", 2, nil),
 					}
 				},
-				killPodFunc: func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
+				terminator: TerminatePodAbnormallyAndWaitFunc(func(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 					fakeclock.Step(60 * time.Second)
 					return nil
-				},
+				}),
 				syncNodeStatus: syncNodeStatus,
 				clock:          fakeclock,
 				dbusCon:        &fakeDbus{},
@@ -801,7 +811,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				probeManager:                     tt.fields.probeManager,
 				shutdownGracePeriodByPodPriority: tt.fields.shutdownGracePeriodByPodPriority,
 				getPods:                          tt.fields.getPods,
-				killPodFunc:                      tt.fields.killPodFunc,
+				terminator:                       tt.fields.terminator,
 				syncNodeStatus:                   tt.fields.syncNodeStatus,
 				dbusCon:                          tt.fields.dbusCon,
 				inhibitLock:                      tt.fields.inhibitLock,

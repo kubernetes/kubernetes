@@ -412,7 +412,7 @@ type KubeletConfiguration struct {
 	// +optional
 	EnableSystemLogQuery bool
 	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
-	// Defaults to 0 seconds.
+	// Defaults to 0 seconds, which will not perform graceful shutdown.
 	// +featureGate=GracefulNodeShutdown
 	// +optional
 	ShutdownGracePeriod metav1.Duration
