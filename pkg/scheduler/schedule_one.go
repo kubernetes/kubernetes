@@ -290,6 +290,15 @@ func (sched *Scheduler) bindingCycle(
 		return status
 	}
 
+	// Any failures after this point cannot lead to the Pod being considered unshcedulable.
+	// i.e., They could return error only when some unexpected temporal errors happen. (e.g., kube-apiserver failure)
+	// So, if Pods are failed at one of them and going to the scheduling queue, the scheduling queue always pushes them to activeQ/backoffQ, instead of the unschedulable pod pool.
+	// This is because such Pods won't be schedulable by any certain cluster events, and thus scheduling hints aren't useful to determine when to push those Pods to activeQ/backoffQ.
+	//
+	// We can call Done() here because Pods failed at all other extension points after here will be retried regardless of the events that happened in the cluster.
+	// By calling Done(), we can free the cluster events stored in the scheduling queue, which is worth for busy clusters.
+	sched.SchedulingQueue.Done(assumedPod.UID)
+
 	// Run "prebind" plugins.
 	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
 		if status.IsRejected() {

@@ -676,6 +676,14 @@ func (p *PriorityQueue) SchedulingCycle() int64 {
 func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) queueingStrategy {
 	logger.V(5).Info("Checking events for in-flight pod", "pod", klog.KObj(pInfo.Pod), "unschedulablePlugins", pInfo.UnschedulablePlugins, "inFlightEventsSize", p.inFlightEvents.Len(), "inFlightPodsSize", len(p.inFlightPods))
 
+	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
+	if len(rejectorPlugins) == 0 {
+		// No failed plugins are associated with this Pod.
+		// Meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
+		// In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
+		return queueAfterBackoff
+	}
+
 	// AddUnschedulableIfNotPresent is called with the Pod at the end of scheduling or binding.
 	// So, given pInfo should have been Pop()ed before,
 	// we can assume pInfo must be recorded in inFlightPods and thus inFlightEvents.
@@ -691,14 +699,6 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 			return queueAfterBackoff
 		}
 		return queueSkip
-	}
-
-	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
-	if len(rejectorPlugins) == 0 {
-		// No failed plugins are associated with this Pod.
-		// Meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
-		// In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
-		return queueAfterBackoff
 	}
 
 	// check if there is an event that makes this Pod schedulable based on pInfo.UnschedulablePlugins.
