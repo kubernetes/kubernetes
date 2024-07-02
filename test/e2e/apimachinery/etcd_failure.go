@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,6 @@ var _ = SIGDescribe("Etcd failure", framework.WithDisruptive(), func() {
 		// - master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		e2eskipper.SkipUnlessProviderIs("gce")
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		err := e2erc.RunRC(ctx, testutils.RCConfig{
@@ -104,12 +104,24 @@ func doEtcdFailure(ctx context.Context, failCommand, fixCommand string) {
 
 func masterExec(ctx context.Context, cmd string) {
 	host := framework.APIAddress() + ":22"
+	framework.Logf("Running SSH command: [%s]", cmd)
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)
 		framework.Failf("master exec command returned non-zero")
 	}
+}
+
+func masterExecOutput(ctx context.Context, cmd string) (stdout string, stderr string, err error) {
+	host := framework.APIAddress() + ":22"
+	framework.Logf("Running SSH command: [%s]", cmd)
+	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
+	if result.Code != 0 {
+		err = fmt.Errorf("unexpected exit code %d, err: %w", result.Code, err)
+	}
+
+	return result.Stdout, result.Stderr, err
 }
 
 func checkExistingRCRecovers(ctx context.Context, f *framework.Framework) {
