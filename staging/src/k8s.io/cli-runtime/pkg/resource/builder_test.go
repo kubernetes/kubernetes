@@ -1264,7 +1264,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestLabelSelector(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
+	labelKey := "labelSelector"
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
@@ -1308,7 +1308,7 @@ func TestLabelSelectorRequiresKnownTypes(t *testing.T) {
 
 func TestFieldSelector(t *testing.T) {
 	pods, svc := testData()
-	fieldKey := metav1.FieldSelectorQueryParam(corev1GV.String())
+	fieldKey := "fieldSelector"
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + fieldKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + fieldKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
@@ -1630,7 +1630,7 @@ func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
-	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
+	labelKey := "labelSelector"
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, pods),
 	})).
@@ -1663,7 +1663,7 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
+	labelKey := "labelSelector"
 	obj, err := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
@@ -1690,7 +1690,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 
 func TestListObjectSubresource(t *testing.T) {
 	pods, _ := testData()
-	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
+	labelKey := "labelSelector"
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey: runtime.EncodeOrDie(corev1Codec, pods),
 	})).
