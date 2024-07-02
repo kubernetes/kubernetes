@@ -104,21 +104,23 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		csiMigrationCompleteResult    bool
 	}{
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag",
-			pluginName:                    "kubernetes.io/gce-pd",
+			name:                          "portworx migration flag enabled and migration-complete flag disabled with CSI migration flag",
+			pluginName:                    "kubernetes.io/portworx-volume",
+			pluginFeature:                 features.CSIMigrationPortworx,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregister:        features.InTreePluginPortworxUnregister,
 			inTreePluginUnregisterEnabled: false,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    false,
 		},
 		{
-			name:                          "gce-pd migration flag enabled and migration-complete flag enabled with CSI migration flag",
-			pluginName:                    "kubernetes.io/gce-pd",
+			name:                          "portworx migration flag enabled and migration-complete flag enabled with CSI migration flag",
+			pluginName:                    "kubernetes.io/portworx-volume",
+			pluginFeature:                 features.CSIMigrationPortworx,
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
+			inTreePluginUnregister:        features.InTreePluginPortworxUnregister,
 			inTreePluginUnregisterEnabled: true,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
@@ -128,9 +130,6 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
-			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
-			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
 			if len(test.pluginFeature) > 0 {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)
 			}
