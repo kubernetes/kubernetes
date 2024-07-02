@@ -145,3 +145,19 @@ func DefaultTLSVersion() uint16 {
 	// Can't use TLSv1.1 because of RC4 cipher usage
 	return tls.VersionTLS12
 }
+
+// TLSMaxVersion returns the TLS Version ID for the version name passed.
+func TLSMaxVersion(versionName string) (uint16, error) {
+	if len(versionName) == 0 {
+		return DefaultTLSMaxVersion(), nil
+	}
+	if version, ok := versions[versionName]; ok {
+		return version, nil
+	}
+	return 0, fmt.Errorf("unknown tls version %q for tls-max-version", versionName)
+}
+
+// DefaultTLSMaxVersion defines the default TLS Max Version.
+func DefaultTLSMaxVersion() uint16 {
+	return tls.VersionTLS13
+}
