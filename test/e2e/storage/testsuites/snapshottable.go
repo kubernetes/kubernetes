@@ -247,7 +247,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				deleteVolumeSnapshot(ctx, f, dc, sr, pattern, vscontent)
 			})
 
-			ginkgo.It("should check snapshot fields, check restore correctly works after modifying source data, check deletion (persistent)", func(ctx context.Context) {
+			ginkgo.It("should check (offline) snapshot fields, check restore correctly works after modifying source data, check deletion (persistent)", func(ctx context.Context) {
 				if pattern.VolType == storageframework.GenericEphemeralVolume {
 					e2eskipper.Skipf("volume type %q is ephemeral", pattern.VolType)
 				}
@@ -396,6 +396,93 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 
 				deleteVolumeSnapshot(ctx, f, dc, sr, pattern, vscontent)
 			})
+
+			ginkgo.It("Verify if online snapshot works", func(ctx context.Context) {
+				init(ctx)
+				// delete the pod at the end of the test
+				ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, pod)
+
+				// The pod should be in the Success state.
+				ginkgo.By("[init] check pod success")
+				pod, err = cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to fetch pod: %v", err)
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+
+				// If test pattern's volumeType is GenericEphemeralVolume or inline volume,
+				// the volumeResource.Pvc is nil, then we need to get the pvc from API server
+				if volumeResource.Pvc == nil {
+					pvcName := ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0])
+					pvcNamespace := pod.Namespace
+					pvc, err = cs.CoreV1().PersistentVolumeClaims(pvcNamespace).Get(ctx, pvcName, metav1.GetOptions{})
+					framework.ExpectNoError(err, "get PVC")
+				} else {
+					pvc = volumeResource.Pvc
+				}
+
+				ginkgo.By("creating a snapshot from the source PVC when the pod is using it")
+				parameters := map[string]string{}
+				sr := storageframework.CreateSnapshotResource(ctx, sDriver, config, pattern, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				ginkgo.DeferCleanup(sr.CleanupResource, f.Timeouts)
+
+				vs := sr.Vs
+				// get the snapshot and check SnapshotContent properties
+				vscontent := checkSnapshot(ctx, dc, sr, pattern)
+
+				var restoredPVC *v1.PersistentVolumeClaim
+				var restoredPod *v1.Pod
+
+				ginkgo.By("creating new pvc from the snapshot")
+				claimSize = pvc.Spec.Resources.Requests.Storage().String()
+				restoredPVC = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					ClaimSize:        claimSize,
+					StorageClassName: &(volumeResource.Sc.Name),
+				}, config.Framework.Namespace.Name)
+
+				group := "snapshot.storage.k8s.io"
+
+				restoredPVC.Spec.DataSource = &v1.TypedLocalObjectReference{
+					APIGroup: &group,
+					Kind:     "VolumeSnapshot",
+					Name:     vs.GetName(),
+				}
+
+				restoredPVC, err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Create(ctx, restoredPVC, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					framework.Logf("deleting claim %q/%q", restoredPVC.Namespace, restoredPVC.Name)
+					// typically this claim has already been deleted
+					err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Delete(ctx, restoredPVC.Name, metav1.DeleteOptions{})
+					if err != nil && !apierrors.IsNotFound(err) {
+						framework.Failf("Error deleting claim %q. Error: %v", restoredPVC.Name, err)
+					}
+				})
+
+				ginkgo.By("starting a pod to use the snapshot")
+				restoredPod = StartInPodWithVolume(ctx, cs, restoredPVC.Namespace, restoredPVC.Name, "restored-pvc-tester", "sleep 300", config.ClientNodeSelection)
+				ginkgo.DeferCleanup(StopPod, cs, restoredPod)
+				framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, restoredPod.Name, restoredPod.Namespace, f.Timeouts.PodStartSlow))
+				commands := e2evolume.GenerateReadFileCmd(datapath)
+				_, err = e2eoutput.LookForStringInPodExec(restoredPod.Namespace, restoredPod.Name, commands, originalMntTestData, time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
+
+				// Delete both Snapshot and restored Pod/PVC at the same time because different storage systems
+				// have different ordering of deletion. Some may require delete the restored PVC first before
+				// Snapshot deletion and some are opposite.
+				err = storageutils.DeleteSnapshotWithoutWaiting(ctx, dc, vs.GetNamespace(), vs.GetName())
+				framework.ExpectNoError(err)
+				framework.Logf("deleting restored pod %q/%q", restoredPod.Namespace, restoredPod.Name)
+				err = cs.CoreV1().Pods(restoredPod.Namespace).Delete(ctx, restoredPod.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+				framework.Logf("deleting restored PVC %q/%q", restoredPVC.Namespace, restoredPVC.Name)
+				err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Delete(ctx, restoredPVC.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+
+				deleteVolumeSnapshot(ctx, f, dc, sr, pattern, vscontent)
+
+			})
+
 		})
 	})
 }
