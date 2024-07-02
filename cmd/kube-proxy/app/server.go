@@ -1009,7 +1009,13 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	informerFactory.Start(wait.NeverStop)
 
 	nodeConfig := config.NewNodeConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
+	// TODO: remove once ConsistentReadFromCache and/or WatchList graduate to GA
+	// Informers may get stale data, specially in cases where the kube-proxy runs as a static pod
+	// or an independent binary, since it may run before the kubelet on the node updates the Node.
+	// The solution in the meantime is to process the Node events and crash if the NodeIPs or the
+	// the PodCIDRs (if local mode nodeCIDR is used) has changed since the first read.
 	// https://issues.k8s.io/111321
+	nodeConfig.RegisterEventHandler(proxy.NewNodePodIPsHandler(ctx, s.NodeIPs))
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
 	}

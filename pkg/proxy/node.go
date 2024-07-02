@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"net"
 	"reflect"
 	"sync"
 
@@ -25,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
@@ -89,6 +91,79 @@ func (n *NodePodCIDRHandler) OnNodeDelete(node *v1.Node) {
 
 // OnNodeSynced is a handler for Node syncs.
 func (n *NodePodCIDRHandler) OnNodeSynced() {}
+
+// NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
+// Implements the config.NodeHandler interface
+// https://issues.k8s.io/111321
+type NodeIPsHandler struct {
+	mu      sync.Mutex
+	nodeIPs []net.IP
+	logger  klog.Logger
+}
+
+func NewNodeIPsHandler(ctx context.Context, nodeIPs []net.IP) *NodeIPsHandler {
+	return &NodeIPsHandler{
+		nodeIPs: nodeIPs,
+		logger:  klog.FromContext(ctx),
+	}
+}
+
+var _ config.NodeHandler = &NodeIPsHandler{}
+
+// OnNodeAdd is a handler for Node creates.
+func (n *NodeIPsHandler) OnNodeAdd(node *v1.Node) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	nodeIPs, err := utilnode.GetNodeHostIPs(node)
+	if err != nil {
+		n.logger.Error(err, "Failed to retrieve node IPs")
+		return
+	}
+
+	// initialize podCIDRs
+	if len(n.nodeIPs) == 0 && len(nodeIPs) > 0 {
+		n.logger.Info("Setting current NodeIPs", "NodeIPs", nodeIPs)
+		n.nodeIPs = nodeIPs
+		return
+	}
+	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+		n.logger.Error(nil, "current NodeIPs are different than previous NodeIPs, restarting",
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+}
+
+// OnNodeUpdate is a handler for Node updates.
+func (n *NodeIPsHandler) OnNodeUpdate(_, node *v1.Node) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	nodeIPs, err := utilnode.GetNodeHostIPs(node)
+	if err != nil {
+		n.logger.Error(err, "Failed to retrieve node IPs")
+		return
+	}
+	// initialize podCIDRs
+	if len(n.nodeIPs) == 0 && len(nodeIPs) > 0 {
+		n.logger.Info("Setting current NodeIPs", "NodeIPs", nodeIPs)
+		n.nodeIPs = nodeIPs
+		return
+	}
+	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+		n.logger.Error(nil, "current NodeIPs are different than previous NodeIPs, restarting",
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+}
+
+// OnNodeDelete is a handler for Node deletes.
+func (n *NodeIPsHandler) OnNodeDelete(node *v1.Node) {
+	n.logger.Error(nil, "Current Node is being deleted", "node", klog.KObj(node))
+}
+
+// OnNodeSynced is a handler for Node syncs.
+func (n *NodeIPsHandler) OnNodeSynced() {}
 
 // NodeEligibleHandler handles the life cycle of the Node's eligibility, as
 // determined by the health server for directing load balancer traffic.
