@@ -208,6 +208,11 @@ func (p *pvcEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageS
 	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
 }
 
+// RequiresFullObject determines if quota requires full objects to calculate the resource usage.
+func (p *pvcEvaluator) RequiresFullObject() bool {
+	return true
+}
+
 // ensure we implement required interface
 var _ quota.Evaluator = &pvcEvaluator{}
 

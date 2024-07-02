@@ -216,14 +216,16 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, time.Duration(1))
+	informerFactory := informerfactory.NewInformerFactory(sharedInformers, metadataInformers)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(ctx, client, metadataClient, &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}, ignoredResources, informerFactory, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
-	go sharedInformers.Start(stop)
+	go informerFactory.Start(stop)
 	return garbageCollector{gc, stop}
 }
 
@@ -852,15 +854,15 @@ func TestGarbageCollectorSync(t *testing.T) {
 		response: map[string]FakeResponse{
 			"GET" + "/api/v1/pods": {
 				200,
-				[]byte("{}"),
+				[]byte(`{"apiVersion": "v1", "kind": "PodList"}`),
 			},
 			"GET" + "/apis/apps/v1/deployments": {
 				200,
-				[]byte("{}"),
+				[]byte(`{"apiVersion": "v1", "kind": "DeploymentList"}`),
 			},
 			"GET" + "/api/v1/secrets": {
 				404,
-				[]byte("{}"),
+				[]byte(`{"apiVersion": "v1", "kind": "SecretList"}`),
 			},
 		},
 	}
@@ -883,12 +885,13 @@ func TestGarbageCollectorSync(t *testing.T) {
 	}
 
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, time.Duration(1))
+	informerFactory := informerfactory.NewInformerFactory(sharedInformers, metadataInformers)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(tCtx, client, metadataClient, rm, map[schema.GroupResource]struct{}{}, informerFactory, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}

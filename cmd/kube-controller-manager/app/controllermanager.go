@@ -22,7 +22,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"math/rand"
 	"net/http"
 	"os"
@@ -33,6 +32,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -410,6 +410,7 @@ type ControllerDescriptor struct {
 	isDisabledByDefault       bool
 	isCloudProviderController bool
 	requiresSpecialHandling   bool
+	isGeneric                 bool
 }
 
 func (r *ControllerDescriptor) Name() string {
@@ -441,6 +442,11 @@ func (r *ControllerDescriptor) IsCloudProviderController() bool {
 // RequiresSpecialHandling should return true only in a special non-generic controllers like ServiceAccountTokenController
 func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
 	return r.requiresSpecialHandling
+}
+
+// IsGeneric returns true if the controller is a generic controller
+func (r *ControllerDescriptor) IsGeneric() bool {
+	return r.isGeneric
 }
 
 // KnownControllers returns all known controllers's name
@@ -671,6 +677,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
 	}
 
+	var remains []*ControllerDescriptor
 	// Each controller is passed a context where the logger has the name of
 	// the controller set through WithName. That name then becomes the prefix of
 	// of all log messages emitted by that controller.
@@ -685,6 +692,24 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 			continue
 		}
 
+		// Start generic controllers after other controllers to reuse typed informers or
+		// create new metadata informers for memory efficiency.
+		if controllerDesc.IsGeneric() {
+			remains = append(remains, controllerDesc)
+			continue
+		}
+
+		check, err := StartController(ctx, controllerCtx, controllerDesc, unsecuredMux)
+		if err != nil {
+			return err
+		}
+		if check != nil {
+			// HealthChecker should be present when controller has started
+			controllerChecks = append(controllerChecks, check)
+		}
+	}
+
+	for _, controllerDesc := range remains {
 		check, err := StartController(ctx, controllerCtx, controllerDesc, unsecuredMux)
 		if err != nil {
 			return err

@@ -164,6 +164,17 @@ func (f *genericInformer) Lister() {{.cacheGenericLister|raw}} {
 `
 
 var forResource = `
+// ExistingInformerForResource gives generic access to a shared informer of the matching type if it already exists.
+func (f *sharedInformerFactory) ExistingInformerForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, bool, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	informer, exists := f.gvrToInformer[resource]
+	if !exists {
+		return nil, false, nil
+	}
+	return &genericInformer{resource: resource.GroupResource(), informer: informer}, true, nil
+}
+
 // ForResource gives generic access to a shared informer of the matching type
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error) {

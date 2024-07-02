@@ -39,9 +39,12 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
@@ -109,14 +112,44 @@ type quotaController struct {
 	stop chan struct{}
 }
 
-func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister quota.ListerForResourceFunc, discoveryFunc NamespacedResourcesFunc) quotaController {
-	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+func newClientsAndServer(t *testing.T) (kubernetes.Interface, metadata.Interface, *httptest.Server) {
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/pods": {
+				200,
+				[]byte("{}"),
+			},
+			"GET" + "/api/v1/secrets": {
+				404,
+				[]byte("{}"),
+			},
+			"GET" + "/apis/apps/v1/deployments": {
+				200,
+				[]byte("{}"),
+			},
+		},
+	}
+
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	clientConfig.ContentConfig.NegotiatedSerializer = nil
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadataClient := metadata.NewForConfigOrDie(clientConfig)
+	return kubeClient, metadataClient, srv
+}
+
+func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, metadataClient metadata.Interface, lister quota.ListerForResourceFunc, discoveryFunc NamespacedResourcesFunc) quotaController {
+	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, controller.NoResyncPeriodFunc())
+	informerFactory := informerfactory.NewInformerFactory(sharedInformers, metadataInformers)
 	quotaConfiguration := install.NewQuotaConfigurationForControllers(lister)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	resourceQuotaControllerOptions := &ControllerOptions{
 		QuotaClient:               kubeClient.CoreV1(),
-		ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
+		ResourceQuotaInformer:     sharedInformers.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.NoResyncPeriodFunc,
 		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
@@ -778,12 +811,14 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	for testName, testCase := range testCases {
+		_, metadataClient, srv := newClientsAndServer(t)
+		defer srv.Close()
 		kubeClient := fake.NewSimpleClientset(&testCase.quota)
 		listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
 			testCase.gvr:      newGenericLister(testCase.gvr.GroupResource(), testCase.items),
 			testCase.errorGVR: newErrorLister(),
 		}
-		qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
+		qc := setupQuotaController(t, kubeClient, metadataClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 		defer close(qc.stop)
 
 		if err := qc.syncResourceQuota(context.TODO(), &testCase.quota); err != nil {
@@ -842,12 +877,14 @@ func TestSyncResourceQuota(t *testing.T) {
 
 func TestAddQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
+	_, metadataClient, srv := newClientsAndServer(t)
+	defer srv.Close()
 	gvr := v1.SchemeGroupVersion.WithResource("pods")
 	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
 		gvr: newGenericLister(gvr.GroupResource(), newTestPods()),
 	}
 
-	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
+	qc := setupQuotaController(t, kubeClient, metadataClient, mockListerForResourceFunc(listersForResourceConfig), mockDiscoveryFunc)
 	defer close(qc.stop)
 
 	testCases := []struct {
@@ -1050,30 +1087,8 @@ func TestDiscoverySync(t *testing.T) {
 		InterfaceUsedCount: 0,
 	}
 
-	testHandler := &fakeActionHandler{
-		response: map[string]FakeResponse{
-			"GET" + "/api/v1/pods": {
-				200,
-				[]byte("{}"),
-			},
-			"GET" + "/api/v1/secrets": {
-				404,
-				[]byte("{}"),
-			},
-			"GET" + "/apis/apps/v1/deployments": {
-				200,
-				[]byte("{}"),
-			},
-		},
-	}
-
-	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	kubeClient, metadataClient, srv := newClientsAndServer(t)
 	defer srv.Close()
-	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	pods := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	secrets := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
@@ -1083,7 +1098,7 @@ func TestDiscoverySync(t *testing.T) {
 		secrets:     newGenericLister(secrets.GroupResource(), []runtime.Object{}),
 		deployments: newGenericLister(deployments.GroupResource(), []runtime.Object{}),
 	}
-	qc := setupQuotaController(t, kubeClient, mockListerForResourceFunc(listersForResourceConfig), fakeDiscoveryClient.ServerPreferredNamespacedResources)
+	qc := setupQuotaController(t, kubeClient, metadataClient, mockListerForResourceFunc(listersForResourceConfig), fakeDiscoveryClient.ServerPreferredNamespacedResources)
 	defer close(qc.stop)
 
 	stopSync := make(chan struct{})
@@ -1107,7 +1122,7 @@ func TestDiscoverySync(t *testing.T) {
 	// Wait until the sync discovers the initial resources
 	time.Sleep(1 * time.Second)
 
-	err = expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
+	err := expectSyncNotBlocked(fakeDiscoveryClient, &qc.workerLock)
 	if err != nil {
 		t.Fatalf("Expected quotacontroller.Sync to be running but it is blocked: %v", err)
 	}

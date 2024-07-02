@@ -83,6 +83,14 @@ func (gv GroupVersion) ToAPIVersion() string {
 	}
 }
 
+func (gv GroupVersion) ToAPIGroup() string {
+	if len(gv.Group) > 0 && gv.Group.NonEmpty() != "core" {
+		return gv.Group.String()
+	} else {
+		return ""
+	}
+}
+
 func (gv GroupVersion) WithKind(kind Kind) GroupVersionKind {
 	return GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind}
 }

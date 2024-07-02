@@ -233,6 +233,11 @@ func (p *podEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageS
 	return generic.CalculateUsageStats(options, p.listFuncByNamespace, podMatchesScopeFunc, p.Usage)
 }
 
+// RequiresFullObject determines if quota requires full objects to calculate the resource usage.
+func (p *podEvaluator) RequiresFullObject() bool {
+	return true
+}
+
 // verifies we implement the required interface.
 var _ quota.Evaluator = &podEvaluator{}
 
