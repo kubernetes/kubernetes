@@ -19,12 +19,16 @@ package resourcelock
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"time"
+	"k8s.io/utils/clock"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	informerv1 "k8s.io/client-go/informers/coordination/v1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -145,6 +149,9 @@ type Interface interface {
 	// Get returns the LeaderElectionRecord
 	Get(ctx context.Context) (*LeaderElectionRecord, []byte, error)
 
+	// GetFromCache returns the LeaderElectionRecord from local cache
+	GetFromCache(ctx context.Context) (*LeaderElectionRecord, []byte, error)
+
 	// Create attempts to create a LeaderElectionRecord
 	Create(ctx context.Context, ler LeaderElectionRecord) error
 
@@ -160,6 +167,10 @@ type Interface interface {
 	// Describe is used to convert details on current resource lock
 	// into a string
 	Describe() string
+
+	// StartSync starts the synchronization of local cache, which is
+	// running in background until the stop channel gets closed.
+	StartSync(stopCh <-chan struct{})
 }
 
 // Manufacture will create a lock of a given type according to the input parameters
@@ -171,6 +182,34 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 		},
 		Client:     coordinationClient,
 		LockConfig: rlc,
+		clock:      clock.RealClock{},
+	}
+	switch lockType {
+	case endpointsResourceLock:
+		return nil, fmt.Errorf("endpoints lock is removed, migrate to %s (using version v0.27.x)", endpointsLeasesResourceLock)
+	case configMapsResourceLock:
+		return nil, fmt.Errorf("configmaps lock is removed, migrate to %s (using version v0.27.x)", configMapsLeasesResourceLock)
+	case LeasesResourceLock:
+		return leaseLock, nil
+	case endpointsLeasesResourceLock:
+		return nil, fmt.Errorf("endpointsleases lock is removed, migrate to %s", LeasesResourceLock)
+	case configMapsLeasesResourceLock:
+		return nil, fmt.Errorf("configmapsleases lock is removed, migrated to %s", LeasesResourceLock)
+	default:
+		return nil, fmt.Errorf("Invalid lock-type %s", lockType)
+	}
+}
+
+func newWithLeaseInformer(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, leaseInformer informerv1.LeaseInformer, rlc ResourceLockConfig) (Interface, error) {
+	leaseLock := &LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Client:        coordinationClient,
+		LockConfig:    rlc,
+		clock:         clock.RealClock{},
+		leaseInformer: leaseInformer,
 	}
 	switch lockType {
 	case endpointsResourceLock:
@@ -201,5 +240,18 @@ func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLock
 	}
 	config.Timeout = timeout
 	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
-	return New(lockType, ns, name, leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), rlc)
+	leaseInformer := informers.NewSharedInformerFactoryWithOptions(leaderElectionClient, 0,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", ns, name)
+		})).Coordination().V1().Leases()
+	return newWithLeaseInformer(lockType, ns, name, leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), leaseInformer, rlc)
+}
+
+// NewFromKubeclient will create a lock of a given type according to the input parameters.
+func NewFromKubeclient(lockType string, ns string, name string, rlc ResourceLockConfig, kubeclient *clientset.Clientset) (Interface, error) {
+	leaseInformer := informers.NewSharedInformerFactoryWithOptions(kubeclient, 0,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", ns, name)
+		})).Coordination().V1().Leases()
+	return newWithLeaseInformer(lockType, ns, name, kubeclient.CoreV1(), kubeclient.CoordinationV1(), leaseInformer, rlc)
 }

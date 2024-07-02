@@ -192,6 +192,10 @@ type LeaderElector struct {
 	// clock is wrapper around time to allow for less flaky testing
 	clock clock.Clock
 
+	// clockSkew is the time difference between local and last observed leader
+	clockSkew         time.Duration
+	clockSkewLeaderID string
+
 	// used to lock the observedRecord
 	observedRecordLock sync.Mutex
 
@@ -204,12 +208,13 @@ type LeaderElector struct {
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer runtime.HandleCrash()
 	defer le.config.Callbacks.OnStoppedLeading()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	le.config.Lock.StartSync(ctx.Done())
 
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	go le.config.Callbacks.OnStartedLeading(ctx)
 	le.renew(ctx)
 }
@@ -343,7 +348,35 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 	}
 
 	// 2. obtain or create the ElectionRecord
-	oldLeaderElectionRecord, oldLeaderElectionRawRecord, err := le.config.Lock.Get(ctx)
+	var (
+		oldLeaderElectionRecord    *rl.LeaderElectionRecord
+		oldLeaderElectionRawRecord []byte
+		err                        error
+	)
+	// Losing the leader lock is costly so let's not risk it using cache.
+	if le.IsLeader() {
+		oldLeaderElectionRecord, oldLeaderElectionRawRecord, err = le.config.Lock.Get(ctx)
+	} else {
+		oldLeaderElectionRecord, oldLeaderElectionRawRecord, err = le.config.Lock.GetFromCache(ctx)
+		// Fallback to retriving the lock from APIServer when local cache is not available or is stale.
+		if err != nil {
+			klog.Errorf("error retrieving resource lock %v from cache: %v", le.config.Lock.Describe(), err)
+			oldLeaderElectionRecord, oldLeaderElectionRawRecord, err = le.config.Lock.Get(ctx)
+			le.recordClockSkew(oldLeaderElectionRecord)
+		} else if !le.isCachedLeaseValid(now.Time, oldLeaderElectionRecord) {
+			// Use renew timestamp in locally cached leader election record to determine possibility of
+			// staleness in local cache because:
+			//   1. Followers only try to acquire the lock when observedTime + LeaseDuration < now
+			//   2. The clock skew between local and the leader node should be roughly stable
+			//   3. ObservedTime + clock skew is always after remote renewTime
+			//   4. Locally cached renewTime is always before or eaual to the remote renewTime
+			//      i.e. observedTime + clock skew > remote renewTime >= locally cached renewTime).
+			//   5. If locally cached renewTime - clock skew + LeaseDuration > now it means observedTime + LeaseDuration > now
+			// TODO(linxiulei): Add periodic clock skew recording to handle inconstant clock skew rate?
+			oldLeaderElectionRecord, oldLeaderElectionRawRecord, err = le.config.Lock.Get(ctx)
+			le.recordClockSkew(oldLeaderElectionRecord)
+		}
+	}
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
@@ -418,6 +451,19 @@ func (le *LeaderElector) Check(maxTolerableExpiredLease time.Duration) error {
 
 func (le *LeaderElector) isLeaseValid(now time.Time) bool {
 	return le.observedTime.Add(time.Second * time.Duration(le.getObservedRecord().LeaseDurationSeconds)).After(now)
+}
+
+func (le *LeaderElector) isCachedLeaseValid(now time.Time, record *rl.LeaderElectionRecord) bool {
+	// ClockSkew is not valid if leader has changed
+	if le.clockSkewLeaderID != record.HolderIdentity {
+		return false
+	}
+	return record.RenewTime.Add(le.clockSkew).Add(time.Second * time.Duration(record.LeaseDurationSeconds)).After(now)
+}
+
+func (le *LeaderElector) recordClockSkew(record *rl.LeaderElectionRecord) {
+	le.clockSkewLeaderID = record.HolderIdentity
+	le.clockSkew = le.clock.Now().Sub(record.RenewTime.Time)
 }
 
 // setObservedRecord will set a new observedRecord and update observedTime to the current time.
