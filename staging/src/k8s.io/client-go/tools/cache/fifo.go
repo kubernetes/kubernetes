@@ -136,7 +136,7 @@ type FIFO struct {
 }
 
 var (
-	_ = Queue(&FIFO{}) // FIFO is a Queue
+	_ Queue = (*FIFO)(nil) // FIFO is a Queue
 )
 
 // Close the queue.
