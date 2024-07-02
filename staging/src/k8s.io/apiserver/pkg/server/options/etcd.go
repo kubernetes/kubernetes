@@ -213,6 +213,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StorageConfig.ReadycheckTimeout, "etcd-readycheck-timeout", s.StorageConfig.ReadycheckTimeout,
 		"The timeout to use when checking etcd readiness")
 
+	fs.BoolVar(&s.StorageConfig.Transport.EnableGrpcHealthcheck, "etcd-enable-grpc-healthcheck", s.StorageConfig.Transport.EnableGrpcHealthcheck,
+		"Enable grpc healthcheck for etcd client. See https://grpc.io/docs/guides/health-checking/#enabling-client-health-checking")
+
 	fs.Int64Var(&s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds, "lease-reuse-duration-seconds", s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds,
 		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
 }
