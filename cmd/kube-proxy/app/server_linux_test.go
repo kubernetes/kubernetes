@@ -558,7 +558,10 @@ detectLocalMode: "BridgeInterface"`)
 			}()
 
 			if tc.append {
-				file.WriteString("append fake content")
+				_, err = file.WriteString("append fake content")
+				if err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			select {

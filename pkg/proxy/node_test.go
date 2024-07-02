@@ -17,12 +17,14 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"strconv"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 func TestNodePodCIDRHandlerAdd(t *testing.T) {
@@ -142,6 +144,145 @@ func TestNodePodCIDRHandlerUpdate(t *testing.T) {
 			}()
 
 			n.OnNodeUpdate(oldNode, node)
+		})
+	}
+}
+
+func TestNodeIPsHandlerUpdate(t *testing.T) {
+	oldKlogOsExit := klog.OsExit
+	defer func() {
+		klog.OsExit = oldKlogOsExit
+	}()
+	klog.OsExit = customExit
+
+	tests := []struct {
+		name        string
+		oldNodeIPs  []net.IP
+		newNodeIPs  []v1.NodeAddress
+		expectPanic bool
+	}{
+		{
+			name: "both empty",
+		},
+		{
+			name: "initialize",
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "192.168.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:1:2:3::1"},
+			},
+		},
+		{
+			name:       "same node",
+			oldNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "192.168.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:1:2:3::1"},
+			},
+		},
+		{
+			name:       "different nodes",
+			oldNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:3:2:1::2"},
+			},
+			expectPanic: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &NodeIPsHandler{
+				nodeIPs: tt.oldNodeIPs,
+			}
+			oldNode := &v1.Node{}
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-node",
+					ResourceVersion: "1",
+				},
+				Status: v1.NodeStatus{
+					Addresses: tt.newNodeIPs,
+				},
+			}
+			defer func() {
+				r := recover()
+				if r == nil && tt.expectPanic {
+					t.Errorf("The code did not panic")
+				} else if r != nil && !tt.expectPanic {
+					t.Errorf("The code did panic")
+				}
+			}()
+
+			n.OnNodeUpdate(oldNode, node)
+		})
+	}
+}
+
+func TestNodeIPsHandlerAdd(t *testing.T) {
+	oldKlogOsExit := klog.OsExit
+	defer func() {
+		klog.OsExit = oldKlogOsExit
+	}()
+	klog.OsExit = customExit
+
+	tests := []struct {
+		name        string
+		oldNodeIPs  []net.IP
+		newNodeIPs  []v1.NodeAddress
+		expectPanic bool
+	}{
+		{
+			name: "both empty",
+		},
+		{
+			name: "initialize",
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "192.168.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:1:2:3::1"},
+			},
+		},
+		{
+			name:       "already initialized and same node",
+			oldNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "192.168.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:1:2:3::1"},
+			},
+		},
+		{
+			name:       "already initialized and different node",
+			oldNodeIPs: []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			newNodeIPs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:3:2:1::2"},
+			},
+			expectPanic: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := &NodeIPsHandler{
+				nodeIPs: tt.oldNodeIPs,
+			}
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-node",
+					ResourceVersion: "1",
+				},
+				Status: v1.NodeStatus{
+					Addresses: tt.newNodeIPs,
+				},
+			}
+			defer func() {
+				r := recover()
+				if r == nil && tt.expectPanic {
+					t.Errorf("The code did not panic")
+				} else if r != nil && !tt.expectPanic {
+					t.Errorf("The code did panic")
+				}
+			}()
+
+			n.OnNodeAdd(node)
 		})
 	}
 }
