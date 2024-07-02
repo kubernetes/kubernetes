@@ -14614,9 +14614,9 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		}}),
-		"may not be removed",
+		"",
 	}, {
-		"Replace an Ephemeral Container",
+		"Replace an Ephemeral Container, old will be removed, new will be added",
 		makePod([]core.EphemeralContainer{{
 			EphemeralContainerCommon: core.EphemeralContainerCommon{
 				Name:                     "firstone",
@@ -14633,7 +14633,7 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 				TerminationMessagePolicy: "File",
 			},
 		}}),
-		"may not be removed",
+		"",
 	}, {
 		"Change an Ephemeral Containers",
 		makePod([]core.EphemeralContainer{{
