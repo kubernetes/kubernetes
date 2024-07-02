@@ -1105,6 +1105,11 @@ func getNodeIPs(ctx context.Context, nodeLister corelisters.NodeLister, name str
 			logger.Error(err, "Failed to retrieve node info")
 			return false, nil
 		}
+		// don't consider the node if is going to be deleted and keep waiting
+		if !node.DeletionTimestamp.IsZero() {
+			logger.Info("Node is being deleted", "node", node.Name)
+			return false, nil
+		}
 		nodeIPs, err = utilnode.GetNodeHostIPs(node)
 		if err != nil {
 			logger.Error(err, "Failed to retrieve node IPs")
