@@ -19,6 +19,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -30,7 +31,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -215,7 +216,7 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		return
 	}
 	if h.UpgradeRequired {
-		h.Responder.Error(w, req, errors.NewBadRequest("Upgrade request required"))
+		h.Responder.Error(w, req, apierrors.NewBadRequest("Upgrade request required"))
 		return
 	}
 
@@ -393,7 +394,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		requestHijackedConn.SetWriteDeadline(deadline)
 		// write the response to the client
 		err := backendHTTPResponse.Write(requestHijackedConn)
-		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if err != nil && !errors.Is(err, os.ErrClosed) {
 			klog.Errorf("Error proxying data from backend to client: %v", err)
 		}
 		// Indicate we handled the request
@@ -423,7 +424,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 			writer = backendConn
 		}
 		_, err := io.Copy(writer, requestHijackedConn)
-		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if err != nil && !errors.Is(err, net.ErrClosed) {
 			klog.Errorf("Error proxying data from client to backend: %v", err)
 		}
 		close(writerComplete)
@@ -437,7 +438,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 			reader = backendConn
 		}
 		_, err := io.Copy(requestHijackedConn, reader)
-		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+		if err != nil && !errors.Is(err, net.ErrClosed) {
 			klog.Errorf("Error proxying data from backend to client: %v", err)
 		}
 		close(readerComplete)
@@ -447,7 +448,20 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	// clean up the other half of the connection.
 	select {
 	case <-writerComplete:
+		// Offer a chance to terminate gracefully. 0.5s is the default timeout
+		// used in socat that performs a similar operation:
+		// https://linux.die.net/man/1/socat
+		select {
+		case <-readerComplete:
+		case <-time.After(500 * time.Millisecond):
+			klog.Error("Connection didn't close gracefully proxying data from client to backend")
+		}
 	case <-readerComplete:
+		select {
+		case <-writerComplete:
+		case <-time.After(500 * time.Millisecond):
+			klog.Error("Connection didn't close gracefully proxying data from backend to client")
+		}
 	}
 	klog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
 
