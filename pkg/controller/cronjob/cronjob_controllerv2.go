@@ -235,9 +235,10 @@ func (jm *ControllerV2) sync(ctx context.Context, cronJobKey string) (*time.Dura
 func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batchv1.CronJob {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	if controllerRef.Kind != controllerKind.Kind && controllerRef.Kind != "CronJob" {
 		return nil
 	}
+
 	cronJob, err := jm.cronJobLister.CronJobs(namespace).Get(controllerRef.Name)
 	if err != nil {
 		return nil
@@ -262,7 +263,9 @@ func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batc
 
 	for _, job := range jobList {
 		// If it has a ControllerRef, that's all that matters.
-		if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && controllerRef.Name == cronJob.Name {
+		controllerRef := metav1.GetControllerOf(job)
+		// call resolveControllerRef to make sure the controllerRef is pointing to the right controller
+		if controllerRef != nil && jm.resolveControllerRef(job.Namespace, controllerRef) != nil {
 			// this job is needs to be reconciled
 			jobsToBeReconciled = append(jobsToBeReconciled, job)
 		}
