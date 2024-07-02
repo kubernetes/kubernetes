@@ -53,10 +53,14 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Shortened Grace Period", f
 			podClient.CreateSync(ctx, getGracePeriodTestPod(podName, testRcNamespace, gracePeriod))
 			err := podClient.Delete(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 			framework.ExpectNoError(err, "failed to delete pod")
-			time.Sleep(10 * time.Second)
-			err = podClient.Delete(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodShort})
+			time.Sleep(5 * time.Second)
+
+		})
+		ginkgo.It("shorter grace period of a second command overrides the longer grace period of a first command", func() {
+			time.Sleep(5 * time.Second)
+			err := podClient.Delete(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriodShort})
 			framework.ExpectNoError(err, "failed to delete pod")
-			time.Sleep(10 * time.Second)
+			time.Sleep(5 * time.Second)
 			// Get pod logs.
 			logs, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream(ctx)
 			framework.ExpectNoError(err, "failed to get pod logs")
