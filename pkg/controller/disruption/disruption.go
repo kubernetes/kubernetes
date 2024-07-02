@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	"k8s.io/client-go/discovery"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -73,6 +74,9 @@ const (
 	// Once the timeout is reached, this controller attempts to set the status
 	// of the condition to False.
 	stalePodDisruptionTimeout = 2 * time.Minute
+
+	// field manager used to disable the pod failure condition
+	fieldManager = "DisruptionController"
 )
 
 type updater func(context.Context, *policy.PodDisruptionBudget) error
@@ -785,15 +789,16 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 		return nil
 	}
 
-	newPod := pod.DeepCopy()
-	updated := apipod.UpdatePodCondition(&newPod.Status, &v1.PodCondition{
-		Type:   v1.DisruptionTarget,
-		Status: v1.ConditionFalse,
-	})
-	if !updated {
-		return nil
-	}
-	if _, err := dc.kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, newPod, metav1.UpdateOptions{}); err != nil {
+	podApply := corev1apply.Pod(pod.Name, pod.Namespace).
+		WithStatus(corev1apply.PodStatus()).
+		WithResourceVersion(pod.ResourceVersion)
+	podApply.Status.WithConditions(corev1apply.PodCondition().
+		WithType(v1.DisruptionTarget).
+		WithStatus(v1.ConditionFalse).
+		WithLastTransitionTime(metav1.Now()),
+	)
+
+	if _, err := dc.kubeClient.CoreV1().Pods(pod.Namespace).ApplyStatus(ctx, podApply, metav1.ApplyOptions{FieldManager: fieldManager, Force: true}); err != nil {
 		return err
 	}
 	logger.V(2).Info("Reset stale DisruptionTarget condition to False", "pod", klog.KObj(pod))
