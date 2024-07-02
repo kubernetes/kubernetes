@@ -25,18 +25,16 @@ import (
 	"strings"
 	"time"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
 	v1 "k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -50,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -181,7 +180,7 @@ func NewVolumeManager(
 	mounter mount.Interface,
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	blockVolumePathHandler volumepathhandler.BlockVolumePathHandler) VolumeManager {
 
 	seLinuxTranslator := util.NewSELinuxLabelTranslator()

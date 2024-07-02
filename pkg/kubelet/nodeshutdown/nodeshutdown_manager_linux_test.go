@@ -34,7 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
@@ -335,7 +335,7 @@ func TestManager(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
 			proberManager := probetest.FakeManager{}
-			fakeRecorder := &record.FakeRecorder{}
+			fakeRecorder := &events.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager, _ := NewManager(&Config{
 				Logger:                          logger,
@@ -439,7 +439,7 @@ func TestFeatureEnabled(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
 
 			proberManager := probetest.FakeManager{}
-			fakeRecorder := &record.FakeRecorder{}
+			fakeRecorder := &events.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(&Config{
@@ -496,7 +496,7 @@ func TestRestart(t *testing.T) {
 	}
 
 	proberManager := probetest.FakeManager{}
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(&Config{
 		Logger:                          logger,
@@ -727,14 +727,14 @@ func Test_groupByPriority(t *testing.T) {
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
 		probeManager   = probetest.FakeManager{}
-		fakeRecorder   = &record.FakeRecorder{}
+		fakeRecorder   = &events.FakeRecorder{}
 		syncNodeStatus = func() {}
 		nodeRef        = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock      = testingclock.NewFakeClock(time.Now())
 	)
 
 	type fields struct {
-		recorder                         record.EventRecorder
+		recorder                         events.EventRecorder
 		nodeRef                          *v1.ObjectReference
 		probeManager                     prober.Manager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
