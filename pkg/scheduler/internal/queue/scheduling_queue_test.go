@@ -1405,7 +1405,7 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
 				WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
-			got, _ := q.addToActiveQ(logger, q.newQueuedPodInfo(tt.pod))
+			got, _ := q.moveToActiveQ(logger, q.newQueuedPodInfo(tt.pod), PodAdd)
 			if got != tt.wantSuccess {
 				t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
 			}
