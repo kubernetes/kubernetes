@@ -281,8 +281,7 @@ func TestLabelFunc(t *testing.T) {
 		if test.expectErr != "" {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
-			}
-			if err.Error() != test.expectErr {
+			} else if err.Error() != test.expectErr {
 				t.Errorf("error expected: %v, got: %v", test.expectErr, err.Error())
 			}
 			continue
