@@ -44,6 +44,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
 			continue
 		}
+		defer func() {
+			if err = writer.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			}
+		}()
+
 		err = streamYaml(writer, indent, rootNode)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
