@@ -1,14 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
-# same list as in https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dapprovers
 approvers:
-  - Random-Liu
-  - dchen1107
-  - derekwaynecarr
-  - yujuhong
-  - sjenning
-  - mrunalp
-  - klueska
+  - sig-node-approvers # https://github.com/kubernetes/kubernetes/blob/master/OWNERS_ALIASES#LC220:~:text=sig%2Dnode%2Dapprovers
 emeritus_approvers:
   - dashpole
   - vishh
