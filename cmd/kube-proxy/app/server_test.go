@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -500,7 +500,7 @@ kind: KubeProxyConfiguration
 			if len(tc.config) > 0 {
 				tmp := t.TempDir()
 				configFile := path.Join(tmp, "kube-proxy.conf")
-				require.NoError(t, ioutil.WriteFile(configFile, []byte(tc.config), 0666))
+				require.NoError(t, os.WriteFile(configFile, []byte(tc.config), 0666))
 				flags = append(flags, "--config", configFile)
 			}
 			require.NoError(t, fs.Parse(flags))
