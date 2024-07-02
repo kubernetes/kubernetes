@@ -104,6 +104,9 @@ type manager struct {
 	// livenessManager manages the results of liveness probes
 	livenessManager results.Manager
 
+	// recorder records events associated with the probe
+	recorder record.EventRecorder
+
 	// startupManager manages the results of startup probes
 	startupManager results.Manager
 
@@ -130,6 +133,7 @@ func NewManager(
 		livenessManager:  livenessManager,
 		startupManager:   startupManager,
 		workers:          make(map[probeKey]*worker),
+		recorder:         recorder,
 		start:            clock.RealClock{}.Now(),
 	}
 }
@@ -193,7 +197,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, startup, pod, c)
+			w := newWorker(m, startup, pod, c, m.recorder)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -205,7 +209,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, readiness, pod, c)
+			w := newWorker(m, readiness, pod, c, m.recorder)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -217,7 +221,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, liveness, pod, c)
+			w := newWorker(m, liveness, pod, c, m.recorder)
 			m.workers[key] = w
 			go w.run()
 		}
