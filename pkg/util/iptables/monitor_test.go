@@ -294,17 +294,18 @@ func TestIPTablesMonitor(t *testing.T) {
 }
 
 func waitForChains(mfe *monitorFakeExec, canary Chain, tables []Table) error {
-	return utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
-		mfe.Lock()
-		defer mfe.Unlock()
+	return utilwait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			mfe.Lock()
+			defer mfe.Unlock()
 
-		for _, table := range tables {
-			if !mfe.tables[string(table)].Has(string(canary)) {
-				return false, nil
+			for _, table := range tables {
+				if !mfe.tables[string(table)].Has(string(canary)) {
+					return false, nil
+				}
 			}
-		}
-		return true, nil
-	})
+			return true, nil
+		})
 }
 
 func ensureNoChains(mfe *monitorFakeExec) bool {
@@ -317,9 +318,10 @@ func ensureNoChains(mfe *monitorFakeExec) bool {
 
 func waitForReloads(reloads *uint32, expected uint32) error {
 	if atomic.LoadUint32(reloads) < expected {
-		utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
-			return atomic.LoadUint32(reloads) >= expected, nil
-		})
+		utilwait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, time.Second, true,
+			func(ctx context.Context) (bool, error) {
+				return atomic.LoadUint32(reloads) >= expected, nil
+			})
 	}
 	got := atomic.LoadUint32(reloads)
 	if got != expected {
@@ -329,9 +331,10 @@ func waitForReloads(reloads *uint32, expected uint32) error {
 }
 
 func waitForNoReload(reloads *uint32, expected uint32) error {
-	utilwait.PollImmediate(50*time.Millisecond, 250*time.Millisecond, func() (bool, error) {
-		return atomic.LoadUint32(reloads) > expected, nil
-	})
+	utilwait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 250*time.Millisecond, true,
+		func(ctx context.Context) (bool, error) {
+			return atomic.LoadUint32(reloads) > expected, nil
+		})
 
 	got := atomic.LoadUint32(reloads)
 	if got != expected {
@@ -341,8 +344,9 @@ func waitForNoReload(reloads *uint32, expected uint32) error {
 }
 
 func waitForBlocked(mfe *monitorFakeExec) error {
-	return utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
-		blocked := mfe.getWasBlocked()
-		return blocked, nil
-	})
+	return utilwait.PollUntilContextTimeout(100*time.Millisecond, time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			blocked := mfe.getWasBlocked()
+			return blocked, nil
+		})
 }
