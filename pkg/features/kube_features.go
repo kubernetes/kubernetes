@@ -52,6 +52,11 @@ const (
 	// services of types other than LoadBalancer.
 	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
 
+	// owner: @HirazawaUi
+	// Deprecated: v1.31
+	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
+	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
+
 	// owner: @bswartz
 	// alpha: v1.18
 	// beta: v1.24
@@ -979,6 +984,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
 
 	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
+
+	AllowOverwriteTerminationGracePeriodSeconds: {Default: false, PreRelease: featuregate.Deprecated}, // deprecated in 1.31, remove in 1.33
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
