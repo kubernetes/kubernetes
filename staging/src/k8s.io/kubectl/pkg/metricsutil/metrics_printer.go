@@ -32,10 +32,11 @@ var (
 		v1.ResourceCPU,
 		v1.ResourceMemory,
 	}
-	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
-	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
-	NamespaceColumn = "NAMESPACE"
-	PodColumn       = "POD"
+	NodeColumns      = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
+	PodColumns       = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
+	ContainerColumns = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
+	NamespaceColumn  = "NAMESPACE"
+	PodColumn        = "POD"
 )
 
 type ResourceMetricsInfo struct {
@@ -82,14 +83,19 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, podMap map[string]v1.Pod, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
-	columnWidth := len(PodColumns)
+	columns := PodColumns
+	if printContainers {
+		columns = ContainerColumns
+	}
+
+	columnWidth := len(columns)
 	if !noHeaders {
 		if withNamespace {
 			printValue(w, NamespaceColumn)
@@ -99,7 +105,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 			printValue(w, PodColumn)
 			columnWidth++
 		}
-		printColumnNames(w, PodColumns)
+		printColumnNames(w, columns)
 	}
 
 	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy))
@@ -107,7 +113,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	for _, m := range metrics {
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printSinglePodContainerMetrics(w, &m, withNamespace)
+			printSinglePodContainerMetrics(w, &m, podMap[m.Name], withNamespace)
 		} else {
 			printSinglePodMetrics(w, &m, withNamespace)
 		}
@@ -119,7 +125,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		for _, m := range metrics {
 			adder.AddPodMetrics(&m)
 		}
-		printPodResourcesSum(w, adder.total, columnWidth)
+		printPodResourcesSum(w, adder.total, columnWidth, printContainers)
 	}
 
 	return nil
@@ -144,8 +150,8 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespac
 	})
 }
 
-func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
-	for _, c := range m.Containers {
+func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, p v1.Pod, withNamespace bool) {
+	for i, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
 		}
@@ -153,7 +159,7 @@ func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, wit
 		printMetricsLine(out, &ResourceMetricsInfo{
 			Name:      c.Name,
 			Metrics:   c.Usage,
-			Available: v1.ResourceList{},
+			Available: p.Spec.Containers[i].Resources.Limits,
 		})
 	}
 }
@@ -217,20 +223,33 @@ func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quant
 	}
 }
 
-func printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int) {
-	for i := 0; i < columnWidth-2; i++ {
+func printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int, printContainers bool) {
+	columns := PodColumns
+	if printContainers {
+		columns = ContainerColumns
+	}
+
+	for i := 0; i < columnWidth-len(columns)+1; i++ {
 		printValue(out, "")
 	}
-	printValue(out, "________")
-	printValue(out, "________")
+
+	for i := 0; i < len(columns)-1; i++ {
+		printValue(out, "________")
+	}
+
 	fmt.Fprintf(out, "\n")
-	for i := 0; i < columnWidth-3; i++ {
+	for i := 0; i < columnWidth-len(columns); i++ {
 		printValue(out, "")
 	}
+
+	Available := v1.ResourceList{}
+	if printContainers {
+		Available = total
+	}
+
 	printMetricsLine(out, &ResourceMetricsInfo{
 		Name:      "",
 		Metrics:   total,
-		Available: v1.ResourceList{},
+		Available: Available,
 	})
-
 }
