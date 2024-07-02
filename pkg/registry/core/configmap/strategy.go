@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/ptr"
 )
 
 // strategy implements behavior for ConfigMap objects
@@ -56,6 +58,7 @@ func (strategy) NamespaceScoped() bool {
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	configMap := obj.(*api.ConfigMap)
 	dropDisabledFields(configMap, nil)
+	configMap.Generation = 1
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -79,6 +82,11 @@ func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Obj
 	oldConfigMap := oldObj.(*api.ConfigMap)
 	newConfigMap := newObj.(*api.ConfigMap)
 	dropDisabledFields(newConfigMap, oldConfigMap)
+	if !apiequality.Semantic.DeepEqual(oldConfigMap.Data, newConfigMap.Data) ||
+		!apiequality.Semantic.DeepEqual(oldConfigMap.BinaryData, newConfigMap.BinaryData) ||
+		ptr.Deref(oldConfigMap.Immutable, false) != ptr.Deref(newConfigMap.Immutable, false) {
+		newConfigMap.Generation = oldConfigMap.Generation + 1
+	}
 }
 
 func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Object) field.ErrorList {

@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/ptr"
 )
 
 // strategy implements behavior for Secret objects
@@ -55,6 +57,7 @@ func (strategy) NamespaceScoped() bool {
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	secret := obj.(*api.Secret)
 	dropDisabledFields(secret, nil)
+	secret.Generation = 1
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -83,6 +86,12 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	}
 
 	dropDisabledFields(newSecret, oldSecret)
+
+	if !apiequality.Semantic.DeepEqual(oldSecret.Data, newSecret.Data) ||
+		oldSecret.Type != newSecret.Type ||
+		ptr.Deref(oldSecret.Immutable, false) != ptr.Deref(newSecret.Immutable, false) {
+		newSecret.Generation = oldSecret.Generation + 1
+	}
 }
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
