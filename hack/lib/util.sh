@@ -685,6 +685,27 @@ function kube::util::ensure-docker-buildx {
   fi
 }
 
+# kube::util::ensure-buildkit-version
+# Check if the current docker buildx builder's buildkit version is greater than the given version
+#
+function kube::util::ensure-buildkit-version {
+  min_version="${1:-}"
+
+  # The command doesn't have any other output options, unfortunately.
+  buildkit_version="$(docker buildx inspect | grep "Buildkit" | awk '{print $2}')"
+
+  # sort -V (--version-sort): natural sort of (version) numbers within text
+  # The sorted versions are ascending. If the buildkit version is greater than the min version,
+  # it will be second of the lines.
+  version="$(printf "${min_version}\n${buildkit_version}" | sort -V | tail -n 1)"
+  if "${version}" = "${buildkit_version}"; then
+    return 0
+  else
+    echo "ERROR: This script requires docker buildx builder buildkit minimum version of ${min_version}, but got version ${buildkit_version}"
+    exit 1
+  fi
+}
+
 # kube::util::ensure-bash-version
 # Check if we are using a supported bash version
 #

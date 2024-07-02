@@ -29,6 +29,7 @@ readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
+KUBE_BUILD_WINDOWS=${KUBE_BUILD_WINDOWS:-n}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
 # ---------------------------------------------------------------------------
@@ -146,7 +147,7 @@ function kube::release::package_node_tarballs() {
       "${release_stage}/node/bin/"
 
     # TODO: Docker images here
-    # kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+    # kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}" "${os}"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -174,14 +175,20 @@ function kube::release::package_node_tarballs() {
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
   kube::util::ensure-docker-buildx
+  docker buildx create --name img-builder --use || true
+  docker buildx inspect --bootstrap
+  kube::util::trap_add 'docker buildx rm' EXIT
+  kube::util::ensure-buildkit-version "v0.8.0"
 
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag
+    local os
     local arch
     platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    os=$(dirname "${platform}")
     arch=$(basename "${platform}")
     kube::log::status "Building images: $platform_tag"
 
@@ -192,11 +199,16 @@ function kube::release::build_server_images() {
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_SERVER_IMAGE_BINARIES array.
-    cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/server/bin/"
+    # KUBE_SERVER_IMAGE_BINARIES / KUBE_SERVER_WINDOWS_IMAGE_BINARIES array.
+    if [[ "${os}" = "windows" ]]; then
+      cp "${KUBE_SERVER_WINDOWS_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/server/bin/"
+    else
+      cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/server/bin/"
+    fi
 
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}" "${os}"
   done
 }
 
@@ -285,16 +297,19 @@ function kube::release::build_conformance_image() {
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
+#  $3 - os, the OS for which we are building docker images.
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
     local binary_dir
+    local os
     local arch
     local binaries
     local images_dir
     binary_dir="$1"
     arch="$2"
-    binaries=$(kube::build::get_docker_wrapped_binaries)
+    os="${3:-linux}"
+    binaries=$(kube::build::get_docker_wrapped_binaries "${os}")
     images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
@@ -320,51 +335,65 @@ function kube::release::create_docker_images_for_server() {
 
     for wrappable in $binaries; do
 
-      local binary_name=${wrappable%%,*}
+      # The full binary name might have a file extension (.exe).
+      local full_binary_name=${wrappable%%,*}
+      local binary_name=${full_binary_name%%.*}
       local base_image=${wrappable##*,}
-      local binary_file_path="${binary_dir}/${binary_name}"
+      local binary_file_path="${binary_dir}/${full_binary_name}"
+      local tar_path="${binary_dir}/${full_binary_name}.tar"
       local docker_build_path="${binary_file_path}.dockerbuild"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       local docker_file_path="${KUBE_ROOT}/build/server-image/Dockerfile"
       # If this binary has its own Dockerfile use that else use the generic Dockerfile.
-      if [[ -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile" ]]; then
+      if [[ "${os}" = "windows" && -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile_windows" ]]; then
+          docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile_windows"
+      elif [[ -f "${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile" ]]; then
           docker_file_path="${KUBE_ROOT}/build/server-image/${binary_name}/Dockerfile"
       fi
 
-      kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
+      kube::log::status "Starting docker build for image: ${binary_name}-${os}-${arch}"
       (
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
-        ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
+        ln "${binary_file_path}" "${docker_build_path}/${full_binary_name}"
+
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
+        local additional_tag=()
+        local release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+
+	# append the OS name only for Windows images into the image name.
+        if [[ "${os}" = "windows" ]]; then
+          docker_image_tag="${docker_registry}/${binary_name}-${os}-${arch}:${docker_tag}"
+          release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${os}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+	fi
+
+        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
+          kube::log::status "Adding additional tag ${release_docker_image_tag} for docker image ${docker_image_tag}"
+          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+          additional_tag=("-t" "${release_docker_image_tag}")
+        fi
 
         local build_log="${docker_build_path}/build.log"
         if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
           -f "${docker_file_path}" \
-          --platform linux/"${arch}" \
-          --load ${docker_build_opts:+"${docker_build_opts}"} \
-          -t "${docker_image_tag}" \
+          --platform "${os}/${arch}" \
+          --output type=docker,dest="${tar_path}" \
+          ${docker_build_opts:+"${docker_build_opts}"} \
+          -t "${docker_image_tag}" "${additional_tag[@]}" \
           --build-arg BASEIMAGE="${base_image}" \
           --build-arg SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE}" \
-          --build-arg BINARY="${binary_name}" \
+          --build-arg BINARY="${full_binary_name}" \
           "${docker_build_path}" >"${build_log}" 2>&1; then
             cat "${build_log}"
             exit 1
         fi
         rm "${build_log}"
 
-        # If we are building an official/alpha/beta release we want to keep
-        # docker images and tag them appropriately.
-        local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
-        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
-          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
-        fi
-        "${DOCKER[@]}" save -o "${binary_file_path}.tar" "${docker_image_tag}" "${release_docker_image_tag}"
         echo "${docker_tag}" > "${binary_file_path}.docker_tag"
         rm -rf "${docker_build_path}"
-        ln "${binary_file_path}.tar" "${images_dir}/"
+        ln "${tar_path}" "${images_dir}/"
 
         kube::log::status "Deleting docker image ${docker_image_tag}"
         "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
