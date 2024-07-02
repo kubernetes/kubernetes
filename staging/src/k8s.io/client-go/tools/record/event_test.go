@@ -76,7 +76,7 @@ func (t *testEventSink) Patch(e *v1.Event, p []byte) (*v1.Event, error) {
 
 type OnCreateFunc func(*v1.Event) (*v1.Event, error)
 
-func OnCreateFactory(testCache map[string]*v1.Event, createEvent chan<- *v1.Event) OnCreateFunc {
+func OnCreateFactory(testCache map[any]*v1.Event, createEvent chan<- *v1.Event) OnCreateFunc {
 	return func(event *v1.Event) (*v1.Event, error) {
 		testCache[getEventKey(event)] = event
 		createEvent <- event
@@ -86,7 +86,7 @@ func OnCreateFactory(testCache map[string]*v1.Event, createEvent chan<- *v1.Even
 
 type OnPatchFunc func(*v1.Event, []byte) (*v1.Event, error)
 
-func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event) OnPatchFunc {
+func OnPatchFactory(testCache map[any]*v1.Event, patchEvent chan<- *v1.Event) OnPatchFunc {
 	return func(event *v1.Event, patch []byte) (*v1.Event, error) {
 		cachedEvent, found := testCache[getEventKey(event)]
 		if !found {
@@ -410,7 +410,7 @@ func TestEventf(t *testing.T) {
 		},
 	}
 
-	testCache := map[string]*v1.Event{}
+	testCache := map[any]*v1.Event{}
 	logCalled := make(chan struct{})
 	createEvent := make(chan *v1.Event)
 	updateEvent := make(chan *v1.Event)
@@ -706,7 +706,7 @@ func TestEventfNoNamespace(t *testing.T) {
 		},
 	}
 
-	testCache := map[string]*v1.Event{}
+	testCache := map[any]*v1.Event{}
 	logCalled := make(chan struct{})
 	createEvent := make(chan *v1.Event)
 	updateEvent := make(chan *v1.Event)
@@ -988,7 +988,7 @@ func TestMultiSinkCache(t *testing.T) {
 		},
 	}
 
-	testCache := map[string]*v1.Event{}
+	testCache := map[any]*v1.Event{}
 	createEvent := make(chan *v1.Event)
 	updateEvent := make(chan *v1.Event)
 	patchEvent := make(chan *v1.Event)
@@ -1001,7 +1001,7 @@ func TestMultiSinkCache(t *testing.T) {
 		OnPatch: OnPatchFactory(testCache, patchEvent),
 	}
 
-	testCache2 := map[string]*v1.Event{}
+	testCache2 := map[any]*v1.Event{}
 	createEvent2 := make(chan *v1.Event)
 	updateEvent2 := make(chan *v1.Event)
 	patchEvent2 := make(chan *v1.Event)

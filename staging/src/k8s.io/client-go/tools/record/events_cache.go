@@ -19,7 +19,6 @@ package record
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -50,39 +49,35 @@ const (
 )
 
 // getEventKey builds unique event key based on source, involvedObject, reason, message
-func getEventKey(event *v1.Event) string {
-	return strings.Join([]string{
-		event.Source.Component,
-		event.Source.Host,
-		event.InvolvedObject.Kind,
-		event.InvolvedObject.Namespace,
-		event.InvolvedObject.Name,
-		event.InvolvedObject.FieldPath,
-		string(event.InvolvedObject.UID),
-		event.InvolvedObject.APIVersion,
-		event.Type,
-		event.Reason,
-		event.Message,
-	},
-		"")
+func getEventKey(event *v1.Event) any {
+	return struct {
+		Source         v1.EventSource
+		InvolvedObject v1.ObjectReference
+		Type           string
+		Reason         string
+		Message        string
+	}{
+		Source:         event.Source,
+		InvolvedObject: event.InvolvedObject,
+		Type:           event.Type,
+		Reason:         event.Reason,
+		Message:        event.Message,
+	}
 }
 
 // getSpamKey builds unique event key based on source, involvedObject
-func getSpamKey(event *v1.Event) string {
-	return strings.Join([]string{
-		event.Source.Component,
-		event.Source.Host,
-		event.InvolvedObject.Kind,
-		event.InvolvedObject.Namespace,
-		event.InvolvedObject.Name,
-		string(event.InvolvedObject.UID),
-		event.InvolvedObject.APIVersion,
-	},
-		"")
+func getSpamKey(event *v1.Event) any {
+	return struct {
+		Source         v1.EventSource
+		InvolvedObject v1.ObjectReference
+	}{
+		Source:         event.Source,
+		InvolvedObject: event.InvolvedObject,
+	}
 }
 
 // EventSpamKeyFunc is a function that returns unique key based on provided event
-type EventSpamKeyFunc func(event *v1.Event) string
+type EventSpamKeyFunc func(event *v1.Event) any
 
 // EventFilterFunc is a function that returns true if the event should be skipped
 type EventFilterFunc func(event *v1.Event) bool
@@ -158,25 +153,26 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 // It returns a tuple of the following:
 // aggregateKey - key the identifies the aggregate group to bucket this event
 // localKey - key that makes this event in the local group
-type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey string)
+type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey any, localKey string)
 
 // EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
 // event.Reason, event.ReportingController and event.ReportingInstance
-func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
-	return strings.Join([]string{
-		event.Source.Component,
-		event.Source.Host,
-		event.InvolvedObject.Kind,
-		event.InvolvedObject.Namespace,
-		event.InvolvedObject.Name,
-		string(event.InvolvedObject.UID),
-		event.InvolvedObject.APIVersion,
-		event.Type,
-		event.Reason,
-		event.ReportingController,
-		event.ReportingInstance,
-	},
-		""), event.Message
+func EventAggregatorByReasonFunc(event *v1.Event) (any, string) {
+	return struct {
+		Source              v1.EventSource
+		InvolvedObject      v1.ObjectReference
+		Type                string
+		Reason              string
+		ReportingController string
+		ReportingInstance   string
+	}{
+		Source:              event.Source,
+		InvolvedObject:      event.InvolvedObject,
+		Type:                event.Type,
+		Reason:              event.Reason,
+		ReportingController: event.ReportingController,
+		ReportingInstance:   event.ReportingInstance,
+	}, event.Message
 }
 
 // EventAggregatorMessageFunc is responsible for producing an aggregation message
@@ -239,7 +235,7 @@ type aggregateRecord struct {
 //   - The cache key for the event, for correlation purposes. This will be set to
 //     the full key for normal events, and to the result of
 //     EventAggregatorMessageFunc for aggregate events.
-func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string) {
+func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, any) {
 	now := metav1.NewTime(e.clock.Now())
 	var record aggregateRecord
 	// eventKey is the full cache key for this event
@@ -324,7 +320,7 @@ func newEventLogger(lruCacheEntries int, clock clock.PassiveClock) *eventLogger 
 }
 
 // eventObserve records an event, or updates an existing one if key is a cache hit
-func (e *eventLogger) eventObserve(newEvent *v1.Event, key string) (*v1.Event, []byte, error) {
+func (e *eventLogger) eventObserve(newEvent *v1.Event, key any) (*v1.Event, []byte, error) {
 	var (
 		patch []byte
 		err   error
@@ -387,7 +383,7 @@ func (e *eventLogger) updateState(event *v1.Event) {
 }
 
 // lastEventObservationFromCache returns the event from the cache, reads must be protected via external lock
-func (e *eventLogger) lastEventObservationFromCache(key string) eventLog {
+func (e *eventLogger) lastEventObservationFromCache(key any) eventLog {
 	value, ok := e.cache.Get(key)
 	if ok {
 		observationValue, ok := value.(eventLog)
