@@ -739,8 +739,6 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 // and this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
 func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	pod := pInfo.Pod
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
 
 	// When the queueing hint is enabled, they are used differently.
 	// But, we use all of them as UnschedulablePlugins when the queueing hint isn't enabled so that we don't break the old behaviour.
@@ -769,7 +767,6 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", ScheduleAttemptFailure).Inc()
 	}
 
-	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	return nil
 }
 
@@ -778,6 +775,11 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 // unschedulable pods in `unschedulablePods`. But if there has been a recent move
 // request, then the pod is put in `podBackoffQ`.
 func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
+	// Refresh the timestamp since the pod is re-added.
+	// Note: we do this before locking to make backoff duration calculation more accurate.
+	// otherwise, depending on how long it waits for a lock to be released, the backoff duration may be longer than expected.
+	pInfo.Timestamp = p.clock.Now()
+
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -801,9 +803,6 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		return p.addUnschedulableWithoutQueueingHint(logger, pInfo, podSchedulingCycle)
 	}
 
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
-
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulablePods.
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
@@ -822,7 +821,6 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		p.cond.Broadcast()
 	}
 
-	p.addNominatedPodUnlocked(logger, pInfo.PodInfo, nil)
 	return nil
 }
 

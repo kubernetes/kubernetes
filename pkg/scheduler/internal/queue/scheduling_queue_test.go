@@ -865,18 +865,6 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
 	}
-	expectedNominatedPods := &nominator{
-		nominatedPodToNode: map[types.UID]string{
-			unschedulablePodInfo.Pod.UID:    "node1",
-			highPriNominatedPodInfo.Pod.UID: "node1",
-		},
-		nominatedPods: map[string][]*framework.PodInfo{
-			"node1": {highPriNominatedPodInfo, unschedulablePodInfo},
-		},
-	}
-	if diff := cmp.Diff(q.nominator, expectedNominatedPods, nominatorCmpOpts...); diff != "" {
-		t.Errorf("Unexpected diff after adding pods (-want, +got):\n%s", diff)
-	}
 	if p, err := q.Pop(logger); err != nil || p.Pod != highPriNominatedPodInfo.Pod {
 		t.Errorf("Expected: %v after Pop, but got: %v", highPriNominatedPodInfo.Pod.Name, p.Pod.Name)
 	}
