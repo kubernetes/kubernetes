@@ -1993,8 +1993,10 @@ func countReadyPods(pods []*v1.Pod) int32 {
 
 // trackTerminatingPods checks if the count of terminating pods is tracked.
 // They are tracked when any the following is true:
-// - JobPodReplacementPolicy is enabled to be returned in the status field,
-// - only failed pods are replaced, because pod failure policy is used
+//   - JobPodReplacementPolicy is enabled to be returned in the status field;
+//     and to delay setting the Job terminal condition,
+//   - JobManagedBy is enabled to delay setting Job terminal condition,
+//   - only failed pods are replaced, because pod failure policy is used
 func trackTerminatingPods(job *batch.Job) bool {
 	if feature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		return true
