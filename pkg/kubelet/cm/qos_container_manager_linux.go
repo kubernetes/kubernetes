@@ -159,8 +159,19 @@ func (m *qosContainerManagerImpl) setHugePagesUnbounded(cgroupConfig *CgroupConf
 	return nil
 }
 
+// setHugePagesLimited ensures hugetlb is effectively limited
+func (m *qosContainerManagerImpl) setHugePagesLimited(cgroupConfig *CgroupConfig) {
+	hugePageLimit := HugePageLimits(m.getNodeAllocatable())
+	cgroupConfig.ResourceParameters.HugePageLimit = hugePageLimit
+}
+
 func (m *qosContainerManagerImpl) setHugePagesConfig(configs map[v1.PodQOSClass]*CgroupConfig) error {
-	for _, v := range configs {
+	for qosClass, v := range configs {
+		// the guaranteed QOS class should respect the reservation for hugepages
+		if qosClass == v1.PodQOSGuaranteed {
+			m.setHugePagesLimited(v)
+			continue
+		}
 		if err := m.setHugePagesUnbounded(v); err != nil {
 			return err
 		}

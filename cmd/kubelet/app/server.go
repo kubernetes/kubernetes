@@ -86,6 +86,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -1340,9 +1341,10 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	}
 	rl := make(v1.ResourceList)
 	for k, v := range m {
-		switch v1.ResourceName(k) {
-		// CPU, memory, local storage, and PID resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
+		rn := v1.ResourceName(k)
+		switch {
+		// CPU, memory, local storage, PID and hugepages resources are supported.
+		case rn == v1.ResourceCPU, rn == v1.ResourceMemory, rn == v1.ResourceEphemeralStorage, rn == pidlimit.PIDs, v1helper.IsHugePageResourceName(rn):
 			q, err := resource.ParseQuantity(v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
@@ -1350,7 +1352,7 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 			if q.Sign() == -1 {
 				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
 			}
-			rl[v1.ResourceName(k)] = q
+			rl[rn] = q
 		default:
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}
