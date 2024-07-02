@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -49,7 +50,7 @@ type objectCacheItem struct {
 	store     *cacheStore
 	reflector *cache.Reflector
 
-	hasSynced func() (bool, error)
+	hasSynced func(context.Context) (bool, error)
 
 	// waitGroup is used to ensure that there won't be two concurrent calls to reflector.Run
 	waitGroup sync.WaitGroup
@@ -239,7 +240,7 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
-		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
+		hasSynced: func(_ context.Context) (bool, error) { return store.hasSynced(), nil },
 		stopCh:    make(chan struct{}),
 	}
 
@@ -319,7 +320,9 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	if !c.isStopped() {
 		item.restartReflectorIfNeeded()
 	}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	defer cancel()
+	if err := wait.PollUntilContextCancel(ctx, 10*time.Millisecond, true, item.hasSynced); err != nil {
 		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))

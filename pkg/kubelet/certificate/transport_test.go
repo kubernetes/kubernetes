@@ -209,7 +209,9 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	// its connections to the server.
 	m.setCurrent(client2CertData.certificate)
 
-	err = wait.PollImmediate(time.Millisecond*50, wait.ForeverTestTimeout, func() (done bool, err error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), wait.ForeverTestTimeout)
+	defer cancel()
+	if err := wait.PollUntilContextCancel(ctx, time.Millisecond*50, true, func(_ context.Context) (done bool, err error) {
 		client.Get().Do(context.TODO())
 		if firstCertSerial.Cmp(lastSerialNumber()) != 0 {
 			// The certificate changed!
@@ -217,8 +219,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 		}
 		t.Logf("Certificate not changed, will retry.")
 		return false, nil
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatal("certificate rotated but client never reconnected with new cert")
 	}
 }

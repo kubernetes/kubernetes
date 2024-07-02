@@ -160,7 +160,9 @@ func (m *Stub) Start() error {
 	}()
 
 	var lastDialErr error
-	wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	if err := wait.PollUntilContextCancel(ctx, 1*time.Second, true, func(_ context.Context) (bool, error) {
 		var conn *grpc.ClientConn
 		_, conn, lastDialErr = dial(m.socket)
 		if lastDialErr != nil {
@@ -168,7 +170,9 @@ func (m *Stub) Start() error {
 		}
 		conn.Close()
 		return true, nil
-	})
+	}); err != nil {
+		return err
+	}
 	if lastDialErr != nil {
 		return lastDialErr
 	}
