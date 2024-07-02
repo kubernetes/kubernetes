@@ -374,7 +374,7 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTSDir
 	} else if err != nil {
 		return nil, err
 	}
-	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, sets.List(paths))
+	klog.V(5).Infof("%s: current paths:   %+v", w.targetDir, sets.List[string](paths))
 
 	newPaths := sets.New[string]()
 	for file := range payload {
@@ -386,7 +386,8 @@ func (w *AtomicWriter) pathsToRemove(payload map[string]FileProjection, oldTSDir
 			subPath = strings.TrimSuffix(subPath, string(os.PathSeparator))
 		}
 	}
-	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, sets.List(newPaths))
+
+	klog.V(5).Infof("%s: new paths:       %+v", w.targetDir, sets.List[string](newPaths))
 
 	result := paths.Difference(newPaths)
 	klog.V(5).Infof("%s: paths to remove: %+v", w.targetDir, result)
