@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
+
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-cmp/cmp"
 )
@@ -35,7 +37,7 @@ func nilPointerFor[T interface{}]() *T {
 // TestRoundtrip roundtrips object serialization to interface{} and back via CBOR.
 func TestRoundtrip(t *testing.T) {
 	type modePair struct {
-		enc cbor.EncMode
+		enc modes.EncMode
 		dec cbor.DecMode
 	}
 
