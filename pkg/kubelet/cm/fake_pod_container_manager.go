@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -124,4 +124,10 @@ func (cm *FakePodContainerManager) SetPodCgroupConfig(_ *v1.Pod, _ v1.ResourceNa
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "SetPodCgroupConfig")
 	return nil
+}
+
+func (m *FakePodContainerManager) DoNotEnforceCPULimits() {
+}
+
+func (m *FakePodContainerManager) SetUnlimitedCPUQuota(*v1.Pod) {
 }

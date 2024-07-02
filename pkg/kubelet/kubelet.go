@@ -1860,10 +1860,36 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				if err := kl.containerManager.UpdateQOSCgroups(); err != nil {
 					klog.V(2).InfoS("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
+
+				if kl.containerManager.PodContainsPinnedCpus(pod) {
+					klog.InfoS("Disabling cpu quota for pod", "podName", pod.Name, "podUID", pod.UID)
+					pcm.DoNotEnforceCPULimits()
+				}
+
 				if err := pcm.EnsureExists(pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
+			} else if kl.containerManager.PodContainsPinnedCpus(pod) {
+				// Quota is not capped when cfs quota is disabled
+				// or when the pod has guaranteed QoS class and exclusively assigned cpus (*)
+				//
+				// (*) This is needed to support the code in internal_container_lifecycle_linux.go
+				// that deals with the CFS throttling issue #70585 affecting:
+				// - Guaranteed QoS Pod's containers with pinned cpus
+				// - Burstable Pods where all containers run close to their defined limit
+				//
+				// Both cases are caused by small rounding and quota synchronization errors inherent
+				// to how the linux CFS quota accounting works. Clusters utilizing the nohz_full kernel
+				// boot argument will also hit this as the accounting period becomes too coarse due
+				// to the disabled tick.
+				//
+				// There is an edge case where this might not be desirable and that is related
+				// to custom runtimes (like Kata) that incur significant enough per container overhead.
+				// This platform overhead happens on the Pod cgroup level and so this change will leave it
+				// unbounded. This cost is for now considered to be acceptable when compared to the
+				// benefit of fixing the throttling of the much more common workload types.
+				pcm.SetUnlimitedCPUQuota(pod)
 			}
 		}
 	}
