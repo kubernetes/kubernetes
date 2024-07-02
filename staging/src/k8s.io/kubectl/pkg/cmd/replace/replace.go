@@ -17,6 +17,7 @@ limitations under the License.
 package replace
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -366,7 +367,7 @@ func (o *ReplaceOptions) forceReplace() error {
 			return err
 		}
 
-		return wait.PollImmediate(1*time.Second, timeout, func() (bool, error) {
+		return wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, timeout, func() (bool, error) {
 			if err := info.Get(); !errors.IsNotFound(err) {
 				return false, err
 			}
