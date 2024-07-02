@@ -646,6 +646,12 @@ metadata:
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
 
+				//ginkgo.By("getting pods with in-cluster configs and request timeout set")
+				//execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --request-timeout=10s --v=6 2>&1")
+				//gomega.Expect(execOutput).To(gomega.MatchRegexp("httpd +1/1 +Running"))
+				//gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				//gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
+
 				ginkgo.By("creating an object containing a namespace with in-cluster config")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=6 2>&1")
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
@@ -658,6 +664,15 @@ metadata:
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
+
+				//ginkgo.By("trying to use kubectl with fake user")
+				//_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --as=fake --v=6 2>&1")
+				//framework.Logf("got err %v", err)
+				//gomega.Expect(err).To(gomega.HaveOccurred())
+				//gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
+				//gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
+				//gomega.Expect(err).To(gomega.ContainSubstring("\"code\": 403"))
+				//gomega.Expect(err).To(gomega.ContainSubstring("users \"fake\" is forbidden"))
 
 				ginkgo.By("trying to use kubectl with invalid token")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
