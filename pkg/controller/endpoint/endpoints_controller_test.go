@@ -160,10 +160,10 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 	return httptest.NewServer(mux), &fakeEndpointsHandler
 }
 
-// makeBlockingEndpointDeleteTestServer will signal the blockNextAction channel on endpoint "POST" & "DELETE" requests. All
-// block endpoint "DELETE" requestsi will wait on a blockDelete signal to delete endpoint. If controller is nil, a error will
-// be sent in the response.
-func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
+// makeBlockingEndpointTestServer will signal the blockNextAction channel on endpoint "POST", "PUT", and "DELETE"
+// requests. "POST" and "PUT" requests will wait on a blockUpdate signal if provided, while "DELETE" requests will wait
+// on a blockDelete signal if provided. If controller is nil, an error will be sent in the response.
+func makeBlockingEndpointTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockUpdate, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
 
 	handlerFunc := func(res http.ResponseWriter, req *http.Request) {
 		if controller == nil {
@@ -172,23 +172,37 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 			return
 		}
 
-		if req.Method == "POST" {
-			controller.endpointsStore.Add(endpoint)
+		if req.Method == "POST" || req.Method == "PUT" {
+			if blockUpdate != nil {
+				go func() {
+					// Delay the update of endpoints to make endpoints cache out of sync
+					<-blockUpdate
+					_ = controller.endpointsStore.Add(endpoint)
+				}()
+			} else {
+				_ = controller.endpointsStore.Add(endpoint)
+			}
 			blockNextAction <- struct{}{}
 		}
 
 		if req.Method == "DELETE" {
-			go func() {
-				// Delay the deletion of endoints to make endpoint cache out of sync
-				<-blockDelete
-				controller.endpointsStore.Delete(endpoint)
+			if blockDelete != nil {
+				go func() {
+					// Delay the deletion of endpoints to make endpoints cache out of sync
+					<-blockDelete
+					_ = controller.endpointsStore.Delete(endpoint)
+					controller.onEndpointsDelete(endpoint)
+				}()
+			} else {
+				_ = controller.endpointsStore.Delete(endpoint)
 				controller.onEndpointsDelete(endpoint)
-			}()
+			}
 			blockNextAction <- struct{}{}
 		}
 
+		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{})))
+		_, _ = res.Write([]byte(runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), endpoint)))
 	}
 
 	mux := http.NewServeMux()
@@ -2378,7 +2392,7 @@ func TestMultipleServiceChanges(t *testing.T) {
 	blockDelete := make(chan struct{})
 	blockNextAction := make(chan struct{})
 	stopChan := make(chan struct{})
-	testServer := makeBlockingEndpointDeleteTestServer(t, controller, endpoint, blockDelete, blockNextAction, ns)
+	testServer := makeBlockingEndpointTestServer(t, controller, endpoint, nil, blockDelete, blockNextAction, ns)
 	defer testServer.Close()
 
 	tCtx := ktesting.Init(t)
@@ -2418,6 +2432,83 @@ func TestMultipleServiceChanges(t *testing.T) {
 	// Cause test server to delete endpoints
 	close(blockDelete)
 	waitForChanReceive(t, 1*time.Second, blockNextAction, "Endpoint should have been recreated")
+
+	close(blockNextAction)
+	close(stopChan)
+}
+
+// TestMultiplePodChanges tests that endpoints that are not updated because of an out of sync endpoints cache are
+// eventually resynced after multiple Pod changes.
+func TestMultiplePodChanges(t *testing.T) {
+	ns := metav1.NamespaceDefault
+
+	readyEndpoints := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, ResourceVersion: "1"},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
+				{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: v1.ProtocolTCP}},
+		}},
+	}
+	notReadyEndpoints := &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, ResourceVersion: "2"},
+		Subsets: []v1.EndpointSubset{{
+			NotReadyAddresses: []v1.EndpointAddress{
+				{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: v1.ProtocolTCP}},
+		}},
+	}
+
+	controller := &endpointController{}
+	blockUpdate := make(chan struct{})
+	blockNextAction := make(chan struct{})
+	stopChan := make(chan struct{})
+	testServer := makeBlockingEndpointTestServer(t, controller, notReadyEndpoints, blockUpdate, nil, blockNextAction, ns)
+	defer testServer.Close()
+
+	tCtx := ktesting.Init(t)
+	*controller = *newController(tCtx, testServer.URL, 0*time.Second)
+	pod := testPod(ns, 0, 1, true, ipv4only)
+	_ = controller.podStore.Add(pod)
+	_ = controller.endpointsStore.Add(readyEndpoints)
+	_ = controller.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector:  map[string]string{"foo": "bar"},
+			ClusterIP: "10.0.0.1",
+			Ports:     []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+		},
+	})
+
+	go func() { controller.Run(tCtx, 1) }()
+
+	// Rapidly update the Pod: Ready -> NotReady -> Ready.
+	pod2 := pod.DeepCopy()
+	pod2.ResourceVersion = "2"
+	pod2.Status.Conditions[0].Status = v1.ConditionFalse
+	_ = controller.podStore.Update(pod2)
+	controller.updatePod(pod, pod2)
+	// blockNextAction should eventually unblock once server gets endpoints request.
+	waitForChanReceive(t, 1*time.Second, blockNextAction, "Pod Update should have caused a request to be sent to the test server")
+	// The endpoints update hasn't been applied to the cache yet.
+	pod3 := pod.DeepCopy()
+	pod3.ResourceVersion = "3"
+	pod3.Status.Conditions[0].Status = v1.ConditionTrue
+	_ = controller.podStore.Update(pod3)
+	controller.updatePod(pod2, pod3)
+	// It shouldn't get endpoints request as the endpoints in the cache is out-of-date.
+	timer := time.NewTimer(100 * time.Millisecond)
+	select {
+	case <-timer.C:
+	case <-blockNextAction:
+		t.Errorf("Pod Update shouldn't have caused a request to be sent to the test server")
+	}
+
+	// Applying the endpoints update to the cache should cause test server to update endpoints.
+	close(blockUpdate)
+	waitForChanReceive(t, 1*time.Second, blockNextAction, "Endpoints should have been updated")
 
 	close(blockNextAction)
 	close(stopChan)

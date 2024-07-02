@@ -110,6 +110,7 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.staleEndpointsTracker = newStaleEndpointsTracker()
 	e.triggerTimeTracker = endpointsliceutil.NewTriggerTimeTracker()
 	e.eventBroadcaster = broadcaster
 	e.eventRecorder = recorder
@@ -145,6 +146,8 @@ type Controller struct {
 	// endpointsSynced returns true if the endpoints shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	endpointsSynced cache.InformerSynced
+	// staleEndpointsTracker can help determine if a cached Endpoints is out of date.
+	staleEndpointsTracker *staleEndpointsTracker
 
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
@@ -384,6 +387,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 			return err
 		}
 		e.triggerTimeTracker.DeleteService(namespace, name)
+		e.staleEndpointsTracker.Delete(namespace, name)
 		return nil
 	}
 
@@ -473,6 +477,8 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 				Labels: service.Labels,
 			},
 		}
+	} else if e.staleEndpointsTracker.IsStale(currentEndpoints) {
+		return fmt.Errorf("endpoints informer cache is out of date, resource version %s already processed for endpoints %s", currentEndpoints.ResourceVersion, key)
 	}
 
 	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
@@ -554,6 +560,12 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 
 		return err
+	}
+	// If the current endpoints is updated we track the old resource version, so
+	// if we obtain this resource version again from the lister we know is outdated
+	// and we need to retry later to wait for the informer cache to be up-to-date.
+	if !createEndpoints {
+		e.staleEndpointsTracker.Stale(currentEndpoints)
 	}
 	return nil
 }
