@@ -220,7 +220,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	)
 
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-informers", func(context genericapiserver.PostStartHookContext) error {
-		s.Informers.Start(context.StopCh)
+		s.Informers.Start(context.Done())
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("start-apiextensions-controllers", func(context genericapiserver.PostStartHookContext) error {
@@ -231,20 +231,20 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		if s.GenericAPIServer.StaticOpenAPISpec != nil {
 			if s.GenericAPIServer.OpenAPIVersionedService != nil {
 				openapiController := openapicontroller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
-				go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.StopCh)
+				go openapiController.Run(s.GenericAPIServer.StaticOpenAPISpec, s.GenericAPIServer.OpenAPIVersionedService, context.Done())
 			}
 
 			if s.GenericAPIServer.OpenAPIV3VersionedService != nil {
 				openapiv3Controller := openapiv3controller.NewController(s.Informers.Apiextensions().V1().CustomResourceDefinitions())
-				go openapiv3Controller.Run(s.GenericAPIServer.OpenAPIV3VersionedService, context.StopCh)
+				go openapiv3Controller.Run(s.GenericAPIServer.OpenAPIV3VersionedService, context.Done())
 			}
 		}
 
-		go namingController.Run(context.StopCh)
-		go establishingController.Run(context.StopCh)
-		go nonStructuralSchemaController.Run(5, context.StopCh)
-		go apiApprovalController.Run(5, context.StopCh)
-		go finalizingController.Run(5, context.StopCh)
+		go namingController.Run(context.Done())
+		go establishingController.Run(context.Done())
+		go nonStructuralSchemaController.Run(5, context.Done())
+		go apiApprovalController.Run(5, context.Done())
+		go finalizingController.Run(5, context.Done())
 
 		discoverySyncedCh := make(chan struct{})
 		go discoveryController.Run(context.StopCh, discoverySyncedCh)
@@ -265,7 +265,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				return true, nil
 			}
 			return false, nil
-		}, context.StopCh)
+		}, context.Done())
 	})
 
 	return s, nil
