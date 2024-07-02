@@ -684,7 +684,7 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 // and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 // If a non-success status is returned, then the scheduling cycle is aborted.
-func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status) {
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status, _ sets.Set[string]) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
 	defer func() {
@@ -692,7 +692,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	var result *framework.PreFilterResult
-	var pluginsWithNodes []string
+	pluginsWithNodes := sets.New[string]()
 	logger := klog.FromContext(ctx)
 	verboseLogs := logger.V(4).Enabled()
 	if verboseLogs {
@@ -715,7 +715,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			if s.Code() == framework.UnschedulableAndUnresolvable {
 				// In this case, the preemption shouldn't happen in this scheduling cycle.
 				// So, no need to execute all PreFilter.
-				return nil, s
+				return nil, s, nil
 			}
 			if s.Code() == framework.Unschedulable {
 				// In this case, the preemption should happen later in this scheduling cycle.
@@ -724,23 +724,23 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 				returnStatus = s
 				continue
 			}
-			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name())
+			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name()), nil
 		}
 		if !r.AllNodes() {
-			pluginsWithNodes = append(pluginsWithNodes, pl.Name())
+			pluginsWithNodes.Insert(pl.Name())
 		}
 		result = result.Merge(r)
 		if !result.AllNodes() && len(result.NodeNames) == 0 {
-			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", pluginsWithNodes)
+			msg := fmt.Sprintf("node(s) didn't satisfy plugin(s) %v simultaneously", sets.List(pluginsWithNodes))
 			if len(pluginsWithNodes) == 1 {
-				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", pluginsWithNodes[0])
+				msg = fmt.Sprintf("node(s) didn't satisfy plugin %v", sets.List(pluginsWithNodes)[0])
 			}
 
 			// When PreFilterResult filters out Nodes, the framework considers Nodes that are filtered out as getting "UnschedulableAndUnresolvable".
-			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, msg)
+			return result, framework.NewStatus(framework.UnschedulableAndUnresolvable, msg), pluginsWithNodes
 		}
 	}
-	return result, returnStatus
+	return result, returnStatus, pluginsWithNodes
 }
 
 func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
