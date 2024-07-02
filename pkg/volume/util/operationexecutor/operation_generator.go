@@ -1065,7 +1065,12 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			pluginDevicePath, mapErr := customBlockVolumeMapper.MapPodDevice()
 			if mapErr != nil {
 				// On failure, return error. Caller will log and retry.
-				og.markVolumeErrorState(volumeToMount, markVolumeOpts, mapErr, actualStateOfWorld)
+				if volumetypes.IsUncertainProgressError(mapErr) &&
+					actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markVolumeOpts.PodName) == VolumeNotMounted {
+					if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts); err != nil {
+						klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
+					}
+				}
 				eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}

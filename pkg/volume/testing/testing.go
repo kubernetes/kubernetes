@@ -945,14 +945,8 @@ func (fv *FakeVolume) MapPodDevice() (string, error) {
 	}
 
 	if fv.VolName == TimeoutAndFailOnSetupVolumeName {
-		_, ok := fv.VolumeMountState[fv.VolName]
-		if !ok {
-			fv.VolumeMountState[fv.VolName] = volumeMountUncertain
-			return "", volumetypes.NewUncertainProgressError("time out on setup")
-		}
-		fv.VolumeMountState[fv.VolName] = volumeNotMounted
-		return "", fmt.Errorf("mounting volume failed")
-
+		fv.VolumeMountState[fv.VolName] = volumeMountUncertain
+		return "", volumetypes.NewUncertainProgressError("time out on setup")
 	}
 
 	if fv.VolName == SuccessAndFailOnSetupVolumeName {
