@@ -159,9 +159,7 @@ func TestProvisioner(t *testing.T) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,
 		volumetest.NewFakeKubeletVolumeHost(t, "/tmp/fake", nil, nil))
-	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{
-		PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: fmt.Sprintf("/tmp/hostpath.%s", uuid.NewUUID())}}}}}
-	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
+	plug, err := plugMgr.FindProvisionablePluginByName(hostPathPluginName)
 	if err != nil {
 		t.Fatalf("Can't find the plugin by name")
 	}

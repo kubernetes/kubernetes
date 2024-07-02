@@ -791,19 +791,6 @@ func (pm *VolumePluginMgr) FindDeletablePluginByName(name string) (DeletableVolu
 	return nil, fmt.Errorf("no deletable volume plugin matched")
 }
 
-// FindCreatablePluginBySpec fetches a persistent volume plugin by name.  If
-// no plugin is found, returns error.
-func (pm *VolumePluginMgr) FindCreatablePluginBySpec(spec *Spec) (ProvisionableVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	if provisionableVolumePlugin, ok := volumePlugin.(ProvisionableVolumePlugin); ok {
-		return provisionableVolumePlugin, nil
-	}
-	return nil, fmt.Errorf("no creatable volume plugin matched")
-}
-
 // FindAttachablePluginBySpec fetches a persistent volume plugin by spec.
 // Unlike the other "FindPlugin" methods, this does not return error if no
 // plugin is found.  All volumes require a mounter and unmounter, but not
