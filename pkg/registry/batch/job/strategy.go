@@ -413,7 +413,9 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			AllowForSuccessCriteriaMetInExtendedScope: true,
 		}
 	}
-	return batchvalidation.JobStatusValidationOptions{}
+	return batchvalidation.JobStatusValidationOptions{
+		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsJobSuccessCriteriaMet(oldJob),
+	}
 }
 
 // WarningsOnUpdate returns warnings for the given update.
