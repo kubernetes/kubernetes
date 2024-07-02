@@ -187,9 +187,8 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		oldPodTemplate = &oldJob.Spec.Template
 	}
 	opts := batchvalidation.JobValidationOptions{
-		PodValidationOptions:    pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
-		AllowElasticIndexedJobs: utilfeature.DefaultFeatureGate.Enabled(features.ElasticIndexedJob),
-		RequirePrefixedLabels:   true,
+		PodValidationOptions:  pod.GetValidationOptionsFromPodTemplate(newPodTemplate, oldPodTemplate),
+		RequirePrefixedLabels: true,
 	}
 	if oldJob != nil {
 		opts.AllowInvalidLabelValueInSelector = opts.AllowInvalidLabelValueInSelector || metav1validation.LabelSelectorHasInvalidLabelValue(oldJob.Spec.Selector)
