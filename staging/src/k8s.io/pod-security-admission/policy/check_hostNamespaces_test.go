@@ -20,14 +20,20 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestHostNamespaces(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *corev1.Pod
-		expectReason string
-		expectDetail string
+		name          string
+		pod           *corev1.Pod
+		opts          options
+		expectReason  string
+		expectDetail  string
+		expectErrList field.ErrorList
 	}{
 		{
 			name: "multiple host namespaces",
@@ -39,11 +45,30 @@ func TestHostNamespaces(t *testing.T) {
 			expectReason: `host namespaces`,
 			expectDetail: `hostNetwork=true, hostPID=true, hostIPC=true`,
 		},
+		{
+			name: "multiple host namespaces, enable field error list",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				HostNetwork: true,
+				HostIPC:     true,
+				HostPID:     true,
+			}},
+			opts: options{
+				withFieldErrors: true,
+			},
+			expectReason: `host namespaces`,
+			expectDetail: `hostNetwork=true, hostPID=true, hostIPC=true`,
+			expectErrList: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "spec.hostNetwork", BadValue: true},
+				{Type: field.ErrorTypeForbidden, Field: "spec.hostPID", BadValue: true},
+				{Type: field.ErrorTypeForbidden, Field: "spec.hostIPC", BadValue: true},
+			},
+		},
 	}
 
+	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "Detail"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := hostNamespaces_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := hostNamespacesV1Dot0(&tc.pod.ObjectMeta, &tc.pod.Spec, tc.opts)
 			if result.Allowed {
 				t.Fatal("expected disallowed")
 			}
@@ -52,6 +77,11 @@ func TestHostNamespaces(t *testing.T) {
 			}
 			if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)
+			}
+			if result.ErrList != nil {
+				if diff := cmp.Diff(tc.expectErrList, *result.ErrList, cmpOpts...); diff != "" {
+					t.Errorf("unexpected field errors (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}

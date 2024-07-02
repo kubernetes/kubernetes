@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -58,7 +59,7 @@ func CheckAppArmorProfile() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       appArmorProfile_1_0,
+				CheckPod:       withOptions(appArmorProfileV1Dot0),
 			},
 		},
 	}
@@ -80,62 +81,79 @@ func allowedProfileType(profile corev1.AppArmorProfileType) bool {
 	}
 }
 
-func appArmorProfile_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	var badSetters []string // things that explicitly set appArmorProfile.type to a bad value
+func appArmorProfileV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
+	badSetters := NewViolations(opts.withFieldErrors) // things that explicitly set appArmorProfile.type to a bad value
 	badValues := sets.NewString()
 
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
 		if !allowedProfileType(podSpec.SecurityContext.AppArmorProfile.Type) {
-			badSetters = append(badSetters, "pod")
+			var err *field.Error
+			if opts.withFieldErrors {
+				err = withBadValue(forbidden(appArmorProfileTypePath), string(podSpec.SecurityContext.AppArmorProfile.Type))
+			}
+			badSetters.Add("pod", err)
 			badValues.Insert(string(podSpec.SecurityContext.AppArmorProfile.Type))
 		}
 	}
 
-	var badContainers []string // containers that set apparmorProfile.type to a bad value
-	visitContainers(podSpec, func(c *corev1.Container) {
+	badContainers := NewViolations(opts.withFieldErrors) // containers that set apparmorProfile.type to a bad value
+	var errs field.ErrorList
+
+	visitContainers(podSpec, opts, func(c *corev1.Container, path *field.Path) {
 		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil {
 			if !allowedProfileType(c.SecurityContext.AppArmorProfile.Type) {
-				badContainers = append(badContainers, c.Name)
+				badContainers.Add(c.Name)
+				errs = append(errs, withBadValue(forbidden(path.Child("securityContext", "appArmorProfile", "type")), string(c.SecurityContext.AppArmorProfile.Type)))
 				badValues.Insert(string(c.SecurityContext.AppArmorProfile.Type))
 			}
 		}
 	})
 
-	if len(badContainers) > 0 {
-		badSetters = append(
-			badSetters,
+	if !badContainers.Empty() {
+		badSetters.Add(
 			fmt.Sprintf(
 				"%s %s",
-				pluralize("container", "containers", len(badContainers)),
-				joinQuote(badContainers),
+				pluralize("container", "containers", badContainers.Len()),
+				joinQuote(badContainers.Data()),
 			),
+			errs...,
 		)
 	}
 
-	var forbiddenAnnotations []string
+	forbiddenAnnotations := NewViolations(opts.withFieldErrors)
 	for k, v := range podMetadata.Annotations {
 		if strings.HasPrefix(k, corev1.DeprecatedAppArmorBetaContainerAnnotationKeyPrefix) && !allowedAnnotationValue(v) {
-			forbiddenAnnotations = append(forbiddenAnnotations, fmt.Sprintf("%s=%q", k, v))
+			if opts.withFieldErrors {
+				forbiddenAnnotations.Add(fmt.Sprintf("%s=%q", k, v), withBadValue(forbidden(annotationsPath.Key(k)), v))
+			} else {
+				forbiddenAnnotations.Add(fmt.Sprintf("%s=%q", k, v))
+			}
 		}
 	}
 
 	badValueList := badValues.List()
-	if len(forbiddenAnnotations) > 0 {
-		sort.Strings(forbiddenAnnotations)
-		badValueList = append(badValueList, forbiddenAnnotations...)
-		badSetters = append(badSetters, pluralize("annotation", "annotations", len(forbiddenAnnotations)))
+	if forbiddenAnnotations.Len() > 0 {
+		forbiddenAnnotationsList := forbiddenAnnotations.Data()
+		sort.Strings(forbiddenAnnotationsList)
+		badValueList = append(badValueList, forbiddenAnnotationsList...)
+		if opts.withFieldErrors {
+			badSetters.Add(pluralize("annotation", "annotations", len(forbiddenAnnotationsList)), *forbiddenAnnotations.Errs()...)
+		} else {
+			badSetters.Add(pluralize("annotation", "annotations", len(forbiddenAnnotationsList)))
+		}
 	}
 
 	// pod or containers explicitly set bad apparmorProfiles
-	if len(badSetters) > 0 {
+	if badSetters.Len() > 0 {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: pluralize("forbidden AppArmor profile", "forbidden AppArmor profiles", len(badValueList)),
 			ForbiddenDetail: fmt.Sprintf(
 				"%s must not set AppArmor profile type to %s",
-				strings.Join(badSetters, " and "),
+				strings.Join(badSetters.Data(), " and "),
 				joinQuote(badValueList),
 			),
+			ErrList: badSetters.Errs(),
 		}
 	}
 

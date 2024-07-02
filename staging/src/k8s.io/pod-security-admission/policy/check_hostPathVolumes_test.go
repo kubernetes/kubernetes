@@ -20,14 +20,20 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestHostPathVolumes(t *testing.T) {
 	tests := []struct {
-		name         string
-		pod          *corev1.Pod
-		expectReason string
-		expectDetail string
+		name          string
+		pod           *corev1.Pod
+		opts          options
+		expectReason  string
+		expectDetail  string
+		expectErrList field.ErrorList
 	}{
 		{
 			name: "host path volumes",
@@ -41,11 +47,31 @@ func TestHostPathVolumes(t *testing.T) {
 			expectReason: `hostPath volumes`,
 			expectDetail: `volumes "a", "b"`,
 		},
+		{
+			name: "host path volumes, enable field error list",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Volumes: []corev1.Volume{
+					{Name: "a", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}}},
+					{Name: "b", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}}},
+					{Name: "c", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				},
+			}},
+			opts: options{
+				withFieldErrors: true,
+			},
+			expectReason: `hostPath volumes`,
+			expectDetail: `volumes "a", "b"`,
+			expectErrList: field.ErrorList{
+				{Type: field.ErrorTypeForbidden, Field: "spec.volumes[0].hostPath", BadValue: ""},
+				{Type: field.ErrorTypeForbidden, Field: "spec.volumes[1].hostPath", BadValue: ""},
+			},
+		},
 	}
 
+	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "Detail"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := hostPathVolumes_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := hostPathVolumesV1Dot0(&tc.pod.ObjectMeta, &tc.pod.Spec, tc.opts)
 			if result.Allowed {
 				t.Fatal("expected disallowed")
 			}
@@ -54,6 +80,11 @@ func TestHostPathVolumes(t *testing.T) {
 			}
 			if e, a := tc.expectDetail, result.ForbiddenDetail; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)
+			}
+			if result.ErrList != nil {
+				if diff := cmp.Diff(tc.expectErrList, *result.ErrList, cmpOpts...); diff != "" {
+					t.Errorf("unexpected field errors (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}

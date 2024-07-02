@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/pod-security-admission/api"
 )
 
@@ -52,30 +53,34 @@ func CheckSeccompProfileRestricted() Check {
 		Versions: []VersionedCheck{
 			{
 				MinimumVersion:   api.MajorMinorVersion(1, 19),
-				CheckPod:         seccompProfileRestricted_1_19,
+				CheckPod:         withOptions(seccompProfileRestrictedV1Dot19),
 				OverrideCheckIDs: []CheckID{checkSeccompBaselineID},
 			},
 			// Starting 1.25, windows pods would be exempted from this check using pod.spec.os field when set to windows.
 			{
 				MinimumVersion:   api.MajorMinorVersion(1, 25),
-				CheckPod:         seccompProfileRestricted_1_25,
+				CheckPod:         withOptions(seccompProfileRestrictedV1Dot25),
 				OverrideCheckIDs: []CheckID{checkSeccompBaselineID},
 			},
 		},
 	}
 }
 
-// seccompProfileRestricted_1_19 checks restricted policy on securityContext.seccompProfile field
-func seccompProfileRestricted_1_19(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+// seccompProfileRestrictedV1Dot19 checks restricted policy on securityContext.seccompProfile field
+func seccompProfileRestrictedV1Dot19(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	// things that explicitly set seccompProfile.type to a bad value
-	var badSetters []string
+	badSetters := NewViolations(opts.withFieldErrors)
 	badValues := sets.NewString()
 
 	podSeccompSet := false
 
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.SeccompProfile != nil {
 		if !validSeccomp(podSpec.SecurityContext.SeccompProfile.Type) {
-			badSetters = append(badSetters, "pod")
+			if opts.withFieldErrors {
+				badSetters.Add("pod", withBadValue(forbidden(seccompProfileTypePath), string(podSpec.SecurityContext.SeccompProfile.Type)))
+			} else {
+				badSetters.Add("pod")
+			}
 			badValues.Insert(string(podSpec.SecurityContext.SeccompProfile.Type))
 		} else {
 			podSeccompSet = true
@@ -83,73 +88,83 @@ func seccompProfileRestricted_1_19(podMetadata *metav1.ObjectMeta, podSpec *core
 	}
 
 	// containers that explicitly set seccompProfile.type to a bad value
-	var explicitlyBadContainers []string
+	explicitlyBadContainers := NewViolations(opts.withFieldErrors)
 	// containers that didn't set seccompProfile and aren't caught by a pod-level seccompProfile
-	var implicitlyBadContainers []string
+	implicitlyBadContainers := NewViolations(opts.withFieldErrors)
+	var explicitlyErrs field.ErrorList
 
-	visitContainers(podSpec, func(c *corev1.Container) {
+	visitContainers(podSpec, opts, func(c *corev1.Container, path *field.Path) {
 		if c.SecurityContext != nil && c.SecurityContext.SeccompProfile != nil {
 			// container explicitly set seccompProfile
 			if !validSeccomp(c.SecurityContext.SeccompProfile.Type) {
 				// container explicitly set seccompProfile to a bad value
-				explicitlyBadContainers = append(explicitlyBadContainers, c.Name)
+				explicitlyBadContainers.Add(c.Name)
+				if opts.withFieldErrors {
+					explicitlyErrs = append(explicitlyErrs, withBadValue(forbidden(path.Child("securityContext", "seccompProfile", "type")), string(c.SecurityContext.SeccompProfile.Type)))
+				}
 				badValues.Insert(string(c.SecurityContext.SeccompProfile.Type))
 			}
 		} else {
 			// container did not explicitly set seccompProfile
 			if !podSeccompSet {
 				// no valid pod-level seccompProfile, so this container implicitly has a bad value
-				implicitlyBadContainers = append(implicitlyBadContainers, c.Name)
+				if opts.withFieldErrors {
+					implicitlyBadContainers.Add(c.Name, required(path.Child("securityContext", "seccompProfile", "type")))
+				} else {
+					implicitlyBadContainers.Add(c.Name)
+				}
 			}
 		}
 	})
 
-	if len(explicitlyBadContainers) > 0 {
-		badSetters = append(
-			badSetters,
+	if !explicitlyBadContainers.Empty() {
+		badSetters.Add(
 			fmt.Sprintf(
 				"%s %s",
-				pluralize("container", "containers", len(explicitlyBadContainers)),
-				joinQuote(explicitlyBadContainers),
+				pluralize("container", "containers", explicitlyBadContainers.Len()),
+				joinQuote(explicitlyBadContainers.Data()),
 			),
+			explicitlyErrs...,
 		)
 	}
 	// pod or containers explicitly set bad seccompProfiles
-	if len(badSetters) > 0 {
+	if !badSetters.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "seccompProfile",
 			ForbiddenDetail: fmt.Sprintf(
 				"%s must not set securityContext.seccompProfile.type to %s",
-				strings.Join(badSetters, " and "),
+				strings.Join(badSetters.Data(), " and "),
 				joinQuote(badValues.List()),
 			),
+			ErrList: badSetters.Errs(),
 		}
 	}
 
 	// pod didn't set seccompProfile and not all containers opted into seccompProfile
-	if len(implicitlyBadContainers) > 0 {
+	if !implicitlyBadContainers.Empty() {
 		return CheckResult{
 			Allowed:         false,
 			ForbiddenReason: "seccompProfile",
 			ForbiddenDetail: fmt.Sprintf(
 				`pod or %s %s must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost"`,
-				pluralize("container", "containers", len(implicitlyBadContainers)),
-				joinQuote(implicitlyBadContainers),
+				pluralize("container", "containers", implicitlyBadContainers.Len()),
+				joinQuote(implicitlyBadContainers.Data()),
 			),
+			ErrList: implicitlyBadContainers.Errs(),
 		}
 	}
 
 	return CheckResult{Allowed: true}
 }
 
-// seccompProfileRestricted_1_25 checks restricted policy on securityContext.seccompProfile field for kubernetes
+// seccompProfileRestrictedV1Dot25 checks restricted policy on securityContext.seccompProfile field for kubernetes
 // version 1.25 and above
-func seccompProfileRestricted_1_25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func seccompProfileRestrictedV1Dot25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, opts options) CheckResult {
 	// Pod API validation would have failed if podOS == Windows and if secCompProfile has been set.
 	// We can admit the Windows pod even if seccompProfile has not been set.
 	if podSpec.OS != nil && podSpec.OS.Name == corev1.Windows {
 		return CheckResult{Allowed: true}
 	}
-	return seccompProfileRestricted_1_19(podMetadata, podSpec)
+	return seccompProfileRestrictedV1Dot19(podMetadata, podSpec, opts)
 }
