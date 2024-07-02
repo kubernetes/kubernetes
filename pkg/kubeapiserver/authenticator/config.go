@@ -94,11 +94,14 @@ type Config struct {
 
 	// Optional field, custom dial function used to connect to webhook
 	CustomDial utilnet.DialFunc
+
+	// APIServerID is the ID of the API server
+	APIServerID string
 }
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func (config Config) New(serverLifecycle context.Context) (authenticator.Request, func(context.Context, *apiserver.AuthenticationConfiguration) error, *spec.SecurityDefinitions, spec3.SecuritySchemes, error) {
+func (config Config) New(serverLifecycle context.Context) (authenticator.Request, func(context.Context, *apiserver.AuthenticationConfiguration, string) error, *spec.SecurityDefinitions, spec3.SecuritySchemes, error) {
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
 	securityDefinitionsV2 := spec.SecurityDefinitions{}
@@ -156,9 +159,9 @@ func (config Config) New(serverLifecycle context.Context) (authenticator.Request
 	// cache misses for all requests using the other. While the service account plugin
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
-	var updateAuthenticationConfig func(context.Context, *apiserver.AuthenticationConfiguration) error
+	var updateAuthenticationConfig func(context.Context, *apiserver.AuthenticationConfiguration, string) error
 	if config.AuthenticationConfig != nil {
-		initialJWTAuthenticator, err := newJWTAuthenticator(serverLifecycle, config.AuthenticationConfig, config.OIDCSigningAlgs, config.APIAudiences, config.ServiceAccountIssuers)
+		initialJWTAuthenticator, err := newJWTAuthenticator(serverLifecycle, config.AuthenticationConfig, config.OIDCSigningAlgs, config.APIAudiences, config.ServiceAccountIssuers, config.APIServerID)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -241,7 +244,7 @@ type jwtAuthenticatorWithCancel struct {
 	cancel           func()
 }
 
-func newJWTAuthenticator(serverLifecycle context.Context, config *apiserver.AuthenticationConfiguration, oidcSigningAlgs []string, apiAudiences authenticator.Audiences, disallowedIssuers []string) (_ *jwtAuthenticatorWithCancel, buildErr error) {
+func newJWTAuthenticator(serverLifecycle context.Context, config *apiserver.AuthenticationConfiguration, oidcSigningAlgs []string, apiAudiences authenticator.Audiences, disallowedIssuers []string, apiServerID string) (_ *jwtAuthenticatorWithCancel, buildErr error) {
 	ctx, cancel := context.WithCancel(serverLifecycle)
 
 	defer func() {
@@ -266,6 +269,7 @@ func newJWTAuthenticator(serverLifecycle context.Context, config *apiserver.Auth
 			CAContentProvider:    oidcCAContent,
 			SupportedSigningAlgs: oidcSigningAlgs,
 			DisallowedIssuers:    disallowedIssuers,
+			APIServerID:          apiServerID,
 		})
 		if err != nil {
 			return nil, err
@@ -295,8 +299,8 @@ type authenticationConfigUpdater struct {
 }
 
 // the input ctx controls the timeout for updateAuthenticationConfig to return, not the lifetime of the constructed authenticators.
-func (c *authenticationConfigUpdater) updateAuthenticationConfig(ctx context.Context, authConfig *apiserver.AuthenticationConfiguration) error {
-	updatedJWTAuthenticator, err := newJWTAuthenticator(c.serverLifecycle, authConfig, c.config.OIDCSigningAlgs, c.config.APIAudiences, c.config.ServiceAccountIssuers)
+func (c *authenticationConfigUpdater) updateAuthenticationConfig(ctx context.Context, authConfig *apiserver.AuthenticationConfiguration, apiServerID string) error {
+	updatedJWTAuthenticator, err := newJWTAuthenticator(c.serverLifecycle, authConfig, c.config.OIDCSigningAlgs, c.config.APIAudiences, c.config.ServiceAccountIssuers, apiServerID)
 	if err != nil {
 		return err
 	}

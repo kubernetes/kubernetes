@@ -696,6 +696,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 		authenticatorConfig.CustomDial = egressDialer
 	}
 
+	authenticatorConfig.APIServerID = apiServerID
 	// var openAPIV3SecuritySchemes spec3.SecuritySchemes
 	authenticator, updateAuthenticationConfig, openAPIV2SecurityDefinitions, openAPIV3SecuritySchemes, err := authenticatorConfig.New(ctx)
 	if err != nil {
@@ -758,7 +759,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 				timeoutCtx, timeoutCancel := context.WithTimeout(ctx, UpdateAuthenticationConfigTimeout)
 				defer timeoutCancel()
-				if err := updateAuthenticationConfig(timeoutCtx, authConfig); err != nil {
+				if err := updateAuthenticationConfig(timeoutCtx, authConfig, apiServerID); err != nil {
 					klog.ErrorS(err, "failed to update authentication config")
 					authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadFailure(apiServerID)
 					// we do not update the tracker here because this error could eventually resolve as we keep retrying
