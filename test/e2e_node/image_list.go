@@ -62,6 +62,7 @@ var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 	imageutils.GetE2EImage(imageutils.NodePerfNpbIs),
 	imageutils.GetE2EImage(imageutils.Etcd),
+	imageutils.GetE2EImage(imageutils.SampleDevicePlugin),
 )
 
 // updateImageAllowList updates the e2epod.ImagePrePullList with
@@ -88,15 +89,11 @@ func updateImageAllowList(ctx context.Context) {
 	} else {
 		e2epod.ImagePrePullList.Insert(gpuDevicePluginImage)
 	}
+	// TODO: unify the sample device plugin image, use the latest for everything
 	if samplePluginImage, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginDSYAML); err != nil {
 		klog.Errorln(err)
 	} else {
 		e2epod.ImagePrePullList.Insert(samplePluginImage)
-	}
-	if samplePluginImageCtrlReg, err := getContainerImageFromE2ETestDaemonset(SampleDevicePluginControlRegistrationDSYAML); err != nil {
-		klog.Errorln(err)
-	} else {
-		e2epod.ImagePrePullList.Insert(samplePluginImageCtrlReg)
 	}
 }
 
