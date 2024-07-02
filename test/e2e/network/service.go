@@ -1679,8 +1679,23 @@ var _ = common.SIGDescribe("Services", func() {
 		service.Spec.Type = v1.ServiceTypeNodePort
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
-		service, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+		// Retry mechanism for picking a node port between 30000 and 30085
+		const maxRetries = 5
+		var err error
+		var nodePort int32
+		for i := 0; i < maxRetries; i++ {
+			nodePort = int32(30000 + rand.Intn(86))
+			service.Spec.Ports[0].NodePort = nodePort
+			tempService, createErr := t.CreateService(service)
+			if createErr == nil {
+				service = tempService
+				break
+			}
+			err = createErr
+			if i == maxRetries-1 {
+				framework.Failf("failed to create service: %s in namespace: %s after %d attempts, last error: %v", serviceName, ns, maxRetries, err)
+			}
+		}
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -1695,7 +1710,6 @@ var _ = common.SIGDescribe("Services", func() {
 		if !e2eservice.NodePortRange.Contains(int(port.NodePort)) {
 			framework.Failf("got unexpected (out-of-range) port for new service: %v", service)
 		}
-		nodePort := port.NodePort
 
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
