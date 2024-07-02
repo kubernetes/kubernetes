@@ -60,8 +60,10 @@ const (
 	Cgroupv2CPURequest string = "/sys/fs/cgroup/cpu.weight"
 	CpuPeriod          string = "100000"
 
-	PollInterval time.Duration = 2 * time.Second
-	PollTimeout  time.Duration = 4 * time.Minute
+	PollInterval               time.Duration = 2 * time.Second
+	PollTimeout                time.Duration = 4 * time.Minute
+	ResourceUpdateTimeout      time.Duration = 4 * time.Minute
+	ResourceUpdateTimeoutShort time.Duration = 30 * time.Second
 )
 
 type ContainerResources struct {
@@ -418,7 +420,7 @@ func verifyPodContainersCgroupValues(pod *v1.Pod, tcInfo []TestContainerInfo, fl
 	return true
 }
 
-func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo) *v1.Pod {
+func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClient, pod, patchedPod *v1.Pod, expectedContainers []TestContainerInfo, updateTimeout time.Duration) *v1.Pod {
 
 	waitForContainerRestart := func() error {
 		var restartContainersExpected []string
@@ -471,8 +473,13 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 		}
 		return fmt.Errorf("timed out waiting for container cgroup values to match expected")
 	}
+	// There are some issues(#123940, #125559) that it takes much time (60-90s) till resources in pod status are updated.
+	// In order to verify fixes for these issues, the timeout here can be overridden with shorter value.
+	if updateTimeout == 0 {
+		updateTimeout = ResourceUpdateTimeout
+	}
 	waitPodStatusResourcesEqualSpecResources := func() (*v1.Pod, error) {
-		for start := time.Now(); time.Since(start) < PollTimeout; time.Sleep(PollInterval) {
+		for start := time.Now(); time.Since(start) < updateTimeout; time.Sleep(PollInterval) {
 			pod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, err
@@ -498,7 +505,7 @@ func waitForPodResizeActuation(c clientset.Interface, podClient *e2epod.PodClien
 	framework.ExpectNoError(aErr, "failed to verify pod resource allocation values equals expected values")
 	//TODO(vinaykul,InPlacePodVerticalScaling): Remove this check once base-OS updates to containerd>=1.6.9
 	//                containerd needs to add CRI support before Beta (See Node KEP #2273)
-	if !isInPlaceResizeSupportedByRuntime(c, pod.Spec.NodeName) {
+	if isInPlaceResizeSupportedByRuntime(c, pod.Spec.NodeName) {
 		// Wait for PodSpec container resources to equal PodStatus container resources indicating resize is complete
 		rPod, rErr := waitPodStatusResourcesEqualSpecResources()
 		framework.ExpectNoError(rErr, "failed to verify pod spec resources equals pod status resources")
@@ -522,10 +529,11 @@ func doPodResizeTests() {
 	})
 
 	type testCase struct {
-		name        string
-		containers  []TestContainerInfo
-		patchString string
-		expected    []TestContainerInfo
+		name          string
+		containers    []TestContainerInfo
+		patchString   string
+		expected      []TestContainerInfo
+		updateTimeout time.Duration
 	}
 
 	noRestart := v1.NotRequired
@@ -676,6 +684,7 @@ func doPodResizeTests() {
 					Resources: &ContainerResources{CPUReq: "200m", CPULim: "400m", MemReq: "200Mi", MemLim: "500Mi"},
 				},
 			},
+			updateTimeout: ResourceUpdateTimeoutShort,
 		},
 		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only",
@@ -712,6 +721,7 @@ func doPodResizeTests() {
 					Resources: &ContainerResources{CPUReq: "200m", CPULim: "400m", MemReq: "300Mi", MemLim: "500Mi"},
 				},
 			},
+			updateTimeout: ResourceUpdateTimeoutShort,
 		},
 		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory limits only",
@@ -1227,6 +1237,38 @@ func doPodResizeTests() {
 				},
 			},
 		},
+		{
+			name: "Burstable QoS pod, two containers - increase c1 memory requests only, decrease c2 memory requests only, (set RestartContainer but, not restarted)",
+			containers: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "200Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"150Mi"}}},
+						{"name":"c2", "resources":{"requests":{"memory":"150Mi"}}}
+					]}}`,
+			expected: []TestContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "150Mi", MemLim: "200Mi"},
+					MemPolicy: &doRestart,
+				},
+				{
+					Name:      "c2",
+					Resources: &ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "150Mi", MemLim: "300Mi"},
+					MemPolicy: &doRestart,
+				},
+			},
+			updateTimeout: ResourceUpdateTimeoutShort,
+		},
 	}
 
 	for idx := range tests {
@@ -1273,7 +1315,7 @@ func doPodResizeTests() {
 			verifyPodAllocations(patchedPod, tc.containers, true)
 
 			ginkgo.By("waiting for resize to be actuated")
-			resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod, patchedPod, tc.expected)
+			resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod, patchedPod, tc.expected, tc.updateTimeout)
 
 			// Check cgroup values only for containerd versions before 1.6.9
 			if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod.Spec.NodeName) {
@@ -1372,7 +1414,7 @@ func doPodResizeResourceQuotaTests() {
 		verifyPodAllocations(patchedPod, containers, true)
 
 		ginkgo.By("waiting for resize to be actuated")
-		resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod1, patchedPod, expected)
+		resizedPod := waitForPodResizeActuation(f.ClientSet, podClient, newPod1, patchedPod, expected, 0)
 		if !isInPlaceResizeSupportedByRuntime(f.ClientSet, newPod1.Spec.NodeName) {
 			ginkgo.By("verifying pod container's cgroup values after resize")
 			if !framework.NodeOSDistroIs("windows") {
