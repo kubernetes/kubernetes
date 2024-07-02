@@ -62,11 +62,18 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (s strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClusterRole := obj.(*rbac.ClusterRole)
 	oldClusterRole := old.(*rbac.ClusterRole)
 
 	_, _ = newClusterRole, oldClusterRole
+	s.updateRulesForAggregation(oldClusterRole, newClusterRole)
+}
+
+func (s strategy) updateRulesForAggregation(oldClusterRole, newClusterRole *rbac.ClusterRole) {
+	if oldClusterRole.AggregationRule != nil && newClusterRole.AggregationRule != nil && newClusterRole.Rules == nil {
+		newClusterRole.Rules = append([]rbac.PolicyRule{}, oldClusterRole.Rules...)
+	}
 }
 
 // Validate validates a new ClusterRole. Validation must check for a correct signature.
