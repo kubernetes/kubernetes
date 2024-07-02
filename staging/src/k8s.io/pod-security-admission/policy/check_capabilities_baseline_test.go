@@ -23,11 +23,14 @@ import (
 )
 
 func TestCapabilitiesBaseline(t *testing.T) {
+	falseBool := false
 	tests := []struct {
-		name         string
-		pod          *corev1.Pod
-		expectReason string
-		expectDetail string
+		name                                     string
+		pod                                      *corev1.Pod
+		expectReason                             string
+		expectDetail                             string
+		enableUserNamespacesPodSecurityStandards bool
+		shouldPass                               bool
 	}{
 		{
 			name: "multiple containers",
@@ -36,16 +39,58 @@ func TestCapabilitiesBaseline(t *testing.T) {
 					{Name: "a", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"FOO", "BAR"}}}},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"BAR", "BAZ"}}}},
 				}}},
-			expectReason: `non-default capabilities`,
-			expectDetail: `containers "a", "b" must not include "BAR", "BAZ", "FOO" in securityContext.capabilities.add`,
+			expectReason:                             `non-default capabilities`,
+			expectDetail:                             `containers "a", "b" must not include "BAR", "BAZ", "FOO" in securityContext.capabilities.add`,
+			enableUserNamespacesPodSecurityStandards: false,
+			shouldPass:                               false,
+		},
+		{
+			name: "with hostUsers, but feature gate not enabled",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "a", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"FOO", "BAR"}}}},
+					{Name: "b", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"BAR", "BAZ"}}}},
+				},
+				HostUsers: &falseBool,
+			}},
+			expectReason:                             `non-default capabilities`,
+			expectDetail:                             `containers "a", "b" must not include "BAR", "BAZ", "FOO" in securityContext.capabilities.add`,
+			enableUserNamespacesPodSecurityStandards: false,
+			shouldPass:                               false,
+		},
+		{
+			name: "without hostUsers, but feature gate enabled",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "a", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"FOO", "BAR"}}}},
+					{Name: "b", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"BAR", "BAZ"}}}},
+				},
+			}},
+			expectReason:                             `non-default capabilities`,
+			expectDetail:                             `containers "a", "b" must not include "BAR", "BAZ", "FOO" in securityContext.capabilities.add`,
+			enableUserNamespacesPodSecurityStandards: true,
+			shouldPass:                               false,
+		},
+		{
+			name: "with hostUsers and feature gate enabled",
+			pod: &corev1.Pod{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "a", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"FOO", "BAR"}}}},
+					{Name: "b", SecurityContext: &corev1.SecurityContext{Capabilities: &corev1.Capabilities{Add: []corev1.Capability{"BAR", "BAZ"}}}},
+				},
+				HostUsers: &falseBool,
+			}},
+			enableUserNamespacesPodSecurityStandards: true,
+			shouldPass:                               true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			RelaxPolicyForUserNamespacePods(tc.enableUserNamespacesPodSecurityStandards)
 			result := capabilitiesBaseline_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
-			if result.Allowed {
-				t.Fatal("expected disallowed")
+			if result.Allowed == !tc.shouldPass {
+				t.Fatalf("expected Allowed to be %v", !tc.shouldPass)
 			}
 			if e, a := tc.expectReason, result.ForbiddenReason; e != a {
 				t.Errorf("expected\n%s\ngot\n%s", e, a)
