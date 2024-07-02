@@ -104,7 +104,7 @@ func TestPodSecurityWebhook(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)
 
 	// Start test API server.
-	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
+	capabilities.ResetForTest(&capabilities.Capabilities{AllowPrivileged: true})
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--anonymous-auth=false",
 		"--allow-privileged=true",
@@ -138,7 +138,7 @@ func TestPodSecurityWebhook(t *testing.T) {
 
 func startPodSecurityServer(t *testing.T) *kubeapiservertesting.TestServer {
 	// ensure the global is set to allow privileged containers
-	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
+	capabilities.ResetForTest(&capabilities.Capabilities{AllowPrivileged: true})
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--anonymous-auth=false",
