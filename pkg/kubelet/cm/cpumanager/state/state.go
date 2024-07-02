@@ -20,7 +20,8 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
-// ContainerCPUAssignments type used in cpu manager state
+// ContainerCPUAssignments type used in cpu manager state.
+// Maps pod UID to container name, and container name to cpuset.CPUSet.
 type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
 
 // Clone returns a copy of ContainerCPUAssignments
