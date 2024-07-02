@@ -148,3 +148,24 @@ func TestJSONSchemaPropsOrArrayMarshalJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestJSONUnderlyingArrayReuse(t *testing.T) {
+	const want = `{"foo":"bar"}`
+
+	b := []byte(want)
+
+	var s JSON
+	if err := s.UnmarshalJSON(b); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Underlying array is modified.
+	copy(b[2:5], "bar")
+	copy(b[8:11], "foo")
+
+	// If UnmarshalJSON copied the bytes of its argument, then it should not have been affected
+	// by the mutation.
+	if got := string(s.Raw); got != want {
+		t.Errorf("unexpected mutation, got %s want %s", got, want)
+	}
+}

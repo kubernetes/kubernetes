@@ -130,7 +130,7 @@ func (s JSON) MarshalJSON() ([]byte, error) {
 
 func (s *JSON) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && !bytes.Equal(data, nullLiteral) {
-		s.Raw = data
+		s.Raw = append(s.Raw[0:0], data...)
 	}
 	return nil
 }
