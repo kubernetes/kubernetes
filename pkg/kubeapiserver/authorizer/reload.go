@@ -35,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
@@ -78,8 +79,8 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
-func (r *reloadableAuthorizerResolver) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
-	return r.current.Load().ruleResolver.RulesFor(user, namespace)
+func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	return r.current.Load().ruleResolver.RulesFor(genericapirequest.WithNamespace(ctx, ""), user, namespace)
 }
 
 // newForConfig constructs

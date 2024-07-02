@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -81,7 +82,7 @@ func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidati
 	if err != nil {
 		return nil, err
 	}
-	rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
+	rules, err := s.ruleResolver.GetRoleReferenceRules(genericapirequest.WithNamespace(ctx, ""), v1RoleRef, metav1.NamespaceNone)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func (s *Storage) Update(ctx context.Context, name string, obj rest.UpdatedObjec
 		if err != nil {
 			return nil, err
 		}
-		rules, err := s.ruleResolver.GetRoleReferenceRules(v1RoleRef, metav1.NamespaceNone)
+		rules, err := s.ruleResolver.GetRoleReferenceRules(genericapirequest.WithNamespace(ctx, ""), v1RoleRef, metav1.NamespaceNone)
 		if err != nil {
 			return nil, err
 		}

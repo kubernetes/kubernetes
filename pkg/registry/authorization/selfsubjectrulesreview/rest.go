@@ -78,7 +78,8 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		}
 	}
 
-	resourceInfo, nonResourceInfo, incomplete, err := r.ruleResolver.RulesFor(user, namespace)
+	// make sure ctx is not carrying namespace inside.
+	resourceInfo, nonResourceInfo, incomplete, err := r.ruleResolver.RulesFor(genericapirequest.WithNamespace(ctx, ""), user, namespace)
 
 	ret := &authorizationapi.SelfSubjectRulesReview{
 		Status: authorizationapi.SubjectRulesReviewStatus{
