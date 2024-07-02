@@ -582,7 +582,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// find the first unhealthy Pod
 	for i := range replicas {
-		if !isHealthy(replicas[i]) {
+		if !isHealthy(replicas[i], set.Spec.MinReadySeconds) {
 			unhealthy++
 			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = replicas[i]
@@ -592,7 +592,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// or the first unhealthy condemned Pod (condemned are sorted in descending order for ease of use)
 	for i := len(condemned) - 1; i >= 0; i-- {
-		if !isHealthy(condemned[i]) {
+		if !isHealthy(condemned[i], set.Spec.MinReadySeconds) {
 			unhealthy++
 			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = condemned[i]
@@ -641,7 +641,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 	// At this point, in monotonic mode all of the current Replicas are Running, Ready and Available,
 	// and we can consider termination.
-	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
+	// We will wait for all predecessors to be Running and Available prior to attempting a deletion.
 	// We will terminate Pods in a monotonically decreasing order.
 	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over
 	// updates.
@@ -692,7 +692,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 
 		// wait for unhealthy Pods on update
-		if !isHealthy(replicas[target]) {
+		if !isHealthy(replicas[target], set.Spec.MinReadySeconds) {
 			logger.V(4).Info("StatefulSet is waiting for Pod to update",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			return &status, nil
@@ -731,12 +731,12 @@ func updateStatefulSetAfterInvariantEstablished(
 	}
 
 	// Collect all targets in the range between getStartOrdinal(set) and getEndOrdinal(set). Count any targets in that range
-	// that are unhealthy i.e. terminated or not running and ready as unavailable). Select the
+	// that are unhealthy i.e. terminated or not running and available as unavailable). Select the
 	// (MaxUnavailable - Unavailable) Pods, in order with respect to their ordinal for termination. Delete
 	// those pods and count the successful deletions. Update the status with the correct number of deletions.
 	unavailablePods := 0
 	for target := len(replicas) - 1; target >= 0; target-- {
-		if !isHealthy(replicas[target]) {
+		if !isHealthy(replicas[target], set.Spec.MinReadySeconds) {
 			unavailablePods++
 		}
 	}

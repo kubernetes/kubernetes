@@ -492,9 +492,9 @@ func isTerminating(pod *v1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
-// isHealthy returns true if pod is running and ready and has not been terminated
-func isHealthy(pod *v1.Pod) bool {
-	return isRunningAndReady(pod) && !isTerminating(pod)
+// isHealthy returns true if pod is running and available and has not been terminated
+func isHealthy(pod *v1.Pod, minReadySeconds int32) bool {
+	return isRunningAndAvailable(pod, minReadySeconds) && !isTerminating(pod)
 }
 
 // allowsBurst is true if the alpha burst annotation is set.
