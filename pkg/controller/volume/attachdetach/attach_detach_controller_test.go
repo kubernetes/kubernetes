@@ -87,8 +87,12 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 
+	var plugins []volume.VolumePlugin
+	plugins = append(plugins, controllervolumetesting.CreateTestPlugin(false)...)
+	plugins = append(plugins, csi.ProbeVolumePlugins()...)
+
 	logger, tCtx := ktesting.NewTestContext(t)
-	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, controllervolumetesting.CreateTestPlugin())
+	adc := createADC(t, tCtx, fakeKubeClient, informerFactory, plugins)
 
 	// Act
 	informerFactory.Start(tCtx.Done())
@@ -136,9 +140,11 @@ func Test_AttachDetachControllerStateOfWorldPopulators_Positive(t *testing.T) {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: %v", err)
 	}
 	for _, pod := range pods {
-		uniqueName := fmt.Sprintf("%s/%s", controllervolumetesting.TestPluginName, pod.Spec.Volumes[0].Name)
+		// All pods in fakeKubeClient have only one volume and share the same volume.
+		// pdName is the part of the translated volume name after csi migration.
+		volumeName := v1.UniqueVolumeName(csiPDUniqueNamePrefix + "pdName")
 		nodeName := types.NodeName(pod.Spec.NodeName)
-		found := adc.desiredStateOfWorld.VolumeExists(v1.UniqueVolumeName(uniqueName), nodeName)
+		found := adc.desiredStateOfWorld.VolumeExists(volumeName, nodeName)
 		if !found {
 			t.Fatalf("Run failed with error. Volume %s, node %s not found in DesiredStateOfWorld",
 				pod.Spec.Volumes[0].Name,
@@ -238,21 +244,43 @@ func BenchmarkNodeUpdate(b *testing.B) {
 }
 
 func Test_AttachDetachControllerRecovery(t *testing.T) {
-	attachDetachRecoveryTestCase(t, []*v1.Pod{}, []*v1.Pod{})
-	newPod1 := controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")
-	attachDetachRecoveryTestCase(t, []*v1.Pod{newPod1}, []*v1.Pod{})
-	newPod1 = controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")
-	attachDetachRecoveryTestCase(t, []*v1.Pod{}, []*v1.Pod{newPod1})
-	newPod1 = controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")
-	newPod2 := controllervolumetesting.NewPodWithVolume("newpod-2", "volumeName3", "mynode-1")
-	attachDetachRecoveryTestCase(t, []*v1.Pod{newPod1}, []*v1.Pod{newPod2})
+	testCases := []struct {
+		testName   string
+		extraPods1 []*v1.Pod
+		extraPods2 []*v1.Pod
+	}{
+		{
+			testName: "No extra pods",
+		},
+		{
+			testName:   "Add a new pod between ASW and DSW ppoulators",
+			extraPods1: []*v1.Pod{controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")},
+		},
+		{
+			testName:   "Add a new pod between DSW ppoulator and reconciler run",
+			extraPods2: []*v1.Pod{controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")},
+		},
+		{
+			testName: "Add a new pod between ASW and DSW ppoulators and another between DSW ppoulator and reconciler run",
+			// All the pods share the same underlying volume, including pre-existing pods. It means that the volume
+			// will be translated to the same persistent volume name. But each "extra pods" is running on a different node.
+			// So the expected attached volumes should be 1+extraPodsNum.
+			extraPods1: []*v1.Pod{controllervolumetesting.NewPodWithVolume("newpod-1", "volumeName2", "mynode-1")},
+			extraPods2: []*v1.Pod{controllervolumetesting.NewPodWithVolume("newpod-2", "volumeName3", "mynode-2")},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
+			attachDetachRecoveryTestCase(t, tc.extraPods1, tc.extraPods2)
+		})
+	}
 }
 
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
-	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
-	plugins := controllervolumetesting.CreateTestPlugin()
+	plugins := controllervolumetesting.CreateTestPlugin(true)
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	csiNodeInformer := informerFactory.Storage().V1().CSINodes().Informer()
@@ -449,18 +477,6 @@ type vaTest struct {
 
 func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 	for _, tc := range []vaTest{
-		{ // pod is scheduled
-			testName:          "Scheduled pod",
-			volName:           "vol1",
-			podName:           "pod1",
-			podNodeName:       "mynode-1",
-			pvName:            "pv1",
-			vaName:            "va1",
-			vaNodeName:        "mynode-1",
-			vaAttachStatus:    false,
-			expected_attaches: map[string][]string{"mynode-1": {"vol1"}},
-			expected_detaches: map[string][]string{},
-		},
 		{ // pod is deleted, attach status:true, verify dangling volume is detached
 			testName:          "VA status is attached",
 			volName:           "vol1",
@@ -514,7 +530,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 
-	plugins = append(plugins, controllervolumetesting.CreateTestPlugin()...)
+	plugins = append(plugins, controllervolumetesting.CreateTestPlugin(false)...)
 	plugins = append(plugins, csi.ProbeVolumePlugins()...)
 
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
