@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.api.authorization.v1beta1;
 
+import "k8s.io/api/authorization/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -111,6 +112,14 @@ message ResourceAttributes {
   // Name is the name of the resource being requested for a "get" or deleted for a "delete". "" (empty) means all.
   // +optional
   optional string name = 7;
+
+  // fieldSelector describes the limitation on access based on field.  It can only limit access, not broaden it.
+  // +optional
+  optional .k8s.io.api.authorization.v1.FieldSelectorAttributes fieldSelector = 8;
+
+  // labelSelector describes the limitation on access based on labels.  It can only limit access, not broaden it.
+  // +optional
+  optional .k8s.io.api.authorization.v1.LabelSelectorAttributes labelSelector = 9;
 }
 
 // ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant,

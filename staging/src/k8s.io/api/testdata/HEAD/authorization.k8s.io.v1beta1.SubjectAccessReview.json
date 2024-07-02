@@ -51,7 +51,31 @@
       "version": "versionValue",
       "resource": "resourceValue",
       "subresource": "subresourceValue",
-      "name": "nameValue"
+      "name": "nameValue",
+      "fieldSelector": {
+        "rawSelector": "rawSelectorValue",
+        "requirements": [
+          {
+            "key": "keyValue",
+            "operator": "operatorValue",
+            "values": [
+              "valuesValue"
+            ]
+          }
+        ]
+      },
+      "labelSelector": {
+        "rawSelector": "rawSelectorValue",
+        "requirements": [
+          {
+            "key": "keyValue",
+            "operator": "operatorValue",
+            "values": [
+              "valuesValue"
+            ]
+          }
+        ]
+      }
     },
     "nonResourceAttributes": {
       "path": "pathValue",
