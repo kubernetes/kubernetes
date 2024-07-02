@@ -148,6 +148,9 @@ spec:
           capabilities:
             add:
             - NET_ADMIN
+            - NET_BIND_SERVICE
+            drop:
+            - ALL
         ports:
         - containerPort: 53
           name: dns
