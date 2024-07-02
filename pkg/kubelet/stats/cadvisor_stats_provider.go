@@ -499,7 +499,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 			// response.
 			klog.ErrorS(err, "Partial failure issuing cadvisor.ContainerInfoV2")
 		} else {
-			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+			return nil, fmt.Errorf("failed to get root cgroup stats: %w", err)
 		}
 	}
 	return infos, nil

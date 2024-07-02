@@ -318,7 +318,7 @@ func getCgroupInfo(cadvisor cadvisor.Interface, containerName string, updateStat
 		MaxAge:    maxAge,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container info for %q: %v", containerName, err)
+		return nil, fmt.Errorf("failed to get container info for %q: %w", containerName, err)
 	}
 	if len(infoMap) != 1 {
 		return nil, fmt.Errorf("unexpected number of containers: %v", len(infoMap))
