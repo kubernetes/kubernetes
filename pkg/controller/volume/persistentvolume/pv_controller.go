@@ -764,7 +764,7 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 //
 //	claim - claim to update
 //	phase - phase to set
-//	volume - volume which Capacity is set into claim.Status.Capacity
+//	volume - volume which Capacity is set into claim.Status.Capacity and VolumeAttributesClassName is set into claim.Status.CurrentVolumeAttributesClassName
 func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Updating PersistentVolumeClaim status", "PVC", klog.KObj(claim), "setPhase", phase)
@@ -778,7 +778,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 	}
 
 	if volume == nil {
-		// Need to reset AccessModes and Capacity
+		// Need to reset AccessModes, Capacity and CurrentVolumeAttributesClassName
 		if claim.Status.AccessModes != nil {
 			claimClone.Status.AccessModes = nil
 			dirty = true
@@ -787,8 +787,13 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 			claimClone.Status.Capacity = nil
 			dirty = true
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) &&
+			claim.Status.CurrentVolumeAttributesClassName != nil {
+			claimClone.Status.CurrentVolumeAttributesClassName = nil
+			dirty = true
+		}
 	} else {
-		// Need to update AccessModes and Capacity
+		// Need to update AccessModes, Capacity and CurrentVolumeAttributesClassName
 		if !reflect.DeepEqual(claim.Status.AccessModes, volume.Spec.AccessModes) {
 			claimClone.Status.AccessModes = volume.Spec.AccessModes
 			dirty = true
@@ -821,6 +826,12 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 				dirty = true
 			}
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) &&
+			!reflect.DeepEqual(claim.Status.CurrentVolumeAttributesClassName, volume.Spec.VolumeAttributesClassName) {
+			claimClone.Status.CurrentVolumeAttributesClassName = volume.Spec.VolumeAttributesClassName
+			dirty = true
+		}
 	}
 
 	if !dirty {
@@ -850,7 +861,7 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(ctx context.Context, c
 //
 //	claim - claim to update
 //	phase - phase to set
-//	volume - volume which Capacity is set into claim.Status.Capacity
+//	volume - volume which Capacity is set into claim.Status.Capacity and VolumeAttributesClassName is set into claim.Status.CurrentVolumeAttributesClassName
 //	eventtype, reason, message - event to send, see EventRecorder.Event()
 func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(ctx context.Context, claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume, eventtype, reason, message string) (*v1.PersistentVolumeClaim, error) {
 	logger := klog.FromContext(ctx)

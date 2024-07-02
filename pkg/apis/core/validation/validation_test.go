@@ -3007,6 +3007,20 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			enableVolumeAttributesClass: true,
 			isExpectedFailure:           true,
 		},
+		"invalid-update-volume-attributes-class-when-claim-not-bound": {
+			oldClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass1.DeepCopy()
+				clone.Status.Phase = core.ClaimPending
+				return clone
+			}(),
+			newClaim: func() *core.PersistentVolumeClaim {
+				clone := validClaimVolumeAttributesClass2.DeepCopy()
+				clone.Status.Phase = core.ClaimPending
+				return clone
+			}(),
+			enableVolumeAttributesClass: true,
+			isExpectedFailure:           true,
+		},
 		"invalid-update-volume-attributes-class-to-nil-without-featuregate-enabled": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
 			newClaim:                    validClaimNilVolumeAttributesClass,
