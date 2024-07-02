@@ -26,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -50,22 +48,6 @@ const (
 var (
 	scName = "csi-sc"
 )
-
-// getVolumeLimitKey returns a ResourceName by filter type
-func getVolumeLimitKey(filterType string) v1.ResourceName {
-	switch filterType {
-	case ebsVolumeFilterType:
-		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-	case gcePDVolumeFilterType:
-		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-	case azureDiskVolumeFilterType:
-		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case cinderVolumeFilterType:
-		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
-	default:
-		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
-	}
-}
 
 func TestCSILimits(t *testing.T) {
 	runningPod := st.MakePod().PVC("csi-ebs.csi.aws.com-3").Obj()
@@ -297,7 +279,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      4,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "fits when node volume limit >= new pods CSI volume",
-			limitSource:  "node",
+			limitSource:  "csinode",
 		},
 		{
 			newPod:       csiEBSOneVolPod,
@@ -306,7 +288,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "doesn't when node volume limit <= pods CSI volume",
-			limitSource:  "node",
+			limitSource:  "csinode",
 			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
@@ -326,7 +308,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "count pending PVCs towards volume limit <= pods CSI volume",
-			limitSource:  "node",
+			limitSource:  "csinode",
 			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		// two same pending PVCs should be counted as 1
@@ -337,7 +319,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      4,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "count multiple pending pvcs towards volume limit >= pods CSI volume",
-			limitSource:  "node",
+			limitSource:  "csinode",
 		},
 		// should count PVCs with invalid PV name but valid SC
 		{
@@ -347,7 +329,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "should count PVCs with invalid PV name but valid SC",
-			limitSource:  "node",
+			limitSource:  "csinode",
 			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		// don't count a volume which has storageclass missing
@@ -358,7 +340,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName},
 			test:         "don't count pvcs with missing SC towards volume limit",
-			limitSource:  "node",
+			limitSource:  "csinode",
 		},
 		// don't count multiple volume types
 		{
@@ -368,7 +350,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName, gceCSIDriverName},
 			test:         "count pvcs with the same type towards volume limit",
-			limitSource:  "node",
+			limitSource:  "csinode",
 			wantStatus:   framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
 		{
@@ -378,7 +360,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:      2,
 			driverNames:  []string{ebsCSIDriverName, gceCSIDriverName},
 			test:         "don't count pvcs with different type towards volume limit",
-			limitSource:  "node",
+			limitSource:  "csinode",
 		},
 		// Tests for in-tree volume migration
 		{
@@ -396,10 +378,8 @@ func TestCSILimits(t *testing.T) {
 			newPod:           inTreeInlineVolPod,
 			existingPods:     []*v1.Pod{inTreeTwoVolPod},
 			filterName:       "csi",
-			maxVols:          2,
 			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
 			migrationEnabled: true,
-			limitSource:      "node",
 			test:             "nil csi node",
 		},
 		{
@@ -494,6 +474,7 @@ func TestCSILimits(t *testing.T) {
 			filterName:       "csi",
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
+			limitSource:      "csinode-with-no-limit",
 			test:             "ephemeral volume missing",
 			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, `looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`),
 		},
@@ -503,6 +484,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			driverNames:      []string{ebsCSIDriverName},
+			limitSource:      "csinode-with-no-limit",
 			test:             "ephemeral volume not owned",
 			wantStatus:       framework.AsStatus(errors.New("PVC test/abc-xyz was not created for pod test/abc (pod is not owner)")),
 		},
@@ -512,6 +494,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
 			driverNames:      []string{ebsCSIDriverName},
+			limitSource:      "csinode-with-no-limit",
 			test:             "ephemeral volume unbound",
 		},
 		{
@@ -522,7 +505,7 @@ func TestCSILimits(t *testing.T) {
 			driverNames:      []string{ebsCSIDriverName},
 			existingPods:     []*v1.Pod{runningPod, csiEBSTwoVolPod},
 			maxVols:          2,
-			limitSource:      "node",
+			limitSource:      "csinode",
 			test:             "ephemeral doesn't when node volume limit <= pods CSI volume",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
@@ -534,7 +517,7 @@ func TestCSILimits(t *testing.T) {
 			driverNames:      []string{ebsCSIDriverName},
 			existingPods:     []*v1.Pod{runningPod, ephemeralTwoVolumePod},
 			maxVols:          2,
-			limitSource:      "node",
+			limitSource:      "csinode",
 			test:             "ephemeral doesn't when node volume limit <= pods ephemeral CSI volume",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
@@ -546,7 +529,7 @@ func TestCSILimits(t *testing.T) {
 			driverNames:      []string{ebsCSIDriverName},
 			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
 			maxVols:          3,
-			limitSource:      "node",
+			limitSource:      "csinode",
 			test:             "persistent doesn't when node volume limit <= pods ephemeral CSI volume + persistent volume, ephemeral disabled",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
@@ -558,7 +541,7 @@ func TestCSILimits(t *testing.T) {
 			driverNames:      []string{ebsCSIDriverName},
 			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
 			maxVols:          3,
-			limitSource:      "node",
+			limitSource:      "csinode",
 			test:             "persistent doesn't when node volume limit <= pods ephemeral CSI volume + persistent volume",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
 		},
@@ -569,7 +552,8 @@ func TestCSILimits(t *testing.T) {
 			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
 			driverNames:      []string{ebsCSIDriverName},
 			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
-			maxVols:          4,
+			maxVols:          5,
+			limitSource:      "csinode",
 			test:             "persistent okay when node volume limit > pods ephemeral CSI volume + persistent volume",
 		},
 		{
@@ -578,7 +562,7 @@ func TestCSILimits(t *testing.T) {
 			maxVols:             2,
 			driverNames:         []string{ebsCSIDriverName},
 			test:                "skip Filter when the pod only uses secrets and configmaps",
-			limitSource:         "node",
+			limitSource:         "csinode",
 			wantPreFilterStatus: framework.NewStatus(framework.Skip),
 		},
 		{
@@ -587,13 +571,14 @@ func TestCSILimits(t *testing.T) {
 			maxVols:     2,
 			driverNames: []string{ebsCSIDriverName},
 			test:        "don't skip Filter when the pod has pvcs",
-			limitSource: "node",
+			limitSource: "csinode",
 		},
 		{
 			newPod:           ephemeralPodWithConfigmapAndSecret,
 			filterName:       "csi",
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
+			limitSource:      "csinode-with-no-limit",
 			test:             "don't skip Filter when the pod has ephemeral volumes",
 			wantStatus:       framework.NewStatus(framework.UnschedulableAndUnresolvable, `looking up PVC test/abc-xyz: persistentvolumeclaims "abc-xyz" not found`),
 		},
@@ -821,12 +806,6 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	}
 	var csiNode *storagev1.CSINode
 
-	addLimitToNode := func() {
-		for _, driver := range driverNames {
-			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(int64(limit), resource.DecimalSI)
-		}
-	}
-
 	initCSINode := func() {
 		csiNode = &storagev1.CSINode{
 			ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -853,12 +832,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	}
 
 	switch limitSource {
-	case "node":
-		addLimitToNode()
 	case "csinode":
-		addDriversCSINode(true)
-	case "both":
-		addLimitToNode()
 		addDriversCSINode(true)
 	case "csinode-with-no-limit":
 		addDriversCSINode(false)
