@@ -483,8 +483,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 		volumeMounter, newMounterErr := volumePlugin.NewMounter(
 			volumeToMount.VolumeSpec,
-			volumeToMount.Pod,
-			volume.VolumeOptions{})
+			volumeToMount.Pod)
 		if newMounterErr != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -970,8 +969,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	}
 	blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 		volumeToMount.VolumeSpec,
-		volumeToMount.Pod,
-		volume.VolumeOptions{})
+		volumeToMount.Pod)
 	if newMapperErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, eventErr.Error())
@@ -1875,8 +1873,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		if fsVolume {
 			volumeMounter, newMounterErr := volumePlugin.NewMounter(
 				volumeToMount.VolumeSpec,
-				volumeToMount.Pod,
-				volume.VolumeOptions{})
+				volumeToMount.Pod)
 			if newMounterErr != nil {
 				eventErr, detailedErr = volumeToMount.GenerateError("NodeExpandVolume.NewMounter initialization failed", newMounterErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -1914,8 +1911,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 			blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 				volumeToMount.VolumeSpec,
-				volumeToMount.Pod,
-				volume.VolumeOptions{})
+				volumeToMount.Pod)
 			if newMapperErr != nil {
 				eventErr, detailedErr = volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)

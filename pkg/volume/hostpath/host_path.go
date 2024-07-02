@@ -118,7 +118,7 @@ func (plugin *hostPathPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
-func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	hostPathVolumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err

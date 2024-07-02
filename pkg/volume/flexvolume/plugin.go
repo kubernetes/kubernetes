@@ -161,7 +161,7 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 }
 
 // NewMounter is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod) (volume.Mounter, error) {
 	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), plugin.runner)
 }
 
