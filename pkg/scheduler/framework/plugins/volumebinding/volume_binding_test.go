@@ -890,3 +890,109 @@ func TestVolumeBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
+	table := []struct {
+		name   string
+		oldObj interface{}
+		newObj interface{}
+		err    bool
+		expect framework.QueueingHint
+	}{
+		{
+			name:   "unexpected objects are passed",
+			oldObj: new(struct{}),
+			newObj: new(struct{}),
+			err:    true,
+			expect: framework.Queue,
+		},
+		{
+			name: "CSINode is newly created",
+			newObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+				},
+			},
+			oldObj: nil,
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "CSINode's migrated-plugins annotations is added",
+			oldObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test1",
+					},
+				},
+			},
+			newObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test1, test2",
+					},
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "CSINode's migrated-plugins annotation is updated",
+			oldObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test1",
+					},
+				},
+			},
+			newObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test2",
+					},
+				},
+			},
+			err:    false,
+			expect: framework.Queue,
+		},
+		{
+			name: "CSINode is updated but migrated-plugins annotation gets unchanged",
+			oldObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test1",
+					},
+				},
+			},
+			newObj: &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "csinode-a",
+					Annotations: map[string]string{
+						v1.MigratedPluginsAnnotationKey: "test1",
+					},
+				},
+			},
+			err:    false,
+			expect: framework.QueueSkip,
+		},
+	}
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			pod := makePod("pod-a").Pod
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := pl.isSchedulableAfterCSINodeChange(logger, pod, item.oldObj, item.newObj)
+			if (err != nil) != item.err {
+				t.Errorf("isSchedulableAfterCSINodeChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
