@@ -19,6 +19,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +38,7 @@ const (
 	ErrCodeInvalidObj
 	ErrCodeUnreachable
 	ErrCodeTimeout
+	ErrCodeCorruptedData
 )
 
 var errCodeToMessage = map[int]string{
@@ -46,6 +48,7 @@ var errCodeToMessage = map[int]string{
 	ErrCodeInvalidObj:               "invalid object",
 	ErrCodeUnreachable:              "server unreachable",
 	ErrCodeTimeout:                  "request timeout",
+	ErrCodeCorruptedData:            "corrupted data",
 }
 
 func NewKeyNotFoundError(key string, rv int64) *StorageError {
@@ -96,14 +99,40 @@ func NewInvalidObjError(key, msg string) *StorageError {
 	}
 }
 
+func NewCorruptedDataError(errToKey map[string]error) error {
+	return &StorageError{
+		Code:      ErrCodeCorruptedData,
+		KeyErrors: errToKey,
+	}
+}
+
 type StorageError struct {
 	Code               int
 	Key                string
+	KeyErrors          map[string]error
 	ResourceVersion    int64
 	AdditionalErrorMsg string
 }
 
+type KeyErrorPair struct {
+	Key   string
+	Error error
+}
+
+func (p KeyErrorPair) Compare(other KeyErrorPair) int {
+	if p.Key == other.Key {
+		return 0
+	}
+	if p.Key < other.Key {
+		return -1
+	}
+	return 1
+}
+
 func (e *StorageError) Error() string {
+	if e.KeyErrors != nil {
+		return fmt.Sprintf("StorageError: %s, Code: %d, KeyErrors:\n%v", errCodeToMessage[e.Code], e.Code, sprintErrorMap(e.KeyErrors))
+	}
 	return fmt.Sprintf("StorageError: %s, Code: %d, Key: %s, ResourceVersion: %d, AdditionalErrorMsg: %s",
 		errCodeToMessage[e.Code], e.Code, e.Key, e.ResourceVersion, e.AdditionalErrorMsg)
 }
@@ -111,6 +140,10 @@ func (e *StorageError) Error() string {
 // IsNotFound returns true if and only if err is "key" not found error.
 func IsNotFound(err error) bool {
 	return isErrCode(err, ErrCodeKeyNotFound)
+}
+
+func IsCorruptedData(err error) bool {
+	return isErrCode(err, ErrCodeCorruptedData)
 }
 
 // IsExist returns true if and only if err is "key" already exists error.
@@ -213,4 +246,22 @@ func IsTooLargeResourceVersion(err error) bool {
 		return false
 	}
 	return apierrors.HasStatusCause(err, metav1.CauseTypeResourceVersionTooLarge)
+}
+
+// sprintErrorMap orders the input by keys and pretty-sprints the slice.
+// We want the errors to be stable in case somebody compares them as strings.
+func sprintErrorMap(errMap map[string]error) string {
+	errKeyPairs := make([]KeyErrorPair, 0, len(errMap))
+	for k, v := range errMap {
+		k, v := k, v
+		errKeyPairs = append(errKeyPairs, KeyErrorPair{Key: k, Error: v})
+	}
+
+	slices.SortStableFunc(errKeyPairs, func(a, b KeyErrorPair) int { return a.Compare(b) })
+
+	s := "{\n"
+	for i := range errKeyPairs {
+		s += fmt.Sprintf("\tkey: %s, error: %v\n", errKeyPairs[i].Key, errKeyPairs[i].Error)
+	}
+	return s + "}"
 }

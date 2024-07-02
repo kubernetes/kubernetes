@@ -54,6 +54,7 @@ var knownReasons = map[metav1.StatusReason]struct{}{
 	metav1.StatusReasonGone:                  {},
 	metav1.StatusReasonInvalid:               {},
 	metav1.StatusReasonServerTimeout:         {},
+	metav1.StatusReasonStoreReadError:        {},
 	metav1.StatusReasonTimeout:               {},
 	metav1.StatusReasonTooManyRequests:       {},
 	metav1.StatusReasonBadRequest:            {},
@@ -373,6 +374,33 @@ func NewServerTimeout(qualifiedResource schema.GroupResource, operation string, 
 		},
 		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, qualifiedResource.String()),
 	}}
+}
+
+func NewStorageReadError(qualifiedResource schema.GroupResource, resourcePrefix string, keysToError map[string]error) *StatusError {
+	var causes []metav1.StatusCause
+	allKeys := make([]string, 0, len(keysToError))
+	for failedKey, err := range keysToError {
+		allKeys = append(allKeys, failedKey)
+		causes = append(causes, metav1.StatusCause{
+			Type:    metav1.CauseTypeUnexpectedServerResponse,
+			Field:   failedKey,
+			Message: err.Error(),
+		})
+	}
+
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusInternalServerError,
+		Reason: metav1.StatusReasonStoreReadError,
+		Details: &metav1.StatusDetails{
+			Group:  qualifiedResource.Group,
+			Kind:   qualifiedResource.Resource,
+			Name:   resourcePrefix,
+			Causes: causes,
+		},
+		Message: fmt.Sprintf("failed to read one or more %s from the storage; failed keys: %v", qualifiedResource.String(), allKeys),
+	},
+	}
 }
 
 // NewServerTimeoutForKind should not exist.  Server timeouts happen when accessing resources, the Kind is just what we
@@ -773,6 +801,10 @@ func IsUnexpectedServerError(err error) bool {
 func IsUnexpectedObjectError(err error) bool {
 	uoe, ok := err.(*UnexpectedObjectError)
 	return err != nil && (ok || errors.As(err, &uoe))
+}
+
+func IsStoreReadError(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonStoreReadError
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
