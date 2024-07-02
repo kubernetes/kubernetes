@@ -195,10 +195,14 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		//     the bookmarkAfterResourceVersion we want. We do that to make progress
 		//     as clients can re-establish a new watch with the given RV and receive
 		//     further notifications.
+		// (b) We have sent the bookmark or the bookmark hasn't been requested.
+		//     In those cases we rely on the higher-level component (i.e., the watch server)
+		//     To eventually stop the watcher, for example when the client disconnected
+		//     or when the request times out.
 		graceful := func() bool {
 			c.stateMutex.Lock()
 			defer c.stateMutex.Unlock()
-			return c.state == cacheWatcherBookmarkReceived
+			return c.state != cacheWatcherWaitingForBookmark
 		}()
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result), graceful)
 		c.forget(graceful)
