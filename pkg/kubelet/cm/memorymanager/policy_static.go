@@ -40,6 +40,19 @@ import (
 
 const policyTypeStatic policyType = "Static"
 
+const (
+	ErrSpecifyReservedMemory          = "[memorymanager] you should specify the system reserved memory"
+	ErrMachineStateNotEmpty           = "[memorymanager] machine state can not be empty when it has memory assignments"
+	ErrNonExistentNUMA                = "[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist"
+	ErrNonExistentMemoryResource      = "[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist"
+	ErrDifferentMachineState          = "[memorymanager] the expected machine state is different from the real one"
+	ErrDefaultNUMAAffinityUnavailable = "[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available"
+	ErrFailedToFindNUMANodes          = "[memorymanager] failed to find NUMA nodes to extend the current topology hint"
+	ErrFailedToRepresentQuantity      = "[memorymanager] failed to represent quantity as int64"
+	ErrFailedToFindDefaultHint        = "[memorymanager] failed to find the default preferred hint"
+	ErrFailedToFindPreferredtHint     = "[memorymanager] failed to find the extended preferred hint"
+)
+
 type systemReservedMemory map[int]map[v1.ResourceName]uint64
 type reusableMemory map[string]map[string]map[v1.ResourceName]uint64
 
@@ -72,7 +85,7 @@ func NewPolicyStatic(machineInfo *cadvisorapi.MachineInfo, reserved systemReserv
 
 	// check if we have some reserved memory for the system
 	if totalSystemReserved <= 0 {
-		return nil, fmt.Errorf("[memorymanager] you should specify the system reserved memory")
+		return nil, fmt.Errorf(ErrSpecifyReservedMemory)
 	}
 
 	return &staticPolicy{
@@ -138,7 +151,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 
 		if !defaultHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the default preferred hint")
+			return fmt.Errorf(ErrFailedToFindDefaultHint)
 		}
 		bestHint = defaultHint
 	}
@@ -152,7 +165,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 
 		if !extendedHint.Preferred && bestHint.Preferred {
-			return fmt.Errorf("[memorymanager] failed to find the extended preferred hint")
+			return fmt.Errorf(ErrFailedToFindPreferredtHint)
 		}
 		bestHint = extendedHint
 	}
@@ -452,7 +465,7 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 		}
 		requestedSize, succeed := quantity.AsInt64()
 		if !succeed {
-			return nil, fmt.Errorf("[memorymanager] failed to represent quantity as int64")
+			return nil, fmt.Errorf(ErrFailedToRepresentQuantity)
 		}
 		requestedResources[resourceName] = uint64(requestedSize)
 	}
@@ -581,7 +594,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 	if len(machineState) == 0 {
 		// Machine state cannot be empty when assignments exist
 		if len(memoryAssignments) != 0 {
-			return fmt.Errorf("[memorymanager] machine state can not be empty when it has memory assignments")
+			return fmt.Errorf(ErrMachineStateNotEmpty)
 		}
 
 		defaultMachineState := p.getDefaultMachineState()
@@ -599,7 +612,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 				for _, nodeID := range b.NUMAAffinity {
 					nodeState, ok := expectedMachineState[nodeID]
 					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses the NUMA that does not exist", pod, containerName)
+						return fmt.Errorf(ErrNonExistentNUMA, pod, containerName)
 					}
 
 					nodeState.NumberOfAssignments++
@@ -607,7 +620,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 
 					memoryState, ok := nodeState.MemoryMap[b.Type]
 					if !ok {
-						return fmt.Errorf("[memorymanager] (pod: %s, container: %s) the memory assignment uses memory resource that does not exist", pod, containerName)
+						return fmt.Errorf(ErrNonExistentMemoryResource, pod, containerName)
 					}
 
 					if requestedSize == 0 {
@@ -641,7 +654,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// - adding or removing physical memory bank from the node
 	// - change of kubelet system-reserved, kube-reserved or pre-reserved-memory-zone parameters
 	if !areMachineStatesEqual(machineState, expectedMachineState) {
-		return fmt.Errorf("[memorymanager] the expected machine state is different from the real one")
+		return fmt.Errorf(ErrDifferentMachineState)
 	}
 
 	return nil
@@ -753,7 +766,7 @@ func (p *staticPolicy) getResourceSystemReserved(nodeID int, resourceName v1.Res
 func (p *staticPolicy) getDefaultHint(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) (*topologymanager.TopologyHint, error) {
 	hints := p.calculateHints(machineState, pod, requestedResources)
 	if len(hints) < 1 {
-		return nil, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")
+		return nil, fmt.Errorf(ErrDefaultNUMAAffinityUnavailable)
 	}
 
 	// hints for all memory types should be the same, so we will check hints only for regular memory type
@@ -799,7 +812,7 @@ func (p *staticPolicy) extendTopologyManagerHint(machineState state.NUMANodeMap,
 	}
 
 	if len(filteredHints) < 1 {
-		return nil, fmt.Errorf("[memorymanager] failed to find NUMA nodes to extend the current topology hint")
+		return nil, fmt.Errorf(ErrFailedToFindNUMANodes)
 	}
 
 	// try to find the preferred hint with the minimal number of NUMA nodes, relevant for the restricted policy

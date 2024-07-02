@@ -359,6 +359,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	}
 	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 	p.updateCPUsToReuse(pod, container, cpuset)
+	klog.InfoS("CPU Resources Assigned:", "CPUSet", cpuset, "NUMA", hint.NUMANodeAffinity, "logID", klog.KObj(pod), "podUID", pod.UID)
 
 	return nil
 }
