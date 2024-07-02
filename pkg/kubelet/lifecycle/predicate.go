@@ -269,7 +269,7 @@ type PredicateFailureError struct {
 }
 
 func (e *PredicateFailureError) Error() string {
-	return fmt.Sprintf("Predicate %s failed", e.PredicateName)
+	return fmt.Sprintf("Predicate %s failed: %s", e.PredicateName, e.PredicateDesc)
 }
 
 // GetReason returns the reason of the PredicateFailureError.
