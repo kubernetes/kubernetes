@@ -139,6 +139,7 @@ type EventBroadcaster interface {
 
 	// StartLogging starts sending events received from this EventBroadcaster to the given logging
 	// function. The return value can be ignored or used to stop recording, if desired.
+	//logcheck:context
 	StartLogging(logf func(format string, args ...interface{})) watch.Interface
 
 	// StartStructuredLogging starts sending events received from this EventBroadcaster to the structured
@@ -224,10 +225,12 @@ func NewBroadcaster(opts ...BroadcasterOption) EventBroadcaster {
 	return eventBroadcaster
 }
 
+//logcheck:context // NewBroadcaster(WithSleepDuration(...), WithContext(...)) should be used instead in code which supports contextual logging.
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
 	return NewBroadcaster(WithSleepDuration(sleepDuration))
 }
 
+//logcheck:context // NewBroadcaster(WithCorrelatorOptions(..), WithContext(...)) should be used instead in code which supports contextual logging.
 func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
 	return NewBroadcaster(WithCorrelatorOptions(options))
 }
@@ -292,7 +295,7 @@ func (e *eventBroadcasterImpl) recordToSink(sink EventSink, event *v1.Event, eve
 	event = &eventCopy
 	result, err := eventCorrelator.EventCorrelate(event)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(e.cancelationCtx, err, "Correlating event failed")
 	}
 	if result.Skip {
 		return
@@ -402,7 +405,7 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) w
 		return watch.NewEmptyWatch()
 	}
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(e.cancelationCtx)
 		for {
 			select {
 			case <-e.cancelationCtx.Done():

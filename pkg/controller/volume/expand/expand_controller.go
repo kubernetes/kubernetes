@@ -169,7 +169,7 @@ func (expc *expandController) enqueuePVC(obj interface{}) {
 	if pvc.Status.Phase == v1.ClaimBound {
 		key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pvc, err))
+			runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pvc, err)) //nolint:logcheck // Not reached, all objects have a key.
 			return
 		}
 		expc.queue.Add(key)
@@ -189,7 +189,7 @@ func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	runtime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	expc.queue.AddRateLimited(key)
 
 	return true
@@ -320,7 +320,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 
 // TODO make concurrency configurable (workers argument). previously, nestedpendingoperations spawned unlimited goroutines
 func (expc *expandController) Run(ctx context.Context) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	defer expc.queue.ShutDown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting expand controller")

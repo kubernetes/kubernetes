@@ -242,7 +242,7 @@ func printStatusAndLogsForNotReadyPods(ctx context.Context, c clientset.Interfac
 func rebootNode(ctx context.Context, c clientset.Interface, provider, name, rebootCmd string) bool {
 	// Setup
 	ns := metav1.NamespaceSystem
-	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector("spec.nodeName", name))
+	ps, err := testutils.NewPodStore(ctx, c, ns, labels.Everything(), fields.OneTermEqualSelector("spec.nodeName", name))
 	if err != nil {
 		framework.Logf("Couldn't initialize pod store: %v", err)
 		return false

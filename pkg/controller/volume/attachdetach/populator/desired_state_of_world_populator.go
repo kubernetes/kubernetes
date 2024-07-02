@@ -20,7 +20,6 @@ package populator
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -127,7 +126,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 		// Retrieve the pod object from pod informer with the namespace key
 		namespace, name, err := kcache.SplitMetaNamespaceKey(dswPodKey)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error splitting dswPodKey %q: %v", dswPodKey, err))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Error splitting dswPodKey", "key", dswPodKey)
 			continue
 		}
 		informerPod, err := dswp.podLister.Pods(namespace).Get(name)

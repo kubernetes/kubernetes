@@ -69,7 +69,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(ctx context.Context, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -104,7 +104,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 	)
 
 	secretCache := secrets.Informer().GetIndexer()
-	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(secretCache, secretCache, 60*time.Second, true)
+	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(ctx, secretCache, secretCache, 60*time.Second, true)
 	e.secretSynced = secrets.Informer().HasSynced
 	secrets.Informer().AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
@@ -113,7 +113,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 				case *v1.Secret:
 					return t.Type == v1.SecretTypeServiceAccountToken
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 					return false
 				}
 			},
@@ -164,7 +164,7 @@ type TokensController struct {
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(ctx context.Context, workers int) {
 	// Shut down queues
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 

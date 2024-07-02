@@ -126,7 +126,7 @@ func (f *Cloud) ClearCalls() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (f *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (f *Cloud) Initialize(ctx context.Context, clientBuilder cloudprovider.ControllerClientBuilder) {
 }
 
 // ListClusters lists the names of the available clusters.

@@ -444,7 +444,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 }
 
 func (dc *DisruptionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	// Start events processing pipeline.
@@ -679,7 +679,7 @@ func (dc *DisruptionController) processNextStalePodDisruptionWorkItem(ctx contex
 		dc.stalePodDisruptionQueue.Forget(key)
 		return true
 	}
-	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %w", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing Pod to clear DisruptionTarget condition, requeueing", "key", key)
 	dc.stalePodDisruptionQueue.AddRateLimited(key)
 	return true
 }

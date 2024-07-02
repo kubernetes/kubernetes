@@ -159,7 +159,7 @@ func (d *namespacedResourcesDeleter) initOpCache(ctx context.Context) {
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to get all supported resources from server")
 	}
 	logger := klog.FromContext(ctx)
 	if len(resources) == 0 {
@@ -554,7 +554,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	// NOT remove the resource instance.
 	if hasChanged := conditionUpdater.Update(ns); hasChanged {
 		if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Couldn't update status condition", "namespace", namespace)
 		}
 	}
 

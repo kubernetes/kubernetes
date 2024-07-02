@@ -17,9 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,9 @@ func (lw fakePodLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	pod1v1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -63,7 +67,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 
 	ch := make(chan interface{})
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(ctx, lw, ch)
 
 	got, ok := <-ch
 	if !ok {
@@ -130,6 +134,9 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 }
 
 func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	pod1 := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "p", Namespace: "one"},
 		Spec:       v1.PodSpec{Containers: []v1.Container{{Image: "image/one"}}}}
@@ -146,7 +153,7 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 
 	ch := make(chan interface{})
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(ctx, lw, ch)
 
 	got, ok := <-ch
 	if !ok {
@@ -171,6 +178,9 @@ func TestNewSourceApiserver_TwoNamespacesSameName(t *testing.T) {
 }
 
 func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
 	lw := fakePodLW{
@@ -180,7 +190,7 @@ func TestNewSourceApiserverInitialEmptySendsEmptyPodUpdate(t *testing.T) {
 
 	ch := make(chan interface{})
 
-	newSourceApiserverFromLW(lw, ch)
+	newSourceApiserverFromLW(ctx, lw, ch)
 
 	got, ok := <-ch
 	if !ok {

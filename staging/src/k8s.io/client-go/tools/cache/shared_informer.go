@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -159,7 +160,14 @@ type SharedInformer interface {
 	// be competing load and scheduling noise.
 	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
+	//
+	// TODO: logcheck:context // AddEventHandlerWithConfig should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
+	// AddEventHandler is a variant of AddEventHandler and AddEventHandlerWithResyncPeriod
+	// where additional optional parameters are passed in a struct. If no resync period
+	// is specified there, AddEventHandlerWithConfig behaves like AddEventHandler.
+	// The context is used for contextual logging.
+	AddEventHandlerWithConfig(ctx context.Context, handler ResourceEventHandler, config HandlerConfig) (ResourceEventHandlerRegistration, error)
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
@@ -170,7 +178,12 @@ type SharedInformer interface {
 	GetController() Controller
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
+	//
+	// TODO: logcheck:context // RunWithContext should be used instead of Run in code which uses contextual logging.
 	Run(stopCh <-chan struct{})
+	// RunWithContext starts and runs the shared informer, returning after it stops.
+	// The informer will be stopped when the context is canceled.
+	RunWithContext(ctx context.Context)
 	// HasSynced returns true if the shared informer's store has been
 	// informed by at least one full LIST of the authoritative state
 	// of the informer's object collection.  This is unrelated to "resync".
@@ -226,6 +239,11 @@ type ResourceEventHandlerRegistration interface {
 	// HasSynced reports if both the parent has synced and all pre-sync
 	// events have been delivered.
 	HasSynced() bool
+}
+
+// Optional configuration options for AddEventHandlerWithConfig.
+type HandlerConfig struct {
+	ResyncPeriod time.Duration
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -309,15 +327,33 @@ const (
 // WaitForNamedCacheSync is a wrapper around WaitForCacheSync that generates log messages
 // indicating that the caller identified by name is waiting for syncs, followed by
 // either a successful or failed sync.
+//
+// TODO: logcheck:context // WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
 func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
-	klog.Infof("Waiting for caches to sync for %s", controllerName)
+	klog.Background().Info("Waiting for caches to sync", "controller", controllerName)
 
 	if !WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s", controllerName))
+		utilruntime.HandleErrorWithContext(context.Background(), nil, "Unable to sync caches", "controller", controllerName)
 		return false
 	}
 
-	klog.Infof("Caches are synced for %s", controllerName)
+	klog.Background().Info("Caches are synced", "controller", controllerName)
+	return true
+}
+
+// WaitForNamedCacheSyncWithContext is a wrapper around WaitForCacheSyncWithContext that generates log messages
+// indicating that the caller is waiting for syncs, followed by either a successful or failed sync.
+// Contextual logging can be used to identify the caller in those log messages.
+func WaitForNamedCacheSyncWithContext(ctx context.Context, cacheSyncs ...InformerSynced) bool {
+	logger := klog.FromContext(ctx)
+	logger.Info("Waiting for caches to sync")
+
+	if !WaitForCacheSync(ctx.Done(), cacheSyncs...) {
+		utilruntime.HandleErrorWithContext(ctx, nil, "Unable to sync caches")
+		return false
+	}
+
+	logger.Info("Caches are synced")
 	return true
 }
 
@@ -403,7 +439,7 @@ type dummyController struct {
 	informer *sharedIndexInformer
 }
 
-func (v *dummyController) Run(stopCh <-chan struct{}) {
+func (v *dummyController) Run(context.Context) {
 }
 
 func (v *dummyController) HasSynced() bool {
@@ -457,10 +493,15 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 }
 
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
+	s.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
+	logger := klog.FromContext(ctx)
 
 	if s.HasStarted() {
-		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
+		logger.Info("Warning: the sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
 
@@ -505,7 +546,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		defer s.startedLock.Unlock()
 		s.stopped = true // Don't want any new listeners
 	}()
-	s.controller.Run(stopCh)
+	s.controller.Run(ctx)
 }
 
 func (s *sharedIndexInformer) HasStarted() bool {
@@ -558,19 +599,19 @@ func (s *sharedIndexInformer) GetController() Controller {
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
-	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+	return s.AddEventHandlerWithConfig(context.Background(), handler, HandlerConfig{ResyncPeriod: s.defaultEventHandlerResyncPeriod})
 }
 
-func determineResyncPeriod(desired, check time.Duration) time.Duration {
+func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) time.Duration {
 	if desired == 0 {
 		return desired
 	}
 	if check == 0 {
-		klog.Warningf("The specified resyncPeriod %v is invalid because this shared informer doesn't support resyncing", desired)
+		logger.Info("Warning: the specified resync period is invalid because this shared informer doesn't support resyncing", "resyncPeriod", desired)
 		return 0
 	}
 	if desired < check {
-		klog.Warningf("The specified resyncPeriod %v is being increased to the minimum resyncCheckPeriod %v", desired, check)
+		logger.Info("Warning: the specified resync period is being increased to the minimum resync check period", "resyncPeriod", desired, "resyncCheckPeriod", check)
 		return check
 	}
 	return desired
@@ -579,6 +620,10 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
+	return s.AddEventHandlerWithConfig(context.Background(), handler, HandlerConfig{ResyncPeriod: resyncPeriod})
+}
+
+func (s *sharedIndexInformer) AddEventHandlerWithConfig(ctx context.Context, handler ResourceEventHandler, config HandlerConfig) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -586,27 +631,29 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		return nil, fmt.Errorf("handler %v was not added to shared informer because it has stopped already", handler)
 	}
 
+	logger := klog.FromContext(ctx)
+	resyncPeriod := config.ResyncPeriod
 	if resyncPeriod > 0 {
 		if resyncPeriod < minimumResyncPeriod {
-			klog.Warningf("resyncPeriod %v is too small. Changing it to the minimum allowed value of %v", resyncPeriod, minimumResyncPeriod)
+			logger.Info("Warning: resync period is too small. Changing it to the minimum allowed value", "resyncPeriod", resyncPeriod, "minimumResyncPeriod", minimumResyncPeriod)
 			resyncPeriod = minimumResyncPeriod
 		}
 
 		if resyncPeriod < s.resyncCheckPeriod {
 			if s.started {
-				klog.Warningf("resyncPeriod %v is smaller than resyncCheckPeriod %v and the informer has already started. Changing it to %v", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
+				logger.Info("Warning: resync period is smaller than resync check period and the informer has already started. Changing it to the resync check period", "resyncPeriod", resyncPeriod, "resyncCheckPeriod", s.resyncCheckPeriod)
 				resyncPeriod = s.resyncCheckPeriod
 			} else {
 				// if the event handler's resyncPeriod is smaller than the current resyncCheckPeriod, update
 				// resyncCheckPeriod to match resyncPeriod and adjust the resync periods of all the listeners
 				// accordingly
 				s.resyncCheckPeriod = resyncPeriod
-				s.processor.resyncCheckPeriodChanged(resyncPeriod)
+				s.processor.resyncCheckPeriodChanged(logger, resyncPeriod)
 			}
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -844,13 +891,13 @@ func (p *sharedProcessor) shouldResync() bool {
 	return resyncNeeded
 }
 
-func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Duration) {
+func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncCheckPeriod time.Duration) {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
 	for listener := range p.listeners {
 		resyncPeriod := determineResyncPeriod(
-			listener.requestedResyncPeriod, resyncCheckPeriod)
+			logger, listener.requestedResyncPeriod, resyncCheckPeriod)
 		listener.setResyncPeriod(resyncPeriod)
 	}
 }

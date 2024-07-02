@@ -450,7 +450,7 @@ func createBalancedPodForNodes(ctx context.Context, f *framework.Framework, cs c
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+			err := testutils.StartPods(ctx, cs, 1, ns, string(uuid.NewUUID()),
 				*initPausePod(f, *podConfig), true, framework.Logf)
 			if err != nil {
 				errChan <- err

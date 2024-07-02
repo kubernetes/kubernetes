@@ -100,7 +100,7 @@ type Publisher struct {
 
 // Run starts process
 func (c *Publisher) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
@@ -121,7 +121,7 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 func (c *Publisher) configMapDeleted(obj interface{}) {
 	cm, err := convertToCM(obj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
@@ -133,7 +133,7 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 func (c *Publisher) configMapUpdated(_, newObj interface{}) {
 	cm, err := convertToCM(newObj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
