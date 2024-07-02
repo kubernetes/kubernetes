@@ -354,7 +354,7 @@ func NewNodeLifecycleController(
 	}
 
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
-	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
+	nc.enterFullDisruptionFunc = nc.FullDisruptionFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -1203,10 +1203,9 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 	return
 }
 
-// HealthyQPSFunc returns the default value for cluster eviction rate - we take
-// nodeNum for consistency with ReducedQPSFunc.
-func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
-	return nc.evictionLimiterQPS
+// FullDisruptionFunc returns 0
+func (nc *Controller) FullDisruptionFunc(nodeNum int) float32 {
+	return 0
 }
 
 // ReducedQPSFunc returns the QPS for when the cluster is large make
