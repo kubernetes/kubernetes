@@ -41,6 +41,9 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		v1.ResourceCPU: *resource.NewMilliQuantity(
 			int64(info.NumCores*1000),
 			resource.DecimalSI),
+		v1.ResourceExclusiveCPU: *resource.NewMilliQuantity(
+			int64(info.NumCores*1000),
+			resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(
 			int64(info.MemoryCapacity),
 			resource.BinarySI),

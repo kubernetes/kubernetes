@@ -277,6 +277,7 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
+		0,
 		topologymanager.NewFakeManager(),
 		nil)
 	testCases := []struct {
@@ -528,7 +529,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -683,7 +684,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.New(), 0, testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -771,6 +772,7 @@ func TestReconcileState(t *testing.T) {
 		},
 		0,
 		cpuset.New(),
+		0,
 		topologymanager.NewFakeManager(),
 		nil)
 
@@ -1290,6 +1292,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
+		0,
 		topologymanager.NewFakeManager(),
 		nil)
 	testCases := []struct {
@@ -1403,7 +1406,7 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.New(), 0, nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if err == nil {
 				t.Errorf("Expected error, but NewManager succeeded")
 			}
@@ -1431,6 +1434,7 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 		},
 		1,
 		cpuset.New(0),
+		0,
 		topologymanager.NewFakeManager(),
 		nil)
 

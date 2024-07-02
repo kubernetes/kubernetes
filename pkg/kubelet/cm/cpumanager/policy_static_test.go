@@ -69,7 +69,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -145,7 +145,7 @@ func TestStaticPolicyStart(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 			policy := p.(*staticPolicy)
 			st := &mockState{
 				assignments:   testCase.stAssignments,
@@ -614,7 +614,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	if testCase.reservedCPUs != nil {
 		cpus = testCase.reservedCPUs.Clone()
 	}
-	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpus, tm, testCase.options)
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpus, 0, tm, testCase.options)
 
 	st := &mockState{
 		assignments:   testCase.stAssignments,
@@ -685,7 +685,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -738,7 +738,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -820,7 +820,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -910,7 +910,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.New(), topologymanager.NewFakeManager(), nil)
+		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.New(), 0, topologymanager.NewFakeManager(), nil)
 		policy := p.(*staticPolicy)
 		st := &mockState{
 			assignments:   tc.stAssignments,
@@ -984,7 +984,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, 0, topologymanager.NewFakeManager(), nil)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -1061,7 +1061,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, 0, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,

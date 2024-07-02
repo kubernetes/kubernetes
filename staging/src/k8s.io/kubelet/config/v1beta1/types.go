@@ -649,6 +649,8 @@ type KubeletConfiguration struct {
 	// CPU list rather than the "dynamic" list by systemReserved and kubeReserved.
 	// This option does not support systemReservedCgroup or kubeReservedCgroup.
 	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
+	// This option specifies the minimum number of CPUs in the shared CPU pool.
+	NumMinSharedCPUs uint8 `json:"numMinSharedCPUs,omitempty"`
 	// showHiddenMetricsForVersion is the previous version for which you want to show
 	// hidden metrics.
 	// Only the previous minor version is meaningful, other values will not be allowed.
