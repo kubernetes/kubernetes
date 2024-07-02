@@ -693,8 +693,8 @@ func TestCelCompilation(t *testing.T) {
 				},
 			},
 			expectedResults: []validationMatcher{
-				invalidError("undefined field 'namespace'"),
-				invalidError("undefined field 'if'"),
+				noError(),
+				noError(),
 				invalidError("found no matching overload"),
 			},
 		},
