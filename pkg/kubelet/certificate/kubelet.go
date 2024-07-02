@@ -65,7 +65,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 			Subsystem:      metrics.KubeletSubsystem,
 			Name:           "server_expiration_renew_errors",
 			Help:           "Counter of certificate renewal errors.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 	)
 	legacyregistry.MustRegister(certificateRenewFailure)
@@ -87,7 +87,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 				31104000,  // 1  year
 				124416000, // 4  years
 			},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 	)
 	legacyregistry.MustRegister(certificateRotationAge)
@@ -129,7 +129,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 				"until certificate expiry (negative if already expired). If " +
 				"serving certificate is invalid or unused, the value will " +
 				"be +INF.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.BETA,
 		},
 		func() float64 {
 			if c := m.Current(); c != nil && c.Leaf != nil {

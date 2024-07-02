@@ -88,6 +88,35 @@
   help: The count of hidden metrics.
   type: Counter
   stabilityLevel: BETA
+- name: certificate_manager_server_rotation_seconds
+  subsystem: kubelet
+  help: Histogram of the number of seconds the previous certificate lived before being
+    rotated.
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 60
+  - 3600
+  - 14400
+  - 86400
+  - 604800
+  - 2.592e+06
+  - 7.776e+06
+  - 1.5552e+07
+  - 3.1104e+07
+  - 1.24416e+08
+- name: certificate_manager_server_ttl_seconds
+  subsystem: kubelet
+  help: Gauge of the shortest TTL (time-to-live) of the Kubelet's serving certificate.
+    The value is in seconds until certificate expiry (negative if already expired).
+    If serving certificate is invalid or unused, the value will be +INF.
+  type: Gauge
+  stabilityLevel: BETA
+- name: server_expiration_renew_errors
+  subsystem: kubelet
+  help: Counter of certificate renewal errors.
+  type: Counter
+  stabilityLevel: BETA
 - name: feature_enabled
   namespace: kubernetes
   help: This metric records the data about the stage and enablement of a k8s feature.
