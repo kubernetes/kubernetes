@@ -25,6 +25,7 @@ import (
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/go-cmp/cmp"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -1880,6 +1881,106 @@ func TestCostEstimation(t *testing.T) {
 			// static maxLength case
 			setSchema := testCase.schemaGenerator(&testCase.setMaxElements)
 			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, testCase.expectedSetCostExceedsLimit, t))
+		})
+	}
+}
+
+func TestOutputType(t *testing.T) {
+	env := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false).StoredExpressionsEnv()
+
+	type tcase struct {
+		name              string
+		exp               string
+		exactType         *celgo.Type
+		equivalentType    *celgo.Type
+		nonEquivalentType *celgo.Type
+		value             interface{}
+	}
+
+	cases := []tcase{
+		{
+			name:      "simple string",
+			exp:       `"hello"`,
+			exactType: celgo.StringType,
+			value:     "hello",
+		},
+		{
+			name:              "string equivalent to dyn",
+			exp:               `"hello"`,
+			exactType:         celgo.StringType,
+			equivalentType:    celgo.StringType,
+			nonEquivalentType: celgo.DynType,
+			value:             "hello",
+		},
+		{
+			name:              "dyn equivalent to string",
+			exp:               `dyn("hello")`,
+			exactType:         celgo.DynType,
+			equivalentType:    celgo.DynType,
+			nonEquivalentType: celgo.StringType,
+			value:             "hello",
+		},
+		{
+			name:              `list of strings`,
+			exp:               `["hello", "world"]`,
+			exactType:         celgo.ListType(celgo.StringType),
+			nonEquivalentType: celgo.ListType(celgo.DynType),
+			equivalentType:    celgo.ListType(celgo.StringType),
+			value:             []ref.Val{types.String("hello"), types.String("world")},
+		},
+		{
+			name:              `list of strings`,
+			exp:               `[dyn("hello"), dyn("world")]`,
+			exactType:         celgo.ListType(celgo.DynType),
+			equivalentType:    celgo.ListType(celgo.DynType),
+			nonEquivalentType: celgo.ListType(celgo.StringType),
+			value:             []ref.Val{types.String("hello"), types.String("world")},
+		},
+		{
+			name:              `Format validate type`,
+			exp:               `format.dns1123Subdomain().validate("#").value()`,
+			exactType:         celgo.ListType(celgo.StringType),
+			equivalentType:    celgo.ListType(celgo.StringType),
+			nonEquivalentType: celgo.ListType(celgo.DynType),
+			value: []string{
+				`a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			ast, issues := env.Compile(tc.exp)
+			if issues != nil && issues.Err() != nil {
+				t.Fatalf("unexpected error: %v", issues.Err())
+			}
+
+			if tc.equivalentType != nil && !ast.OutputType().IsEquivalentType(tc.equivalentType) {
+				t.Errorf("expected %v to be equivalent to type %v", ast.OutputType(), tc.equivalentType)
+			}
+
+			if tc.nonEquivalentType != nil && ast.OutputType().IsEquivalentType(tc.nonEquivalentType) {
+				t.Errorf("expected %v to not be equivalent to type %v", ast.OutputType(), tc.nonEquivalentType)
+			}
+
+			if tc.exactType != nil && !ast.OutputType().IsExactType(tc.exactType) {
+				t.Errorf("expected exact type %v, got %v", tc.exactType, ast.OutputType())
+			}
+
+			prog, err := env.Program(ast)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			res, _, err := prog.Eval(map[string]interface{}{})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(tc.value, res.Value()); diff != "" {
+				t.Errorf("unexpected result: %v", diff)
+			}
 		})
 	}
 }
