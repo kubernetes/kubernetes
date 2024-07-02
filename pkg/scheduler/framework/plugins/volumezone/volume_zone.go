@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // VolumeZone is a plugin that checks volume zone.
@@ -105,7 +106,8 @@ func (pl *VolumeZone) Name() string {
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
 func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	podPVTopologies, status := pl.getPVbyPod(ctx, pod)
+	logger := klog.FromContext(ctx)
+	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -116,16 +118,12 @@ func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, p
 	return nil, nil
 }
 
-func (pl *VolumeZone) getPVbyPod(ctx context.Context, pod *v1.Pod) ([]pvTopology, *framework.Status) {
-	logger := klog.FromContext(ctx)
+// getPVbyPod gets PVTopology from pod
+func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
 	podPVTopologies := make([]pvTopology, 0)
 
-	for i := range pod.Spec.Volumes {
-		volume := pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
 		if pvcName == "" {
 			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
@@ -212,7 +210,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	if err != nil {
 		// Fallback to calculate pv list here
 		var status *framework.Status
-		podPVTopologies, status = pl.getPVbyPod(ctx, pod)
+		podPVTopologies, status = pl.getPVbyPod(logger, pod)
 		if !status.IsSuccess() {
 			return status
 		}
@@ -291,11 +289,57 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// A new pvc may make a pod schedulable.
-		// Due to fields are immutable except `spec.resources`, pvc update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}},
+		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
 	}
+}
+
+// getPersistentVolumeClaimNameFromPod gets pvc names bound to a pod.
+func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string {
+	var pvcNames []string
+	for i := range pod.Spec.Volumes {
+		volume := pod.Spec.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		pvcNames = append(pvcNames, pvcName)
+	}
+	return pvcNames
+}
+
+// isSchedulableAfterPersistentVolumeClaimChange is invoked whenever a PersistentVolumeClaim added or updated.
+// It checks whether the change of PVC has made a previously unschedulable pod schedulable.
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+	}
+	if pl.isPVCRequestedFromPod(logger, modifiedPVC, pod) {
+		logger.V(5).Info("PVC that is referred from the pod was created or updated, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("PVC irrelevant to the Pod was created or updated, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
+	return framework.QueueSkip, nil
+}
+
+// isPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
+func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pod *v1.Pod) bool {
+	if (pvc == nil) || (pod.Namespace != pvc.Namespace) {
+		return false
+	}
+	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
+	for _, pvcName := range pvcNames {
+		if pvc.Name == pvcName {
+			logger.V(5).Info("PVC is referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+			return true
+		}
+	}
+	logger.V(5).Info("PVC is not referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+	return false
 }
 
 // New initializes a new plugin and returns it.
