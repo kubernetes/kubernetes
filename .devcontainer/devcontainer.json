@@ -1,0 +1,46 @@
+// For format details, see https://containers.dev
+{
+    "name": "Kubernetes environment from dev container",
+
+    // For details about this image:
+    // https://github.com/kubernetes/release/tree/master/images/build/cross
+    "image": "registry.k8s.io/build-image/kube-cross:v1.30.0-go1.22.2-bullseye.0",
+    "remoteUser": "root",
+
+    // Setup the go environment and mount into the dev container at the expected location
+    "workspaceFolder": "/go/src/k8s.io/kubernetes",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/go/src/k8s.io/kubernetes,type=bind,consistency=cached",
+
+    // Install the features based on the software required for Kubernetes development
+    // https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#installing-required-software
+    // https://containers.dev/features
+    "features": {
+        // The first-run-notice.txt is displayed by a script within
+        // ghcr.io/devcontainers/features/common-utils:2
+        // Although it might be installed by other features,
+        // we are explicitly installing it to ensure it's included
+        "ghcr.io/devcontainers/features/common-utils:2": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/python:1": {}
+    },
+
+    // Setup the dev container environment
+    "onCreateCommand": "./.devcontainer/setup.sh",
+
+    // Add etcd & _output/bin path to PATH
+    "remoteEnv": {
+        "PATH": "${containerEnv:PATH}:${containerWorkspaceFolder}/third_party/etcd:${containerWorkspaceFolder}/_output/bin"
+    },
+
+    // Configure the hostRequirements based on the Kubernetes Hardware Requirements
+    // https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#hardware-requirements
+    "hostRequirements": {
+        "memory": "8gb",
+        "storage": "50gb"
+    },
+
+    // for Kubernetes testing, suppress extraneous forwarding messages
+    "otherPortsAttributes": {
+        "onAutoForward": "silent"
+    }
+}

@@ -1,0 +1,34 @@
+👋 Welcome to Kubernetes contribution in a dev container!
+   Works in GitHub Codespaces, VS Code, or in docker using the devcontainer cli.
+
+See https://www.kubernetes.dev/docs/onboarding/ for guidance on contributing to Kubernetes.
+
+This dev container environment satisfies the requirements found at https://github.com/kubernetes/community/blob/master/contributors/devel/development.md and includes:
+ - kubernetes/kubernetes repository
+ - Docker
+ - Go
+ - build-essential/rsync/jq/gcloud/PyYAML/etcd
+ - kind/kubetest2
+
+For details about dev containers and the container image, see https://containers.dev and https://github.com/kubernetes/release/tree/master/images/build/cross.
+The configuration for the dev container is in the .github/.devcontainer folder.
+🎵 By default in Codespaces this environment uses a 8-core machine. Some tests may require a larger machine. In Codespaces you can change the machine type.
+   See https://docs.github.com/en/codespaces/customizing-your-codespace/changing-the-machine-type-for-your-codespace
+
+⚙️ If you are working in Codespaces on your own fork, this environment is automatically configured to support the GitHub workflow found at https://www.kubernetes.dev/docs/guide/github-workflow/ (omit the clone step).
+↪️ Otherwise, Codespaces will automatically fork the repository for you when you make your first push.
+
+🔍 To explore VS Code to its fullest, search using the Command Palette (Cmd/Ctrl + Shift + P or F1).
+
+🤖 Run e2e test command example:
+  $ make
+  $ KUBETEST2_RUN_DIR=$(pwd)/_output/local/go/bin/ kubetest2 kind -v 2 \
+      --build \
+      --up \
+      --down \
+      --test=ginkgo \
+      -- \
+      --parallel 4 \
+      --focus-regex='TTLAfterFinished'
+
+For details about kubetest2, see https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests-kubetest2.md and https://github.com/kubernetes-sigs/kubetest2.
