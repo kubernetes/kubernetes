@@ -105,7 +105,7 @@ func TestSecretCache(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "name", Namespace: "ns", ResourceVersion: "125"},
 	}
 	fakeWatch.Add(secret)
-	getFn := func() (bool, error) {
+	getFn := func(ctx context.Context) (bool, error) {
 		object, err := store.Get("ns", "name")
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -113,20 +113,20 @@ func TestSecretCache(t *testing.T) {
 			}
 			return false, err
 		}
-		secret := object.(*v1.Secret)
+		secret = object.(*v1.Secret)
 		if secret == nil || secret.Name != "name" || secret.Namespace != "ns" {
 			return false, fmt.Errorf("unexpected secret: %v", secret)
 		}
 		return true, nil
 	}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, getFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// Eventually we should observer secret deletion.
+	// Eventually we should observe secret deletion.
 	fakeWatch.Delete(secret)
-	getFn = func() (bool, error) {
-		_, err := store.Get("ns", "name")
+	getFn = func(ctx context.Context) (bool, error) {
+		_, err = store.Get("ns", "name")
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -135,7 +135,7 @@ func TestSecretCache(t *testing.T) {
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, getFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -166,7 +166,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 
 	store.AddReference("ns", "name", "pod")
 	// This should trigger List and Watch actions eventually.
-	actionsFn := func() (bool, error) {
+	actionsFn := func(ctx context.Context) (bool, error) {
 		actions := fakeClient.Actions()
 		if len(actions) > 2 {
 			return false, fmt.Errorf("too many actions: %v", actions)
@@ -179,7 +179,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 		}
 		return true, nil
 	}
-	if err := wait.PollImmediate(10*time.Millisecond, time.Second, actionsFn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, actionsFn); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -309,7 +309,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeWatch.Add(tc.eventual)
 
 			// Eventually Get should return that secret.
-			getFn := func() (bool, error) {
+			getFn := func(ctx context.Context) (bool, error) {
 				object, err := store.Get("ns", "name")
 				if err != nil {
 					if apierrors.IsNotFound(err) {
@@ -320,7 +320,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 				secret := object.(*v1.Secret)
 				return apiequality.Semantic.DeepEqual(tc.eventual, secret), nil
 			}
-			if err := wait.PollImmediate(10*time.Millisecond, time.Second, getFn); err != nil {
+			if err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, time.Second, true, getFn); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
