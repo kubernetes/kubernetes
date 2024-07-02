@@ -825,7 +825,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs:   "0",
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -2162,6 +2162,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					jobCtx.podsWithDelayedDeletionPerIndex = getPodsWithDelayedDeletionPerIndex(logger, jobCtx)
 				}
 			}
+			jobCtx.terminating = ptr.To(controller.CountTerminatingPods(jobCtx.activePods))
 
 			err := manager.trackJobStatusAndRemoveFinalizers(ctx, jobCtx, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
@@ -2231,7 +2232,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedFailed:        1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonDeadlineExceeded,
 					Message: "Job was active longer than specified deadline",
@@ -2251,7 +2252,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			expectedFailed:        1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonDeadlineExceeded,
 					Message: "Job was active longer than specified deadline",
@@ -2265,6 +2266,12 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			startTime:             10,
 			backoffLimit:          6,
 			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonDeadlineExceeded,
+					Message: "Job was active longer than specified deadline",
+				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
@@ -2281,6 +2288,12 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			failedPods:            1,
 			expectedFailed:        1,
 			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
@@ -3906,12 +3919,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
 					},
-					{
-						Type:    batch.JobComplete,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
 				},
 			},
 		},
@@ -4008,12 +4015,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Conditions: []batch.JobCondition{
 					{
 						Type:    batch.JobSuccessCriteriaMet,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
-					{
-						Type:    batch.JobComplete,
 						Status:  v1.ConditionTrue,
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
@@ -4116,12 +4117,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				Conditions: []batch.JobCondition{
 					{
 						Type:    batch.JobSuccessCriteriaMet,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
-					{
-						Type:    batch.JobComplete,
 						Status:  v1.ConditionTrue,
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
@@ -4243,12 +4238,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
 					},
-					{
-						Type:    batch.JobComplete,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
 				},
 			},
 		},
@@ -4307,12 +4296,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						Reason:  batch.JobReasonPodFailurePolicy,
 						Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
 					},
-					{
-						Type:    batch.JobFailed,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonPodFailurePolicy,
-						Message: "Pod default/mypod-0 has condition DisruptionTarget matching FailJob rule at index 0",
-					},
 				},
 			},
 		},
@@ -4351,6 +4334,12 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				FailedIndexes:           ptr.To("0"),
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobFailureTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonFailedIndexes,
+						Message: "Job has failed indexes",
+					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
@@ -4393,6 +4382,12 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobFailureTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonBackoffLimitExceeded,
+						Message: "Job has reached the specified backoff limit",
+					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
@@ -4822,6 +4817,10 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
+						Type:   batch.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+					},
+					{
 						Type:   batch.JobComplete,
 						Status: v1.ConditionTrue,
 					},
@@ -5096,6 +5095,12 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
+						Type:    batch.JobFailureTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonBackoffLimitExceeded,
+						Message: "Job has reached the specified backoff limit",
+					},
+					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
 						Reason:  batch.JobReasonBackoffLimitExceeded,
@@ -5131,6 +5136,12 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobFailureTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonFailedIndexes,
+						Message: "Job has failed indexes",
+					},
 					{
 						Type:    batch.JobFailed,
 						Status:  v1.ConditionTrue,
@@ -5171,7 +5182,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
-						Type:    batch.JobFailed,
+						Type:    batch.JobFailureTarget,
 						Status:  v1.ConditionTrue,
 						Reason:  batch.JobReasonMaxFailedIndexesExceeded,
 						Message: "Job has exceeded the specified maximal number of failed indexes",
@@ -6436,7 +6447,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6455,7 +6466,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6474,7 +6485,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6493,7 +6504,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6512,7 +6523,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    2,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6531,7 +6542,7 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    2,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:    batch.JobFailed,
+					Type:    batch.JobFailureTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
 					Message: "Job has reached the specified backoff limit",
@@ -6580,6 +6591,10 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedSucceeded: 4,
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
+				{
+					Type:   batch.JobSuccessCriteriaMet,
+					Status: v1.ConditionTrue,
+				},
 				{
 					Type:   batch.JobComplete,
 					Status: v1.ConditionTrue,
@@ -6692,6 +6707,12 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			expectedFailed:    2,
 			expectedConditions: []batch.JobCondition{
 				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
+				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
 					Reason:  batch.JobReasonBackoffLimitExceeded,
@@ -6722,6 +6743,12 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			expectedSucceeded: 0,
 			expectedFailed:    7,
 			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonBackoffLimitExceeded,
+					Message: "Job has reached the specified backoff limit",
+				},
 				{
 					Type:    batch.JobFailed,
 					Status:  v1.ConditionTrue,
