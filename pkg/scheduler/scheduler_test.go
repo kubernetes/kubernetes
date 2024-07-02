@@ -686,12 +686,12 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			},
 		},
 		{
-			name:    "register plugin with empty event",
+			name:    "register plugin with empty event (not recommended)",
 			plugins: []framework.Plugin{&emptyEventPlugin{}},
 			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
 		},
 		{
-			name:    "register plugins including emptyEventPlugin",
+			name:    "register plugins including emptyEventPlugin (not recommended)",
 			plugins: []framework.Plugin{&emptyEventPlugin{}, &fakeNodePlugin{}},
 			want: map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{
 				{Resource: framework.Pod, ActionType: framework.Add}: {
@@ -738,7 +738,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				return exts[i].Name() < exts[j].Name()
 			})
 
-			got := buildQueueingHintMap(exts)
+			got := buildQueueingHintMap(logger, exts)
 
 			for e, fns := range got {
 				wantfns, ok := tt.want[e]
@@ -873,7 +873,7 @@ func Test_UnionedGVKs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			registry := plugins.NewInTreeRegistry()
@@ -896,7 +896,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			}
 
 			queueingHintsPerProfile := internalqueue.QueueingHintMapPerProfile{
-				"default": buildQueueingHintMap(fwk.EnqueueExtensions()),
+				"default": buildQueueingHintMap(logger, fwk.EnqueueExtensions()),
 			}
 			got := unionedGVKs(queueingHintsPerProfile)
 

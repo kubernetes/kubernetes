@@ -34,9 +34,7 @@ import (
 const Name = names.SchedulingGates
 
 // SchedulingGates checks if a Pod carries .spec.schedulingGates.
-type SchedulingGates struct {
-	enableSchedulingQueueHint bool
-}
+type SchedulingGates struct{}
 
 var _ framework.PreEnqueuePlugin = &SchedulingGates{}
 var _ framework.EnqueueExtensions = &SchedulingGates{}
@@ -59,26 +57,17 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
-	if !pl.enableSchedulingQueueHint {
-		return nil
-	}
-	// When the QueueingHint feature is enabled,
-	// the scheduling queue uses Pod/Update Queueing Hint
-	// to determine whether a Pod's update makes the Pod schedulable or not.
-	// https://github.com/kubernetes/kubernetes/pull/122234
 	return []framework.ClusterEventWithHint{
-		// Pods can be more schedulable once it's gates are removed
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 	}
 }
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
-	return &SchedulingGates{
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
-	}, nil
+	return &SchedulingGates{}, nil
 }
 
+// Pod will become schedulable once it's gates are removed
 func (pl *SchedulingGates) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	_, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
