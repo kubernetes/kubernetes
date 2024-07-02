@@ -2537,6 +2537,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, podCopy); !ok {
 					kl.rejectPod(pod, reason, message)
+					metrics.AdmissionRejectionsTotal.WithLabelValues(reason).Inc()
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
@@ -2548,6 +2549,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(activePods, pod); !ok {
 					kl.rejectPod(pod, reason, message)
+					metrics.AdmissionRejectionsTotal.WithLabelValues(reason).Inc()
 					continue
 				}
 			}
