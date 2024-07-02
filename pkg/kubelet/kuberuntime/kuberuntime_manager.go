@@ -740,6 +740,11 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podStatus *ku
 			return
 		}
 		if currentPodMemoryUsage >= uint64(*podResources.Memory) {
+			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
+			if referr != nil {
+				klog.ErrorS(referr, "Couldn't make a ref to pod", "pod", klog.KObj(pod))
+			}
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedResizePodMemory, "Aborting attempt to set pod memory limit less than current memory usage for pod")
 			klog.ErrorS(nil, "Aborting attempt to set pod memory limit less than current memory usage", "pod", pod.Name)
 			result.Fail(fmt.Errorf("Aborting attempt to set pod memory limit less than current memory usage for pod %s", pod.Name))
 			return
