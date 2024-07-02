@@ -691,7 +691,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 	}
 
 	// If the optional token getter function is set, use it. Otherwise, use the default token getter.
-	if o.ServiceAccounts.OptionalTokenGetter != nil {
+	if o.ServiceAccounts != nil && o.ServiceAccounts.OptionalTokenGetter != nil {
 		authenticatorConfig.ServiceAccountTokenGetter = o.ServiceAccounts.OptionalTokenGetter(versionedInformer)
 	} else {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
