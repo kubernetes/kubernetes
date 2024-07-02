@@ -17,6 +17,7 @@ limitations under the License.
 package get
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -49,9 +50,17 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 			parsedField = s.SortField
 		}
 
-		if sorter, err := NewTableSorter(table, parsedField); err != nil {
+		sorter, err := NewTableSorter(table, parsedField)
+		if sorter != nil && errors.As(err, &ErrNoFieldMatch{}) {
+			klog.Warningf("WARNING: %v", err.Error())
+		} else if sorter == nil || err != nil {
+			if err == nil {
+				return fmt.Errorf("unknown sorting error")
+			}
 			return err
-		} else if err := sorter.Sort(); err != nil {
+		}
+
+		if err := sorter.Sort(); err != nil {
 			return err
 		}
 		return s.Delegate.PrintObj(table, out)
@@ -382,6 +391,21 @@ func (t *TableSorter) Sort() error {
 	return nil
 }
 
+// ErrNoFieldMatch is a structured error indicating the provided JSONPath did not
+// match any row in the table.
+type ErrNoFieldMatch struct {
+	field string
+}
+
+// Error implements the error interface.
+func (e ErrNoFieldMatch) Error() string {
+	return fmt.Sprintf("couldn't find any field with path %q in the list of objects", e.field)
+}
+
+// NewTableSorter creates a new table sorter with a given JSONPath field.
+// - If no rows match the JSONPath, returns a sorter and a warning.
+// - On other error, returns nil and the error.
+// - If successful, returns the sorter and nil.
 func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 	var parsedRows [][][]reflect.Value
 
@@ -403,15 +427,17 @@ func NewTableSorter(table *metav1.Table, field string) (*TableSorter, error) {
 		}
 	}
 
-	if len(table.Rows) > 0 && !fieldFoundOnce {
-		return nil, fmt.Errorf("couldn't find any field with path %q in the list of objects", field)
-	}
-
-	return &TableSorter{
+	sorter := &TableSorter{
 		obj:        table,
 		field:      field,
 		parsedRows: parsedRows,
-	}, nil
+	}
+
+	if len(table.Rows) > 0 && !fieldFoundOnce {
+		return sorter, ErrNoFieldMatch{field: field}
+	}
+
+	return sorter, nil
 }
 func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
 	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
