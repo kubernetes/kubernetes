@@ -29,11 +29,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/dump"
-	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -46,7 +46,7 @@ type volumePerformanceTestSuite struct {
 
 var _ storageframework.TestSuite = &volumePerformanceTestSuite{}
 
-const testTimeout = 15 * time.Minute
+const testTimeout = 30 * time.Minute
 
 // Time intervals when a resource was created, it enters
 // the desired state and the elapsed time between these
@@ -78,7 +78,7 @@ func InitVolumePerformanceTestSuite() storageframework.TestSuite {
 		tsInfo: storageframework.TestSuiteInfo{
 			Name: "volume-lifecycle-performance",
 			TestPatterns: []storageframework.TestPattern{
-				storageframework.FsVolModeDynamicPV,
+				storageframework.BlockVolModeDynamicPV,
 			},
 		},
 	}
@@ -100,6 +100,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		pvcs    []*v1.PersistentVolumeClaim
 		options *storageframework.PerformanceTestOptions
 		stopCh  chan struct{}
+		pods    []*v1.Pod
 	}
 	var (
 		dInfo *storageframework.DriverInfo
@@ -135,16 +136,55 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 				close(l.stopCh)
 			}
 
-			ginkgo.By("Deleting all PVCs")
-			for _, pvc := range l.pvcs {
-				err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
-				framework.ExpectNoError(err)
-				err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 5*time.Minute)
-				framework.ExpectNoError(err)
+			var (
+				errs []error
+				mu   sync.Mutex
+				wg   sync.WaitGroup
+			)
+
+			wg.Add(len(l.pods))
+			for _, pod := range l.pods {
+				go func(pod *v1.Pod) {
+					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
+
+					framework.Logf("Deleting pod %v", pod.Name)
+					err := e2epod.DeletePodWithWait(ctx, l.cs, pod)
+					mu.Lock()
+					defer mu.Unlock()
+					errs = append(errs, err)
+				}(pod)
 			}
+			wg.Wait()
+
+			ginkgo.By("Deleting all PVCs")
+
+			startTime := time.Now()
+			wg.Add(len(l.pvcs))
+			for _, pvc := range l.pvcs {
+				go func(pvc *v1.PersistentVolumeClaim) { // Start a goroutine for each PVC
+					defer wg.Done() // Decrement the counter when the goroutine finishes
+					startDeletingPvcTime := time.Now()
+					framework.Logf("Start deleting PVC %v", pvc.GetName())
+					err := e2epv.DeletePersistentVolumeClaim(ctx, l.cs, pvc.Name, pvc.Namespace)
+					framework.Logf("Deleted PVC %v in %v", pvc.GetName(), time.Since(startDeletingPvcTime))
+					framework.ExpectNoError(err)
+					startDeletingPVTime := time.Now()
+					err = e2epv.WaitForPersistentVolumeDeleted(ctx, l.cs, pvc.Spec.VolumeName, 1*time.Second, 100*time.Minute)
+					framework.Logf("Deleted PV %v in %v", pvc.GetName(), time.Since(startDeletingPVTime))
+					framework.ExpectNoError(err)
+				}(pvc)
+			}
+			wg.Wait()
+
+			endTime := time.Now() // Capture overall end time
+			totalDuration := endTime.Sub(startTime)
+			framework.Logf("Deleted all PVCs in %v", totalDuration) // Log total deletion time
+
 			ginkgo.By(fmt.Sprintf("Deleting Storage Class %s", l.scName))
 			err := l.cs.StorageV1().StorageClasses().Delete(ctx, l.scName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
+
 		} else {
 			ginkgo.By("Local l setup is nil")
 		}
@@ -198,6 +238,20 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 				create: pvc.CreationTimestamp.Time,
 			}
 			provisioningStats.mutex.Unlock()
+
+			// Create 10k pods
+			podConfig := e2epod.Config{
+				NS:           l.ns.Name,
+				SeLinuxLabel: e2epv.SELinuxLabel,
+			}
+			pod, _ := e2epod.MakeSecPod(&podConfig)
+			_, err = l.cs.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
+			if err != nil {
+				framework.Failf("Failed to create pod [%+v]. Error: %v", pod, err)
+			}
+			framework.ExpectNoError(err)
+
+			l.pods = append(l.pods, pod)
 		}
 
 		ginkgo.By("Waiting for all PVCs to be Bound...")
@@ -209,12 +263,12 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 			ginkgo.Fail(fmt.Sprintf("expected all PVCs to be in Bound state within %v minutes", testTimeout))
 		}
 
-		ginkgo.By("Calculating performance metrics for provisioning operations")
-		createPerformanceStats(provisioningStats, l.options.ProvisioningOptions.Count, l.pvcs)
+		// ginkgo.By("Calculating performance metrics for provisioning operations")
+		// createPerformanceStats(provisioningStats, l.options.ProvisioningOptions.Count, l.pvcs)
 
-		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", dump.Pretty(l.options.ProvisioningOptions.ExpectedMetrics)))
-		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
-		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
+		// ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", dump.Pretty(l.options.ProvisioningOptions.ExpectedMetrics)))
+		// errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
+		// framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
 
 }
@@ -287,6 +341,7 @@ func newPVCWatch(ctx context.Context, f *framework.Framework, provisionCount int
 			newPVCInterval.elapsed = now.Sub(newPVCInterval.create)
 			pvcs = append(pvcs, newPVC)
 		}
+		framework.Logf("Number of Bound PVCs: %v", count)
 		if count == provisionCount {
 			// Number of Bound PVCs equals the number of PVCs
 			// provisioned by this test

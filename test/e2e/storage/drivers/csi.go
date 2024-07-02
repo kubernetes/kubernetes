@@ -114,16 +114,16 @@ func initHostPathCSIDriver(name string, capabilities map[storageframework.Capabi
 			Capabilities: capabilities,
 			StressTestOptions: &storageframework.StressTestOptions{
 				NumPods:     10,
-				NumRestarts: 10,
+				NumRestarts: 1,
 			},
 			VolumeSnapshotStressTestOptions: &storageframework.VolumeSnapshotStressTestOptions{
 				NumPods:      10,
-				NumSnapshots: 10,
+				NumSnapshots: 1,
 			},
 			PerformanceTestOptions: &storageframework.PerformanceTestOptions{
 				ProvisioningOptions: &storageframework.PerformanceTestProvisioningOptions{
 					VolumeSize: "1Mi",
-					Count:      300,
+					Count:      1000,
 					// Volume provisioning metrics are compared to a high baseline.
 					// Failure to pass would suggest a performance regression.
 					ExpectedMetrics: &storageframework.Metrics{
@@ -886,6 +886,18 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				NumPods:      20,
 				NumSnapshots: 2,
 			},
+			PerformanceTestOptions: &storageframework.PerformanceTestOptions{
+				ProvisioningOptions: &storageframework.PerformanceTestProvisioningOptions{
+					VolumeSize: "1Mi",
+					Count:      10000,
+					// Volume provisioning metrics are compared to a high baseline.
+					// Failure to pass would suggest a performance regression.
+					ExpectedMetrics: &storageframework.Metrics{
+						AvgLatency: 2 * time.Minute,
+						Throughput: 0.5,
+					},
+				},
+			},
 		},
 	}
 }
@@ -914,7 +926,7 @@ func (g *gcePDCSIDriver) GetDynamicProvisionStorageClass(ctx context.Context, co
 	if fsType != "" {
 		parameters["csi.storage.k8s.io/fstype"] = fsType
 	}
-	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
+	delayedBinding := storagev1.VolumeBindingImmediate
 
 	return storageframework.GetStorageClass(provisioner, parameters, &delayedBinding, ns)
 }

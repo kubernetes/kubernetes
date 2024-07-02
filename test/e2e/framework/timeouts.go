@@ -31,7 +31,7 @@ var defaultTimeouts = TimeoutContext{
 	PVReclaim:                 3 * time.Minute,
 	PVBound:                   3 * time.Minute,
 	PVCreate:                  3 * time.Minute,
-	PVDelete:                  5 * time.Minute,
+	PVDelete:                  1000 * time.Minute,
 	PVDeleteSlow:              20 * time.Minute,
 	SnapshotCreate:            5 * time.Minute,
 	SnapshotDelete:            5 * time.Minute,

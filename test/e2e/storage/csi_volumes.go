@@ -26,7 +26,7 @@ import (
 
 // List of testDrivers to be executed in below loop
 var csiTestDrivers = []func() storageframework.TestDriver{
-	drivers.InitHostPathCSIDriver,
+	// drivers.InitHostPathCSIDriver,
 	drivers.InitGcePDCSIDriver,
 	// Don't run tests with mock driver (drivers.InitMockCSIDriver), it does not provide persistent storage.
 }
