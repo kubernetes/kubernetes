@@ -238,11 +238,12 @@ func (f *fakeVolumeHost) ScriptCommands(scripts []CommandScript) {
 }
 
 func (f *fakeVolumeHost) WaitForKubeletErrNil() error {
-	return wait.PollImmediate(10*time.Millisecond, 10*time.Second, func() (bool, error) {
-		f.mux.Lock()
-		defer f.mux.Unlock()
-		return f.kubeletErr == nil, nil
-	})
+	return wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 10*time.Second, true,
+		func(ctx context.Context) (bool, error) {
+			f.mux.Lock()
+			defer f.mux.Unlock()
+			return f.kubeletErr == nil, nil
+		})
 }
 
 type fakeAttachDetachVolumeHost struct {
