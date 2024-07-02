@@ -410,7 +410,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, nil
 		}
 		return true, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
@@ -424,7 +424,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 			return false, fmt.Errorf("expected %d valid children, got %d", validChildrenCount, len(children.Items))
 		}
 		return false, nil
-	}); err != nil && err != wait.ErrWaitTimeout {
+	}); err != nil && !wait.Interrupted(err) {
 		t.Error(err)
 	}
 
