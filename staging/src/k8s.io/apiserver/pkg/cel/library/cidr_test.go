@@ -117,8 +117,13 @@ func TestCIDR(t *testing.T) {
 		expectCompileErrs []string
 	}{
 		{
+			name:              "compilation error for cidr(int)",
+			expr:              `cidr(192168)`,
+			expectCompileErrs: []string{"found no matching overload for 'cidr' applied to '\\(int\\)'"},
+		},
+		{
 			name:         "parse ipv4",
-			expr:         `cidr("192.168.0.0/24")`,
+			expr:         `cidr(dyn("192.168.0.0/24"))`,
 			expectResult: apiservercel.CIDR{Prefix: ipv4CIDR},
 		},
 		{

@@ -246,6 +246,11 @@ func TestQuantity(t *testing.T) {
 			expectValue: types.Int(1),
 		},
 		{
+			name:        "quantity_sign_zero",
+			expr:        `sign(quantity("0"))`,
+			expectValue: types.Int(0),
+		},
+		{
 			name:        "add_quantity",
 			expr:        `quantity("50k").add(quantity("20")) == quantity("50.02k")`,
 			expectValue: trueVal,
@@ -271,9 +276,19 @@ func TestQuantity(t *testing.T) {
 			expectValue: types.Int(-49980),
 		},
 		{
+			name:        "arith_chain_1_sign",
+			expr:        `sign(quantity("50k").add(20).sub(quantity("100k")))`,
+			expectValue: types.Int(-1),
+		},
+		{
 			name:        "arith_chain",
 			expr:        `quantity("50k").add(20).sub(quantity("100k")).sub(-50000).asInteger()`,
 			expectValue: types.Int(20),
+		},
+		{
+			name:        "arith_chain_sign",
+			expr:        `sign(quantity("50k").add(20).sub(quantity("100k")).sub(-50000))`,
+			expectValue: types.Int(1),
 		},
 		{
 			name:        "as_integer",
