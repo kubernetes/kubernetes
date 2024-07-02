@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -125,7 +126,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	})
 
 	// Get node info from the driver.
-	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	csi, err := newCsiDriverClient(csiDriverName(pluginName), oteltrace.NewNoopTracerProvider())
 	if err != nil {
 		return err
 	}
@@ -425,6 +426,7 @@ func (p *csiPlugin) NewMounter(
 		kubeVolHost:         kvh,
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
+	mounter.csiClientGetter.tp = p.host.GetTracerProvider()
 
 	dir := mounter.GetPath()
 	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
@@ -457,6 +459,7 @@ func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	unmounter.driverName = csiDriverName(data[volDataKey.driverName])
 	unmounter.volumeID = data[volDataKey.volHandle]
 	unmounter.csiClientGetter.driverName = unmounter.driverName
+	unmounter.csiClientGetter.tp = p.host.GetTracerProvider()
 
 	return unmounter, nil
 }
@@ -832,6 +835,7 @@ func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
 		plugin:       p,
 		k8s:          k8s,
 		watchTimeout: csiTimeout,
+		tp:           p.host.GetTracerProvider(),
 	}, nil
 }
 
