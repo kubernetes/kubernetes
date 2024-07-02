@@ -210,12 +210,12 @@ func (kl *Kubelet) getPodResourcesDir() string {
 // pods.
 func (kl *Kubelet) GetPods() []*v1.Pod {
 	pods := kl.podManager.GetPods()
-	// a kubelet running without apiserver requires an additional
-	// update of the static pod status. See #57106
 	for i, p := range pods {
+		// Pod cache does not get updated status for static pods.
+		// TODO(tallclair): Most callers of GetPods() do not need pod status. We should either parameterize this,
+		// or move the status injection to only the callers that do need it (maybe just the /pods http handler?).
 		if kubelettypes.IsStaticPod(p) {
 			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
-				klog.V(2).InfoS("Pod status updated", "pod", klog.KObj(p), "status", status.Phase)
 				// do not mutate the cache
 				p = p.DeepCopy()
 				p.Status = status
