@@ -119,11 +119,6 @@ func (hu *HostUtil) PathExists(pathname string) (bool, error) {
 	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
 }
 
-// EvalHostSymlinks returns the path name after evaluating symlinks
-func (hu *HostUtil) EvalHostSymlinks(pathname string) (string, error) {
-	return filepath.EvalSymlinks(pathname)
-}
-
 // GetOwner returns the integer ID for the user and group of the given path
 // Note that on windows, it always returns 0. We actually don't set Group on
 // windows platform, see SetVolumeOwnership implementation.

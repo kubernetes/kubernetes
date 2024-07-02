@@ -93,12 +93,6 @@ func (hu *FakeHostUtil) PathExists(pathname string) (bool, error) {
 	return false, nil
 }
 
-// EvalHostSymlinks returns the path name after evaluating symlinks.
-// No-op for testing
-func (hu *FakeHostUtil) EvalHostSymlinks(pathname string) (string, error) {
-	return pathname, nil
-}
-
 // GetOwner returns the integer ID for the user and group of the given path
 // Not implemented for testing
 func (hu *FakeHostUtil) GetOwner(pathname string) (int64, int64, error) {
