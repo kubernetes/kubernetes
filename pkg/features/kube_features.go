@@ -953,6 +953,13 @@ const (
 	//
 	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
 	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
+
+	// owner: @saschagrunert
+	// kep: https://kep.k8s.io/4639
+	// alpha: v1.31
+	//
+	// Enables the OCI volume source.
+	OCIVolume featuregate.Feature = "OCIVolume"
 )
 
 func init() {
@@ -1209,6 +1216,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SELinuxMount: {Default: false, PreRelease: featuregate.Alpha},
 
 	SupplementalGroupsPolicy: {Default: false, PreRelease: featuregate.Alpha},
+
+	OCIVolume: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
