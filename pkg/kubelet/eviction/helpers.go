@@ -738,7 +738,6 @@ func process(stats statsFunc) cmpFunc {
 
 		p1Process := processUsage(p1Stats.ProcessStats)
 		p2Process := processUsage(p2Stats.ProcessStats)
-		// prioritize evicting the pod which has the larger consumption of process
 		return int(p2Process - p1Process)
 	}
 }
