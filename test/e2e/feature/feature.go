@@ -224,6 +224,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthenticator = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthenticator"))
 
+	// Owner: sig-auth
+	// Marks tests that require a conforming implementation of
+	// Node claims for serviceaccounts
+	ServiceAccountTokenNodeBindingValidation = framework.WithFeature(framework.ValidFeatures.Add("ServiceAccountTokenNodeBindingValidation"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthorizer = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
 
