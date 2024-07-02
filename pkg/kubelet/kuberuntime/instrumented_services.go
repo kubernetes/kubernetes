@@ -335,11 +335,11 @@ func (in instrumentedRuntimeService) CheckpointContainer(ctx context.Context, op
 	return err
 }
 
-func (in instrumentedRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
+func (in instrumentedRuntimeService) GetContainerEvents(ctx context.Context, containerEventsCh chan *runtimeapi.ContainerEventResponse, connectionEstablishedCallback func(runtimeapi.RuntimeService_GetContainerEventsClient)) error {
 	const operation = "get_container_events"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.GetContainerEvents(containerEventsCh, connectionEstablishedCallback)
+	err := in.service.GetContainerEvents(ctx, containerEventsCh, connectionEstablishedCallback)
 	recordError(operation, err)
 	return err
 }
