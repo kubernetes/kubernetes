@@ -30,8 +30,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -205,36 +207,64 @@ func TestManagedHostsFileContent(t *testing.T) {
 		hostName        string
 		hostDomainName  string
 		hostAliases     []v1.HostAlias
+		isSupportIPv6   bool
 		expectedContent string
 	}{
 		{
-			hostIPs:     []string{"123.45.67.89"},
-			hostName:    "podFoo",
-			hostAliases: []v1.HostAlias{},
-			expectedContent: `# Kubernetes-managed hosts file.
-127.0.0.1	localhost
-::1	localhost ip6-localhost ip6-loopback
-fe00::0	ip6-localnet
-fe00::0	ip6-mcastprefix
-fe00::1	ip6-allnodes
-fe00::2	ip6-allrouters
-123.45.67.89	podFoo
-`,
+			hostIPs:       []string{"123.45.67.89"},
+			hostName:      "podFoo",
+			hostAliases:   []v1.HostAlias{},
+			isSupportIPv6: true,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				::1	localhost ip6-localhost ip6-loopback
+				fe00::0	ip6-localnet
+				fe00::0	ip6-mcastprefix
+				fe00::1	ip6-allnodes
+				fe00::2	ip6-allrouters
+				123.45.67.89	podFoo
+				`,
+		},
+		{
+			hostIPs:       []string{"123.45.67.89"},
+			hostName:      "podFoo",
+			hostAliases:   []v1.HostAlias{},
+			isSupportIPv6: false,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				123.45.67.89	podFoo
+				`,
 		},
 		{
 			hostIPs:        []string{"203.0.113.1"},
 			hostName:       "podFoo",
 			hostDomainName: "domainFoo",
 			hostAliases:    []v1.HostAlias{},
-			expectedContent: `# Kubernetes-managed hosts file.
-127.0.0.1	localhost
-::1	localhost ip6-localhost ip6-loopback
-fe00::0	ip6-localnet
-fe00::0	ip6-mcastprefix
-fe00::1	ip6-allnodes
-fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
-`,
+			isSupportIPv6:  true,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				::1	localhost ip6-localhost ip6-loopback
+				fe00::0	ip6-localnet
+				fe00::0	ip6-mcastprefix
+				fe00::1	ip6-allnodes
+				fe00::2	ip6-allrouters
+				203.0.113.1	podFoo.domainFoo	podFoo
+				`,
+		},
+		{
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases:    []v1.HostAlias{},
+			isSupportIPv6:  false,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				203.0.113.1	podFoo.domainFoo	podFoo
+				`,
 		},
 		{
 			hostIPs:        []string{"203.0.113.1"},
@@ -243,18 +273,37 @@ fe00::2	ip6-allrouters
 			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 			},
-			expectedContent: `# Kubernetes-managed hosts file.
-127.0.0.1	localhost
-::1	localhost ip6-localhost ip6-loopback
-fe00::0	ip6-localnet
-fe00::0	ip6-mcastprefix
-fe00::1	ip6-allnodes
-fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+			isSupportIPv6: true,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				::1	localhost ip6-localhost ip6-loopback
+				fe00::0	ip6-localnet
+				fe00::0	ip6-mcastprefix
+				fe00::1	ip6-allnodes
+				fe00::2	ip6-allrouters
+				203.0.113.1	podFoo.domainFoo	podFoo
 
-# Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
-`,
+				# Entries added by HostAliases.
+				123.45.67.89	foo	bar	baz
+				`,
+		},
+		{
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases: []v1.HostAlias{
+				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+			},
+			isSupportIPv6: false,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				203.0.113.1	podFoo.domainFoo	podFoo
+
+				# Entries added by HostAliases.
+				123.45.67.89	foo	bar	baz
+				`,
 		},
 		{
 			hostIPs:        []string{"203.0.113.1"},
@@ -264,41 +313,81 @@ fe00::2	ip6-allrouters
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
-			expectedContent: `# Kubernetes-managed hosts file.
-127.0.0.1	localhost
-::1	localhost ip6-localhost ip6-loopback
-fe00::0	ip6-localnet
-fe00::0	ip6-mcastprefix
-fe00::1	ip6-allnodes
-fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+			isSupportIPv6: true,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				::1	localhost ip6-localhost ip6-loopback
+				fe00::0	ip6-localnet
+				fe00::0	ip6-mcastprefix
+				fe00::1	ip6-allnodes
+				fe00::2	ip6-allrouters
+				203.0.113.1	podFoo.domainFoo	podFoo
 
-# Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
-456.78.90.123	park	doo	boo
-`,
+				# Entries added by HostAliases.
+				123.45.67.89	foo	bar	baz
+				456.78.90.123	park	doo	boo
+				`,
+		},
+		{
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases: []v1.HostAlias{
+				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+			},
+			isSupportIPv6: false,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				203.0.113.1	podFoo.domainFoo	podFoo
+
+				# Entries added by HostAliases.
+				123.45.67.89	foo	bar	baz
+				456.78.90.123	park	doo	boo
+				`,
 		},
 		{
 			hostIPs:        []string{"203.0.113.1", "fd00::6"},
 			hostName:       "podFoo",
 			hostDomainName: "domainFoo",
 			hostAliases:    []v1.HostAlias{},
-			expectedContent: `# Kubernetes-managed hosts file.
-127.0.0.1	localhost
-::1	localhost ip6-localhost ip6-loopback
-fe00::0	ip6-localnet
-fe00::0	ip6-mcastprefix
-fe00::1	ip6-allnodes
-fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
-fd00::6	podFoo.domainFoo	podFoo
-`,
+			isSupportIPv6:  true,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				::1	localhost ip6-localhost ip6-loopback
+				fe00::0	ip6-localnet
+				fe00::0	ip6-mcastprefix
+				fe00::1	ip6-allnodes
+				fe00::2	ip6-allrouters
+				203.0.113.1	podFoo.domainFoo	podFoo
+				fd00::6	podFoo.domainFoo	podFoo
+				`,
+		},
+		{
+			hostIPs:        []string{"203.0.113.1", "fd00::6"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases:    []v1.HostAlias{},
+			isSupportIPv6:  false,
+			expectedContent: `
+				# Kubernetes-managed hosts file.
+				127.0.0.1	localhost
+				203.0.113.1	podFoo.domainFoo	podFoo
+				fd00::6	podFoo.domainFoo	podFoo
+				`,
 		},
 	}
 
 	for _, testCase := range testCases {
-		actualContent := managedHostsFileContent(testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
-		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
+		normalize := func(s string) string {
+			return dedent.Dedent(strings.Trim(s, "\n"))
+		}
+
+		actualContent := managedHostsFileContent(testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases, testCase.isSupportIPv6)
+		assert.Equal(t, normalize(testCase.expectedContent), string(actualContent), "hosts file content not expected")
 	}
 }
 
