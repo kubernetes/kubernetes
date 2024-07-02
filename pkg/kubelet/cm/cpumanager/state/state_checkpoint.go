@@ -130,8 +130,7 @@ func (sc *stateCheckpoint) restoreState() error {
 		}
 	}
 
-	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
-	sc.cache.SetCPUAssignments(tmpAssignments)
+	sc.cache.SetCPUAssignments(tmpAssignments, tmpDefaultCPUSet)
 
 	klog.V(2).InfoS("State checkpoint: restored state from checkpoint")
 	klog.V(2).InfoS("State checkpoint: defaultCPUSet", "defaultCpuSet", tmpDefaultCPUSet.String())
@@ -195,10 +194,10 @@ func (sc *stateCheckpoint) GetCPUAssignments() ContainerCPUAssignments {
 }
 
 // SetCPUSet sets CPU set
-func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet, defaultCPUSet cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.SetCPUSet(podUID, containerName, cset)
+	sc.cache.SetCPUSet(podUID, containerName, cset, defaultCPUSet)
 	err := sc.storeState()
 	if err != nil {
 		klog.InfoS("Store state to checkpoint error", "err", err)
@@ -206,21 +205,24 @@ func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset c
 }
 
 // SetDefaultCPUSet sets default CPU set
-func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) {
+func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.SetDefaultCPUSet(cset)
+	if err := sc.cache.SetDefaultCPUSet(cset); err != nil {
+		return err
+	}
 	err := sc.storeState()
 	if err != nil {
 		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
+	return nil
 }
 
 // SetCPUAssignments sets CPU to pod assignments
-func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
+func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.SetCPUAssignments(a)
+	sc.cache.SetCPUAssignments(a, defaultCPUSet)
 	err := sc.storeState()
 	if err != nil {
 		klog.InfoS("Store state to checkpoint error", "err", err)
@@ -228,10 +230,10 @@ func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments) {
 }
 
 // Delete deletes assignment for specified pod
-func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
+func (sc *stateCheckpoint) Delete(podUID string, containerName string, defaultCPUSet cpuset.CPUSet) {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.Delete(podUID, containerName)
+	sc.cache.Delete(podUID, containerName, defaultCPUSet)
 	err := sc.storeState()
 	if err != nil {
 		klog.InfoS("Store state to checkpoint error", "err", err)

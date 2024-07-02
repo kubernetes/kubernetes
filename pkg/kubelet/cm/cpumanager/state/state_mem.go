@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	"fmt"
 	"sync"
 
 	"k8s.io/klog/v2"
@@ -68,7 +69,7 @@ func (s *stateMemory) GetCPUAssignments() ContainerCPUAssignments {
 	return s.assignments.Clone()
 }
 
-func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -77,26 +78,33 @@ func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset
 	}
 
 	s.assignments[podUID][containerName] = cset
+	s.defaultCPUSet = defaultCPUSet
 	klog.InfoS("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
 }
 
-func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
+func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) error {
 	s.Lock()
 	defer s.Unlock()
 
+	if !s.defaultCPUSet.IsEmpty() {
+		return fmt.Errorf("Couldn't reset defaultCPUSet to: %v", cset)
+	}
+
 	s.defaultCPUSet = cset
 	klog.InfoS("Updated default CPUSet", "cpuSet", cset)
+	return nil
 }
 
-func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments) {
+func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
 	s.assignments = a.Clone()
+	s.defaultCPUSet = defaultCPUSet
 	klog.InfoS("Updated CPUSet assignments", "assignments", a)
 }
 
-func (s *stateMemory) Delete(podUID string, containerName string) {
+func (s *stateMemory) Delete(podUID string, containerName string, defaultCPUSet cpuset.CPUSet) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -104,6 +112,7 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
+	s.defaultCPUSet = defaultCPUSet
 	klog.V(2).InfoS("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
 }
 

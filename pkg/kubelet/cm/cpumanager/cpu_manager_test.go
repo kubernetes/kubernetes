@@ -61,22 +61,25 @@ func (s *mockState) GetCPUSetOrDefault(podUID string, containerName string) cpus
 	return s.GetDefaultCPUSet()
 }
 
-func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet, defaultCPUSet cpuset.CPUSet) {
 	if _, exists := s.assignments[podUID]; !exists {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
 	s.assignments[podUID][containerName] = cset
+	s.defaultCPUSet = defaultCPUSet
 }
 
-func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
+func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) error {
 	s.defaultCPUSet = cset
+	return nil
 }
 
-func (s *mockState) Delete(podUID string, containerName string) {
+func (s *mockState) Delete(podUID string, containerName string, defaultCPUSet cpuset.CPUSet) {
 	delete(s.assignments[podUID], containerName)
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
 	}
+	s.defaultCPUSet = defaultCPUSet
 }
 
 func (s *mockState) ClearState() {
@@ -84,8 +87,9 @@ func (s *mockState) ClearState() {
 	s.assignments = make(state.ContainerCPUAssignments)
 }
 
-func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
+func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet) {
 	s.assignments = a.Clone()
+	s.defaultCPUSet = defaultCPUSet
 }
 
 func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
