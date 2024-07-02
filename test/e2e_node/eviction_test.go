@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -45,6 +44,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -513,23 +513,19 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
 
-	f.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; PodDisruptionConditions enabled", nodefeature.PodDisruptionConditions, func() {
+	f.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition)+"; baseline scenario to verify DisruptionTarget is added", func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			pidsConsumed := int64(10000)
 			summary := eventuallyGetSummary(ctx)
 			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.PodDisruptionConditions): true,
-			}
 		})
-		disruptionTarget := v1.DisruptionTarget
 		specs := []podEvictSpec{
 			{
 				evictionPriority:           1,
 				pod:                        pidConsumingPod("fork-bomb-container", 30000),
-				wantPodDisruptionCondition: &disruptionTarget,
+				wantPodDisruptionCondition: ptr.To(v1.DisruptionTarget),
 			},
 		}
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)

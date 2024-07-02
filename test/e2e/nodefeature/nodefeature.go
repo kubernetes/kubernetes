@@ -83,9 +83,6 @@ var (
 	OOMScoreAdj = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodDisruptionConditions = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 
 	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)

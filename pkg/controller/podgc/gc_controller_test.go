@@ -31,20 +31,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
@@ -69,23 +66,21 @@ func TestGCTerminated(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                          string
-		pods                          []nameToPhase
-		threshold                     int
-		deletedPodNames               sets.Set[string]
-		patchedPodNames               sets.Set[string]
-		enablePodDisruptionConditions bool
+		name            string
+		pods            []nameToPhase
+		threshold       int
+		deletedPodNames sets.Set[string]
+		patchedPodNames sets.Set[string]
 	}{
 		{
-			name: "delete pod a which is PodFailed and pod b which is PodSucceeded; PodDisruptionConditions enabled",
+			name: "delete pod a which is PodFailed and pod b which is PodSucceeded",
 			pods: []nameToPhase{
 				{name: "a", phase: v1.PodFailed},
 				{name: "b", phase: v1.PodSucceeded},
 				{name: "c", phase: v1.PodFailed},
 			},
-			threshold:                     1,
-			deletedPodNames:               sets.New("a", "b"),
-			enablePodDisruptionConditions: true,
+			threshold:       1,
+			deletedPodNames: sets.New("a", "b"),
 		},
 		{
 			name: "threshold = 0, disables terminated pod deletion",
@@ -156,7 +151,6 @@ func TestGCTerminated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
 			_, ctx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			creationTime := time.Unix(0, 0)
 			nodes := []*v1.Node{testutil.NewNode("node")}
 
@@ -206,19 +200,18 @@ func waitForAdded(q workqueue.TypedDelayingInterface[string], depth int) error {
 
 func TestGCOrphaned(t *testing.T) {
 	testCases := []struct {
-		name                          string
-		initialClientNodes            []*v1.Node
-		initialInformerNodes          []*v1.Node
-		delay                         time.Duration
-		addedClientNodes              []*v1.Node
-		deletedClientNodes            []*v1.Node
-		addedInformerNodes            []*v1.Node
-		deletedInformerNodes          []*v1.Node
-		pods                          []*v1.Pod
-		itemsInQueue                  int
-		deletedPodNames               sets.Set[string]
-		patchedPodNames               sets.Set[string]
-		enablePodDisruptionConditions bool
+		name                 string
+		initialClientNodes   []*v1.Node
+		initialInformerNodes []*v1.Node
+		delay                time.Duration
+		addedClientNodes     []*v1.Node
+		deletedClientNodes   []*v1.Node
+		addedInformerNodes   []*v1.Node
+		deletedInformerNodes []*v1.Node
+		pods                 []*v1.Pod
+		itemsInQueue         int
+		deletedPodNames      sets.Set[string]
+		patchedPodNames      sets.Set[string]
 	}{
 		{
 			name: "nodes present in lister",
@@ -259,17 +252,16 @@ func TestGCOrphaned(t *testing.T) {
 			deletedPodNames: sets.New("a", "b"),
 		},
 		{
-			name:  "no nodes with PodDisruptionConditions enabled",
+			name:  "no nodes, one running pod",
 			delay: 2 * quarantineTime,
 			pods: []*v1.Pod{
 				makePod("a", "deleted", v1.PodFailed),
 				makePod("b", "deleted", v1.PodSucceeded),
 				makePod("c", "deleted", v1.PodRunning),
 			},
-			itemsInQueue:                  1,
-			deletedPodNames:               sets.New("a", "b", "c"),
-			patchedPodNames:               sets.New("c"),
-			enablePodDisruptionConditions: true,
+			itemsInQueue:    1,
+			deletedPodNames: sets.New("a", "b", "c"),
+			patchedPodNames: sets.New("c"),
 		},
 		{
 			name:  "quarantine not finished",
@@ -351,7 +343,6 @@ func TestGCOrphaned(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
 			_, ctx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 
 			client := setupNewSimpleClient(test.initialClientNodes, test.pods)
 			gcc, podInformer, nodeInformer := NewFromClient(ctx, client, -1)
@@ -416,23 +407,11 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                          string
-		pods                          []nameToPhase
-		deletedPodNames               sets.Set[string]
-		patchedPodNames               sets.Set[string]
-		enablePodDisruptionConditions bool
+		name            string
+		pods            []nameToPhase
+		deletedPodNames sets.Set[string]
+		patchedPodNames sets.Set[string]
 	}{
-		{
-			name: "Unscheduled pod in any phase must be deleted, the phase of the running pod is changed to Failed; PodDisruptionConditions enabled",
-			pods: []nameToPhase{
-				{name: "a", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "b", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-				{name: "c", phase: v1.PodRunning, deletionTimeStamp: &metav1.Time{}, nodeName: ""},
-			},
-			deletedPodNames:               sets.New("a", "b", "c"),
-			patchedPodNames:               sets.New("c"),
-			enablePodDisruptionConditions: true,
-		},
 		{
 			name: "Unscheduled pod in any phase must be deleted",
 			pods: []nameToPhase{
@@ -457,7 +436,6 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
 			_, ctx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			creationTime := time.Unix(0, 0)
 
 			pods := make([]*v1.Pod, 0, len(test.pods))
@@ -505,12 +483,11 @@ func TestGCTerminating(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                          string
-		pods                          []nameToPodConfig
-		nodes                         []node
-		deletedPodNames               sets.Set[string]
-		patchedPodNames               sets.Set[string]
-		enablePodDisruptionConditions bool
+		name            string
+		pods            []nameToPodConfig
+		nodes           []node
+		deletedPodNames sets.Set[string]
+		patchedPodNames sets.Set[string]
 	}{
 		{
 			name: "pods have deletion timestamp set and the corresponding nodes are not ready",
@@ -592,7 +569,7 @@ func TestGCTerminating(t *testing.T) {
 			patchedPodNames: sets.New("b1", "b4", "b5", "b6"),
 		},
 		{
-			name: "pods deleted from node tained out-of-service; PodDisruptionConditions enabled",
+			name: "pods deleted from node tainted out-of-service",
 			nodes: []node{
 				{name: "worker", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
 					Effect: v1.TaintEffectNoExecute}}},
@@ -602,16 +579,14 @@ func TestGCTerminating(t *testing.T) {
 				{name: "b", phase: v1.PodFailed, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
 				{name: "c", phase: v1.PodSucceeded, deletionTimeStamp: &metav1.Time{}, nodeName: "worker"},
 			},
-			deletedPodNames:               sets.New("a", "b", "c"),
-			patchedPodNames:               sets.New("a"),
-			enablePodDisruptionConditions: true,
+			deletedPodNames: sets.New("a", "b", "c"),
+			patchedPodNames: sets.New("a"),
 		},
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
 			_, ctx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 
 			creationTime := time.Unix(0, 0)
 			nodes := make([]*v1.Node, 0, len(test.nodes))
@@ -720,7 +695,6 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)
 
 			pods := []*v1.Pod{test.pod}
 

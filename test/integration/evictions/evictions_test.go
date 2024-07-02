@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -50,12 +49,10 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -346,36 +343,22 @@ func TestEvictionVersions(t *testing.T) {
 // TestEvictionWithFinalizers tests eviction with the use of finalizers
 func TestEvictionWithFinalizers(t *testing.T) {
 	cases := map[string]struct {
-		enablePodDisruptionConditions bool
-		phase                         v1.PodPhase
-		dryRun                        bool
-		wantDisruptionTargetCond      bool
+		phase                    v1.PodPhase
+		dryRun                   bool
+		wantDisruptionTargetCond bool
 	}{
-		"terminal pod with PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodSucceeded,
-			wantDisruptionTargetCond:      true,
+		"terminal pod": {
+			phase:                    v1.PodSucceeded,
+			wantDisruptionTargetCond: true,
 		},
-		"terminal pod with PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
-			phase:                         v1.PodSucceeded,
-			wantDisruptionTargetCond:      false,
+		"running pod": {
+			phase:                    v1.PodRunning,
+			wantDisruptionTargetCond: true,
 		},
-		"running pod with PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodRunning,
-			wantDisruptionTargetCond:      true,
-		},
-		"running pod with PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
-			phase:                         v1.PodRunning,
-			wantDisruptionTargetCond:      false,
-		},
-		"running pod with PodDisruptionConditions enabled should not update conditions in dry-run mode": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodRunning,
-			dryRun:                        true,
-			wantDisruptionTargetCond:      false,
+		"running pod should not update conditions in dry-run mode": {
+			phase:                    v1.PodRunning,
+			dryRun:                   true,
+			wantDisruptionTargetCond: false,
 		},
 	}
 	for name, tc := range cases {
@@ -386,7 +369,6 @@ func TestEvictionWithFinalizers(t *testing.T) {
 
 			ns := framework.CreateNamespaceOrDie(clientSet, "eviction-with-finalizers", t)
 			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, tc.enablePodDisruptionConditions)
 			defer tCtx.Cancel("test has completed")
 
 			informers.Start(tCtx.Done())
