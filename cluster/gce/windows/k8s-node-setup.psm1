@@ -329,6 +329,10 @@ function Set-EnvironmentVars {
 function Set-PrerequisiteOptions {
   # Windows updates cause the node to reboot at arbitrary times.
   Log-Output "Disabling Windows Update service"
+  # 1 = Disables Automatic Updates. (see https://learn.microsoft.com/de-de/security-updates/windowsupdateservices/18127499)
+  Set-ItemProperty HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU -Name NoAutoUpdate -Value 1
+  # 2 = notify of download. (see https://learn.microsoft.com/de-de/security-updates/windowsupdateservices/18127499)
+  Set-ItemProperty HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU -Name AUOptions -Value 2
   & sc.exe config wuauserv start=disabled
   & sc.exe stop wuauserv
   Write-VerboseServiceInfoToConsole -Service 'wuauserv' -Delay 1
