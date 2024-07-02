@@ -305,6 +305,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				config.NFTables.TableName,
 				initOnly,
 			)
 		} else {
@@ -323,6 +324,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				s.Recorder,
 				s.HealthzServer,
 				config.NodePortAddresses,
+				config.NFTables.TableName,
 				initOnly,
 			)
 		}

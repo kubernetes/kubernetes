@@ -59385,6 +59385,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 							Format:      "",
 						},
 					},
+					"serviceProxyName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The value for the \"service.kubernetes.io/service-proxy-name\" label that this kube-proxy instance shall handle. If unset (default), kube-proxy will handle any service that has NOT set this label.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"mode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "mode specifies which proxy mode to use.",
@@ -59717,6 +59724,13 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref 
 						SchemaProps: spec.SchemaProps{
 							Description: "minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+					"tableName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The name of the tables (ip and ip6) that this instance of kube-proxy will use",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
