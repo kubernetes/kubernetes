@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -69,6 +70,26 @@ func getTestPod() *v1.Pod {
 			Namespace: "new",
 		},
 	}
+}
+
+// getTestPods generates a slice of test Pod objects based on the input integer n.
+func getTestPods(n int) (pods []v1.Pod) {
+	for i := 0; i < n; i++ {
+		s := strconv.Itoa(i)
+		pod := v1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(s),
+				Name:      "foo" + s,
+				Namespace: "new",
+			},
+		}
+		pods = append(pods, pod)
+	}
+	return
 }
 
 // After adding reconciliation, if status in pod manager is different from the cached status, a reconciliation
@@ -426,7 +447,9 @@ func TestStaleUpdates(t *testing.T) {
 
 	t.Log("... even if it's stale as long as nothing changes")
 	mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
-	m.apiStatusVersions[mirrorPodUID] = m.apiStatusVersions[mirrorPodUID] - 1
+
+	statusVersion, _ := m.getApiStatusVersion(mirrorPodUID)
+	m.setApiStatusVersion(mirrorPodUID, statusVersion-1)
 
 	m.SetPodStatus(pod, status)
 	m.syncBatch(true)
@@ -434,6 +457,19 @@ func TestStaleUpdates(t *testing.T) {
 
 	t.Logf("Nothing stuck in the pipe.")
 	verifyUpdates(t, m, 0)
+}
+
+func TestManyPodsUpdates(t *testing.T) {
+	const podNums = 100
+	pods := getTestPods(podNums)
+	client := fake.NewSimpleClientset(&v1.PodList{Items: pods})
+	m := newTestManager(client)
+
+	for i := 0; i < podNums; i++ {
+		m.SetPodStatus(&pods[i], getRandomPodStatus())
+	}
+
+	verifyUpdates(t, m, podNums)
 }
 
 // shuffle returns a new shuffled list of container statuses.
@@ -1320,13 +1356,16 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	}
 
 	t.Logf("Orphaned pods should be removed.")
-	m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)] = 100
-	m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)] = 200
+	m.setApiStatusVersions(map[kubetypes.MirrorPodUID]uint64{
+		kubetypes.MirrorPodUID(testPod.UID):   100,
+		kubetypes.MirrorPodUID(mirrorPod.UID): 200,
+	})
 	m.syncBatch(true)
-	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)]; ok {
+
+	if _, ok := m.getApiStatusVersion(kubetypes.MirrorPodUID(testPod.UID)); ok {
 		t.Errorf("Should have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)]; ok {
+	if _, ok := m.getApiStatusVersion(kubetypes.MirrorPodUID(mirrorPod.UID)); ok {
 		t.Errorf("Should have cleared status for mirrorPod")
 	}
 
@@ -1337,13 +1376,15 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	staticPod.UID = "static-uid"
 	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
 	m.podManager.(mutablePodManager).AddPod(staticPod)
-	m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)] = 100
-	m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)] = 200
+	m.setApiStatusVersions(map[kubetypes.MirrorPodUID]uint64{
+		kubetypes.MirrorPodUID(testPod.UID):   100,
+		kubetypes.MirrorPodUID(mirrorPod.UID): 200,
+	})
 	m.testSyncBatch()
-	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)]; !ok {
+	if _, ok := m.getApiStatusVersion(kubetypes.MirrorPodUID(testPod.UID)); !ok {
 		t.Errorf("Should not have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)]; !ok {
+	if _, ok := m.getApiStatusVersion(kubetypes.MirrorPodUID(mirrorPod.UID)); !ok {
 		t.Errorf("Should not have cleared status for mirrorPod")
 	}
 }
