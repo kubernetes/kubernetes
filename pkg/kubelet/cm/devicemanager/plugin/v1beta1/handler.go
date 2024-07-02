@@ -66,14 +66,21 @@ func (s *server) ValidatePlugin(pluginName string, endpoint string, versions []s
 }
 
 func (s *server) connectClient(name string, socketPath string) error {
-	c := NewPluginClient(name, socketPath, s.chandler)
+	c := s.getClient(name)
+	if c != nil {
+		if c.SocketPath() != socketPath {
+			return fmt.Errorf("the device plugin %s already registered with a different socket path %s", name, c.SocketPath())
+		}
+		klog.V(2).InfoS("Client already connected with the same socket path", "name", name, "socketPath", socketPath)
+		return nil
+	}
 
-	s.registerClient(name, c)
+	c = NewPluginClient(name, socketPath, s.chandler)
 	if err := c.Connect(); err != nil {
-		s.deregisterClient(name)
 		klog.ErrorS(err, "Failed to connect to new client", "resource", name)
 		return err
 	}
+	s.registerClient(name, c)
 
 	go func() {
 		s.runClient(name, c)
@@ -83,8 +90,11 @@ func (s *server) connectClient(name string, socketPath string) error {
 }
 
 func (s *server) disconnectClient(name string, c Client) error {
+	if err := c.Disconnect(); err != nil {
+		return err
+	}
 	s.deregisterClient(name)
-	return c.Disconnect()
+	return nil
 }
 
 func (s *server) registerClient(name string, c Client) {
