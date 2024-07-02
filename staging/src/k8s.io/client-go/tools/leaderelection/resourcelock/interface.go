@@ -19,14 +19,14 @@ package resourcelock
 import (
 	"context"
 	"fmt"
+	"time"
+
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -163,7 +163,7 @@ type Interface interface {
 }
 
 // Manufacture will create a lock of a given type according to the input parameters
-func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
+func New(lockType string, ns string, name string, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
 	leaseLock := &LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Namespace: ns,
@@ -201,5 +201,5 @@ func NewFromKubeconfig(lockType string, ns string, name string, rlc ResourceLock
 	}
 	config.Timeout = timeout
 	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "leader-election"))
-	return New(lockType, ns, name, leaderElectionClient.CoreV1(), leaderElectionClient.CoordinationV1(), rlc)
+	return New(lockType, ns, name, leaderElectionClient.CoordinationV1(), rlc)
 }
