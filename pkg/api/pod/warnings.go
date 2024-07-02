@@ -170,6 +170,16 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
+	overlappingPathInContainers := warningsForOverlappingVirtualPaths(podSpec)
+	if len(overlappingPathInContainers) > 0 {
+		warnings = append(warnings, overlappingPathInContainers...)
+	}
+
+	overlappingPathInInitContainers := warningsForOverlappingVirtualPaths(podSpec)
+	if len(overlappingPathInInitContainers) > 0 {
+		warnings = append(warnings, overlappingPathInInitContainers...)
+	}
+
 	// duplicate hostAliases (#91670, #58477)
 	if len(podSpec.HostAliases) > 1 {
 		items := sets.New[string]()
@@ -354,6 +364,84 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 		if t.PodAffinityTerm.LabelSelector == nil {
 			warnings = append(warnings, fmt.Sprintf("%s: a null labelSelector results in matching no pod", fieldPath.Index(i).Child("podAffinityTerm", "labelSelector")))
 		}
+	}
+	return warnings
+}
+
+func warningsForOverlappingVirtualPaths(podSpec *api.PodSpec) []string {
+	warnings := make([]string, 0)
+	for _, v := range podSpec.Volumes {
+		if v.ConfigMap != nil && v.ConfigMap.Items != nil {
+			a := sets.NewString()
+			for _, item := range v.ConfigMap.Items {
+				if a.Has(item.Path) {
+					warnings = append(warnings, fmt.Sprintf("config map: %q - conflicting duplicate paths", v.ConfigMap.Name))
+				}
+				a.Insert(item.Path)
+			}
+		}
+
+		if v.Secret != nil && v.Secret.Items != nil {
+			a := sets.NewString()
+			for _, item := range v.Secret.Items {
+				if a.Has(item.Path) {
+					warnings = append(warnings, fmt.Sprintf("secret: %q - conflicting duplicate paths", v.Secret.SecretName))
+				}
+				a.Insert(item.Path)
+			}
+		}
+
+		if v.DownwardAPI != nil && v.DownwardAPI.Items != nil {
+			a := sets.NewString()
+			for _, item := range v.DownwardAPI.Items {
+				if a.Has(item.Path) {
+					warnings = append(warnings, "downward api - conflicting duplicate paths")
+				}
+				a.Insert(item.Path)
+			}
+		}
+
+		if v.Projected != nil {
+			a := sets.NewString()
+			for _, item := range v.Projected.Sources {
+				if item.ServiceAccountToken != nil {
+					a.Insert(item.ServiceAccountToken.Path)
+				}
+			}
+
+			for _, item := range v.Projected.Sources {
+				if item.ConfigMap != nil && item.ConfigMap.Items != nil {
+					for _, item := range item.ConfigMap.Items {
+						if a.Has(item.Path) {
+							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
+						}
+					}
+				}
+
+				if item.Secret != nil && item.Secret.Items != nil {
+					for _, item := range item.Secret.Items {
+						if a.Has(item.Path) {
+							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
+						}
+					}
+				}
+
+				if item.DownwardAPI != nil && item.DownwardAPI.Items != nil {
+					for _, item := range item.DownwardAPI.Items {
+						if a.Has(item.Path) {
+							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
+						}
+					}
+				}
+
+				if item.ClusterTrustBundle != nil {
+					if a.Has(item.ClusterTrustBundle.Path) {
+						warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
+					}
+				}
+			}
+		}
+
 	}
 	return warnings
 }
