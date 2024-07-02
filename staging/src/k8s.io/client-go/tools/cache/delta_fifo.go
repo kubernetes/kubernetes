@@ -520,9 +520,7 @@ func (f *DeltaFIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	list := make([]string, 0, len(f.queue))
-	for _, key := range f.queue {
-		list = append(list, key)
-	}
+	list = append(list, f.queue...)
 	return list
 }
 

@@ -250,7 +250,7 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 	}
 	applyParameters.Store(p)
 
-	// if log format not exists, use nil loggr
+	// if log format not exists, use nil logger
 	format, _ := logRegistry.get(c.Format)
 	if format.factory == nil {
 		klog.ClearLogger()
