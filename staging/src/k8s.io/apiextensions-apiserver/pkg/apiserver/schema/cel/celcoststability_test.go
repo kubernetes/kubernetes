@@ -37,17 +37,19 @@ func TestCelCostStability(t *testing.T) {
 	}{
 		{name: "integers",
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
-			obj:    objs(math.MaxInt64, math.MaxInt64, math.MaxInt32, math.MaxInt32, math.MaxInt64, math.MaxInt64),
+			obj: objs(int64(math.MaxInt64), int64(math.MaxInt64), int32(math.MaxInt32), int32(math.MaxInt32),
+				int64(math.MaxInt64), int64(math.MaxInt64)),
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
 			expectCost: map[string]int64{
-				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", math.MaxInt64)): 11,
+				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", int64(math.MaxInt64))): 11,
 				"self.val1 == self.val6":                              5, // integer with no format is the same as int64
 				"type(self.val1) == int":                              4,
 				fmt.Sprintf("self.val3 + 1 == %d + 1", math.MaxInt32): 5, // CEL integers are 64 bit
 			},
 		},
 		{name: "numbers",
-			obj:    objs(math.MaxFloat64, math.MaxFloat64, math.MaxFloat32, math.MaxFloat32, math.MaxFloat64, math.MaxFloat64, int64(1)),
+			obj: objs(float64(math.MaxFloat64), float64(math.MaxFloat64), float32(math.MaxFloat32), float32(math.MaxFloat32),
+				float64(math.MaxFloat64), float64(math.MaxFloat64), int64(1)),
 			schema: schemas(numberType, numberType, floatType, floatType, doubleType, doubleType, doubleType),
 			expectCost: map[string]int64{
 				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%f", math.MaxFloat64)): 11,
@@ -1218,7 +1220,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
 			expectCost: map[string]uint64{
-				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", math.MaxInt64)): 8,
+				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", int64(math.MaxInt64))): 8,
 				"self.val1 == self.val6":                              4, // integer with no format is the same as int64
 				"type(self.val1) == int":                              4,
 				fmt.Sprintf("self.val3 + 1 == %d + 1", math.MaxInt32): 5, // CEL integers are 64 bit
