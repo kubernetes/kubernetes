@@ -41,7 +41,7 @@ import (
 	"google.golang.org/grpc/status"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
+	mount "k8s.io/mount-utils"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -87,6 +87,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/client/hadialer"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -1030,10 +1031,14 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 
 // updateDialer instruments a restconfig with a dial. the returned function allows forcefully closing all active connections.
 func updateDialer(clientConfig *restclient.Config) (func(), error) {
-	if clientConfig.Transport != nil || clientConfig.Dial != nil {
-		return nil, fmt.Errorf("there is already a transport or dialer configured")
+	if clientConfig.Transport != nil {
+		return nil, fmt.Errorf("there is already a transport configured")
 	}
-	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
+	dial := clientConfig.Dial
+	if dial == nil {
+		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	}
+	d := connrotation.NewDialer(dial)
 	clientConfig.Dial = d.DialContext
 	return d.CloseAll, nil
 }
@@ -1075,6 +1080,7 @@ func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclien
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
+	hadialer.OverrideDial(clientConfig)
 }
 
 // getNodeName returns the node name according to the cloud provider
