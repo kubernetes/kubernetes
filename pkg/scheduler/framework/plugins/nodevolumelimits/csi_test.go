@@ -641,6 +641,86 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
+func TestCSILimitsAddedPVCQHint(t *testing.T) {
+	tests := []struct {
+		test           string
+		newPod         *v1.Pod
+		attachedVolume *v1.Volume
+		addedPvc       *v1.PersistentVolumeClaim
+		wantQHint      framework.QueueingHint
+	}{
+		{
+			test:      "a pod isn't in the same namespace as an added PVC",
+			newPod:    st.MakePod().Namespace("ns1").Obj(),
+			addedPvc:  st.MakePersistentVolumeClaim().Namespace("ns2").Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			test:   "a pod is in the same namespace as an added PVC",
+			newPod: st.MakePod().Namespace("ns1").Obj(),
+			attachedVolume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{
+					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pvc1",
+					},
+				},
+			},
+			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
+			wantQHint: framework.Queue,
+		},
+		{
+			test:   "a pod has an ephemeral volume related to an added PVC",
+			newPod: st.MakePod().Name("pod1").Namespace("ns1").Obj(),
+			attachedVolume: &v1.Volume{
+				Name: "ephemeral",
+				VolumeSource: v1.VolumeSource{
+					Ephemeral: &v1.EphemeralVolumeSource{},
+				},
+			},
+			addedPvc:  st.MakePersistentVolumeClaim().Name("pod1-ephemeral").Namespace("ns1").Obj(),
+			wantQHint: framework.Queue,
+		},
+		{
+			test:   "a pod doesn't have the same PVC as an added PVC",
+			newPod: st.MakePod().Namespace("ns1").Obj(),
+			attachedVolume: &v1.Volume{
+				VolumeSource: v1.VolumeSource{
+					PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+						ClaimName: "pvc1",
+					},
+				},
+			},
+			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			test:      "a pod doesn't have any PVC attached",
+			newPod:    st.MakePod().Namespace("ns1").Obj(),
+			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			p := &CSILimits{}
+			logger, _ := ktesting.NewTestContext(t)
+
+			if test.attachedVolume != nil {
+				test.newPod.Spec.Volumes = append(test.newPod.Spec.Volumes, *test.attachedVolume)
+			}
+
+			qhint, err := p.isSchedulableAfterPVCAdded(logger, test.newPod, nil, test.addedPvc)
+			if err != nil {
+				t.Errorf("isSchedulableAfterPVCAdded failed: %v", err)
+			}
+			if qhint != test.wantQHint {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
 func TestCSILimitsQHint(t *testing.T) {
 	podEbs := st.MakePod().PVC("csi-ebs.csi.aws.com-2")
 
