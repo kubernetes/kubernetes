@@ -41,14 +41,6 @@ func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.Per
 	}
 }
 
-// DropDisabledStatusFields removes disabled fields from the pv status.
-// This should be called from PrepareForUpdate for all resources containing a pv status.
-func DropDisabledStatusFields(oldStatus, newStatus *api.PersistentVolumeStatus) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeLastPhaseTransitionTime) && oldStatus.LastPhaseTransitionTime.IsZero() {
-		newStatus.LastPhaseTransitionTime = nil
-	}
-}
-
 func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {
 	if pv == nil {
 		return nil
