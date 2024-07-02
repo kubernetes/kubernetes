@@ -29,7 +29,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Job"),
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name", "metadata.namespace", "status.successful":
+			case "metadata.name", "metadata.namespace", "status.successful", "status.active", "status.failed":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label %q not supported for Job", label)
