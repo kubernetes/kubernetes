@@ -739,6 +739,10 @@ func process(stats statsFunc) cmpFunc {
 		p1Process := processUsage(p1Stats.ProcessStats)
 		p2Process := processUsage(p2Stats.ProcessStats)
 		// prioritize evicting the pod which has the larger consumption of process
+		if p1Process == 0 || p2Process == 0 {
+			// Looks like there is an issue where cadvisor stats reports 0 processes
+			klog.V(4).InfoS("ProcessStats", "p1Process", p1Process, "p2Process", p2Process)
+		}
 		return int(p2Process - p1Process)
 	}
 }
