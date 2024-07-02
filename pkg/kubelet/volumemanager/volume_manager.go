@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -107,19 +108,17 @@ type VolumeManager interface {
 	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
-	// referenced by the specified pod that are successfully attached and
+	// referenced by the specified pod that are desired and actually attached and
 	// mounted. The key in the map is the OuterVolumeSpecName (i.e.
 	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
 	// volumes.
 	GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
 
-	// GetPossiblyMountedVolumesForPod returns a VolumeMap containing the volumes
-	// referenced by the specified pod that are either successfully attached
+	// HasPossiblyMountedVolumesForPod returns whether the pod has
+	// any volumes that are either successfully attached
 	// and mounted or are "uncertain", i.e. a volume plugin may be mounting
-	// them right now. The key in the map is the OuterVolumeSpecName (i.e.
-	// pod.Spec.Volumes[x].Name). It returns an empty VolumeMap if pod has no
-	// volumes.
-	GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap
+	// them right now.
+	HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool
 
 	// GetExtraSupplementalGroupsForPod returns a list of the extra
 	// supplemental groups for the Pod. These extra supplemental groups come
@@ -297,8 +296,8 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
 	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
+	for name, mountedVolume := range vm.getMountedVolumes(podName) {
+		podVolumes[name] = container.VolumeInfo{
 			Mounter:             mountedVolume.Mounter,
 			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
 			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
@@ -308,17 +307,8 @@ func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) co
 	return podVolumes
 }
 
-func (vm *volumeManager) GetPossiblyMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
-	podVolumes := make(container.VolumeMap)
-	for _, mountedVolume := range vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName) {
-		podVolumes[mountedVolume.OuterVolumeSpecName] = container.VolumeInfo{
-			Mounter:             mountedVolume.Mounter,
-			BlockVolumeMapper:   mountedVolume.BlockVolumeMapper,
-			ReadOnly:            mountedVolume.VolumeSpec.ReadOnly,
-			InnerVolumeSpecName: mountedVolume.InnerVolumeSpecName,
-		}
-	}
-	return podVolumes
+func (vm *volumeManager) HasPossiblyMountedVolumesForPod(podName types.UniquePodName) bool {
+	return len(vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName)) > 0
 }
 
 func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
@@ -326,14 +316,14 @@ func (vm *volumeManager) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	supplementalGroups := sets.New[string]()
 
 	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		if mountedVolume.VolumeGidValue != "" {
-			supplementalGroups.Insert(mountedVolume.VolumeGidValue)
+		if mountedVolume.VolumeGIDValue != "" {
+			supplementalGroups.Insert(mountedVolume.VolumeGIDValue)
 		}
 	}
 
 	result := make([]int64, 0, supplementalGroups.Len())
 	for _, group := range sets.List(supplementalGroups) {
-		iGroup, extra := getExtraSupplementalGid(group, pod)
+		iGroup, extra := getExtraSupplementalGID(group, pod)
 		if !extra {
 			continue
 		}
@@ -459,16 +449,15 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 		vm.verifyVolumesUnmountedFunc(uniquePodName))
 
 	if err != nil {
-		var mountedVolumes []string
+		var mountedVolumes []v1.UniqueVolumeName
 		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
-			mountedVolumes = append(mountedVolumes, v.OuterVolumeSpecName)
+			mountedVolumes = append(mountedVolumes, v.VolumeName)
 		}
-		sort.Strings(mountedVolumes)
-
 		if len(mountedVolumes) == 0 {
 			return nil
 		}
 
+		slices.Sort(mountedVolumes)
 		return fmt.Errorf(
 			"mounted volumes=%v: %w",
 			mountedVolumes,
@@ -484,7 +473,7 @@ func (vm *volumeManager) getVolumesNotInDSW(uniquePodName types.UniquePodName, e
 
 	for _, volumeToMount := range vm.desiredStateOfWorld.GetVolumesToMount() {
 		if volumeToMount.PodName == uniquePodName {
-			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecName)
+			volumesNotInDSW.Delete(volumeToMount.OuterVolumeSpecNames...)
 		}
 	}
 
@@ -499,7 +488,7 @@ func (vm *volumeManager) getUnattachedVolumes(uniquePodName types.UniquePodName)
 		if volumeToMount.PodName == uniquePodName &&
 			volumeToMount.PluginIsAttachable &&
 			!vm.actualStateOfWorld.VolumeExists(volumeToMount.VolumeName) {
-			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecName)
+			unattachedVolumes = append(unattachedVolumes, volumeToMount.OuterVolumeSpecNames...)
 		}
 	}
 	sort.Strings(unattachedVolumes)
@@ -529,29 +518,37 @@ func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName)
 	}
 }
 
-// getUnmountedVolumes fetches the current list of mounted volumes from
-// the actual state of the world, and uses it to process the list of
-// expectedVolumes. It returns a list of unmounted volumes.
-// The list also includes volume that may be mounted in uncertain state.
-func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
-	mountedVolumes := sets.New[string]()
-	for _, mountedVolume := range vm.actualStateOfWorld.GetMountedVolumesForPod(podName) {
-		mountedVolumes.Insert(mountedVolume.OuterVolumeSpecName)
+// getMountedVolumes returns volumes that are desired and actually mounted,
+// indexed by the outer volume spec name.
+func (vm *volumeManager) getMountedVolumes(podName types.UniquePodName) map[string]*cache.MountedVolume {
+	outerNames := map[v1.UniqueVolumeName][]string{}
+	for _, toMountVolumes := range vm.desiredStateOfWorld.GetVolumesToMount() {
+		if toMountVolumes.PodName == podName {
+			outerNames[toMountVolumes.VolumeName] = toMountVolumes.OuterVolumeSpecNames
+		}
 	}
-	return filterUnmountedVolumes(mountedVolumes, expectedVolumes)
+	volumes := vm.actualStateOfWorld.GetMountedVolumesForPod(podName)
+	volumesByOuterName := make(map[string]*cache.MountedVolume)
+	for i, mountedVolume := range volumes {
+		for _, name := range outerNames[mountedVolume.VolumeName] {
+			volumesByOuterName[name] = &volumes[i]
+		}
+	}
+	return volumesByOuterName
 }
 
-// filterUnmountedVolumes adds each element of expectedVolumes that is not in
-// mountedVolumes to a list of unmountedVolumes and returns it.
-func filterUnmountedVolumes(mountedVolumes sets.Set[string], expectedVolumes []string) []string {
+// getUnmountedVolumes returns a list of unmounted volumes.
+// This includes the volumes in expectedVolumes, but not in one of DSW/ASW.
+// The list also includes volume that may be mounted in uncertain state.
+func (vm *volumeManager) getUnmountedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
+	mountedVolumes := vm.getMountedVolumes(podName)
 	unmountedVolumes := []string{}
 	for _, expectedVolume := range expectedVolumes {
-		if !mountedVolumes.Has(expectedVolume) {
+		if _, ok := mountedVolumes[expectedVolume]; !ok {
 			unmountedVolumes = append(unmountedVolumes, expectedVolume)
 		}
 	}
-	sort.Strings(unmountedVolumes)
-
+	slices.Sort(unmountedVolumes)
 	return unmountedVolumes
 }
 
@@ -562,22 +559,22 @@ func getExpectedVolumes(pod *v1.Pod) []string {
 	return mounts.Union(devices).UnsortedList()
 }
 
-// getExtraSupplementalGid returns the value of an extra supplemental GID as
+// getExtraSupplementalGID returns the value of an extra supplemental GID as
 // defined by an annotation on a volume and a boolean indicating whether the
 // volume defined a GID that the pod doesn't already request.
-func getExtraSupplementalGid(volumeGidValue string, pod *v1.Pod) (int64, bool) {
-	if volumeGidValue == "" {
+func getExtraSupplementalGID(volumeGIDValue string, pod *v1.Pod) (int64, bool) {
+	if volumeGIDValue == "" {
 		return 0, false
 	}
 
-	gid, err := strconv.ParseInt(volumeGidValue, 10, 64)
+	gid, err := strconv.ParseInt(volumeGIDValue, 10, 64)
 	if err != nil {
 		return 0, false
 	}
 
 	if pod.Spec.SecurityContext != nil {
-		for _, existingGid := range pod.Spec.SecurityContext.SupplementalGroups {
-			if gid == int64(existingGid) {
+		for _, existingGID := range pod.Spec.SecurityContext.SupplementalGroups {
+			if gid == int64(existingGID) {
 				return 0, false
 			}
 		}

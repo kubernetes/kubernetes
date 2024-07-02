@@ -195,7 +195,7 @@ func TestCleanOrphanVolumes(t *testing.T) {
 				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
 				podName := util.GetUniquePodName(pod)
 				volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
-					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
+					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* SELinuxContext */)
 				if err != nil {
 					t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 				}
@@ -318,7 +318,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 
 			podName := util.GetUniquePodName(pod)
 			volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
-				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */, nil /* SELinuxContext */)
+				podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGIDValue */, nil /* SELinuxContext */)
 			if err != nil {
 				t.Fatalf("Error adding volume %s to dsow: %v", volumeSpec.Name(), err)
 			}

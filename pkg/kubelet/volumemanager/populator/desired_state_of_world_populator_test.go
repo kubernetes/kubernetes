@@ -17,13 +17,9 @@ limitations under the License.
 package populator
 
 import (
+	"fmt"
 	"testing"
 	"time"
-
-	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/ptr"
-
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +32,7 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -46,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -400,13 +398,12 @@ func TestFindAndRemoveDeletedPodsWithUncertain(t *testing.T) {
 
 	// Mark the volume as uncertain
 	opts := operationexecutor.MarkVolumeOpts{
-		PodName:             util.GetUniquePodName(pod),
-		PodUID:              pod.UID,
-		VolumeName:          expectedVolumeName,
-		OuterVolumeSpecName: "dswp-test-volume-name",
-		VolumeGidVolume:     "",
-		VolumeSpec:          volume.NewSpecFromPersistentVolume(pv, false),
-		VolumeMountState:    operationexecutor.VolumeMountUncertain,
+		PodName:          util.GetUniquePodName(pod),
+		PodUID:           pod.UID,
+		VolumeName:       expectedVolumeName,
+		VolumeGIDVolume:  "",
+		VolumeSpec:       volume.NewSpecFromPersistentVolume(pv, false),
+		VolumeMountState: operationexecutor.VolumeMountUncertain,
 	}
 	err := dswp.actualStateOfWorld.MarkVolumeMountAsUncertain(opts)
 	if err != nil {
@@ -1375,13 +1372,12 @@ func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}
 		markVolumeOpts := operationexecutor.MarkVolumeOpts{
-			PodName:             volumeToMount.PodName,
-			PodUID:              volumeToMount.Pod.UID,
-			VolumeName:          volumeToMount.VolumeName,
-			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
-			VolumeGidVolume:     volumeToMount.VolumeGidValue,
-			VolumeSpec:          volumeToMount.VolumeSpec,
-			VolumeMountState:    operationexecutor.VolumeMounted,
+			PodName:          volumeToMount.PodName,
+			PodUID:           volumeToMount.Pod.UID,
+			VolumeName:       volumeToMount.VolumeName,
+			VolumeGIDVolume:  volumeToMount.VolumeGIDValue,
+			VolumeSpec:       volumeToMount.VolumeSpec,
+			VolumeMountState: operationexecutor.VolumeMounted,
 		}
 		err = asw.MarkVolumeAsMounted(markVolumeOpts)
 		if err != nil {

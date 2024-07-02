@@ -17,15 +17,14 @@ limitations under the License.
 package metrics
 
 import (
-	"k8s.io/klog/v2/ktesting"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
-
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -82,14 +81,13 @@ func TestMetricCollection(t *testing.T) {
 	}
 
 	markVolumeOpts := operationexecutor.MarkVolumeOpts{
-		PodName:             podName,
-		PodUID:              pod.UID,
-		VolumeName:          generatedVolumeName,
-		Mounter:             mounter,
-		BlockVolumeMapper:   mapper,
-		OuterVolumeSpecName: volumeSpec.Name(),
-		VolumeSpec:          volumeSpec,
-		VolumeMountState:    operationexecutor.VolumeMounted,
+		PodName:           podName,
+		PodUID:            pod.UID,
+		VolumeName:        generatedVolumeName,
+		Mounter:           mounter,
+		BlockVolumeMapper: mapper,
+		VolumeSpec:        volumeSpec,
+		VolumeMountState:  operationexecutor.VolumeMounted,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {
