@@ -282,7 +282,6 @@ type dynamicResources struct {
 	classLister                resourcelisters.DeviceClassLister
 	podSchedulingContextLister resourcelisters.PodSchedulingContextLister
 	sliceLister                resourcelisters.ResourceSliceLister
-	claimNameLookup            *resourceclaim.Lookup
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -354,7 +353,6 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		classLister:                fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha3().PodSchedulingContexts().Lister(),
 		sliceLister:                fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
-		claimNameLookup:            resourceclaim.NewNameLookup(fh.ClientSet()),
 		claimAssumeCache:           fh.ResourceClaimCache(),
 	}
 
@@ -625,7 +623,7 @@ func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourceapi.Resou
 // It calls an optional handler for those claims that it finds.
 func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podResourceName string, claim *resourceapi.ResourceClaim)) error {
 	for _, resource := range pod.Spec.ResourceClaims {
-		claimName, mustCheckOwner, err := pl.claimNameLookup.Name(pod, &resource)
+		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &resource)
 		if err != nil {
 			return err
 		}

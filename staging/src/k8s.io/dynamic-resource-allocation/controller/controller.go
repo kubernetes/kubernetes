@@ -146,7 +146,6 @@ type controller struct {
 	driver              Driver
 	setReservedFor      bool
 	kubeClient          kubernetes.Interface
-	claimNameLookup     *resourceclaim.Lookup
 	queue               workqueue.TypedRateLimitingInterface[string]
 	eventRecorder       record.EventRecorder
 	dcLister            resourcelisters.DeviceClassLister
@@ -169,7 +168,6 @@ func New(
 	dcInformer := informerFactory.Resource().V1alpha3().DeviceClasses()
 	claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 	schedulingCtxInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
-	claimNameLookup := resourceclaim.NewNameLookup(kubeClient)
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	go func() {
@@ -210,7 +208,6 @@ func New(
 		driver:              driver,
 		setReservedFor:      true,
 		kubeClient:          kubeClient,
-		claimNameLookup:     claimNameLookup,
 		dcLister:            dcInformer.Lister(),
 		claimCache:          claimCache,
 		schedulingCtxLister: schedulingCtxInformer.Lister(),
@@ -584,7 +581,7 @@ func (ctrl *controller) allocateClaims(ctx context.Context, claims []*ClaimAlloc
 }
 
 func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim v1.PodResourceClaim) (*ClaimAllocation, error) {
-	claimName, mustCheckOwner, err := ctrl.claimNameLookup.Name(pod, &podClaim)
+	claimName, mustCheckOwner, err := resourceclaim.Name(pod, &podClaim)
 	if err != nil {
 		return nil, err
 	}
