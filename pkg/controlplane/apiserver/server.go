@@ -154,9 +154,6 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 			c.Extra.PeerEndpointLeaseReconciler,
 			c.Extra.PeerEndpointReconcileInterval,
 			client)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create peer endpoint lease controller: %w", err)
-		}
 		s.GenericAPIServer.AddPostStartHookOrDie("peer-endpoint-reconciler-controller",
 			func(hookContext genericapiserver.PostStartHookContext) error {
 				peerEndpointCtrl.Start(hookContext.StopCh)
