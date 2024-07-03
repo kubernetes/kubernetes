@@ -33,9 +33,6 @@ registry.k8s.io/e2e-test-images/volume/iscsi
 registry.k8s.io/e2e-test-images/volume/nfs
 registry.k8s.io/etcd
 registry.k8s.io/pause
-registry.k8s.io/prometheus-dummy-exporter
-registry.k8s.io/prometheus-to-sd
-registry.k8s.io/sd-dummy-exporter
 registry.k8s.io/sig-storage/csi-attacher
 registry.k8s.io/sig-storage/csi-external-health-monitor-controller
 registry.k8s.io/sig-storage/csi-node-driver-registrar
