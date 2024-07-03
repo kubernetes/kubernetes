@@ -728,7 +728,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
 					v1.IPv6Protocol: net.IPv6zero,
 				},
-				nodeInformer: nodeInformer,
+				NodeInformer: nodeInformer,
 			}
 
 			err = s.platformSetup(ctx)

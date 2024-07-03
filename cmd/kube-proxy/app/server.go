@@ -165,10 +165,10 @@ type ProxyServer struct {
 	Hostname        string
 	PrimaryIPFamily v1.IPFamily
 	NodeIPs         map[v1.IPFamily]net.IP
+	NodeInformer    v1informers.NodeInformer
 
-	rawNodeIPs   []net.IP
-	podCIDRs     []string // only used for LocalModeNodeCIDR
-	nodeInformer v1informers.NodeInformer
+	rawNodeIPs []net.IP
+	podCIDRs   []string // only used for LocalModeNodeCIDR
 
 	Proxier proxy.Provider
 }
@@ -206,9 +206,9 @@ func newProxyServer(ctx context.Context, cfg *kubeproxyconfig.KubeProxyConfigura
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.Hostname).String()
 		}))
-	s.nodeInformer = currentNodeInformerFactory.Core().V1().Nodes()
-	nodeLister := s.nodeInformer.Lister()
-	nodeInformerHasSynced := s.nodeInformer.Informer().HasSynced
+	s.NodeInformer = currentNodeInformerFactory.Core().V1().Nodes()
+	nodeLister := s.NodeInformer.Lister()
+	nodeInformerHasSynced := s.NodeInformer.Informer().HasSynced
 
 	currentNodeInformerFactory.Start(wait.NeverStop)
 
@@ -580,7 +580,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	informerFactory.Start(wait.NeverStop)
 	serviceInformerFactory.Start(wait.NeverStop)
 
-	nodeConfig := config.NewNodeConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
+	nodeConfig := config.NewNodeConfig(ctx, s.NodeInformer, s.Config.ConfigSyncPeriod.Duration)
 	// TODO: remove once ConsistentReadFromCache and/or WatchList graduate to GA
 	// Informers may get stale data, specially in cases where the kube-proxy runs as a static pod
 	// or an independent binary, since it may run before the kubelet on the node updates the Node.

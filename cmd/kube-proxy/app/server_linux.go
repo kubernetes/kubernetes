@@ -80,7 +80,7 @@ func (s *ProxyServer) platformSetup(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
 		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.nodeInformer.Lister(), s.Hostname)
+		node, err := waitForPodCIDR(ctx, s.NodeInformer.Lister(), s.Hostname)
 		if err != nil {
 			return err
 		}
