@@ -482,7 +482,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
 			schedulingQueue := queue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 			testSched := Scheduler{
 				StopEverything:  ctx.Done(),

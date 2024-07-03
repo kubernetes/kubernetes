@@ -2039,7 +2039,7 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			cs := fake.NewSimpleClientset(tt.podInfo.Pod)
+			cs := fake.NewClientset(tt.podInfo.Pod)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podLister := informerFactory.Core().V1().Pods().Lister()
 

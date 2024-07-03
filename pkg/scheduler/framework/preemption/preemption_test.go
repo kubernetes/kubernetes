@@ -333,7 +333,7 @@ func TestDryRunPreemption(t *testing.T) {
 			for _, n := range tt.nodes {
 				objs = append(objs, n)
 			}
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -437,7 +437,7 @@ func TestSelectCandidate(t *testing.T) {
 			for _, pod := range tt.testPods {
 				objs = append(objs, pod)
 			}
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			snapshot := internalcache.NewSnapshot(tt.testPods, nodes)
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
