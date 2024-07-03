@@ -1328,15 +1328,52 @@ func newErrWatcher(err error) *errWatcher {
 }
 
 func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
-	return delegator.CacheWithoutSnapshots{}.ShouldDelegateExactRV(resourceVersion, recursive)
+	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
+	if !recursive || c.watchCache.snapshots == nil {
+		return delegator.Result{ShouldDelegate: true}, nil
+	}
+	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		return delegator.Result{}, err
+	}
+	return c.shouldDelegateExactRV(listRV)
 }
 
 func (c *Cacher) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
-	return delegator.CacheWithoutSnapshots{}.ShouldDelegateContinue(continueToken, recursive)
+	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
+	if !recursive || c.watchCache.snapshots == nil {
+		return delegator.Result{ShouldDelegate: true}, nil
+	}
+	_, continueRV, err := storage.DecodeContinue(continueToken, c.resourcePrefix)
+	if err != nil {
+		return delegator.Result{}, err
+	}
+	if continueRV > 0 {
+		return c.shouldDelegateExactRV(uint64(continueRV))
+	} else {
+		// Continue with negative RV is a consistent read.
+		return c.ShouldDelegateConsistentRead()
+	}
+}
+
+func (c *Cacher) shouldDelegateExactRV(rv uint64) (delegator.Result, error) {
+	// Exact requests on future revision require support for consistent read, but are not a consistent read by themselves.
+	if c.watchCache.notFresh(rv) {
+		return delegator.Result{
+			ShouldDelegate: !delegator.ConsistentReadSupported(),
+		}, nil
+	}
+	_, canServe := c.watchCache.snapshots.GetLessOrEqual(rv)
+	return delegator.Result{
+		ShouldDelegate: !canServe,
+	}, nil
 }
 
 func (c *Cacher) ShouldDelegateConsistentRead() (delegator.Result, error) {
-	return delegator.CacheWithoutSnapshots{}.ShouldDelegateConsistentRead()
+	return delegator.Result{
+		ConsistentRead: true,
+		ShouldDelegate: !delegator.ConsistentReadSupported(),
+	}, nil
 }
 
 // Implements watch.Interface.
