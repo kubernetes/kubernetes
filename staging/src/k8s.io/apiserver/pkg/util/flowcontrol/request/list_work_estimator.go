@@ -85,7 +85,10 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
-	listFromStorage, _ := shouldListFromStorage(&listOptions)
+	listFromStorage, _, err := shouldListFromStorage(&listOptions, false, emptyCache{})
+	if err != nil {
+		return WorkEstimate{InitialSeats: maxSeats}
+	}
 	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	numStored, err := e.countGetterFn(key(requestInfo))
@@ -162,32 +165,61 @@ func key(requestInfo *apirequest.RequestInfo) string {
 // NOTICE: Keep in sync with shouldDelegateList function in
 //
 //	staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func shouldListFromStorage(opts *metav1.ListOptions) (shouldDeletage, consistentRead bool) {
+func shouldListFromStorage(opts *metav1.ListOptions, recursive bool, snapshots snapshotCache) (shouldDeletage, consistentRead bool, err error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	consistentRead = false
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true, consistentRead
+		if recursive {
+			canServe, err := snapshots.CanServeExactRV(opts.ResourceVersion)
+			return !canServe, consistentRead, err
+		}
+		return true, consistentRead, nil
 	case metav1.ResourceVersionMatchNotOlderThan:
-		return false, consistentRead
+		return false, consistentRead, nil
 	case "":
 		// Legacy exact match
 		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true, consistentRead
+			if recursive {
+				canServe, err := snapshots.CanServeExactRV(opts.ResourceVersion)
+				return !canServe, consistentRead, err
+			}
+			return true, consistentRead, nil
 		}
 		// Continue
 		if len(opts.Continue) > 0 {
-			return true, consistentRead
+			if recursive {
+				canServe, err := snapshots.CanServeContinue(opts.Continue)
+				return !canServe, consistentRead, err
+			}
+			return true, consistentRead, nil
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
 			consistentRead = true
 			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead
+			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead, nil
 		}
-		return false, consistentRead
+		return false, consistentRead, nil
 	default:
-		return true, consistentRead
+		return true, consistentRead, nil
 	}
 }
+
+type snapshotCache interface {
+	CanServeExactRV(string) (bool, error)
+	CanServeContinue(string) (bool, error)
+}
+
+type emptyCache struct{}
+
+func (e emptyCache) CanServeContinue(string) (bool, error) {
+	return false, nil
+}
+
+func (e emptyCache) CanServeExactRV(string) (bool, error) {
+	return false, nil
+}
+
+var _ snapshotCache = emptyCache{}

@@ -317,14 +317,17 @@ func TestShouldDelegateList(t *testing.T) {
 		}
 	}
 
-	runTestCases := func(t *testing.T, testcases map[opts]bool, overrides ...map[opts]bool) {
+	runTestCases := func(t *testing.T, snapshotAvailable bool, testcases map[opts]bool, overrides ...map[opts]bool) {
 		for opt, expectBypass := range testCases {
 			for _, override := range overrides {
 				if bypass, ok := override[opt]; ok {
 					expectBypass = bypass
 				}
 			}
-			gotBypass, _ := shouldDelegateList(toStorageOpts(opt))
+			gotBypass, _, err := shouldDelegateList(toStorageOpts(opt), fakeSnapshotCache{snapshotAvailable: snapshotAvailable})
+			if err != nil {
+				t.Fatal(err)
+			}
 			if gotBypass != expectBypass {
 				t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", opt, expectBypass, gotBypass)
 			}
@@ -336,12 +339,23 @@ func TestShouldDelegateList(t *testing.T) {
 		consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
 	}
 
-	t.Run("ConsistentListFromCache=false", func(t *testing.T) {
+	listFromCacheSnapshotOverrides := map[opts]bool{}
+	listFromCacheSnapshotOverrides[opts{Recursive: true, Continue: continueOnRev1}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnRev1}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnRev1}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnRev1}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, ResourceVersion: "1", Limit: 100}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	listFromCacheSnapshotOverrides[opts{Recursive: true, ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+
+	t.Run("ConsistentListFromStorage=false/ListFromCacheSnapshot=false", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		runTestCases(t, testCases)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+		runTestCases(t, false, testCases)
 	})
-	t.Run("ConsistentListFromCache=true", func(t *testing.T) {
+	t.Run("ConsistentListFromStorage=true/ListFromCacheSnapshot=false", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 
 		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
@@ -350,9 +364,55 @@ func TestShouldDelegateList(t *testing.T) {
 		// However in CI all test are run and there must be a test(s) that properly
 		// initialize the storage layer so that the mentioned method evaluates to true
 		forceRequestWatchProgressSupport(t)
-		runTestCases(t, testCases, consistentListFromCacheOverrides)
+		runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+	})
+
+	t.Run("ConsistentListFromStorage=false/ListFromCacheSnapshot=true", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+		t.Run("SnapshotAvailable=false", func(t *testing.T) {
+			runTestCases(t, false, testCases)
+		})
+		t.Run("SnapshotAvailable=true", func(t *testing.T) {
+			runTestCases(t, true, testCases, listFromCacheSnapshotOverrides)
+		})
+	})
+
+	t.Run("ConsistentListFromStorage=true/ListFromCacheSnapshot=true", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
+		//
+		// If you were to run only TestGetListCacheBypass you would see that the test fail.
+		// However in CI all test are run and there must be a test(s) that properly
+		// initialize the storage layer so that the mentioned method evaluates to true
+		forceRequestWatchProgressSupport(t)
+
+		t.Run("SnapshotAvailable=false", func(t *testing.T) {
+			runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+		})
+		t.Run("SnapshotAvailable=true", func(t *testing.T) {
+			runTestCases(t, true, testCases, consistentListFromCacheOverrides, listFromCacheSnapshotOverrides)
+		})
 	})
 }
+
+type fakeSnapshotCache struct {
+	snapshotAvailable bool
+}
+
+func (f fakeSnapshotCache) CanServeContinue(string) (bool, error) {
+	return f.snapshotAvailable, nil
+}
+
+func (f fakeSnapshotCache) CanServeExactRV(string) (bool, error) {
+	return f.snapshotAvailable, nil
+}
+
+var _ snapshotCache = fakeSnapshotCache{}
 
 func TestConsistentReadFallback(t *testing.T) {
 	tcs := []struct {
@@ -515,6 +575,100 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+		})
+	}
+}
+
+func TestMatchExactResourceVersionFallback(t *testing.T) {
+	tcs := []struct {
+		name                        string
+		snapshotAvailableFirstTime  bool
+		snapshotAvailableSecondTime bool
+
+		expectStoreRequests    int
+		expectSnapshotRequests int
+	}{
+		{
+			name:                       "Disabled",
+			snapshotAvailableFirstTime: false,
+			expectStoreRequests:        2,
+			expectSnapshotRequests:     1,
+		},
+		{
+			name:                        "Enabled",
+			snapshotAvailableFirstTime:  true,
+			snapshotAvailableSecondTime: true,
+			expectStoreRequests:         1,
+			expectSnapshotRequests:      2,
+		},
+		{
+			name:                        "Fallback",
+			snapshotAvailableFirstTime:  true,
+			snapshotAvailableSecondTime: false,
+			expectSnapshotRequests:      2,
+			expectStoreRequests:         2,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			backingStorage := &dummyStorage{}
+			expectStoreRequests := 0
+			backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+				expectStoreRequests++
+				podList := listObj.(*example.PodList)
+				switch opts.ResourceVersionMatch {
+				case "":
+					podList.ResourceVersion = "42"
+				case metav1.ResourceVersionMatchExact:
+					podList.ResourceVersion = opts.ResourceVersion
+				}
+				return nil
+			}
+			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			snapshotRequestCount := 0
+			cacher.watchCache.RWMutex.Lock()
+			cacher.watchCache.snapshots = &fakeSnapshotter{
+				getLessOrEqual: func(rv uint64) (orderedLister, bool) {
+					snapshotRequestCount++
+					var snapshotAvailable bool
+					switch snapshotRequestCount {
+					case 1:
+						snapshotAvailable = tc.snapshotAvailableFirstTime
+					case 2:
+						snapshotAvailable = tc.snapshotAvailableSecondTime
+					}
+					if snapshotAvailable {
+						return fakeOrderedLister{}, true
+					} else {
+						return nil, false
+					}
+				},
+			}
+			cacher.watchCache.RWMutex.Unlock()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+			delegator := NewCacheDelegator(cacher, backingStorage)
+
+			result := &example.PodList{}
+			err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.ResourceVersion != "20" {
+				t.Fatalf("Unexpected List response RV, got: %q, want: %d", result.ResourceVersion, 20)
+			}
+			if expectStoreRequests != tc.expectStoreRequests {
+				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", expectStoreRequests, tc.expectStoreRequests)
+			}
+			if snapshotRequestCount != tc.expectSnapshotRequests {
+				t.Fatalf("Unexpected number of requests to snapshots, got: %d, want: %d", snapshotRequestCount, tc.expectSnapshotRequests)
+			}
+
 		})
 	}
 }
