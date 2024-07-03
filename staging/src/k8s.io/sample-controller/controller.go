@@ -225,7 +225,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	// there was a failure so be sure to report it.  This method allows for
 	// pluggable error handling which can be used for things like
 	// cluster-monitoring.
-	utilruntime.HandleErrorWithContext(ctx, err, "error syncing; requeuing", "objectReference", objRef)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing; requeuing for later retry", "objectReference", objRef)
 	// since we failed, we should requeue the item to work on later.  This
 	// method will add a backoff to avoid hotlooping on particular items
 	// (they're probably still not going to work right away) and overall
@@ -247,7 +247,7 @@ func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName
 		// The Foo resource may no longer exist, in which case we stop
 		// processing.
 		if errors.IsNotFound(err) {
-			utilruntime.HandleError(fmt.Errorf("foo '%#v' in work queue no longer exists", objectRef))
+			utilruntime.HandleErrorWithContext(ctx, err, "Foo referenced by item in work queue no longer exists", "objectReference", objectRef)
 			return nil
 		}
 
@@ -259,7 +259,7 @@ func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
 		// the resource will be queued again.
-		utilruntime.HandleError(fmt.Errorf("%#v: deployment name must be specified", objectRef))
+		utilruntime.HandleErrorWithContext(ctx, nil, "Deployment name missing from object reference", "objectReference", objectRef)
 		return nil
 	}
 
@@ -349,12 +349,16 @@ func (c *Controller) handleObject(obj interface{}) {
 	if object, ok = obj.(metav1.Object); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object, invalid type"))
+			// If the object value is not too big and does not contain sensitive information then
+			// it may be useful to include it.
+			utilruntime.HandleErrorWithContext(context.Background(), nil, "Error decoding object, invalid type", "type", fmt.Sprintf("%T", obj))
 			return
 		}
 		object, ok = tombstone.Obj.(metav1.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
+			// If the object value is not too big and does not contain sensitive information then
+			// it may be useful to include it.
+			utilruntime.HandleErrorWithContext(context.Background(), nil, "Error decoding object tombstone, invalid type", "type", fmt.Sprintf("%T", tombstone.Obj))
 			return
 		}
 		logger.V(4).Info("Recovered deleted object", "resourceName", object.GetName())
