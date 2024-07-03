@@ -457,9 +457,8 @@ func (config *NetworkingTestConfig) GetResponseFromTestContainer(ctx context.Con
 
 // GetHTTPCodeFromTestContainer executes a curl via kubectl exec in a test container and returns the status code.
 func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(ctx context.Context, path, targetIP string, targetPort int) (int, error) {
-	cmd := fmt.Sprintf("curl -g -q -s -o /dev/null -w %%{http_code} http://%s:%d%s",
-		targetIP,
-		targetPort,
+	cmd := fmt.Sprintf("curl -g -q -s -o /dev/null -w %%{http_code} http://%s%s",
+		net.JoinHostPort(targetIP, strconv.Itoa(targetPort)),
 		path)
 	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.TestContainerPod.Name, cmd)
 	// We only care about the status code reported by curl,
