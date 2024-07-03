@@ -466,7 +466,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", nil)
+	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -485,7 +485,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{}, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -504,7 +504,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{}, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -522,7 +522,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{}, matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -550,7 +550,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", nil)
+	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", storage.ListOptions{}, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -630,7 +630,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 				store.Add(makeTestPod("bar", 4))
 			}()
 
-			_, _, err := store.WaitUntilFreshAndList(ctx, 4, "", nil)
+			_, _, err := store.WaitUntilFreshAndList(ctx, 4, "", storage.ListOptions{}, nil)
 			if !errors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
@@ -659,7 +659,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	defer store.Stop()
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 0, "", nil)
+		resp, _, err := store.WaitUntilFreshAndList(ctx, 0, "", storage.ListOptions{}, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -682,7 +682,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 10, "", nil)
+		resp, _, err := store.WaitUntilFreshAndList(ctx, 10, "", storage.ListOptions{}, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
