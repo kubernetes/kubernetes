@@ -784,31 +784,36 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 // NOTICE: Keep in sync with shouldListFromStorage function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
+func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true
+		return true, nil
 	case metav1.ResourceVersionMatchNotOlderThan:
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
+			return true, nil
 		}
 	default:
-		return true
+		return true, nil
 	}
 	// Continue
 	if len(opts.Predicate.Continue) > 0 {
-		return true
+		_, rv, err := storage.DecodeContinue(opts.Predicate.Continue, c.resourcePrefix)
+		if err != nil {
+			return false, err
+		}
+		_, isCached := c.watchCache.storeSnapshots.Get(uint64(rv))
+		return !isCached, nil
 	}
 	// Consistent Read
 	if opts.ResourceVersion == "" {
 		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+		return !consistentListFromCacheEnabled || !requestWatchProgressSupported, nil
 	}
-	return false
+	return false, nil
 }
 
 // computeListLimit determines whether the cacher should
@@ -833,8 +838,8 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) (listResp, string, error) {
-	if !recursive {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
+	if !opts.Recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
 			return listResp{}, "", err
@@ -848,7 +853,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts, opts.Predicate.MatcherIndex(ctx))
 }
 
 type listResp struct {
@@ -861,16 +866,18 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
-	pred := opts.Predicate
-	if shouldDelegateList(opts) {
+	delegate, err := c.shouldDelegateList(opts)
+	if err != nil {
+		return err
+	}
+	if delegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
@@ -934,7 +941,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
 	success := "true"
 	fallback := "false"
 	if err != nil {
