@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -495,7 +496,7 @@ func (s sortableStoreElements) Swap(i, j int) {
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, key string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
@@ -509,6 +510,48 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	if err != nil {
 		return listResp{}, "", err
 	}
+	return w.list(resourceVersion, key, opts, matchValues)
+}
+
+func (w *watchCache) list(resourceVersion uint64, key string, opts storage.ListOptions, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		return w.listExactRV(key, "", resourceVersion)
+	case metav1.ResourceVersionMatchNotOlderThan:
+	case "":
+		// Legacy exact match
+		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return w.listExactRV(key, "", resourceVersion)
+		}
+	}
+	// Continue
+	if len(opts.Predicate.Continue) > 0 {
+		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return listResp{}, "", errors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+		continueKey, continueRV, err := storage.DecodeContinue(opts.Predicate.Continue, key)
+		if err != nil {
+			return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+		}
+		return w.listExactRV(key, continueKey, uint64(continueRV))
+	}
+	return w.listLatestRV(key, matchValues)
+}
+
+func (w *watchCache) listExactRV(key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
+	store, ok := w.snapshots.GetLessOrEqual(resourceVersion)
+	if !ok {
+		err = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+		return listResp{}, "", err
+	}
+	items := store.ListPrefix(key, continueKey)
+	return listResp{
+		Items:           items,
+		ResourceVersion: resourceVersion,
+	}, "", nil
+}
+
+func (w *watchCache) listLatestRV(key string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
