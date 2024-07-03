@@ -19,6 +19,8 @@ package pod
 import (
 	"context"
 	"fmt"
+	"os"
+	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -170,14 +172,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
-	overlappingPathInContainers := warningsForOverlappingVirtualPaths(podSpec)
+	overlappingPathInContainers := warningsForOverlappingVirtualPaths(podSpec.Volumes)
 	if len(overlappingPathInContainers) > 0 {
 		warnings = append(warnings, overlappingPathInContainers...)
-	}
-
-	overlappingPathInInitContainers := warningsForOverlappingVirtualPaths(podSpec)
-	if len(overlappingPathInInitContainers) > 0 {
-		warnings = append(warnings, overlappingPathInInitContainers...)
 	}
 
 	// duplicate hostAliases (#91670, #58477)
@@ -368,80 +365,141 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 	return warnings
 }
 
-func warningsForOverlappingVirtualPaths(podSpec *api.PodSpec) []string {
+// warningsForOverlappingVirtualPaths validates that there are no overlapping paths in single ConfigMapVolume, SecretVolume, DownwardAPIVolume and ProjectedVolume.
+// A volume can try to load different keys to the same path which will result in overwriting of the value from the latest registered key
+// Another possible scenario is when one of the path contains the other key path. Example:
+// configMap:
+//
+//		name: myconfig
+//		items:
+//		  - key: key1
+//		    path: path
+//	      - key: key2
+//			path: path/path2
+//
+// In such cases we either get `is directory` or 'file exists' error message.
+func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 	warnings := make([]string, 0)
-	for _, v := range podSpec.Volumes {
+
+	for _, v := range volumes {
 		if v.ConfigMap != nil && v.ConfigMap.Items != nil {
-			a := sets.NewString()
-			for _, item := range v.ConfigMap.Items {
-				if a.Has(item.Path) {
-					warnings = append(warnings, fmt.Sprintf("config map: %q - conflicting duplicate paths", v.ConfigMap.Name))
-				}
-				a.Insert(item.Path)
+			w := checkVolumeMappingForOverlap(extractPaths(v.ConfigMap.Items), fmt.Sprintf("volume %q (ConfigMap %q): overlapping path", v.Name, v.ConfigMap.Name))
+			if len(w) > 0 {
+				warnings = append(warnings, w...)
 			}
 		}
 
 		if v.Secret != nil && v.Secret.Items != nil {
-			a := sets.NewString()
-			for _, item := range v.Secret.Items {
-				if a.Has(item.Path) {
-					warnings = append(warnings, fmt.Sprintf("secret: %q - conflicting duplicate paths", v.Secret.SecretName))
-				}
-				a.Insert(item.Path)
+			w := checkVolumeMappingForOverlap(extractPaths(v.Secret.Items), fmt.Sprintf("volume %q (Secret %q): overlapping path", v.Name, v.Secret.SecretName))
+			if len(w) > 0 {
+				warnings = append(warnings, w...)
 			}
 		}
 
 		if v.DownwardAPI != nil && v.DownwardAPI.Items != nil {
-			a := sets.NewString()
-			for _, item := range v.DownwardAPI.Items {
-				if a.Has(item.Path) {
-					warnings = append(warnings, "downward api - conflicting duplicate paths")
-				}
-				a.Insert(item.Path)
+			w := checkVolumeMappingForOverlap(extractPathsDownwardAPI(v.DownwardAPI.Items), fmt.Sprintf("volume %q (DownwardAPI): overlapping path", v.Name))
+			if len(w) > 0 {
+				warnings = append(warnings, w...)
 			}
 		}
 
 		if v.Projected != nil {
-			a := sets.NewString()
-			for _, item := range v.Projected.Sources {
-				if item.ServiceAccountToken != nil {
-					a.Insert(item.ServiceAccountToken.Path)
-				}
-			}
+			var sourcePaths, allPaths []string
+			var errorMessage string
 
-			for _, item := range v.Projected.Sources {
-				if item.ConfigMap != nil && item.ConfigMap.Items != nil {
-					for _, item := range item.ConfigMap.Items {
-						if a.Has(item.Path) {
-							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
-						}
+			for _, source := range v.Projected.Sources {
+				switch {
+				case source.ConfigMap != nil && source.ConfigMap.Items != nil:
+					sourcePaths = extractPaths(source.ConfigMap.Items)
+					errorMessage = fmt.Sprintf("volume %q (Projected ConfigMap %q): overlapping path", v.Name, source.ConfigMap.Name)
+				case source.Secret != nil && source.Secret.Items != nil:
+					sourcePaths = extractPaths(source.Secret.Items)
+					errorMessage = fmt.Sprintf("volume %q (Projected Secret %q): overlapping path", v.Name, source.Secret.Name)
+				case source.DownwardAPI != nil && source.DownwardAPI.Items != nil:
+					sourcePaths = extractPathsDownwardAPI(source.DownwardAPI.Items)
+					errorMessage = fmt.Sprintf("volume %q (Projected DownwardAPI): overlapping path", v.Name)
+				case source.ServiceAccountToken != nil:
+					sourcePaths = []string{source.ServiceAccountToken.Path}
+					errorMessage = fmt.Sprintf("volume %q (Projected ServiceAccountToken): overlapping path", v.Name)
+				case source.ClusterTrustBundle != nil:
+					sourcePaths = []string{source.ClusterTrustBundle.Path}
+					if source.ClusterTrustBundle.Name != nil {
+						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping path", v.Name, *source.ClusterTrustBundle.Name)
+					} else {
+						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping path", v.Name, *source.ClusterTrustBundle.SignerName)
 					}
 				}
 
-				if item.Secret != nil && item.Secret.Items != nil {
-					for _, item := range item.Secret.Items {
-						if a.Has(item.Path) {
-							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
-						}
-					}
+				if len(sourcePaths) == 0 {
+					continue
 				}
 
-				if item.DownwardAPI != nil && item.DownwardAPI.Items != nil {
-					for _, item := range item.DownwardAPI.Items {
-						if a.Has(item.Path) {
-							warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
-						}
-					}
+				warningsInSource := checkVolumeMappingForOverlap(sourcePaths, errorMessage)
+				if len(warningsInSource) > 0 {
+					warnings = append(warnings, warningsInSource...)
 				}
 
-				if item.ClusterTrustBundle != nil {
-					if a.Has(item.ClusterTrustBundle.Path) {
-						warnings = append(warnings, fmt.Sprintf("projected volume: %q - conflicting duplicate paths", v.Name))
-					}
+				allPaths = append(allPaths, sourcePaths...)
+				warningsInAllPaths := checkVolumeMappingForOverlap(allPaths, errorMessage)
+				if len(warningsInAllPaths) > 0 {
+					warnings = append(warnings, warningsInAllPaths...)
 				}
 			}
 		}
 
 	}
 	return warnings
+}
+
+func extractPaths(mapping []api.KeyToPath) []string {
+	result := make([]string, 0, len(mapping))
+
+	for _, v := range mapping {
+		result = append(result, v.Path)
+	}
+	return result
+}
+
+func extractPathsDownwardAPI(mapping []api.DownwardAPIVolumeFile) []string {
+	result := make([]string, 0, len(mapping))
+
+	for _, v := range mapping {
+		result = append(result, v.Path)
+	}
+	return result
+}
+
+func checkVolumeMappingForOverlap(paths []string, warningMessage string) []string {
+	pathSeparator := string(os.PathSeparator)
+	warnings := make([]string, 0)
+	uniquePaths := sets.New[string]()
+
+	for _, path := range paths {
+		normalizedPath := strings.TrimRight(path, pathSeparator)
+		if collision := checkForOverlap(uniquePaths, normalizedPath); collision != nil {
+			warnings = append(warnings, fmt.Sprintf("%s %q with %q", warningMessage, normalizedPath, *collision))
+		}
+		uniquePaths.Insert(normalizedPath)
+	}
+
+	return warnings
+}
+
+func checkForOverlap(paths sets.Set[string], path string) *string {
+	pathSeparator := string(os.PathSeparator)
+	p := paths.UnsortedList()
+	sort.Strings(p)
+
+	for _, item := range p {
+		switch {
+		case item == path:
+			return &item
+		case strings.HasPrefix(item+pathSeparator, path):
+			return &item
+		case strings.HasPrefix(path+pathSeparator, item):
+			return &item
+		}
+	}
+
+	return nil
 }
