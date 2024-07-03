@@ -198,20 +198,34 @@ func (d *dummyStorage) injectError(err error) {
 
 func TestGetListCacheBypass(t *testing.T) {
 	type testCase struct {
-		opts         storage.ListOptions
-		expectBypass bool
+		opts            storage.ListOptions
+		cachedRevisions []uint64
+		expectBypass    bool
+	}
+	continueOnRev3, err := storage.EncodeContinue("pods/a", "pods", 3)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 	commonTestCases := []testCase{
 		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
-
-		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "2"}, expectBypass: false},
 
 		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
 
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: continueOnRev3}}, cachedRevisions: []uint64{2}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: continueOnRev3}}, cachedRevisions: []uint64{2}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: continueOnRev3}}, cachedRevisions: []uint64{3}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: continueOnRev3}}, cachedRevisions: []uint64{3}, expectBypass: false},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: continueOnRev3, Limit: 500}}, cachedRevisions: []uint64{2}, expectBypass: true},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: continueOnRev3, Limit: 500}}, cachedRevisions: []uint64{2}, expectBypass: true},
+
+		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: continueOnRev3, Limit: 500}}, cachedRevisions: []uint64{3}, expectBypass: false},
+		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: continueOnRev3, Limit: 500}}, cachedRevisions: []uint64{3}, expectBypass: false},
+
+		// Legacy exact match
+		{opts: storage.ListOptions{ResourceVersion: "2", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
 		{opts: storage.ListOptions{ResourceVersion: "", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
 		{opts: storage.ListOptions{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
 		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
@@ -224,7 +238,7 @@ func TestGetListCacheBypass(t *testing.T) {
 			testCase{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
 		)
 		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+			testGetListCacheBypass(t, tc.opts, tc.cachedRevisions, tc.expectBypass)
 		}
 
 	})
@@ -244,18 +258,21 @@ func TestGetListCacheBypass(t *testing.T) {
 			testCase{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
 		)
 		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+			testGetListCacheBypass(t, tc.opts, tc.cachedRevisions, tc.expectBypass)
 		}
 	})
 }
 
-func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
+func testGetListCacheBypass(t *testing.T, options storage.ListOptions, cachedRevisions []uint64, expectBypass bool) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
+	for _, rev := range cachedRevisions {
+		cacher.watchCache.storeSnapshots.Set(rev, fakeOrderedLister{})
+	}
 
 	result := &example.PodList{}
 
@@ -289,7 +306,7 @@ func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectByp
 	}
 	gotBypass := err == errDummy
 	if gotBypass != expectBypass {
-		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
+		t.Errorf("Unexpected bypass result for List request with options %+v, cachedRevisions: %v. bypass expected: %v, got: %v", options, cachedRevisions, expectBypass, gotBypass)
 	}
 }
 
@@ -3077,7 +3094,10 @@ func TestListIndexer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
-			_, usedIndex, err := cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, pred, tt.recursive)
+			_, usedIndex, err := cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, storage.ListOptions{
+				Predicate: pred,
+				Recursive: tt.recursive,
+			})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
