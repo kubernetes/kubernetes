@@ -709,8 +709,8 @@ func computeListLimit(opts storage.ListOptions) int64 {
 	return opts.Predicate.Limit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) (listResp, string, error) {
-	if !recursive {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
+	if !opts.Recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
 			return listResp{}, "", err
@@ -720,7 +720,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts, opts.Predicate.MatcherIndex(ctx))
 }
 
 type listResp struct {
@@ -730,7 +730,11 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, listRV uint64) error {
-	recursive := opts.Recursive
+	// Match validation in etcd3
+	if len(opts.Predicate.Continue) > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+		return errors.NewBadRequest("specifying resource version is not allowed when using continue")
+	}
+
 	pred := opts.Predicate
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
@@ -772,7 +776,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
 	if err != nil {
 		return err
 	}
