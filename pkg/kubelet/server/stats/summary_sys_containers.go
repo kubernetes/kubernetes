@@ -83,7 +83,7 @@ func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig c
 		}
 		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
 		if err != nil {
-			if errors.Is(errors.Unwrap(err), cadvisormemory.ErrDataNotFound) {
+			if errors.Is(err, cadvisormemory.ErrDataNotFound) {
 				klog.V(4).InfoS("cgroup stats not found in memory cache", "containerName", cont.name)
 			} else {
 				klog.ErrorS(err, "Failed to get system container stats", "containerName", cont.name)
