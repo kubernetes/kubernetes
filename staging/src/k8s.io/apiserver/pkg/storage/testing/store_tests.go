@@ -1658,7 +1658,7 @@ func ExpectContinueMatches(t *testing.T, expect, got string) {
 	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported bool) {
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported, listFromCacheSnapshot bool) {
 	outPod := &example.Pod{}
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
@@ -1701,8 +1701,10 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 			name:          "List with negative continue RV returns consistent RV",
 			continueToken: encodeContinueOrDie("/pods/a", -1),
 			validateResponseRV: func(t *testing.T, rv int) {
-				// TODO: Update cacheSyncRV after continue is served from cache.
 				assert.Equal(t, consistentRV, rv)
+				if listFromCacheSnapshot {
+					cacheSyncRV = rv
+				}
 			},
 		},
 		{
@@ -1728,6 +1730,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 		t.Run(tc.name, func(t *testing.T) {
 			out := &example.PodList{}
 			opts := storage.ListOptions{
+				Recursive:       true,
 				ResourceVersion: tc.requestRV,
 				Predicate: storage.SelectionPredicate{
 					Label:    labels.Everything(),

@@ -254,7 +254,7 @@ func TestList(t *testing.T) {
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
