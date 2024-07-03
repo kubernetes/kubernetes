@@ -92,7 +92,7 @@ var _ = SIGDescribe("AppArmor", feature.AppArmor, nodefeature.AppArmor, func() {
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func(ctx context.Context) {
 				status := runAppArmorTest(ctx, f, false, v1.DeprecatedAppArmorBetaProfileRuntimeDefault)
-				expectSoftRejection(status)
+				expectRejection(status)
 			})
 		})
 	}
@@ -229,12 +229,11 @@ func createPodWithAppArmor(ctx context.Context, f *framework.Framework, profile 
 	return e2epod.NewPodClient(f).Create(ctx, pod)
 }
 
-func expectSoftRejection(status v1.PodStatus) {
+func expectRejection(status v1.PodStatus) {
 	args := []interface{}{"PodStatus: %+v", status}
-	gomega.Expect(status.Phase).To(gomega.Equal(v1.PodPending), args...)
+	gomega.Expect(status.Phase).To(gomega.Equal(v1.PodFailed), args...)
 	gomega.Expect(status.Reason).To(gomega.Equal("AppArmor"), args...)
 	gomega.Expect(status.Message).To(gomega.ContainSubstring("AppArmor"), args...)
-	gomega.Expect(status.ContainerStatuses[0].State.Waiting.Reason).To(gomega.Equal("Blocked"), args...)
 }
 
 func isAppArmorEnabled() bool {
