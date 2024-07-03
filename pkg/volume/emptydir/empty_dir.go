@@ -18,9 +18,10 @@ package emptydir
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
+
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -512,7 +513,8 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
 		// Remove any quota
 		err := fsquota.ClearQuota(ed.mounter, dir)
 		if err != nil {

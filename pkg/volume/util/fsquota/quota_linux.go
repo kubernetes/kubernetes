@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
@@ -467,4 +469,8 @@ func ClearQuota(m mount.Interface, path string) error {
 		return fmt.Errorf("unable to clear quota for %s: %v", path, err)
 	}
 	return nil
+}
+
+func enabledQuotasForMonitoring() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }
