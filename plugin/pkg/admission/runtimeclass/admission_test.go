@@ -551,7 +551,7 @@ func TestValidateOverhead(t *testing.T) {
 			name:         "No RuntimeClass, empty Overhead set in pod",
 			runtimeClass: nil,
 			pod:          setEmptyOverhead(newOverheadValidPod("no-resource-req-no-overhead", 1, getGuaranteedRequirements(), false)),
-			expectError:  false,
+			expectError:  true,
 		},
 		{
 			name:         "No RuntimeClass, Overhead is nil in pod",
@@ -587,7 +587,7 @@ func TestValidateOverhead(t *testing.T) {
 				},
 			},
 			pod:         setEmptyOverhead(newOverheadValidPod("no-resource-req-no-overhead", 1, core.ResourceRequirements{}, false)),
-			expectError: false,
+			expectError: true,
 		},
 		{
 			name: "RuntimeClass is set, Overhead is nil in pod",
