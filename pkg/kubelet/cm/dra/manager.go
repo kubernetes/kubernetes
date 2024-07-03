@@ -154,7 +154,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
-		klog.V(3).InfoS("Processing resource", "podClaim", podClaim.Name, "pod", pod.Name)
+		klog.V(3).InfoS("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
 			return fmt.Errorf("prepare resource claim: %v", err)
@@ -162,6 +162,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 		if claimName == nil {
 			// Nothing to do.
+			klog.V(5).InfoS("No need to prepare resources, no claim generated", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 			continue
 		}
 		// Query claim object from the API server
@@ -196,6 +197,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 					return fmt.Errorf("claim %s: %v", klog.KObj(resourceClaim), err)
 				}
 				claimInfo = m.cache.add(ci)
+				klog.V(6).InfoS("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
+			} else {
+				klog.V(6).InfoS("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
 
 			// Add a reference to the current pod in the claim info.
@@ -211,6 +215,7 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 
 			// If this claim is already prepared, there is no need to prepare it again.
 			if claimInfo.isPrepared() {
+				klog.V(5).InfoS("Resources already prepared", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim))
 				return nil
 			}
 
@@ -322,8 +327,9 @@ func lookupClaimRequest(claims []*drapb.Claim, claimUID string) *drapb.Claim {
 func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*ContainerInfo, error) {
 	cdiDevices := []kubecontainer.CDIDevice{}
 
-	for i, podResourceClaim := range pod.Spec.ResourceClaims {
-		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
+	for i := range pod.Spec.ResourceClaims {
+		podClaim := &pod.Spec.ResourceClaims[i]
+		claimName, _, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
 			return nil, fmt.Errorf("list resource claims: %v", err)
 		}
@@ -331,10 +337,11 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 		// was generated for the referenced claim. There are valid use
 		// cases when this might happen, so we simply skip it.
 		if claimName == nil {
+			klog.V(5).InfoS("No CDI devices, no claim generated", "pod", klog.KObj(pod), "podClaimName", podClaim.Name)
 			continue
 		}
 		for _, claim := range container.Resources.Claims {
-			if podResourceClaim.Name != claim.Name {
+			if podClaim.Name != claim.Name {
 				continue
 			}
 
@@ -364,6 +371,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 		}
 	}
 
+	klog.V(5).InfoS("Determined CDI devices for pod", "pod", klog.KObj(pod), "cdiDevices", cdiDevices)
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
@@ -471,7 +479,9 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 	err := m.cache.withLock(func() error {
 		// Delete all claimInfos from the cache that have just been unprepared.
 		for _, claimName := range claimNamesMap {
+			claimInfo, _ := m.cache.get(claimName, namespace)
 			m.cache.delete(claimName, namespace)
+			klog.V(6).InfoS("Deleted claim info cache entry", "claim", klog.KRef(namespace, claimName), "claimInfoEntry", claimInfo)
 		}
 
 		// Atomically sync the cache back to the checkpoint.
