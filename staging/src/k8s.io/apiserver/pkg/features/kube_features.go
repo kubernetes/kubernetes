@@ -69,16 +69,6 @@ const (
 	// all at once.
 	APIListChunking featuregate.Feature = "APIListChunking"
 
-	// owner: @MikeSpreitzer @yue9944882
-	// alpha: v1.18
-	// beta: v1.20
-	// stable: 1.29
-	//
-	// Enables managing request concurrency with prioritization and fairness at each server.
-	// The FeatureGate was introduced in release 1.15 but the feature
-	// was not really implemented before 1.18.
-	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
-
 	// owner: @ilackams
 	// alpha: v1.7
 	// beta: v1.16
@@ -361,8 +351,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
