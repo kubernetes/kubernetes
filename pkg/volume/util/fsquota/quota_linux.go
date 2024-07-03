@@ -272,10 +272,6 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 // However, do cache the device->applier map; the number of devices
 // is bounded.
 func SupportsQuotas(m mount.Interface, path string) (bool, error) {
-	if !enabledQuotasForMonitoring() {
-		klog.V(3).Info("SupportsQuotas called, but quotas disabled")
-		return false, nil
-	}
 	supportsQuotasLock.Lock()
 	defer supportsQuotasLock.Unlock()
 	if supportsQuotas, ok := supportsQuotasMap[path]; ok {
@@ -414,7 +410,7 @@ func GetInodes(path string) (*resource.Quantity, error) {
 // ClearQuota -- remove the quota assigned to a directory
 func ClearQuota(m mount.Interface, path string) error {
 	klog.V(3).Infof("ClearQuota %s", path)
-	if !enabledQuotasForMonitoring() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
 		return fmt.Errorf("clearQuota called, but quotas disabled")
 	}
 	quotaLock.Lock()
@@ -469,8 +465,4 @@ func ClearQuota(m mount.Interface, path string) error {
 		return fmt.Errorf("unable to clear quota for %s: %v", path, err)
 	}
 	return nil
-}
-
-func enabledQuotasForMonitoring() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

@@ -292,10 +292,22 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 // assignQuota checks if the underlying medium supports quotas and if so, sets
 func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) error {
+	var userNamespaceEnabled bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		userNamespaceEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
+	}
+
 	if mounterSize != nil {
-		// Deliberately shadow the outer use of err as noted
-		// above.
-		hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir)
+		var hasQuotas bool
+		var err error
+		if userNamespaceEnabled && utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
+			// Deliberately shadow the outer use of err as noted
+			// above.
+			hasQuotas, err = fsquota.SupportsQuotas(ed.mounter, dir)
+		} else {
+			klog.V(3).Info("SupportsQuotas called, but quotas disabled")
+
+		}
 		if err != nil {
 			klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
 		} else if hasQuotas {
@@ -513,8 +525,12 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
+	var userNamespaceEnabled bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
+		userNamespaceEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) && userNamespaceEnabled {
 		// Remove any quota
 		err := fsquota.ClearQuota(ed.mounter, dir)
 		if err != nil {
