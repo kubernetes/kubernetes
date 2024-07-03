@@ -672,10 +672,15 @@ func TestApfWithRequestDigest(t *testing.T) {
 	}
 }
 
-func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
+func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) {
+	// scenario:
+	// a) priority level nominal concurrency is set to 1
+	// b) the handler of the first request panics while it is being executed
+	// c) next request that follows should not be rejected
+	t.Parallel()
+
 	epmetrics.Register()
 	fcmetrics.Register()
-	timeFmt := "15:04:05.999"
 
 	t.Run("priority level concurrency is set to 1, request handler panics, next request should not be rejected", func(t *testing.T) {
 		const (
@@ -749,9 +754,19 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
 		}
 	})
+}
+
+func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) request times out before its handler writes to the
+	// underlying ResponseWriter object.
+	t.Parallel()
+
+	epmetrics.Register()
+	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, request times out and inner handler hasn't written to the response yet", func(t *testing.T) {
-		t.Parallel()
 		const (
 			userName                                              = "alice"
 			fsName                                                = "test-fs"
@@ -822,9 +837,19 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
 		}
 	})
+}
+
+func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) the request being executed times out first, and
+	// b) then the inner hander of the request panics
+	t.Parallel()
+
+	epmetrics.Register()
+	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, inner handler panics after the request times out", func(t *testing.T) {
-		t.Parallel()
 		const (
 			userName                                              = "alice"
 			fsName                                                = "test-fs"
@@ -901,9 +926,19 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
 		}
 	})
+}
+
+func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1
+	// b) the handler of the request writes to the ResponseWriter object first
+	// c) the request times out
+	t.Parallel()
+
+	epmetrics.Register()
+	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, inner handler writes to the response before request times out", func(t *testing.T) {
-		t.Parallel()
 		const (
 			userName                                              = "alice"
 			fsName                                                = "test-fs"
@@ -973,9 +1008,23 @@ func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
 			t.Errorf("Expected no error from the controller, but got: %#v", controllerErr)
 		}
 	})
+}
+
+func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
+	// scenario:
+	// a) priority level concurrency is set to 1, and queue length is 1
+	// b) the first request arrives and is being executed
+	// c) the second request arrives and is is enqueued
+	// d) the first request handler blocks indefinitely
+	// e) the second request should be rejected by APF
+	// f) the first request eventually times out
+	t.Parallel()
+
+	epmetrics.Register()
+	fcmetrics.Register()
+	timeFmt := "15:04:05.999"
 
 	t.Run("priority level concurrency is set to 1, queue length is 1, first request should time out and second (enqueued) request should time out as well", func(t *testing.T) {
-		t.Parallel()
 
 		type result struct {
 			err      error
