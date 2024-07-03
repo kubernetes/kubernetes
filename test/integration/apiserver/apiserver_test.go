@@ -62,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -386,10 +387,18 @@ var (
 // TestListOptions ensures that list works as expected for valid and invalid combinations of limit, continue,
 // resourceVersion and resourceVersionMatch.
 func TestListOptions(t *testing.T) {
-
 	for _, watchCacheEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
-			testListOptions(t, watchCacheEnabled)
+			if watchCacheEnabled {
+				for _, listFromCacheSnapshot := range []bool{true, false} {
+					t.Run(fmt.Sprintf("listFromCacheSnapshot=%v", listFromCacheSnapshot), func(t *testing.T) {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
+						testListOptions(t, true)
+					})
+				}
+			} else {
+				testListOptions(t, watchCacheEnabled)
+			}
 		})
 	}
 }
