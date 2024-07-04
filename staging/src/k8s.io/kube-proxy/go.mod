@@ -49,5 +49,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	k8s.io/kube-openapi => github.com/jefftree/kube-openapi v0.0.8-gnostic.0.20240704151150-111929cc962a
 	k8s.io/kube-proxy => ../kube-proxy
 )
