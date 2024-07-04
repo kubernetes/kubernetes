@@ -67,12 +67,13 @@ func TestValidationExpressions(t *testing.T) {
 		// equality, comparisons and type specific functions
 		{name: "integers",
 			// 1st obj and schema args are for "self.val1" field, 2nd for "self.val2" and so on.
-			obj:    objs(math.MaxInt64, math.MaxInt64, math.MaxInt32, math.MaxInt32, math.MaxInt64, math.MaxInt64),
+			obj: objs(int64(math.MaxInt64), int64(math.MaxInt64), int32(math.MaxInt32), int32(math.MaxInt32),
+				int64(math.MaxInt64), int64(math.MaxInt64)),
 			schema: schemas(integerType, integerType, int32Type, int32Type, int64Type, int64Type),
 			valid: []string{
-				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", math.MaxInt64)),
+				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%d", int64(math.MaxInt64))),
 				ValsEqualThemselvesAndDataLiteral("self.val3", "self.val4", fmt.Sprintf("%d", math.MaxInt32)),
-				ValsEqualThemselvesAndDataLiteral("self.val5", "self.val6", fmt.Sprintf("%d", math.MaxInt64)),
+				ValsEqualThemselvesAndDataLiteral("self.val5", "self.val6", fmt.Sprintf("%d", int64(math.MaxInt64))),
 				"self.val1 == self.val6", // integer with no format is the same as int64
 				"type(self.val1) == int",
 				fmt.Sprintf("self.val3 + 1 == %d + 1", math.MaxInt32), // CEL integers are 64 bit
@@ -86,7 +87,8 @@ func TestValidationExpressions(t *testing.T) {
 			},
 		},
 		{name: "numbers",
-			obj:    objs(math.MaxFloat64, math.MaxFloat64, math.MaxFloat32, math.MaxFloat32, math.MaxFloat64, math.MaxFloat64, int64(1)),
+			obj: objs(float64(math.MaxFloat64), float64(math.MaxFloat64), float32(math.MaxFloat32), float32(math.MaxFloat32),
+				float64(math.MaxFloat64), float64(math.MaxFloat64), int64(1)),
 			schema: schemas(numberType, numberType, floatType, floatType, doubleType, doubleType, doubleType),
 			valid: []string{
 				ValsEqualThemselvesAndDataLiteral("self.val1", "self.val2", fmt.Sprintf("%f", math.MaxFloat64)),
@@ -2842,7 +2844,7 @@ func TestCELValidationLimit(t *testing.T) {
 	}{
 		{
 			name:   "test limit",
-			obj:    objs(math.MaxInt64),
+			obj:    objs(int64(math.MaxInt64)),
 			schema: schemas(integerType),
 			valid: []string{
 				"self.val1 > 0",

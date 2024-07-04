@@ -96,7 +96,7 @@ func TestVModule(t *testing.T) {
 			},
 		},
 		{
-			arg:         fmt.Sprintf("invalidint32=%d", math.MaxInt32+1),
+			arg:         fmt.Sprintf("invalidint32=%d", uint(math.MaxInt32+1)),
 			expectError: `parsing verbosity in "invalidint32=2147483648": strconv.ParseUint: parsing "2147483648": value out of range`,
 		},
 	}
