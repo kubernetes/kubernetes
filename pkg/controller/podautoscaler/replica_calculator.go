@@ -380,6 +380,18 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 	unreadyPods = sets.NewString()
 	ignoredPods = sets.NewString()
 	for _, pod := range pods {
+		shouldIgnore := false
+		for i, _ := range pod.ObjectMeta.OwnerReferences {
+			if pod.ObjectMeta.OwnerReferences[i].Kind == "Job" || pod.ObjectMeta.OwnerReferences[i].Kind == "CronJob" {
+				ignoredPods.Insert(pod.Name)
+				shouldIgnore = true
+			}
+		}
+
+		if shouldIgnore {
+			continue
+		}
+
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
 			ignoredPods.Insert(pod.Name)
 			continue
