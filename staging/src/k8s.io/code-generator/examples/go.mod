@@ -56,3 +56,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2

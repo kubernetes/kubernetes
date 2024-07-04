@@ -21,3 +21,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2

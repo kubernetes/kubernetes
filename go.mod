@@ -32,7 +32,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/protobuf v1.5.4
-	github.com/google/cadvisor v0.49.0
+	github.com/google/cadvisor v0.49.0-openshift-4.17-2
 	github.com/google/cel-go v0.20.1
 	github.com/google/gnostic-models v0.6.8
 	github.com/google/go-cmp v0.6.0
@@ -225,6 +225,7 @@ require (
 )
 
 replace (
+	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery

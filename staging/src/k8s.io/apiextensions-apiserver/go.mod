@@ -127,6 +127,7 @@ require (
 )
 
 replace (
+	github.com/google/cadvisor => github.com/openshift/google-cadvisor v0.49.0-openshift-4.17-2
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
