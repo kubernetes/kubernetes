@@ -191,34 +191,32 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 // getClient gets a real or fake client depending on whether the user is dry-running or not
 func getClient(file string, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
+		dryRun := apiclient.NewDryRun()
+		if err := dryRun.WithKubeConfigFile(file); err != nil {
 			return nil, err
 		}
+		dryRun.WithDefaultMarshalFunction().
+			WithWriter(os.Stdout).
+			PrependReactor(dryRun.HealthCheckJobReactor()).
+			PrependReactor(dryRun.PatchNodeReactor())
 
 		// In order for fakeclient.Discovery().ServerVersion() to return the backing API Server's
 		// real version; we have to do some clever API machinery tricks. First, we get the real
-		// API Server's version
-		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
+		// API Server's version.
+		realServerVersion, err := dryRun.Client().Discovery().ServerVersion()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get server version")
 		}
-
-		// Get the fake clientset
-		dryRunOpts := apiclient.GetDefaultDryRunClientOptions(dryRunGetter, os.Stdout)
-		// Print GET and LIST requests
-		dryRunOpts.PrintGETAndLIST = true
-		fakeclient := apiclient.NewDryRunClientWithOpts(dryRunOpts)
-		// As we know the return of Discovery() of the fake clientset is of type *fakediscovery.FakeDiscovery
-		// we can convert it to that struct.
-		fakeclientDiscovery, ok := fakeclient.Discovery().(*fakediscovery.FakeDiscovery)
+		// Obtain the FakeDiscovery object for this fake client.
+		fakeClient := dryRun.FakeClient()
+		fakeClientDiscovery, ok := fakeClient.Discovery().(*fakediscovery.FakeDiscovery)
 		if !ok {
-			return nil, errors.New("couldn't set fake discovery's server version")
+			return nil, errors.New("could not set fake discovery's server version")
 		}
-		// Lastly, set the right server version to be used
-		fakeclientDiscovery.FakedServerVersion = realServerVersion
-		// return the fake clientset used for dry-running
-		return fakeclient, nil
+		// Lastly, set the right server version to be used.
+		fakeClientDiscovery.FakedServerVersion = realServerVersion
+
+		return fakeClient, nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
 }

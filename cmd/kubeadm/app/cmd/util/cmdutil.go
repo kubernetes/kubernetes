@@ -20,22 +20,18 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
 // ErrorSubcommandRequired is an error returned when a parent command cannot be executed.
@@ -113,18 +109,6 @@ func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 	}
 
 	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
-}
-
-// GetClientSet gets a real or fake client depending on whether the user is dry-running or not
-func GetClientSet(file string, dryRun bool) (clientset.Interface, error) {
-	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
-		}
-		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
-	}
-	return kubeconfigutil.ClientSetFromFile(file)
 }
 
 // ValueFromFlagsOrConfig checks if the "name" flag has been set. If yes, it returns the value of the flag, otherwise it returns the value from config.

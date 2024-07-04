@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
@@ -150,11 +151,18 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		}()
 	}
 
-	// Create the bootstrap client before we possibly overwrite the server address
-	// for ControlPlaneKubeletLocalMode.
-	bootstrapClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
-	if err != nil {
-		return errors.Errorf("could not create client from bootstrap kubeconfig")
+	var client clientset.Interface
+	// If dry-use the client from joinData, else create a new bootstrap client
+	if data.DryRun() {
+		client, err = data.Client()
+		if err != nil {
+			return err
+		}
+	} else {
+		client, err = kubeconfigutil.ToClientSet(tlsBootstrapCfg)
+		if err != nil {
+			return errors.Errorf("could not create client from bootstrap kubeconfig")
+		}
 	}
 
 	if features.Enabled(initCfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
@@ -204,7 +212,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// A new Node with the same name as an existing control-plane Node can cause undefined
 	// behavior and ultimately control-plane failure.
 	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
-	node, err := bootstrapClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "cannot get Node %q", nodeName)
 	}

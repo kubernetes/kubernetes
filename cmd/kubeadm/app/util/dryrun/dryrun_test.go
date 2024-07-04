@@ -79,7 +79,7 @@ func TestPrintDryRunFiles(t *testing.T) {
 				},
 			},
 			wantW: "[dryrun] Would write file \"" + cfgPath + "\" with content:\n" +
-				"	apiVersion: kubeadm.k8s.io/unknownVersion\n",
+				"apiVersion: kubeadm.k8s.io/unknownVersion",
 			wantErr: false,
 		},
 	}
@@ -91,7 +91,7 @@ func TestPrintDryRunFiles(t *testing.T) {
 				return
 			}
 			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("output: %v, expected output: %v", gotW, tt.wantW)
+				t.Errorf("\noutput: %q\nexpected output: %q", gotW, tt.wantW)
 			}
 		})
 	}
