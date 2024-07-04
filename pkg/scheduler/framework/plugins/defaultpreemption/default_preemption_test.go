@@ -201,6 +201,19 @@ func TestPostFilter(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
+			name: "preemption should respect absent NodeToStatusMap entry meaning UnschedulableAndUnresolvable",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{},
+			wantResult:            framework.NewPostFilterResultWithNominatedNode(""),
+			wantStatus:            framework.NewStatus(framework.Unschedulable, "preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
+		},
+		{
 			name: "pod can be made schedulable on one node",
 			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(midPriority).Obj(),
 			pods: []*v1.Pod{

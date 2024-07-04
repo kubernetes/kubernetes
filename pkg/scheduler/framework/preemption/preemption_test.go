@@ -142,6 +142,11 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			expected: sets.New[string](),
 		},
 		{
+			name:          "No node should be attempted as all are implicitly UnschedulableAndUnresolvable",
+			nodesStatuses: framework.NodeToStatusMap{},
+			expected:      sets.New[string](),
+		},
+		{
 			name: "ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
@@ -207,7 +212,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, ""),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
+				// node4 is UnschedulableAndUnresolvable by absence
 			},
 			expected: sets.New("node1", "node3"),
 		},
@@ -225,13 +230,13 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var nodeInfos []*framework.NodeInfo
+			var nodeInfos tf.NodeInfoLister
 			for _, name := range nodeNames {
 				ni := framework.NewNodeInfo()
 				ni.SetNode(st.MakeNode().Name(name).Obj())
 				nodeInfos = append(nodeInfos, ni)
 			}
-			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
+			nodes := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
 			if len(tt.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}

@@ -350,6 +350,9 @@ type Diagnosis struct {
 	PreFilterMsg string
 	// PostFilterMsg records the messages returned from PostFilter plugins.
 	PostFilterMsg string
+	// AbsentNodesStatus defines a status for all UnschedulableAndUnresolvable nodes
+	// that are absent in NodeToStatusMap.
+	AbsentNodesStatus *Status
 }
 
 // FitError describes a fit error of a pod.
@@ -404,6 +407,12 @@ func (f *FitError) Error() string {
 		for _, status := range f.Diagnosis.NodeToStatusMap {
 			for _, reason := range status.Reasons() {
 				reasons[reason]++
+			}
+		}
+		if len(f.Diagnosis.NodeToStatusMap) < f.NumAllNodes {
+			// Adding predefined reasons for UnschedulableAndUnresolvable nodes that are absent in NodeToStatusMap
+			for _, reason := range f.Diagnosis.AbsentNodesStatus.Reasons() {
+				reasons[reason] += f.NumAllNodes - len(f.Diagnosis.NodeToStatusMap)
 			}
 		}
 

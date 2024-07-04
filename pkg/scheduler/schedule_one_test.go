@@ -1986,11 +1986,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("ignore").UID("ignore").PVC("unknownPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithPlugin("VolumeBinding"),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithPlugin("VolumeBinding"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         `persistentvolumeclaim "unknownPVC" not found`,
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithPlugin("VolumeBinding"),
 					UnschedulablePlugins: sets.New(volumebinding.Name),
 				},
 			},
@@ -2011,12 +2009,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("ignore").UID("ignore").Namespace(v1.NamespaceDefault).PVC("existingPVC").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithPlugin("VolumeBinding"),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithPlugin("VolumeBinding"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         `persistentvolumeclaim "existingPVC" is being deleted`,
 					UnschedulablePlugins: sets.New(volumebinding.Name),
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithPlugin("VolumeBinding"),
 				},
 			},
 		},
@@ -2206,12 +2202,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithPlugin("FakePreFilter"),
-						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithPlugin("FakePreFilter"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					PreFilterMsg:         "injected unschedulable status",
 					UnschedulablePlugins: sets.New("FakePreFilter"),
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithPlugin("FakePreFilter"),
 				},
 			},
 		},
@@ -2278,13 +2272,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 3,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-						"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					UnschedulablePlugins: sets.New("FakePreFilter2", "FakePreFilter3"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
 				},
 			},
 		},
@@ -2308,11 +2299,10 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
 				NumAllNodes: 1,
 				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter2"),
-					},
+					NodeToStatusMap:      framework.NodeToStatusMap{},
 					UnschedulablePlugins: sets.New("FakePreFilter2"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter2"),
 				},
 			},
 		},
@@ -2341,6 +2331,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					},
 					UnschedulablePlugins: sets.New("FakePreFilter", "FakeFilter"),
 					PreFilterMsg:         "",
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
 				},
 			},
 		},
@@ -2446,6 +2437,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap:      framework.NodeToStatusMap{},
 					UnschedulablePlugins: sets.New("FakePreFilter"),
+					AbsentNodesStatus:    framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
 				},
 			},
 		},

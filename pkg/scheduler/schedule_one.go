@@ -467,10 +467,14 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		if !s.IsRejected() {
 			return nil, diagnosis, s.AsError()
 		}
-		// All nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
+		// All Unschedulable nodes in NodeToStatusMap will have the same status so that they can be handled in the preemption.
 		// Some non trivial refactoring is needed to avoid this copy.
-		for _, n := range allNodes {
-			diagnosis.NodeToStatusMap[n.Node().Name] = s
+		if s.Code() == framework.Unschedulable {
+			for _, n := range allNodes {
+				diagnosis.NodeToStatusMap[n.Node().Name] = s
+			}
+		} else if s.Code() == framework.UnschedulableAndUnresolvable {
+			diagnosis.AbsentNodesStatus = s
 		}
 
 		// Record the messages from PreFilter in Diagnosis.PreFilterMsg.
@@ -504,6 +508,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 				nodes = append(nodes, nodeInfo)
 			}
 		}
+		diagnosis.AbsentNodesStatus = framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result")
 	}
 	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, fwk, state, pod, &diagnosis, nodes)
 	// always try to update the sched.nextStartNodeIndex regardless of whether an error has occurred
