@@ -1056,7 +1056,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobBackoffLimitPerIndex: {Default: true, PreRelease: featuregate.Beta},
 
-	JobManagedBy: {Default: false, PreRelease: featuregate.Alpha},
+	JobManagedBy: {Default: true, PreRelease: featuregate.Beta},
 
 	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
 
