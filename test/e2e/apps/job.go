@@ -769,6 +769,24 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
+	for i := 0; i < 50; i++ {
+		ginkgo.It(fmt.Sprintf("should fail when exceeds active deadline early - %v", i), func(ctx context.Context) {
+			activeDeadlineSeconds := int64(1)
+			parallelism := int32(2)
+			completions := int32(4)
+			backoffLimit := int32(6) // default value
+
+			ginkgo.By("Creating a job")
+			job := e2ejob.NewTestJob("notTerminate", fmt.Sprintf("exceed-active-deadline-%v", i), v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
+			job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+			framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring job past active deadline")
+			err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailed, batchv1.JobReasonDeadlineExceeded)
+			framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
+		})
+	}
+
 	/*
 		Release: v1.15
 		Testname: Jobs, active pods, graceful termination
