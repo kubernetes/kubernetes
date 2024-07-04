@@ -195,14 +195,19 @@ func (p *staticPolicy) validateState(s state.State) error {
 	tmpAssignments := s.GetCPUAssignments()
 	tmpDefaultCPUset := s.GetDefaultCPUSet()
 
+	allCPUs := p.topology.CPUDetails.CPUs()
+	if p.options.StrictCPUReservation {
+		allCPUs = allCPUs.Difference(p.reservedCPUs)
+	}
+
 	// Default cpuset cannot be empty when assignments exist
 	if tmpDefaultCPUset.IsEmpty() {
 		if len(tmpAssignments) != 0 {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
 		// state is empty initialize
-		allCPUs := p.topology.CPUDetails.CPUs()
 		s.SetDefaultCPUSet(allCPUs)
+		klog.InfoS("Static policy initialized", "defaultCPUSet", allCPUs)
 		return nil
 	}
 
@@ -210,9 +215,16 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// 1. Check if the reserved cpuset is not part of default cpuset because:
 	// - kube/system reserved have changed (increased) - may lead to some containers not being able to start
 	// - user tampered with file
-	if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
-		return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
-			p.reservedCPUs.String(), tmpDefaultCPUset.String())
+	if p.options.StrictCPUReservation {
+		if !p.reservedCPUs.Intersection(tmpDefaultCPUset).IsEmpty() {
+			return fmt.Errorf("some of strictly reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reservedCPUs.Intersection(tmpDefaultCPUset).String(), tmpDefaultCPUset.String())
+		}
+	} else {
+		if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
+			return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reservedCPUs.String(), tmpDefaultCPUset.String())
+		}
 	}
 
 	// 2. Check if state for static policy is consistent
@@ -235,15 +247,20 @@ func (p *staticPolicy) validateState(s state.State) error {
 	// the set of CPUs stored in the state.
 	totalKnownCPUs := tmpDefaultCPUset.Clone()
 	tmpCPUSets := []cpuset.CPUSet{}
+	tmpAllCPUs := p.topology.CPUDetails.CPUs()
 	for pod := range tmpAssignments {
 		for _, cset := range tmpAssignments[pod] {
 			tmpCPUSets = append(tmpCPUSets, cset)
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
-	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+	if p.options.StrictCPUReservation {
+		tmpAllCPUs = tmpAllCPUs.Difference(p.reservedCPUs)
+	}
+	if !totalKnownCPUs.Equals(tmpAllCPUs) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+			tmpAllCPUs.String(), totalKnownCPUs.String())
+
 	}
 
 	return nil
