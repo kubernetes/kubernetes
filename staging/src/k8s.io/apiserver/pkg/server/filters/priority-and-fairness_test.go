@@ -673,16 +673,15 @@ func TestApfWithRequestDigest(t *testing.T) {
 	}
 }
 
-func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) {
+type panicShouldNotRejectFutureRequest struct {
+	firstReqVerifier, secondReqVerifier verifier
+}
+
+func (test panicShouldNotRejectFutureRequest) runT(t *testing.T) {
 	// scenario:
 	// a) priority level nominal concurrency is set to 1
 	// b) the handler of the first request panics while it is being executed
 	// c) next request that follows should not be rejected
-	t.Parallel()
-
-	epmetrics.Register()
-	fcmetrics.Register()
-
 	const (
 		userName                                              = "alice"
 		fsName                                                = "test-fs"
@@ -727,13 +726,12 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 	err := firstHandlerDone.wait(t, wait.ForeverTestTimeout)
 	wantNoError{}.verify(t, holder{err: err})
 
-	clientMustNotTimeout{}.verify(t, firstResult)
-	wantContains{"stream error: stream ID 1; INTERNAL_ERROR; received from peer"}.verify(t, firstResult)
+	test.firstReqVerifier.verify(t, firstResult)
 
 	// the second request should be served successfully.
 	secondReq := client.newRequest(t, secondRequestPathShouldWork, "")
 	secondResult := client.send(t, secondReq, 2*time.Minute)
-	wantStatusCode{http.StatusOK}.verify(t, secondResult)
+	test.secondReqVerifier.verify(t, secondResult)
 
 	err = secondHandlerDone.wait(t, wait.ForeverTestTimeout)
 	wantNoError{}.verify(t, holder{err: err})
@@ -744,16 +742,15 @@ func TestPriorityAndFairnessWithPanicShouldNotRejectFutureRequest(t *testing.T) 
 	wantNoError{}.verify(t, holder{err: controllerErr})
 }
 
-func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T) {
+type requestTimesOutBeforeHandlerWrites struct {
+	reqVerifier verifier
+}
+
+func (test requestTimesOutBeforeHandlerWrites) runT(t *testing.T) {
 	// scenario:
 	// a) priority level concurrency is set to 1
 	// b) request times out before its handler writes to the
 	// underlying ResponseWriter object.
-	t.Parallel()
-
-	epmetrics.Register()
-	fcmetrics.Register()
-
 	const (
 		userName                                              = "alice"
 		fsName                                                = "test-fs"
@@ -795,9 +792,8 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 		defer close(callerRoundTripDoneCh)
 		t.Logf("Waiting for the request: %q to time out", req.URL)
 		result = client.send(t, req, time.Minute)
-		clientMustNotTimeout{}.verify(t, result)
 	}()
-	wantStatusCode{http.StatusGatewayTimeout}.verify(t, result)
+	test.reqVerifier.verify(t, result)
 
 	t.Logf("Waiting for the inner handler of the request: %q to complete", req.URL)
 	err := reqHandlerCompleted.wait(t, wait.ForeverTestTimeout)
@@ -809,16 +805,15 @@ func TestPriorityAndFairnessWithRequestTimesOutBeforeHandlerWrites(t *testing.T)
 	wantNoError{}.verify(t, holder{err: controllerErr})
 }
 
-func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) {
+type handlerPanicsAfterRequestTimesOut struct {
+	reqVerifier verifier
+}
+
+func (test handlerPanicsAfterRequestTimesOut) runT(t *testing.T) {
 	// scenario:
 	// a) priority level concurrency is set to 1
 	// b) the request being executed times out first, and
 	// b) then the inner hander of the request panics
-	t.Parallel()
-
-	epmetrics.Register()
-	fcmetrics.Register()
-
 	const (
 		userName                                              = "alice"
 		fsName                                                = "test-fs"
@@ -865,9 +860,8 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 		defer close(callerRoundTripDoneCh)
 		t.Logf("Waiting for the request: %q to time out", req.URL)
 		result = client.send(t, req, time.Minute)
-		clientMustNotTimeout{}.verify(t, result)
 	}()
-	wantStatusCode{http.StatusGatewayTimeout}.verify(t, result)
+	test.reqVerifier.verify(t, result)
 
 	t.Logf("Waiting for the inner handler of the request: %q to complete", req.URL)
 	err := reqHandlerErr.wait(t, wait.ForeverTestTimeout)
@@ -879,16 +873,15 @@ func TestPriorityAndFairnessWithHandlerPanicsAfterRequestTimesOut(t *testing.T) 
 	wantNoError{}.verify(t, holder{err: controllerErr})
 }
 
-func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T) {
+type handlerWritesBeforeRequestTimesOut struct {
+	reqVerifier verifier
+}
+
+func (test handlerWritesBeforeRequestTimesOut) runT(t *testing.T) {
 	// scenario:
 	// a) priority level concurrency is set to 1
 	// b) the handler of the request writes to the ResponseWriter object first
 	// c) the request times out
-	t.Parallel()
-
-	epmetrics.Register()
-	fcmetrics.Register()
-
 	const (
 		userName                                              = "alice"
 		fsName                                                = "test-fs"
@@ -936,9 +929,8 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 		defer close(callerRoundTripDoneCh)
 		t.Logf("Waiting for the request: %q to time out", req.URL)
 		result = client.send(t, req, time.Minute)
-		clientMustNotTimeout{}.verify(t, result)
 	}()
-	wantContains{"stream error: stream ID 1; INTERNAL_ERROR; received from peer"}.verify(t, result)
+	test.reqVerifier.verify(t, result)
 
 	t.Logf("Waiting for the inner handler of the request: %q to complete", req.URL)
 	err := reqHandlerErr.wait(t, wait.ForeverTestTimeout)
@@ -950,7 +942,11 @@ func TestPriorityAndFairnessWithHandlerWritesBeforeRequestTimesOut(t *testing.T)
 	wantNoError{}.verify(t, holder{err: controllerErr})
 }
 
-func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
+type enqueuedRequestTimingOut struct {
+	firstReqVerifier, secondReqVerifier verifier
+}
+
+func (test enqueuedRequestTimingOut) runT(t *testing.T) {
 	// scenario:
 	// a) priority level concurrency is set to 1, and queue length is 1
 	// b) the first request arrives and is being executed
@@ -958,11 +954,6 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 	// d) the first request handler blocks indefinitely
 	// e) the second request should be rejected by APF
 	// f) the first request eventually times out
-	t.Parallel()
-
-	epmetrics.Register()
-	fcmetrics.Register()
-
 	const (
 		userName                                                           = "alice"
 		fsName                                                             = "test-fs"
@@ -1051,10 +1042,9 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 	}()
 
 	firstReqResult := <-firstReqResultCh
-	clientMustNotTimeout{}.verify(t, firstReqResult)
 	// first request is expected to time out with
 	// an http.StatusGatewayTimeout, not with a stream reset error.
-	wantStatusCode{http.StatusGatewayTimeout}.verify(t, firstReqResult)
+	test.firstReqVerifier.verify(t, firstReqResult)
 
 	t.Logf("Waiting for the inner handler of the request: %q to complete", firstReq.URL)
 	err := firstReqHandlerErr.wait(t, wait.ForeverTestTimeout)
@@ -1062,12 +1052,11 @@ func TestPriorityAndFairnessWithEnqueuedRequestTimingOut(t *testing.T) {
 
 	// second request is expected to either be rejected (ideal behavior) or time out (current approximation of the ideal behavior)
 	secondReqResult := <-secondReqResultCh
-	clientMustNotTimeout{}.verify(t, secondReqResult)
 	// second request is expected to be rejected by APF with http.StatusTooManyRequests
 	// a) we don't expect the timeout filter to time it out with http.StatusGatewayTimeout
 	// b) we don't expect a stream reset error, since the second request
 	// handler never panics or writes to the ResponseWriter object.
-	wantStatusCode{http.StatusTooManyRequests}.verify(t, secondReqResult)
+	test.secondReqVerifier.verify(t, secondReqResult)
 
 	close(stopCh)
 	t.Log("Waiting for the controller to shutdown")
@@ -1432,6 +1421,147 @@ func TestGetRequestWaitContext(t *testing.T) {
 	}
 }
 
+func TestPriorityAndFairnessWithRequestDeadline(t *testing.T) {
+	// expectations are captured into reusable instances
+	var (
+		wantStreamResetErr            = wantContains{"stream error: stream ID 1; INTERNAL_ERROR; received from peer"}
+		wantHTTPStatusOK              = wantStatusCode{http.StatusOK}
+		wantHTTPStatusGatewayTimeout  = wantStatusCode{http.StatusGatewayTimeout}
+		wantHTTPStatusTooManyRequests = wantStatusCode{http.StatusTooManyRequests}
+	)
+
+	// group names are added here
+	const (
+		withTimeoutFilter = "WithTimeoutFilter"
+	)
+
+	// all sub-tests must adhere to the following
+	type tRunner interface {
+		runT(t *testing.T)
+	}
+
+	// the following sub-tests are intended to be run in parallel
+	// under a certain feature gate configuration
+	tests := []struct {
+		name    string
+		runners map[string]tRunner
+	}{
+		{
+			name: "PanicShouldNotRejectFutureRequest",
+			runners: map[string]tRunner{
+				withTimeoutFilter: panicShouldNotRejectFutureRequest{
+					firstReqVerifier: wantBoth{
+						a: wantStreamResetErr,
+						b: clientMustNotTimeout{},
+					},
+					secondReqVerifier: wantHTTPStatusOK,
+				},
+			},
+		},
+		{
+			name: "RequestTimesOutBeforeHandlerWrites",
+			runners: map[string]tRunner{
+				withTimeoutFilter: requestTimesOutBeforeHandlerWrites{
+					reqVerifier: wantBoth{
+						a: wantHTTPStatusGatewayTimeout,
+						b: clientMustNotTimeout{},
+					},
+				},
+			},
+		},
+		{
+			name: "HandlerPanicsAfterRequestTimesOut",
+			runners: map[string]tRunner{
+				withTimeoutFilter: handlerPanicsAfterRequestTimesOut{
+					reqVerifier: wantBoth{
+						a: wantHTTPStatusGatewayTimeout,
+						b: clientMustNotTimeout{},
+					},
+				},
+			},
+		},
+		{
+			name: "HandlerWritesBeforeRequestTimesOut",
+			runners: map[string]tRunner{
+				withTimeoutFilter: handlerWritesBeforeRequestTimesOut{
+					reqVerifier: wantBoth{
+						a: wantStreamResetErr,
+						b: clientMustNotTimeout{},
+					},
+				},
+			},
+		},
+		{
+			name: "EnqueuedRequestTimingOut",
+			runners: map[string]tRunner{
+				withTimeoutFilter: enqueuedRequestTimingOut{
+					firstReqVerifier: wantBoth{
+						a: wantHTTPStatusGatewayTimeout,
+						b: clientMustNotTimeout{},
+					},
+					secondReqVerifier: wantBoth{
+						a: wantHTTPStatusTooManyRequests,
+						b: clientMustNotTimeout{},
+					},
+				},
+			},
+		},
+	}
+
+	// each of the following parent tests represent a group,
+	// and must run serially to each other
+	groups := []struct {
+		name  string
+		setup func(*testing.T) (teardown func())
+	}{
+		{
+			name: withTimeoutFilter,
+			setup: func(*testing.T) func() {
+				// TODO: ensure the alpha feature proposed in the KEP:
+				// https://kep.k8s.io/4460 is disabled
+				return func() {}
+			},
+
+			// TODO: add a new group 'PerHandlerReadWriteTimeout': this enables
+			// the alpha feature proposed in the KEP: https://kep.k8s.io/4460
+		},
+	}
+
+	epmetrics.Register()
+	fcmetrics.Register()
+
+	for _, group := range groups {
+		// This sub-test represents a group, it must run serially to the
+		// next group, so it should be a serial test.
+		// This Run will not return until its parallel sub-tests complete.
+		t.Run(group.name, func(t *testing.T) {
+			t.Logf("running tests with group: %s", group.name)
+			teardown := group.setup(t)
+
+			// the cleanup will be invoked after this test (group) and
+			// all its parallel subtests complete.
+			t.Cleanup(func() {
+				teardown()
+				t.Logf("tests finished for group: %s", group.name)
+			})
+
+			for _, test := range tests {
+				// all sub-tests within a group will run in parallel
+				test := test // capture range variable
+				t.Run(test.name, func(t *testing.T) {
+					t.Parallel()
+
+					tRunner, ok := test.runners[group.name]
+					if !ok {
+						t.Fatalf("wrong test setup - no test found with group=%s", group.name)
+					}
+					tRunner.runT(t)
+				})
+			}
+		})
+	}
+}
+
 // placeholder for objects we want to assert on
 type holder struct {
 	req  *http.Request
@@ -1444,6 +1574,17 @@ type holder struct {
 // configuration under which a test is being run.
 type verifier interface {
 	verify(t *testing.T, got holder)
+}
+
+type wantBoth struct {
+	a, b verifier
+}
+
+func (want wantBoth) verify(t *testing.T, got holder) {
+	t.Helper()
+
+	want.a.verify(t, got)
+	want.b.verify(t, got)
 }
 
 type wantNoError struct{}
