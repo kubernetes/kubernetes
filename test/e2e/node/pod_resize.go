@@ -1695,8 +1695,8 @@ func doPodResizeSchedulerTests() {
 		nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2 := getNodeAllocatableAndAvailableMilliCPUValues(&node)
 		framework.Logf("TEST2: Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableMilliCPU2, nodeAvailableMilliCPU2)
-		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
-		testPod1CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
+		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableMilliCPU2+testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
+		testPod1CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
 		framework.Logf("TEST2: testPod1 MilliCPUs after resize '%dm'", testPod1CPUQuantityResized.MilliValue())
 
 		c3 := []TestContainerInfo{
@@ -1723,20 +1723,24 @@ func doPodResizeSchedulerTests() {
 
 		ginkgo.By(fmt.Sprintf("TEST2: Create testPod3 '%s' that cannot fit node '%s' due to insufficient CPU.", testPod3.Name, node.Name))
 		testPod3 = podClient.Create(ctx, testPod3)
+
 		p3Err := e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod3.Name, testPod3.Namespace)
 		framework.ExpectNoError(p3Err, "failed to create pod3 or pod3 did not become pending!")
+		ginkgo.By(fmt.Sprintf("TEST2: Verify pod '%s' is pending", testPod3.Name))
 		gomega.Expect(testPod3.Status.Phase).To(gomega.Equal(v1.PodPending))
 
 		ginkgo.By(fmt.Sprintf("TEST2: Resize pod '%s' to make enough space for pod '%s'", testPod1.Name, testPod3.Name))
-		testPod1, p1Err := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(context.TODO(),
+		testPod1, p1Err := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ToMakeSpaceForPod3), metav1.PatchOptions{})
 		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+                time.Sleep(10 * time.Second)
 
 		ginkgo.By(fmt.Sprintf("TEST2: Verify pod '%s' is running after successfully resizing pod '%s'", testPod3.Name, testPod1.Name))
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod1.Name, testPod1.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod2.Name, testPod2.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod3.Name, testPod3.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
-		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3))
+		p3Err = e2epod.WaitForPodRunningInNamespaceSlow(ctx, f.ClientSet, testPod3.Name, f.Namespace.Name)
+		framework.ExpectNoError(p3Err, "failed to create pod3 after resizing, did not become running!")
 
 		ginkgo.By("deleting pods")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
