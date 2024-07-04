@@ -3758,6 +3758,10 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, fmt.Sprintf("must not have more than %v characters (including spaces) in the search list", MaxDNSSearchListChars)))
 		}
 		for i, search := range dnsConfig.Searches {
+			// single dot is allowed #125883
+			if search == "." {
+				continue
+			}
 			// it is fine to have a trailing dot
 			search = strings.TrimSuffix(search, ".")
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)

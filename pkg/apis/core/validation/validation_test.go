@@ -9774,6 +9774,13 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		},
 		dnsPolicy:     &testDNSNone,
 		expectedError: true,
+	}, {
+		desc: "valid: search is single dot",
+		dnsConfig: &core.PodDNSConfig{
+			Searches: []string{"."},
+		},
+		dnsPolicy:     &testDNSNone,
+		expectedError: false,
 	},
 	}
 
