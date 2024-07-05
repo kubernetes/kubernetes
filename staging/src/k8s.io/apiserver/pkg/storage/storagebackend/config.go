@@ -90,6 +90,11 @@ type Config struct {
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+
+	// IndexLabels are the keys of metadata.labels of an object. In addition to
+	// built-in indexes such as pod.spec.nodeName, the apiserver cacher will create
+	// additional indexes for these labels to speed up list and watch requests.
+	IndexLabels []string
 }
 
 // ConfigForResource is a Config specialized to a particular `schema.GroupResource`

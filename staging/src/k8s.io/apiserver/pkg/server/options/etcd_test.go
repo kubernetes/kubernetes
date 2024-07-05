@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -443,5 +444,66 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	}
 	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
+	}
+}
+
+func TestParseIndexLabels(t *testing.T) {
+	testCases := []struct {
+		name              string
+		indexLabels       []string
+		expectIndexLabels map[schema.GroupResource][]string
+		expectErr         string
+	}{
+		{
+			name:        "test single label index",
+			indexLabels: []string{"pods#app"},
+			expectIndexLabels: map[schema.GroupResource][]string{
+				{Group: "", Resource: "pods"}: {"app"},
+			},
+		},
+		{
+			name:        "test multiple label index and multiple resources",
+			indexLabels: []string{"pods#app;k8s-app", "deployments.apps#role"},
+			expectIndexLabels: map[schema.GroupResource][]string{
+				{Group: "", Resource: "pods"}:            {"app", "k8s-app"},
+				{Group: "apps", Resource: "deployments"}: {"role"},
+			},
+		},
+		{
+			name:        "test empty label index",
+			indexLabels: []string{"pods#", "deployments.apps#role;", "statefulsets.apps#;role"},
+			expectIndexLabels: map[schema.GroupResource][]string{
+				{Group: "apps", Resource: "deployments"}:  {"role"},
+				{Group: "apps", Resource: "statefulsets"}: {"role"},
+			},
+		},
+		{
+			name:        "test invalid label index",
+			indexLabels: []string{"pods#app#k8s-app"},
+			expectErr:   "invalid value of index label: pods#app#k8s-app",
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			result, err := parseIndexLabels(testcase.indexLabels)
+			if len(testcase.expectErr) != 0 && !strings.Contains(err.Error(), testcase.expectErr) {
+				t.Errorf("got err: %v, expected err: %s", err, testcase.expectErr)
+			}
+			if len(testcase.expectErr) == 0 {
+				if err != nil {
+					t.Errorf("got err: %v, expected err nil", err)
+				} else {
+					if len(testcase.expectIndexLabels) != len(result) {
+						t.Errorf("got index labels: %v, expected index labels %v", result, testcase.expectIndexLabels)
+					}
+					for key, expectValue := range testcase.expectIndexLabels {
+						if resultValue, exist := result[key]; !exist || !reflect.DeepEqual(expectValue, resultValue) {
+							t.Errorf("got index labels: %v, expected index labels %v", result, testcase.expectIndexLabels)
+						}
+					}
+				}
+			}
+		})
 	}
 }

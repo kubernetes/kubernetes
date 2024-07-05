@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
@@ -37,6 +39,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/clock"
 )
@@ -350,6 +353,19 @@ func TestNamespaceScopedWatch(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
 }
 
+func TestLabelIndexWatchByLabels(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CacherLabelIndex, true)
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs, withLabelKeyIndexerFuncsFactory("app"))
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchByLabels(ctx, t, cacher)
+}
+
+func TestWatchByLabels(t *testing.T) {
+	ctx, cacher, terminate := testSetup(t, withSpecNodeNameIndexerFuncs)
+	t.Cleanup(terminate)
+	storagetesting.RunTestWatchByLabels(ctx, t, cacher)
+}
+
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	ctx, cacher, terminate := testSetup(t)
 	t.Cleanup(terminate)
@@ -390,6 +406,7 @@ type setupOptions struct {
 	resourcePrefix string
 	keyFunc        func(runtime.Object) (string, error)
 	indexerFuncs   map[string]storage.IndexerFunc
+	indexers       *cache.Indexers
 	clock          clock.WithTicker
 }
 
@@ -418,6 +435,41 @@ func withSpecNodeNameIndexerFuncs(options *setupOptions) {
 			}
 			return pod.Spec.NodeName
 		},
+	}
+}
+
+func withLabelKeyIndexerFactory(labelKeys ...string) func(options *setupOptions) {
+	return func(options *setupOptions) {
+		if options.indexers == nil || *options.indexers == nil {
+			options.indexers = &cache.Indexers{}
+		}
+		indexers := *options.indexers
+		for _, labelKey := range labelKeys {
+			indexers[storage.LabelIndex(labelKey)] = func(obj interface{}) ([]string, error) {
+				pod := obj.(*example.Pod)
+				if pod.Labels == nil {
+					return nil, nil
+				}
+				return []string{pod.Labels[labelKey]}, nil
+			}
+		}
+	}
+}
+
+func withLabelKeyIndexerFuncsFactory(labelKeys ...string) func(options *setupOptions) {
+	return func(options *setupOptions) {
+		if options.indexerFuncs == nil {
+			options.indexerFuncs = map[string]storage.IndexerFunc{}
+		}
+		for _, labelKey := range labelKeys {
+			options.indexerFuncs[labelKey] = func(obj runtime.Object) string {
+				pod := obj.(*example.Pod)
+				if pod.Labels == nil {
+					return ""
+				}
+				return pod.Labels[labelKey]
+			}
+		}
 	}
 }
 
@@ -450,6 +502,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		NewFunc:        newPod,
 		NewListFunc:    newPodList,
 		IndexerFuncs:   setupOpts.indexerFuncs,
+		Indexers:       setupOpts.indexers,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 		Clock:          setupOpts.clock,
 	}
@@ -514,4 +567,168 @@ func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime
 		}
 		return true, nil
 	})
+}
+
+func TestListByLabelWithoutIndex(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CacherLabelIndex, false)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(t, withLabelKeyIndexerFactory("app"))
+	t.Cleanup(terminate)
+	runTestListByLabels(ctx, t, cacher, "")
+}
+
+func TestListByLabelIndex(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CacherLabelIndex, true)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(t, withLabelKeyIndexerFactory("app"))
+	t.Cleanup(terminate)
+	runTestListByLabels(ctx, t, cacher, "app")
+}
+
+func TestWatchByLabelIndex(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CacherLabelIndex, true)
+	ctx, cacher, _, terminate := testSetupWithEtcdServer(t, withLabelKeyIndexerFuncsFactory("app"))
+	t.Cleanup(terminate)
+	indexLabel := "app"
+	inPods := []*example.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo1", Labels: map[string]string{indexLabel: "app1"}}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo2", Labels: map[string]string{indexLabel: "app2"}}},
+	}
+	labelSelector, err := labels.Parse(fmt.Sprintf("%s=app2", indexLabel))
+	if err != nil {
+		t.Errorf("error parsing label selector: %v", err)
+	}
+	watchByLabel := storage.ListOptions{
+		Recursive: true,
+		Predicate: storage.SelectionPredicate{
+			Label:       labelSelector,
+			Field:       fields.Everything(),
+			IndexLabels: []string{indexLabel},
+		},
+	}
+	watchAll := storage.ListOptions{
+		Recursive: true,
+		Predicate: storage.SelectionPredicate{
+			Label:       labels.Everything(),
+			Field:       fields.Everything(),
+			IndexLabels: []string{indexLabel},
+		},
+	}
+	watchNamespaceKey := fmt.Sprintf("/pods/%s/", inPods[0].Namespace)
+	watcher1, err := cacher.Watch(ctx, watchNamespaceKey, watchByLabel)
+	if err != nil {
+		t.Errorf("error creating watcher: %v", err)
+	}
+	// test watcher1 is added as a value watcher
+	if err := checkWatchers(cacher, 1, 0); err != nil {
+		t.Errorf("error checking watchers: %v", err)
+	}
+
+	watcher2, err := cacher.Watch(ctx, watchNamespaceKey, watchAll)
+	if err != nil {
+		t.Errorf("error creating watcher: %v", err)
+	}
+	// test watcher2 is added as an all watcher
+	if err := checkWatchers(cacher, 1, 1); err != nil {
+		t.Errorf("error checking watchers: %v", err)
+	}
+	// test events is filtered by label index before dispatching
+	for _, pod := range inPods {
+		if err = cacher.Create(ctx, computePodKey(pod), pod, &example.Pod{}, 0); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+	for _, pod := range inPods {
+		if err = cacher.Delete(ctx, computePodKey(pod), &example.Pod{}, nil, storage.ValidateAllObjectFunc, &example.Pod{}); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+	copyPod := func(pod *example.Pod, resourceVersion string) *example.Pod {
+		copied := pod.DeepCopy()
+		copied.ResourceVersion = resourceVersion
+		return copied
+	}
+	expectWatcher1Events := []watch.Event{
+		{Type: watch.Added, Object: copyPod(inPods[1], "3")},
+		{Type: watch.Deleted, Object: copyPod(inPods[1], "5")},
+	}
+	expectWatcher2Events := []watch.Event{
+		{Type: watch.Added, Object: copyPod(inPods[0], "2")},
+		{Type: watch.Added, Object: copyPod(inPods[1], "3")},
+		{Type: watch.Deleted, Object: copyPod(inPods[0], "4")},
+		{Type: watch.Deleted, Object: copyPod(inPods[1], "5")},
+	}
+	verifyEvents(t, watcher1, expectWatcher1Events, true)
+	verifyEvents(t, watcher2, expectWatcher2Events, true)
+	// test dispatched to only one watcher
+	watcher1.Stop()
+	if err := checkWatchers(cacher, 0, 1); err != nil {
+		t.Errorf("error checking watchers: %v", err)
+	}
+	watcher2.Stop()
+	if err := checkWatchers(cacher, 0, 0); err != nil {
+		t.Errorf("error checking watchers: %v", err)
+	}
+}
+
+func checkWatchers(cacher *Cacher, expectValueWatcherCount, expectAllWatcherCount int) error {
+	// test label index watcher is added as a value watcher
+	if count := len(cacher.watchers.valueWatchers); count != expectValueWatcherCount {
+		return fmt.Errorf("expected only one value watcher, got %v", count)
+	}
+	if count := len(cacher.watchers.allWatchers); count != expectAllWatcherCount {
+		return fmt.Errorf("expected none all watcher, got %v", count)
+	}
+	return nil
+}
+
+func runTestListByLabels(ctx context.Context, t *testing.T, c *Cacher, expectByIndex string) {
+	inPods := []*example.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo1", Labels: map[string]string{"app": "app1"}}},
+		{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo2", Labels: map[string]string{"app": "app2"}}},
+	}
+	labelSelector, err := labels.Parse("app=app1")
+	if err != nil {
+		t.Errorf("error parsing label selector: %v", err)
+	}
+	var lastRV string
+	for _, pod := range inPods {
+		out := &example.Pod{}
+		if err = c.Create(ctx, computePodKey(pod), pod, out, 0); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		lastRV = out.ResourceVersion
+	}
+	listOpt := storage.SelectionPredicate{
+		Label:       labelSelector,
+		Field:       fields.Everything(),
+		IndexLabels: []string{expectByIndex},
+	}
+	// list by GetList first to ensure cacher is ready
+	list := &example.PodList{}
+	if err := c.GetList(ctx, fmt.Sprintf("/pods/%s/", inPods[0].Namespace), storage.ListOptions{Predicate: listOpt, Recursive: true}, list); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Errorf("Expected 1 item, got %d", len(list.Items))
+	}
+	// test listItems returns expect indexUsed
+	listRV, _ := strconv.Atoi(lastRV)
+	objs, _, indexUsed, err := c.listItems(ctx, uint64(listRV), fmt.Sprintf("/pods/%s/", inPods[0].Namespace), listOpt, true)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	expectItems := 1
+	expectIndexName := storage.LabelIndex(expectByIndex)
+	if expectByIndex == "" {
+		// listItems not by index, should return all items
+		expectItems = 2
+		expectIndexName = ""
+	}
+	if expectIndexName != indexUsed {
+		t.Errorf("Expected indexUsed to be %s, got %s", expectIndexName, indexUsed)
+	}
+	if len(objs) != expectItems {
+		t.Errorf("Expected %d item, got %d", expectItems, len(objs))
+	}
 }

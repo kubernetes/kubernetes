@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1040,6 +1041,188 @@ func RunTestNamespaceScopedWatch(ctx context.Context, t *testing.T, store storag
 	}
 }
 
+// It tests watch resources by labels.
+func RunTestWatchByLabels(ctx context.Context, t *testing.T, store storage.Interface) {
+	tests := []struct {
+		name               string
+		requestedName      string
+		requestedNamespace string
+		recursive          bool
+		fieldSelector      fields.Selector
+		labelSelector      labels.Selector
+		indexFields        []string
+		indexLabels        []string
+		watchTests         []*testWatchStruct
+	}{
+		{
+			name:               "watch by label selector, single label index",
+			requestedNamespace: "t1-ns1",
+			recursive:          true,
+			labelSelector:      parseLabelSelectorOrDie("app=app1"),
+			indexLabels:        []string{"app"},
+			watchTests: []*testWatchStruct{
+				{basePodWithLabel("t1-foo1", "t1-ns1", "app=app1"), true, watch.Added},
+				{basePodWithLabel("t1-foo2", "t1-ns1", "app=app2"), false, ""},
+				{basePodWithLabel("t1-foo3", "t1-ns1", ""), false, ""},
+				{basePodWithLabel("t1-foo4", "t1-ns2", "app=app1"), false, ""},
+				{basePodWithLabelUpdated("t1-foo1", "t1-ns1", "app=app1"), true, watch.Modified},
+				{basePodWithLabel("t1-foo1", "t1-ns1", "app=app2"), true, watch.Deleted},
+			},
+		},
+		{
+			name:               "watch by label selector, multiple label index",
+			requestedNamespace: "t2-ns1",
+			recursive:          true,
+			labelSelector:      parseLabelSelectorOrDie("app=app1,role!=r1"),
+			indexLabels:        []string{"app"},
+			watchTests: []*testWatchStruct{
+				{basePodWithLabel("t2-foo1", "t2-ns1", "app=app1"), true, watch.Added},
+				{basePodWithLabelUpdated("t2-foo1", "t2-ns1", "app=app1"), true, watch.Modified},
+				{basePodWithLabel("t2-foo2", "t2-ns1", "app=app2"), false, ""},
+				{basePodWithLabel("t2-foo3", "t2-ns2", "app=app1"), false, ""},
+				{basePodWithLabel("t2-foo4", "t2-ns1", "app=app1,role=r1"), false, ""},
+				{basePodWithLabel("t2-foo5", "t2-ns1", "app=app1,role=r2"), true, watch.Added},
+				{basePodWithLabel("t2-foo5", "t2-ns1", "app=app1,role=r1"), true, watch.Deleted},
+			},
+		},
+		{
+			name:               "watch by label selector and field selector",
+			requestedNamespace: "t3-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=t3-bar1"),
+			labelSelector:      parseLabelSelectorOrDie("app=app1"),
+			indexFields:        []string{"spec.nodeName"},
+			indexLabels:        []string{"app"},
+			watchTests: []*testWatchStruct{
+				{basePodWithLabel("t3-foo1", "t3-ns1", "app=app1"), true, watch.Added},
+				{basePodWithLabel("t3-foo2", "t3-ns1", "app=app2"), false, ""},
+				{basePodWithLabel("t3-foo3", "t3-ns1", ""), false, ""},
+				{basePodWithLabelAssigned("t3-foo4", "t3-ns1", "t3-bar1", "app=app1"), false, ""},
+				{basePodWithLabelAssigned("t3-foo5", "t3-ns1", "t3-bar2", "app=app1"), true, watch.Added},
+				{basePodWithLabelUpdated("t3-foo1", "t3-ns1", "app=app1"), true, watch.Modified},
+				{basePodWithLabelAssigned("t3-foo1", "t3-ns1", "t3-bar2", "app=app1"), true, watch.Modified},
+				{basePodWithLabelAssigned("t3-foo5", "t3-ns1", "t3-bar1", "app=app1"), true, watch.Deleted},
+			},
+		},
+		{
+			name:               "watch by multiple label selector and field selector",
+			requestedNamespace: "t4-ns1",
+			recursive:          true,
+			fieldSelector:      fields.ParseSelectorOrDie("spec.nodeName!=t3-bar1"),
+			labelSelector:      parseLabelSelectorOrDie("app=app1,role=r1"),
+			indexFields:        []string{"spec.nodeName"},
+			indexLabels:        []string{"app"},
+			watchTests: []*testWatchStruct{
+				{basePodWithLabel("t4-foo1", "t4-ns1", "app=app1"), false, ""},
+				{basePodWithLabel("t4-foo2", "t4-ns1", "app=app1,role=r1"), true, watch.Added},
+				{basePodWithLabel("t4-foo3", "t4-ns1", "app=app1,role=r2"), false, ""},
+				{basePodWithLabelAssigned("t4-foo4", "t4-ns1", "t3-bar2", "app=app1,role=r1"), true, watch.Added},
+				{basePodWithLabelAssigned("t4-foo5", "t4-ns1", "t3-bar2", "app=app1,role=r2"), false, ""},
+				{basePodWithLabelAssigned("t4-foo6", "t4-ns1", "t3-bar2", "app=app2,role=r1"), false, ""},
+				{basePodWithLabelUpdated("t4-foo2", "t4-ns1", "app=app1,role=r1"), true, watch.Modified},
+				{basePodWithLabelAssigned("t4-foo2", "t4-ns1", "t3-bar1", "app=app1,role=r1"), true, watch.Deleted},
+				{basePodWithLabel("t4-foo4", "t4-ns1", "app=app1,role=r1"), true, watch.Modified},
+			},
+		},
+		{
+			name:               "watch by set based label selectors",
+			requestedNamespace: "t5-ns1",
+			recursive:          true,
+			labelSelector:      parseLabelSelectorOrDie("app in (app1, app2)"),
+			indexLabels:        []string{"app"},
+			watchTests: []*testWatchStruct{
+				{basePodWithLabel("t5-foo1", "t5-ns1", "app=app1"), true, watch.Added},
+				{basePodWithLabel("t5-foo2", "t5-ns1", "app=app2"), true, watch.Added},
+				{basePodWithLabel("t5-foo3", "t5-ns1", "app=app3"), false, ""},
+				{basePodWithLabel("t5-foo1", "t5-ns1", "app=app2"), true, watch.Modified},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestInfo := &genericapirequest.RequestInfo{}
+			requestInfo.Name = tt.requestedName
+			requestInfo.Namespace = tt.requestedNamespace
+			ctx = genericapirequest.WithRequestInfo(ctx, requestInfo)
+			ctx = genericapirequest.WithNamespace(ctx, tt.requestedNamespace)
+
+			watchKey := "/pods"
+			if tt.requestedNamespace != "" {
+				watchKey += "/" + tt.requestedNamespace
+				if tt.requestedName != "" {
+					watchKey += "/" + tt.requestedName
+				}
+			}
+
+			predicate := storage.SelectionPredicate{
+				Label: tt.labelSelector,
+				Field: tt.fieldSelector,
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					pod := obj.(*example.Pod)
+					return labels.Set(pod.GetLabels()), fields.Set{
+						"spec.nodeName": pod.Spec.NodeName,
+					}, nil
+				},
+				IndexFields: []string{"spec.nodeName"},
+				IndexLabels: tt.indexLabels,
+			}
+			if predicate.Label == nil {
+				predicate.Label = labels.Everything()
+			}
+			if predicate.Field == nil {
+				predicate.Field = fields.Everything()
+			}
+
+			list := &example.PodList{}
+			opts := storage.ListOptions{
+				ResourceVersion: "",
+				Predicate:       predicate,
+				Recursive:       true,
+			}
+			if err := store.GetList(ctx, "/pods", opts, list); err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			opts.ResourceVersion = list.ResourceVersion
+			opts.Recursive = tt.recursive
+
+			w, err := store.Watch(ctx, watchKey, opts)
+			if err != nil {
+				t.Fatalf("Watch failed: %v", err)
+			}
+
+			currentObjs := map[string]*example.Pod{}
+			for _, watchTest := range tt.watchTests {
+				out := &example.Pod{}
+				key := "pods/" + watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+					func(runtime.Object) (runtime.Object, error) {
+						obj := watchTest.obj.DeepCopy()
+						return obj, nil
+					}), nil)
+				if err != nil {
+					t.Fatalf("GuaranteedUpdate failed: %v", err)
+				}
+
+				expectObj := out
+				podIdentifier := watchTest.obj.Namespace + "/" + watchTest.obj.Name
+				if watchTest.watchType == watch.Deleted {
+					expectObj = currentObjs[podIdentifier]
+					expectObj.ResourceVersion = out.ResourceVersion
+					delete(currentObjs, podIdentifier)
+				} else {
+					currentObjs[podIdentifier] = out
+				}
+				if watchTest.expectEvent {
+					testCheckResult(t, w, watch.Event{Type: watchTest.watchType, Object: expectObj})
+				}
+			}
+			w.Stop()
+			testCheckStop(t, w)
+		})
+	}
+}
+
 // RunOptionalTestWatchDispatchBookmarkEvents tests whether bookmark events are sent.
 // This feature is currently implemented in watch cache layer, so this is optional.
 //
@@ -1654,4 +1837,40 @@ func baseNamespacedPodAssigned(podName, namespace, nodeName string) *example.Pod
 		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace},
 		Spec:       example.PodSpec{NodeName: nodeName},
 	}
+}
+
+func basePodWithLabel(podName, namespace, labelStr string) *example.Pod {
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: namespace, Labels: map[string]string{}},
+	}
+	if labelStr != "" {
+		for _, label := range strings.Split(labelStr, ",") {
+			parts := strings.SplitN(label, "=", 2)
+			if len(parts) != 2 {
+				panic(labelStr)
+			}
+			pod.Labels[parts[0]] = parts[1]
+		}
+	}
+	return pod
+}
+
+func basePodWithLabelUpdated(podName, namespace, labelStr string) *example.Pod {
+	pod := basePodWithLabel(podName, namespace, labelStr)
+	pod.Status = example.PodStatus{Phase: "Running"}
+	return pod
+}
+
+func basePodWithLabelAssigned(podName, namespace, nodeName, labelStr string) *example.Pod {
+	pod := basePodWithLabel(podName, namespace, labelStr)
+	pod.Spec = example.PodSpec{NodeName: nodeName}
+	return pod
+}
+
+func parseLabelSelectorOrDie(selector string) labels.Selector {
+	s, err := labels.Parse(selector)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }

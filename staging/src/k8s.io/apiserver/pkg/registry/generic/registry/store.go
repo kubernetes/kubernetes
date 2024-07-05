@@ -1535,6 +1535,35 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if err != nil {
 		return err
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CacherLabelIndex) && len(opts.StorageConfig.Config.IndexLabels) > 0 {
+		indexLabels := opts.StorageConfig.Config.IndexLabels
+		for _, label := range indexLabels {
+			if options.TriggerFunc == nil {
+				options.TriggerFunc = map[string]storage.IndexerFunc{}
+			}
+			options.TriggerFunc[label] = labelKeyTriggerFunc(label)
+			if options.Indexers == nil || *options.Indexers == nil {
+				options.Indexers = &cache.Indexers{}
+			}
+			indexers := *options.Indexers
+			indexers[storage.LabelIndex(label)] = labelKeyIndexFunc(label)
+		}
+		klog.Infof("store for %s, CacherLabelIndex feature is enabled, add %s as cache triggers and indexes", e.DefaultQualifiedResource.String(), strings.Join(indexLabels, ","))
+		// decorate PredicateFunc to add indexLabels
+		predicateFunc := e.PredicateFunc
+		e.PredicateFunc = func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+			pred := predicateFunc(label, field)
+			if len(indexLabels) == 0 {
+				return pred
+			}
+			for _, label := range indexLabels {
+				if label != "" {
+					pred.IndexLabels = append(pred.IndexLabels, label)
+				}
+			}
+			return pred
+		}
+	}
 
 	// ResourcePrefix must come from the underlying factory
 	prefix := opts.ResourcePrefix
@@ -1689,4 +1718,32 @@ func validateIndexers(indexers *cache.Indexers) error {
 		}
 	}
 	return nil
+}
+
+// labelKeyTriggerFunc returns a TriggerFunc which returns value metadata.labels[labelKey] of given object.
+func labelKeyTriggerFunc(labelKey string) func(obj runtime.Object) string {
+	return func(obj runtime.Object) string {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return ""
+		}
+		if accessor.GetLabels() == nil {
+			return ""
+		}
+		return accessor.GetLabels()[labelKey]
+	}
+}
+
+// labelKeyIndexFunc returns a IndexFunc which returns value metadata.labels[labelKey] of given object.
+func labelKeyIndexFunc(labelKey string) func(obj interface{}) ([]string, error) {
+	return func(obj interface{}) ([]string, error) {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		if accessor.GetLabels() == nil {
+			return []string{}, nil
+		}
+		return []string{accessor.GetLabels()[labelKey]}, nil
+	}
 }

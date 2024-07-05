@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagevalue "k8s.io/apiserver/pkg/storage/value"
-	"k8s.io/klog/v2"
 )
 
 type EtcdOptions struct {
@@ -172,6 +172,14 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
 		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
 		"to not disable watch caching for that resource")
+
+	fs.StringSliceVar(&s.StorageConfig.IndexLabels, "index-labels", s.StorageConfig.IndexLabels, ""+
+		"Index labels settings for some resources (pods, nodes, etc.), comma separated. "+
+		"The individual setting format: resource[.group]#labelName1;labelName2, where resource is lowercase plural (no version), "+
+		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
+		"and labelName is a string. It takes effect when watch-cache and feature gate CacherLabelIndex are enabled. "+
+		"In addition to built-in indexes such as pod.spec.nodeName, apiserver cacher "+
+		"will create additional indexes for these labels to speed up list and watch requests.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
@@ -402,7 +410,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 	if ret.StorageObjectCountTracker == nil {
 		ret.StorageObjectCountTracker = storageConfig.StorageObjectCountTracker
 	}
-
+	ret.StorageConfig.Config.IndexLabels = nil
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
 		if err != nil {
@@ -417,6 +425,11 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
 			klog.V(3).InfoS("Using watch cache", "resource", resource)
+			indexLabelSet, err := parseIndexLabels(f.Options.StorageConfig.IndexLabels)
+			if err != nil {
+				return generic.RESTOptions{}, err
+			}
+			ret.StorageConfig.Config.IndexLabels = indexLabelSet[resource]
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}
@@ -517,4 +530,22 @@ func (t *transformerStorageFactory) Configs() []storagebackend.Config {
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
 	return t.delegate.Backends()
+}
+
+// parseIndexLabels turns a list of all resource index labels into a map of group resources
+// to index labels.
+func parseIndexLabels(indexLabels []string) (map[schema.GroupResource][]string, error) {
+	indexLabelMap := make(map[schema.GroupResource][]string)
+	for _, label := range indexLabels {
+		tokens := strings.Split(label, "#")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("invalid value of index label: %s", label)
+		}
+		if len(tokens[1]) == 0 {
+			continue
+		}
+		labels := strings.Split(tokens[1], ";")
+		indexLabelMap[schema.ParseGroupResource(tokens[0])] = sets.NewString(labels...).Delete("").List()
+	}
+	return indexLabelMap, nil
 }

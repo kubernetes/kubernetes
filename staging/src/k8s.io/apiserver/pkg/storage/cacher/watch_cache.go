@@ -546,6 +546,8 @@ func (w *watchCache) waitUntilFreshAndListItems(ctx context.Context, resourceVer
 		for _, matchValue := range matchValues {
 			if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
 				return result, w.resourceVersion, matchValue.IndexName, nil
+			} else {
+				klog.Warningf("failed to list by index %s=%s: %v", matchValue.IndexName, matchValue.Value, err)
 			}
 		}
 		return w.store.List(), w.resourceVersion, "", nil

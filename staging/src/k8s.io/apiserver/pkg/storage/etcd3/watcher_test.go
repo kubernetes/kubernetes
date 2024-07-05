@@ -57,6 +57,11 @@ func TestNamespaceScopedWatch(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedWatch(ctx, t, store)
 }
 
+func TestLabelIndexWatch(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchByLabels(ctx, t, store)
+}
+
 func TestDeleteTriggerWatch(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)

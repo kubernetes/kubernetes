@@ -116,8 +116,10 @@ func (wm watchersMap) addWatcher(w *cacheWatcher, number int) {
 	wm[number] = w
 }
 
-func (wm watchersMap) deleteWatcher(number int) {
+func (wm watchersMap) deleteWatcher(number int) bool {
+	_, ok := wm[number]
 	delete(wm, number)
+	return ok
 }
 
 func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
@@ -127,35 +129,51 @@ func (wm watchersMap) terminateAll(done func(*cacheWatcher)) {
 	}
 }
 
-type indexedWatchers struct {
-	allWatchers   map[namespacedName]watchersMap
-	valueWatchers map[string]watchersMap
+type triggerIndex struct {
+	indexName string
+	value     string
 }
 
-func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespacedName, value string, supported bool) {
+type indexedWatchers struct {
+	resource      string
+	allWatchers   map[namespacedName]watchersMap
+	valueWatchers map[triggerIndex]watchersMap
+}
+
+func (i *indexedWatchers) addWatcher(w *cacheWatcher, number int, scope namespacedName, triggerIdx triggerIndex, supported bool) {
 	if supported {
-		if _, ok := i.valueWatchers[value]; !ok {
-			i.valueWatchers[value] = watchersMap{}
+		if _, ok := i.valueWatchers[triggerIdx]; !ok {
+			i.valueWatchers[triggerIdx] = watchersMap{}
 		}
-		i.valueWatchers[value].addWatcher(w, number)
+		i.valueWatchers[triggerIdx].addWatcher(w, number)
+		klog.V(3).Infof("add watcher#%d for resource %s of index %+v", number, i.resource, triggerIdx)
+		metrics.WatcherCountGauge.WithLabelValues(i.resource, triggerIdx.indexName).Inc()
 	} else {
 		scopedWatchers, ok := i.allWatchers[scope]
 		if !ok {
 			scopedWatchers = watchersMap{}
 			i.allWatchers[scope] = scopedWatchers
 		}
+		klog.V(3).Infof("add watcher#%d for resource %s", number, i.resource)
+		metrics.WatcherCountGauge.WithLabelValues(i.resource, "").Inc()
 		scopedWatchers.addWatcher(w, number)
 	}
 }
 
-func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, value string, supported bool) {
+func (i *indexedWatchers) deleteWatcher(number int, scope namespacedName, triggerIndex triggerIndex, supported bool) {
 	if supported {
-		i.valueWatchers[value].deleteWatcher(number)
-		if len(i.valueWatchers[value]) == 0 {
-			delete(i.valueWatchers, value)
+		if i.valueWatchers[triggerIndex].deleteWatcher(number) {
+			klog.V(3).Infof("delete watcher#%d for resource %s of index %+v", number, i.resource, triggerIndex)
+			metrics.WatcherCountGauge.WithLabelValues(i.resource, triggerIndex.indexName).Dec()
+		}
+		if len(i.valueWatchers[triggerIndex]) == 0 {
+			delete(i.valueWatchers, triggerIndex)
 		}
 	} else {
-		i.allWatchers[scope].deleteWatcher(number)
+		if i.allWatchers[scope].deleteWatcher(number) {
+			klog.V(3).Infof("delete watcher#%d of resource %s", number, i.resource)
+			metrics.WatcherCountGauge.WithLabelValues(i.resource, "").Dec()
+		}
 		if len(i.allWatchers[scope]) == 0 {
 			delete(i.allWatchers, scope)
 		}
@@ -176,8 +194,9 @@ func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done 
 	for _, watchers := range i.valueWatchers {
 		watchers.terminateAll(done)
 	}
+	metrics.WatcherCountGauge.Reset()
 	i.allWatchers = map[namespacedName]watchersMap{}
-	i.valueWatchers = map[string]watchersMap{}
+	i.valueWatchers = map[triggerIndex]watchersMap{}
 }
 
 // As we don't need a high precision here, we keep all watchers timeout within a
@@ -237,11 +256,6 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 
 type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
 
-type indexedTriggerFunc struct {
-	indexName   string
-	indexerFunc storage.IndexerFunc
-}
-
 // Cacher is responsible for serving WATCH and LIST requests for a given
 // resource from its internal cache and updating its cache in the background
 // based on the underlying storage contents.
@@ -290,7 +304,7 @@ type Cacher struct {
 
 	// indexedTrigger is used for optimizing amount of watchers that needs to process
 	// an incoming event.
-	indexedTrigger *indexedTriggerFunc
+	indexedTriggers map[string]storage.IndexerFunc
 	// watchers is mapping from the value of trigger function that a
 	// watcher is interested into the watchers
 	watcherIdx int
@@ -345,18 +359,23 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		return nil, fmt.Errorf("storage codec doesn't seem to match given type: %v", err)
 	}
 
-	var indexedTrigger *indexedTriggerFunc
+	indexedTriggers := map[string]storage.IndexerFunc{}
 	if config.IndexerFuncs != nil {
-		// For now, we don't support multiple trigger functions defined
-		// for a given resource.
-		if len(config.IndexerFuncs) > 1 {
-			return nil, fmt.Errorf("cacher %s doesn't support more than one IndexerFunc: ", reflect.TypeOf(obj).String())
-		}
-		for key, value := range config.IndexerFuncs {
-			if value != nil {
-				indexedTrigger = &indexedTriggerFunc{
-					indexName:   key,
-					indexerFunc: value,
+		if utilfeature.DefaultFeatureGate.Enabled(features.CacherLabelIndex) {
+			for key, value := range config.IndexerFuncs {
+				if value != nil {
+					indexedTriggers[key] = value
+				}
+			}
+		} else {
+			// For now, we don't support multiple trigger functions defined
+			// for a given resource.
+			if len(config.IndexerFuncs) > 1 {
+				return nil, fmt.Errorf("cacher %s doesn't support more than one IndexerFunc: ", reflect.TypeOf(obj).String())
+			}
+			for key, value := range config.IndexerFuncs {
+				if value != nil {
+					indexedTriggers[key] = value
 				}
 			}
 		}
@@ -367,19 +386,20 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	objType := reflect.TypeOf(obj)
 	cacher := &Cacher{
-		resourcePrefix: config.ResourcePrefix,
-		ready:          newReady(),
-		storage:        config.Storage,
-		objectType:     objType,
-		groupResource:  config.GroupResource,
-		versioner:      config.Versioner,
-		newFunc:        config.NewFunc,
-		newListFunc:    config.NewListFunc,
-		indexedTrigger: indexedTrigger,
-		watcherIdx:     0,
+		resourcePrefix:  config.ResourcePrefix,
+		ready:           newReady(),
+		storage:         config.Storage,
+		objectType:      objType,
+		groupResource:   config.GroupResource,
+		versioner:       config.Versioner,
+		newFunc:         config.NewFunc,
+		newListFunc:     config.NewListFunc,
+		indexedTriggers: indexedTriggers,
+		watcherIdx:      0,
 		watchers: indexedWatchers{
+			resource:      config.GroupResource.String(),
 			allWatchers:   make(map[namespacedName]watchersMap),
-			valueWatchers: make(map[string]watchersMap),
+			valueWatchers: make(map[triggerIndex]watchersMap),
 		},
 		// TODO: Figure out the correct value for the buffer size.
 		incoming:              make(chan watchCacheEvent, 100),
@@ -567,13 +587,28 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		scope.namespace = ""
 	}
 
-	triggerValue, triggerSupported := "", false
-	if c.indexedTrigger != nil {
+	// Watch requests require multiple trigger indexes may not be commonly used, currently only one triggerIndex is supported.
+	// The following guarantees that no OR operator is supported, thus filtering events by one triggerIndex is enough
+	// - LabelSelector and fieldSelector are ANDed together.
+	// - Multiple requirements in a labelSelector are also ANDed.
+	// - Set-based labelSelector which ORed multiple values is not supported through the following `RequiresExactMatch` check
+	triggerIdx, triggerSupported := triggerIndex{}, false
+	if len(c.indexedTriggers) > 0 {
 		for _, field := range pred.IndexFields {
-			if field == c.indexedTrigger.indexName {
+			if _, ok := c.indexedTriggers[field]; ok {
 				if value, ok := pred.Field.RequiresExactMatch(field); ok {
-					triggerValue, triggerSupported = value, true
+					triggerIdx, triggerSupported = triggerIndex{value: value, indexName: field}, true
 					break
+				}
+			}
+		}
+		if !triggerSupported {
+			for _, label := range pred.IndexLabels {
+				if _, ok := c.indexedTriggers[label]; ok {
+					if value, ok := pred.Label.RequiresExactMatch(label); ok {
+						triggerIdx, triggerSupported = triggerIndex{value: value, indexName: label}, true
+						break
+					}
 				}
 			}
 		}
@@ -584,7 +619,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// - having it large enough to ensure that watchers that need to process
 	//   a bunch of changes have enough buffer to avoid from blocking other
 	//   watchers on our watcher having a processing hiccup
-	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
+	chanSize := c.watchCache.suggestedWatchChannelSize(len(c.indexedTriggers) > 0, triggerSupported)
 
 	// client-go is going to fall back to a standard LIST on any error
 	// returned for watch-list requests
@@ -666,10 +701,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 
 		// Update watcher.forget function once we can compute it.
-		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, scope, triggerIdx, triggerSupported)
 		// Update the bookMarkAfterResourceVersion
 		watcher.setBookmarkAfterResourceVersion(bookmarkAfterResourceVersionFn())
-		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerValue, triggerSupported)
+		c.watchers.addWatcher(watcher, c.watcherIdx, scope, triggerIdx, triggerSupported)
 		addedWatcher = true
 
 		// Add it to the queue only when the client support watch bookmarks.
@@ -994,19 +1029,22 @@ func baseObjectThreadUnsafe(object runtime.Object) runtime.Object {
 	return object
 }
 
-func (c *Cacher) triggerValuesThreadUnsafe(event *watchCacheEvent) ([]string, bool) {
-	if c.indexedTrigger == nil {
+func (c *Cacher) triggerIndexesThreadUnsafe(event *watchCacheEvent) ([]triggerIndex, bool) {
+	if len(c.indexedTriggers) == 0 {
 		return nil, false
 	}
 
-	result := make([]string, 0, 2)
-	result = append(result, c.indexedTrigger.indexerFunc(baseObjectThreadUnsafe(event.Object)))
-	if event.PrevObject == nil {
-		return result, true
-	}
-	prevTriggerValue := c.indexedTrigger.indexerFunc(baseObjectThreadUnsafe(event.PrevObject))
-	if result[0] != prevTriggerValue {
-		result = append(result, prevTriggerValue)
+	var result []triggerIndex
+	for indexName, triggerFunc := range c.indexedTriggers {
+		triggerValue := triggerFunc(baseObjectThreadUnsafe(event.Object))
+		result = append(result, triggerIndex{indexName: indexName, value: triggerValue})
+		if event.PrevObject == nil {
+			continue
+		}
+		prevTriggerValue := triggerFunc(baseObjectThreadUnsafe(event.PrevObject))
+		if triggerValue != prevTriggerValue {
+			result = append(result, triggerIndex{indexName: indexName, value: prevTriggerValue})
+		}
 	}
 	return result, true
 }
@@ -1140,6 +1178,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		wcEvent := *event
 		setCachingObjects(&wcEvent, c.versioner)
 		event = &wcEvent
+		metrics.WatchDispatchEventNumWatchers.WithLabelValues(c.groupResource.String()).Observe(float64(len(c.watchersBuffer)))
 
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
@@ -1202,7 +1241,7 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 	// It is safe to call triggerValuesThreadUnsafe here, because at this
 	// point only this thread can access this event (we create a separate
 	// watchCacheEvent for every dispatch).
-	triggerValues, supported := c.triggerValuesThreadUnsafe(event)
+	triggerIndexes, supported := c.triggerIndexesThreadUnsafe(event)
 
 	c.Lock()
 	defer c.Unlock()
@@ -1249,8 +1288,8 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 
 	if supported {
 		// Iterate over watchers interested in the given values of the trigger.
-		for _, triggerValue := range triggerValues {
-			for _, watcher := range c.watchers.valueWatchers[triggerValue] {
+		for _, triggerIdx := range triggerIndexes {
+			for _, watcher := range c.watchers.valueWatchers[triggerIdx] {
 				c.watchersBuffer = append(c.watchersBuffer, watcher)
 			}
 		}
@@ -1328,7 +1367,7 @@ func (c *Cacher) Stop() {
 	c.stopWg.Wait()
 }
 
-func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerValue string, triggerSupported bool) func(bool) {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, triggerIdx triggerIndex, triggerSupported bool) func(bool) {
 	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
@@ -1338,7 +1377,7 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
 		// on a watcher multiple times.
-		c.watchers.deleteWatcher(index, scope, triggerValue, triggerSupported)
+		c.watchers.deleteWatcher(index, scope, triggerIdx, triggerSupported)
 		c.stopWatcherLocked(w)
 	}
 }
