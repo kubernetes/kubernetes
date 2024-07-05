@@ -1184,14 +1184,14 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 		},
 	}
 	failOnePod := func(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job) {
-		if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
-			t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodFailed, err)
+		if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
+			t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodFailed, err)
 		}
 	}
 	succeedOnePodAndScaleDown := func(ctx context.Context, clientSet clientset.Interface, jobObj *batchv1.Job) {
 		// mark one pod as succeeded
 		if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 0); err != nil {
-			t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+			t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
 		}
 		jobClient := clientSet.BatchV1().Jobs(jobObj.Namespace)
 		if _, err := updateJob(ctx, jobClient, jobObj.Name, func(j *batchv1.Job) {
@@ -1448,7 +1448,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					t.Fatalf("Failed to list Job Pods: %v", err)
 				}
 				if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, len(jobPods)); err != nil {
-					t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+					t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
 				}
 			}
 			validateJobStatus(ctx, t, clientSet, jobObj, test.wantTerminalStatus)
@@ -2262,16 +2262,14 @@ func TestManagedBy_UsingReservedJobFinalizers(t *testing.T) {
 		t.Fatalf("Error %v when marking the %q pod as succeeded", err, klog.KObj(podObj))
 	}
 
-	// Mark the job as finished so that the built-in controller receives the
+	// Trigger termination for the Job so that the built-in controller receives the
 	// UpdateJob event in reaction to each it would remove the pod's finalizer,
 	// if not for the custom managedBy field.
 	jobObj.Status.Conditions = append(jobObj.Status.Conditions, batchv1.JobCondition{
-		Type:   batchv1.JobComplete,
+		Type:   batchv1.JobSuccessCriteriaMet,
 		Status: v1.ConditionTrue,
 	})
 	jobObj.Status.StartTime = ptr.To(metav1.Now())
-	jobObj.Status.CompletionTime = ptr.To(metav1.Now())
-
 	if jobObj, err = clientSet.BatchV1().Jobs(jobObj.Namespace).UpdateStatus(ctx, jobObj, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Error %v when updating the job as finished %v", err, klog.KObj(jobObj))
 	}

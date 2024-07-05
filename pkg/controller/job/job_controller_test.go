@@ -1574,6 +1574,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	completedCond := newCondition(batch.JobComplete, v1.ConditionTrue, "", "", now)
 	succeededCond := newCondition(batch.JobSuccessCriteriaMet, v1.ConditionTrue, "", "", minuteAgo)
 	failedCond := newCondition(batch.JobFailed, v1.ConditionTrue, "", "", now)
+	failureTargetCond := newCondition(batch.JobFailureTarget, v1.ConditionTrue, "", "", now)
 	indexedCompletion := batch.IndexedCompletion
 	mockErr := errors.New("mock error")
 	cases := map[string]struct {
@@ -2181,17 +2182,18 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Failed: []types.UID{"a"},
 					},
+					Conditions: []batch.JobCondition{*failureTargetCond},
 				},
 			},
 			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().trackingFinalizer().Pod,
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
 			},
-			finishedCond:     failedCond,
-			wantRmFinalizers: 1,
+			finishedCond: failedCond,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					Failed:                  1,
+					Conditions:              []batch.JobCondition{*failureTargetCond},
 				},
 			},
 			wantFailedPodsMetric: 1,
@@ -2207,17 +2209,18 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Failed: []types.UID{"a"},
 					},
+					Conditions: []batch.JobCondition{*failureTargetCond},
 				},
 			},
 			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().trackingFinalizer().Pod,
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
 			},
-			finishedCond:     failedCond,
-			wantRmFinalizers: 1,
+			finishedCond: failedCond,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					Failed:                  1,
+					Conditions:              []batch.JobCondition{*failureTargetCond},
 				},
 			},
 			wantFailedPodsMetric: 1,
@@ -2232,22 +2235,125 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Failed: []types.UID{"a"},
 					},
+					Conditions: []batch.JobCondition{*failureTargetCond},
 				},
 			},
 			pods: []*v1.Pod{
-				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().trackingFinalizer().Pod,
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
 			},
-			finishedCond:     failedCond,
-			wantRmFinalizers: 1,
+			finishedCond: failedCond,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					Failed:                  1,
-					Conditions:              []batch.JobCondition{*failedCond},
+					Conditions:              []batch.JobCondition{*failureTargetCond},
+				},
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Failed:                  1,
+					Conditions:              []batch.JobCondition{*failureTargetCond, *failedCond},
 				},
 			},
 			wantFailedPodsMetric: 1,
 		},
+		"pod is terminating; JobSuccessCriteriaMet, but JobComplete condition is delayed; JobPodReplacementPolicy enabled": {
+			enableJobPodReplacementPolicy: true,
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](1),
+					Parallelism: ptr.To[int32](1),
+				},
+				Status: batch.JobStatus{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed:    []types.UID{"a"},
+						Succeeded: []types.UID{"b"},
+					},
+					Conditions: []batch.JobCondition{*succeededCond},
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
+			},
+			finishedCond: completedCond,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Succeeded:               1,
+					Failed:                  1,
+					Conditions:              []batch.JobCondition{*succeededCond},
+				},
+			},
+			wantFailedPodsMetric:    1,
+			wantSucceededPodsMetric: 1,
+		},
+		"pod is terminating; JobSuccessCriteriaMet, but JobComplete condition is delayed; JobManagedBy enabled": {
+			enableJobManagedBy: true,
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](1),
+					Parallelism: ptr.To[int32](1),
+				},
+				Status: batch.JobStatus{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed:    []types.UID{"a"},
+						Succeeded: []types.UID{"b"},
+					},
+					Conditions: []batch.JobCondition{*succeededCond},
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
+			},
+			finishedCond: completedCond,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Succeeded:               1,
+					Failed:                  1,
+					Conditions:              []batch.JobCondition{*succeededCond},
+				},
+			},
+			wantFailedPodsMetric:    1,
+			wantSucceededPodsMetric: 1,
+		},
+		"pod is terminating; JobSuccessCriteriaMet, JobComplete condition is not delayed; JobPodReplacementPolicy and JobManagedBy disabled": {
+			enableJobSuccessPolicy: true,
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](1),
+					Parallelism: ptr.To[int32](1),
+				},
+				Status: batch.JobStatus{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed:    []types.UID{"a"},
+						Succeeded: []types.UID{"b"},
+					},
+					Conditions: []batch.JobCondition{*succeededCond},
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodRunning).deletionTimestamp().Pod,
+			},
+			finishedCond: completedCond,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Succeeded:               1,
+					Failed:                  1,
+					Conditions:              []batch.JobCondition{*succeededCond},
+				},
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Succeeded:               1,
+					Failed:                  1,
+					Conditions:              []batch.JobCondition{*succeededCond, *completedCond},
+					CompletionTime:          ptr.To(metav1.NewTime(now)),
+				},
+			},
+			wantFailedPodsMetric:    1,
+			wantSucceededPodsMetric: 1,
+		},
+
 		"indexed job with a failed pod with delayed finalizer removal; the pod is not counted": {
 			enableJobBackoffLimitPerIndex: true,
 			job: batch.Job{
