@@ -927,6 +927,10 @@ func runTopologyManagerTests(f *framework.Framework) {
 		runTMScopeResourceAlignmentTestSuite(ctx, f, configMap, reservedSystemCPUs, policy, numaNodes, coreCount)
 	})
 
+	ginkgo.It("should fail if the tests run in CI", func(ctx context.Context) {
+		ginkgo.Fail("expected failure")
+	})
+
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if oldCfg != nil {
 			// restore kubelet config
