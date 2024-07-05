@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
@@ -684,11 +685,10 @@ func (test panicShouldNotRejectFutureRequest) runT(t *testing.T) {
 	// c) next request that follows should not be rejected
 	const (
 		userName                                              = "alice"
-		fsName                                                = "test-fs"
-		plName                                                = "test-pl"
 		serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
 	)
 
+	fsName, plName := newFSandPLNames()
 	apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
@@ -753,11 +753,10 @@ func (test requestTimesOutBeforeHandlerWrites) runT(t *testing.T) {
 	// underlying ResponseWriter object.
 	const (
 		userName                                              = "alice"
-		fsName                                                = "test-fs"
-		plName                                                = "test-pl"
 		serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
 	)
 
+	fsName, plName := newFSandPLNames()
 	apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
@@ -816,11 +815,10 @@ func (test handlerPanicsAfterRequestTimesOut) runT(t *testing.T) {
 	// b) then the inner hander of the request panics
 	const (
 		userName                                              = "alice"
-		fsName                                                = "test-fs"
-		plName                                                = "test-pl"
 		serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
 	)
 
+	fsName, plName := newFSandPLNames()
 	apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
@@ -884,11 +882,10 @@ func (test handlerWritesBeforeRequestTimesOut) runT(t *testing.T) {
 	// c) the request times out
 	const (
 		userName                                              = "alice"
-		fsName                                                = "test-fs"
-		plName                                                = "test-pl"
 		serverConcurrency, plConcurrencyShares, plConcurrency = 1, 1, 1
 	)
 
+	fsName, plName := newFSandPLNames()
 	apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, 0)
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
@@ -959,11 +956,10 @@ func (test enqueuedRequestTimingOut) runT(t *testing.T) {
 	// f) the first request eventually times out
 	const (
 		userName                                                           = "alice"
-		fsName                                                             = "test-fs"
-		plName                                                             = "test-pl"
 		serverConcurrency, plConcurrencyShares, plConcurrency, queueLength = 1, 1, 1, 1
 	)
 
+	fsName, plName := newFSandPLNames()
 	apfConfiguration := newConfiguration(fsName, plName, userName, plConcurrencyShares, queueLength)
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
@@ -1193,6 +1189,12 @@ func unsyncedInformers(status map[reflect.Type]bool) []string {
 	}
 
 	return names
+}
+
+func newFSandPLNames() (string, string) {
+	fsName := fmt.Sprintf("%s-%d", "test-fs", rand.IntnRange(100, 199))
+	plName := fmt.Sprintf("%s-%d", "test-pl", rand.IntnRange(200, 299))
+	return fsName, plName
 }
 
 func newConfiguration(fsName, plName, user string, concurrency int32, queueLength int32) []runtime.Object {
