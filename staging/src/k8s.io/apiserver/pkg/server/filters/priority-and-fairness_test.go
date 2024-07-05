@@ -693,27 +693,31 @@ func (test panicShouldNotRejectFutureRequest) runT(t *testing.T) {
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-	headerMatcher := headerMatcher{}
 	// we will raise a panic for the first request.
 	firstRequestPathPanic, secondRequestPathShouldWork := "/request/panic-as-designed", "/request/should-succeed-as-expected"
 	firstHandlerDone := errSender{who: firstRequestPathPanic, ch: make(chan error)}
 	secondHandlerDone := errSender{who: secondRequestPathShouldWork, ch: make(chan error)}
 	requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headerMatcher.inspect(t, w, fsName, plName)
 		switch {
 		case r.URL.Path == firstRequestPathPanic:
 			close(firstHandlerDone.ch)
 			panic(fmt.Errorf("request handler panic'd as designed - %#v", r.RequestURI))
 		case r.URL.Path == secondRequestPathShouldWork:
+			// a write to the delegated ResponseWriter is needed
+			// here, so the timeout handler copies the response
+			// headers written so far to the original (user
+			// facing) ResponseWriter object.
+			if _, err := w.Write([]byte("success")); err != nil {
+				t.Errorf("unexpected error from Write: %v", err)
+			}
 			close(secondHandlerDone.ch)
-
 		}
 	})
 
 	// NOTE: the server will enforce a 1m timeout on every incoming
 	//  request, and the client enforces a timeout of 2m.
 	handler := newHandlerChain(t, requestHandler, controller, userName, time.Minute)
-	server, client := newHTTP2ServerWithClient(handler)
+	server, client := newHTTP2ServerWithClient(handler, &apfNames{fsName: fsName, plName: plName})
 	defer server.Close()
 
 	// we send two requests synchronously, one at a time
@@ -761,13 +765,10 @@ func (test requestTimesOutBeforeHandlerWrites) runT(t *testing.T) {
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-	headerMatcher := headerMatcher{}
 	rquestTimesOutPath := "/request/time-out-as-designed"
 	reqHandlerCompleted := errSender{who: rquestTimesOutPath, ch: make(chan error)}
 	callerRoundTripDoneCh := make(chan struct{})
 	requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headerMatcher.inspect(t, w, fsName, plName)
-
 		if r.URL.Path == rquestTimesOutPath {
 			defer close(reqHandlerCompleted.ch)
 
@@ -779,7 +780,7 @@ func (test requestTimesOutBeforeHandlerWrites) runT(t *testing.T) {
 	// NOTE: the server will enforce a 5s timeout on every
 	//  incoming request, and the client enforces a timeout of 1m.
 	handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-	server, client := newHTTP2ServerWithClient(handler)
+	server, client := newHTTP2ServerWithClient(handler, &apfNames{fsName: fsName, plName: plName})
 	defer server.Close()
 
 	// send a request synchronously with a client timeout of 1m,  this minimizes the
@@ -823,13 +824,10 @@ func (test handlerPanicsAfterRequestTimesOut) runT(t *testing.T) {
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-	headerMatcher := headerMatcher{}
 	rquestTimesOutPath := "/request/time-out-as-designed"
 	reqHandlerErr := errSender{who: rquestTimesOutPath, ch: make(chan error)}
 	callerRoundTripDoneCh := make(chan struct{})
 	requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headerMatcher.inspect(t, w, fsName, plName)
-
 		if r.URL.Path == rquestTimesOutPath {
 			defer close(reqHandlerErr.ch)
 			<-callerRoundTripDoneCh
@@ -846,7 +844,7 @@ func (test handlerPanicsAfterRequestTimesOut) runT(t *testing.T) {
 	// NOTE: the server will enforce a 5s timeout on every
 	//  incoming request, and the client enforces a timeout of 1m.
 	handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-	server, client := newHTTP2ServerWithClient(handler)
+	server, client := newHTTP2ServerWithClient(handler, &apfNames{fsName: fsName, plName: plName})
 	defer server.Close()
 
 	// send a request synchronously with a client timeout of 1m, this minimizes the
@@ -890,13 +888,10 @@ func (test handlerWritesBeforeRequestTimesOut) runT(t *testing.T) {
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-	headerMatcher := headerMatcher{}
 	rquestTimesOutPath := "/request/time-out-as-designed"
 	reqHandlerErr := errSender{who: rquestTimesOutPath, ch: make(chan error, 1)}
 	callerRoundTripDoneCh := make(chan struct{})
 	requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headerMatcher.inspect(t, w, fsName, plName)
-
 		if r.URL.Path == rquestTimesOutPath {
 			defer close(reqHandlerErr.ch)
 
@@ -917,7 +912,7 @@ func (test handlerWritesBeforeRequestTimesOut) runT(t *testing.T) {
 	// NOTE: the server will enforce a 5s timeout on every
 	//  incoming request, and the client enforces a timeout of 1m.
 	handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-	server, client := newHTTP2ServerWithClient(handler)
+	server, client := newHTTP2ServerWithClient(handler, &apfNames{fsName: fsName, plName: plName})
 	defer server.Close()
 
 	// send a request synchronously with a client timeout of 1m, this minimizes the
@@ -964,13 +959,11 @@ func (test enqueuedRequestTimingOut) runT(t *testing.T) {
 	stopCh := make(chan struct{})
 	controller, controllerCompletedCh := startAPFController(t, stopCh, apfConfiguration, serverConcurrency, plName, plConcurrency)
 
-	headerMatcher := headerMatcher{}
 	firstRequestTimesOutPath, secondRequestEnqueuedPath := "/request/first/time-out-as-designed", "/request/second/enqueued-as-designed"
 	firstReqHandlerErr := errSender{who: firstRequestTimesOutPath, ch: make(chan error, 1)}
 	firstReqInProgressCh := make(chan struct{})
 	firstReqRoundTripDoneCh, secondReqRoundTripDoneCh := make(chan struct{}), make(chan struct{})
 	requestHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		headerMatcher.inspect(t, w, fsName, plName)
 		switch {
 		case r.URL.Path == firstRequestTimesOutPath:
 			defer close(firstReqHandlerErr.ch)
@@ -996,7 +989,7 @@ func (test enqueuedRequestTimingOut) runT(t *testing.T) {
 	// NOTE: the server will enforce a 5s timeout on every
 	//  incoming request, and the client enforces a timeout of 1m.
 	handler := newHandlerChain(t, requestHandler, controller, userName, 5*time.Second)
-	server, client := newHTTP2ServerWithClient(handler)
+	server, client := newHTTP2ServerWithClient(handler, &apfNames{fsName: fsName, plName: plName})
 	defer server.Close()
 
 	// This test involves two requests sent to the same priority level, which has 1 queue and
@@ -1109,30 +1102,45 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 }
 
 // returns a started http2 server, with a client function to send request to the server.
-func newHTTP2ServerWithClient(handler http.Handler) (*httptest.Server, *client) {
+func newHTTP2ServerWithClient(handler http.Handler, wantAPFNames *apfNames) (*httptest.Server, *client) {
 	server := httptest.NewUnstartedServer(handler)
 	server.EnableHTTP2 = true
 	server.StartTLS()
-	return server, &client{server: server}
+	return server, &client{server: server, wantAPFNames: wantAPFNames}
 }
 
-type headerMatcher struct{}
+// placeholder for the expected prioritylevel and flowschema object names
+type apfNames struct {
+	fsName, plName string
+}
+
+type wantAPFResponseHeaders struct{}
 
 // verifies that the expected flow schema and priority level UIDs are attached to the header.
-func (m *headerMatcher) inspect(t *testing.T, w http.ResponseWriter, expectedFS, expectedPL string) {
+func (want wantAPFResponseHeaders) verify(t *testing.T, h holder) {
 	t.Helper()
+
+	// we can't pre-populate the names, since the object names are generated
+	// when the test runs, so the test is expected to attach the generated names
+	// here so we can compare against the response headers
+	if h.wantAPFNames == nil {
+		t.Fatalf("wrong test setup - need the priority level and flowschema names: %#v", h)
+	}
+	expectedFS, expectedPL := h.wantAPFNames.fsName, h.wantAPFNames.plName
+
 	err := func() error {
-		if w == nil {
+		got := h.resp
+		if got == nil {
 			return fmt.Errorf("expected a non nil HTTP response")
 		}
 
 		key := flowcontrol.ResponseHeaderMatchedFlowSchemaUID
-		if value := w.Header().Get(key); expectedFS != value {
+		if value := got.Header.Get(key); expectedFS != value {
 			return fmt.Errorf("expected HTTP header %s to have value %q, but got: %q", key, expectedFS, value)
 		}
 
 		key = flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID
-		if value := w.Header().Get(key); expectedPL != value {
+		if value := got.Header.Get(key); expectedPL != value {
 			return fmt.Errorf("expected HTTP header %s to have value %q, but got %q", key, expectedPL, value)
 		}
 		return nil
@@ -1459,7 +1467,10 @@ func TestPriorityAndFairnessWithRequestDeadline(t *testing.T) {
 						a: wantStreamResetErr,
 						b: clientMustNotTimeout{},
 					},
-					secondReqVerifier: wantHTTPStatusOK,
+					secondReqVerifier: wantBoth{
+						a: wantHTTPStatusOK,
+						b: wantAPFResponseHeaders{},
+					},
 				},
 			},
 		},
@@ -1506,7 +1517,10 @@ func TestPriorityAndFairnessWithRequestDeadline(t *testing.T) {
 					},
 					secondReqVerifier: wantBoth{
 						a: wantHTTPStatusTooManyRequests,
-						b: clientMustNotTimeout{},
+						b: wantBoth{
+							a: clientMustNotTimeout{},
+							b: wantAPFResponseHeaders{},
+						},
 					},
 				},
 			},
@@ -1572,6 +1586,9 @@ type holder struct {
 	req  *http.Request
 	resp *http.Response
 	err  error
+
+	// the expected flowschema and priority level names are stored here
+	wantAPFNames *apfNames
 }
 
 // the test uses this abstraction to assert on an expected error, or a response
@@ -1669,7 +1686,8 @@ func (clientMustNotTimeout) verify(t *testing.T, got holder) {
 }
 
 type client struct {
-	server *httptest.Server
+	server       *httptest.Server
+	wantAPFNames *apfNames
 }
 
 func (c *client) newRequest(t *testing.T, path string, params string) *http.Request {
@@ -1692,7 +1710,7 @@ func (c *client) send(t *testing.T, req *http.Request, timeout time.Duration) ho
 	resp, err := client.Do(req)
 	t.Logf("At %s, RoundTrip of request: %q has completed", time.Now().Format(timeFmt), req.URL)
 
-	return holder{req: req, resp: resp, err: err}
+	return holder{req: req, resp: resp, err: err, wantAPFNames: c.wantAPFNames}
 }
 
 // this channel abstraction is used by a test goroutine to wait for its child
