@@ -32,9 +32,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -53,7 +56,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	cgroupConfig := &CgroupConfig{
 		Name: cm.cgroupRoot,
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
-		ResourceParameters: getCgroupConfig(nodeAllocatable, false),
+		ResourceParameters: cm.getCgroupConfig(nodeAllocatable, false),
 	}
 	if cm.cgroupManager.Exists(cgroupConfig.Name) {
 		return nil
@@ -81,7 +84,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 	cgroupConfig := &CgroupConfig{
 		Name:               cm.cgroupRoot,
-		ResourceParameters: getCgroupConfig(nodeAllocatable, false),
+		ResourceParameters: cm.getCgroupConfig(nodeAllocatable, false),
 	}
 
 	// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
@@ -110,7 +113,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		klog.V(2).InfoS("Enforcing system reserved on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved, false); err != nil {
+		if err := cm.enforceExistingCgroup(nc.SystemReservedCgroupName, nc.SystemReserved, false); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -119,7 +122,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		klog.V(2).InfoS("Enforcing kube reserved on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, false); err != nil {
+		if err := cm.enforceExistingCgroup(nc.KubeReservedCgroupName, nc.KubeReserved, false); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -129,7 +132,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedCompressibleEnforcementKey) {
 		klog.V(2).InfoS("Enforcing system reserved compressible on cgroup", "cgroupName", nc.SystemReservedCgroupName, "limits", nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved, true); err != nil {
+		if err := cm.enforceExistingCgroup(nc.SystemReservedCgroupName, nc.SystemReserved, true); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Compressible Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -139,7 +142,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedCompressibleEnforcementKey) {
 		klog.V(2).InfoS("Enforcing kube reserved compressible on cgroup", "cgroupName", nc.KubeReservedCgroupName, "limits", nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, true); err != nil {
+		if err := cm.enforceExistingCgroup(nc.KubeReservedCgroupName, nc.KubeReserved, true); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Compressible Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return errors.New(message)
@@ -150,9 +153,9 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList, compressibleResources bool) error {
-	rp := getCgroupConfig(rl, compressibleResources)
-
+func (cm *containerManagerImpl) enforceExistingCgroup(cNameStr string, rl v1.ResourceList, compressibleResources bool) error {
+	cName := cm.cgroupManager.CgroupName(cNameStr)
+	rp := cm.getCgroupConfig(rl, compressibleResources)
 	if rp == nil {
 		return fmt.Errorf("%q cgroup is not configured properly", cName)
 	}
@@ -173,17 +176,17 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		ResourceParameters: rp,
 	}
 	klog.V(4).InfoS("Enforcing limits on cgroup", "cgroupName", cName, "cpuShares", cgroupConfig.ResourceParameters.CPUShares, "memory", cgroupConfig.ResourceParameters.Memory, "pidsLimit", cgroupConfig.ResourceParameters.PidsLimit)
-	if err := cgroupManager.Validate(cgroupConfig.Name); err != nil {
+	if err := cm.cgroupManager.Validate(cgroupConfig.Name); err != nil {
 		return err
 	}
-	if err := cgroupManager.Update(cgroupConfig); err != nil {
+	if err := cm.cgroupManager.Update(cgroupConfig); err != nil {
 		return err
 	}
 	return nil
 }
 
 // getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
-func getCgroupConfig(rl v1.ResourceList, compressibleResourcesOnly bool) *ResourceConfig {
+func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList, compressibleResourcesOnly bool) *ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
 		return nil
@@ -217,7 +220,35 @@ func getCgroupConfig(rl v1.ResourceList, compressibleResourcesOnly bool) *Resour
 		rc.HugePageLimit = HugePageLimits(rl)
 	}
 
+	// In the case of a None policy, cgroupv2 and systemd cgroup manager, we must make sure systemd is aware of the cpuset cgroup.
+	// By default, systemd will not create it, as we've not chosen to delegate it, and we haven't included it in the Apply() request.
+	// However, this causes a bug where kubelet restarts unnecessarily (cpuset cgroup is created in the cgroupfs, but systemd
+	// doesn't know about it and deletes it, and then kubelet doesn't continue because the cgroup isn't configured as expected).
+	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
+	// and this is sufficient.
+	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
+	if cm.NodeConfig.CPUManagerPolicy == string(cpumanager.PolicyNone) {
+		if cm.allCPUs.IsEmpty() {
+			cm.allCPUs = cm.getAllCPUs()
+		}
+		rc.CPUSet = cm.allCPUs
+	}
+
 	return &rc
+}
+
+func (cm *containerManagerImpl) getAllCPUs() cpuset.CPUSet {
+	machineInfo, err := cm.cadvisorInterface.MachineInfo()
+	if err != nil {
+		klog.V(4).InfoS("Failed to get machine info to get default cpuset", "error", err)
+		return cpuset.CPUSet{}
+	}
+	topo, err := topology.Discover(machineInfo)
+	if err != nil {
+		klog.V(4).InfoS("Failed to get topology info to get default cpuset", "error", err)
+		return cpuset.CPUSet{}
+	}
+	return topo.CPUDetails.CPUs()
 }
 
 // GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
