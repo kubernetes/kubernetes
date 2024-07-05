@@ -2157,6 +2157,51 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of Complete=True without SuccessCriteriaMet=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime:      &now,
+					CompletionTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobComplete,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
+			},
+		},
+		"invalid addition of Failed=True without FailureTarget=True": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
 		"completionTime can be removed to fix still running job": {
@@ -2179,11 +2224,23 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobFailed,
 							Status: api.ConditionTrue,
@@ -2199,12 +2256,24 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
 					CompletionTime: &now,
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobComplete,
 							Status: api.ConditionTrue,
@@ -2220,6 +2289,16 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Active:    1,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2228,6 +2307,10 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 					CompletionTime: &now,
 					Active:         1,
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobComplete,
 							Status: api.ConditionTrue,
@@ -2239,10 +2322,20 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 			},
 		},
-		"transition to Failed condition with terminating>0 and ready>0": {
+		"invalid attempt to transition to Failed=True with terminating > 0": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+					Terminating: ptr.To[int32](1),
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2250,19 +2343,73 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 					StartTime: &now,
 					Conditions: []batch.JobCondition{
 						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+						{
 							Type:   batch.JobFailed,
 							Status: api.ConditionTrue,
 						},
 					},
 					Terminating: ptr.To[int32](1),
-					Ready:       ptr.To[int32](1),
 				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.terminating"},
+			},
+		},
+		"invalid attempt to transition to Failed=True with active > 0": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+					Active: 1,
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   batch.JobFailed,
+							Status: api.ConditionTrue,
+						},
+					},
+					Active: 1,
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.active"},
 			},
 		},
 		"invalid attempt to transition to Failed=True with uncountedTerminatedPods.Failed>0": {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2272,6 +2419,10 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 						Failed: []types.UID{"a"},
 					},
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobFailureTarget,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobFailed,
 							Status: api.ConditionTrue,
@@ -2364,6 +2515,18 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Succeeded: []types.UID{"a"},
+					},
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -2374,6 +2537,10 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 						Succeeded: []types.UID{"a"},
 					},
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobComplete,
 							Status: api.ConditionTrue,
@@ -2389,12 +2556,25 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 			enableJobManagedBy: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
+				Status: batch.JobStatus{
+					StartTime: &now,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
 			},
 			newJob: &batch.Job{
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
 					StartTime: &now,
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobComplete,
 							Status: api.ConditionTrue,
@@ -2500,6 +2680,12 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				ObjectMeta: validObjectMeta,
 				Status: batch.JobStatus{
 					StartTime: &nowPlusMinute,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
 				},
 			},
 			newJob: &batch.Job{
@@ -2508,6 +2694,10 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 					StartTime:      &nowPlusMinute,
 					CompletionTime: &now,
 					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
 						{
 							Type:   batch.JobComplete,
 							Status: api.ConditionTrue,
@@ -2941,6 +3131,7 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 				},
 			},
 			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 				{Type: field.ErrorTypeInvalid, Field: "status.conditions"},
 			},
 		},
@@ -3438,6 +3629,28 @@ func TestStatusStrategy_ValidateUpdate(t *testing.T) {
 						Status: api.ConditionTrue,
 					}},
 				},
+			},
+		},
+		"invalid attempt to set more ready pods than active": {
+			enableJobManagedBy: true,
+			job: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+			},
+			newJob: &batch.Job{
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Completions: ptr.To[int32](5),
+				},
+				Status: batch.JobStatus{
+					Active: 1,
+					Ready:  ptr.To[int32](2),
+				},
+			},
+			wantErrs: field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "status.ready"},
 			},
 		},
 	}
