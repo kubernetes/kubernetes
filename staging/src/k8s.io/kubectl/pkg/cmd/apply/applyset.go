@@ -191,7 +191,7 @@ func (a ApplySet) Validate(ctx context.Context, client dynamic.Interface) error 
 		}
 		parentRefResourceIgnoreVersion := a.parentRef.Resource.GroupResource().WithVersion("")
 		if !permittedCRParents.Has(parentRefResourceIgnoreVersion) {
-			errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent", a.parentRef.Resource))
+			errors = append(errors, fmt.Errorf("resource %q is not permitted as an ApplySet parent (CRD needs %q label)", a.parentRef.Resource, ApplysetParentCRDLabel))
 		}
 	}
 	return utilerrors.NewAggregate(errors)

@@ -2315,19 +2315,19 @@ func TestApplySetParentValidation(t *testing.T) {
 		"other namespaced builtin parents types are correctly parsed but invalid": {
 			applysetFlag:     "deployments.apps/thename",
 			expectParentKind: "Deployment",
-			expectErr:        "[namespace is required to use namespace-scoped ApplySet, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent]",
+			expectErr:        "[namespace is required to use namespace-scoped ApplySet, resource \"apps/v1, Resource=deployments\" is not permitted as an ApplySet parent (CRD needs \"applyset.kubernetes.io/is-parent-type\" label)]",
 		},
 		"namespaced builtin parents with multi-segment groups are correctly parsed but invalid": {
 			applysetFlag:     "priorityclasses.scheduling.k8s.io/thename",
 			expectParentKind: "PriorityClass",
-			expectErr:        "resource \"scheduling.k8s.io/v1alpha1, Resource=priorityclasses\" is not permitted as an ApplySet parent",
+			expectErr:        "resource \"scheduling.k8s.io/v1alpha1, Resource=priorityclasses\" is not permitted as an ApplySet parent (CRD needs \"applyset.kubernetes.io/is-parent-type\" label)",
 		},
 		"non-namespaced builtin types are correctly parsed but invalid": {
 			applysetFlag:        "namespaces/thename",
 			expectParentKind:    "Namespace",
 			namespaceFlag:       "somenamespace",
 			expectBlankParentNs: true,
-			expectErr:           "resource \"/v1, Resource=namespaces\" is not permitted as an ApplySet parent",
+			expectErr:           "resource \"/v1, Resource=namespaces\" is not permitted as an ApplySet parent (CRD needs \"applyset.kubernetes.io/is-parent-type\" label)",
 		},
 		"parent namespace should use the value of the namespace flag": {
 			applysetFlag:     "mysecret",
