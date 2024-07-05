@@ -180,6 +180,10 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"ClientWithList":                                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithList"}),
 		"ClientWithApply":                                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithApply"}),
 		"ClientWithListAndApply":                            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithListAndApply"}),
+		"NewClient":                                         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClient"}),
+		"NewClientWithApply":                                c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithApply"}),
+		"NewClientWithList":                                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithList"}),
+		"NewClientWithListAndApply":                         c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewClientWithListAndApply"}),
 	}
 
 	if generateApply {
@@ -472,7 +476,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClient[*$.resultType|raw$](
+			$.NewClient|raw$[*$.resultType|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -485,7 +489,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithApply[*$.resultType|raw$, *$.inputApplyConfig|raw$](
+			$.NewClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -498,7 +502,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithList[*$.resultType|raw$, *$.resultType|raw$List](
+			$.NewClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -512,7 +516,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithListAndApply[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
+			$.NewClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -526,7 +530,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClient[*$.resultType|raw$](
+			$.NewClient|raw$[*$.resultType|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -539,7 +543,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithApply[*$.resultType|raw$, *$.inputApplyConfig|raw$](
+			$.NewClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -552,7 +556,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithList[*$.resultType|raw$, *$.resultType|raw$List](
+			$.NewClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
@@ -566,7 +570,7 @@ var newStruct = []string{
 	// new$.type|publicPlural$ returns a $.type|publicPlural$
 	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
 		return &$.type|privatePlural${
-			gentype.NewClientWithListAndApply[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
+			$.NewClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
 				"$.type|resource$",
 				c.RESTClient(),
 				$.schemeParameterCodec|raw$,
