@@ -103,6 +103,7 @@ func ToJSON(data []byte) ([]byte, error) {
 // body to JSON, then unmarshals the JSON.
 type YAMLToJSONDecoder struct {
 	reader Reader
+	strict bool
 }
 
 // NewYAMLToJSONDecoder decodes YAML documents from the provided
@@ -116,6 +117,15 @@ func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
 	}
 }
 
+// NewStrictYAMLToJSONDecoder same as NewYAMLToJSONDecoder but strict mode
+func NewStrictYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
+	reader := bufio.NewReader(r)
+	return &YAMLToJSONDecoder{
+		reader: NewYAMLReader(reader),
+		strict: true,
+	}
+}
+
 // Decode reads a YAML document as JSON from the stream or returns
 // an error. The decoding rules match json.Unmarshal, not
 // yaml.Unmarshal.
@@ -126,7 +136,12 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	}
 
 	if len(bytes) != 0 {
-		err := yaml.Unmarshal(bytes, into)
+		var err error
+		if d.strict {
+			err = yaml.UnmarshalStrict(bytes, into)
+		} else {
+			err = yaml.Unmarshal(bytes, into)
+		}
 		if err != nil {
 			return YAMLSyntaxError{err}
 		}
@@ -239,6 +254,7 @@ type decoder interface {
 type YAMLOrJSONDecoder struct {
 	r          io.Reader
 	bufferSize int
+	strict     bool
 
 	decoder decoder
 }
@@ -260,15 +276,28 @@ func (e YAMLSyntaxError) Error() string {
 	return e.err.Error()
 }
 
+type decoderOption func(jsonDecoder *YAMLOrJSONDecoder)
+
+// WithStrict returns an option that will set strict mode
+func WithStrict() decoderOption {
+	return func(d *YAMLOrJSONDecoder) {
+		d.strict = true
+	}
+}
+
 // NewYAMLOrJSONDecoder returns a decoder that will process YAML documents
 // or JSON documents from the given reader as a stream. bufferSize determines
 // how far into the stream the decoder will look to figure out whether this
 // is a JSON stream (has whitespace followed by an open brace).
-func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
-	return &YAMLOrJSONDecoder{
+func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int, opts ...decoderOption) *YAMLOrJSONDecoder {
+	d := &YAMLOrJSONDecoder{
 		r:          r,
 		bufferSize: bufferSize,
 	}
+	for _, opt := range opts {
+		opt(d)
+	}
+	return d
 }
 
 // Decode unmarshals the next object from the underlying stream into the
@@ -279,7 +308,11 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		if isJSON {
 			d.decoder = json.NewDecoder(buffer)
 		} else {
-			d.decoder = NewYAMLToJSONDecoder(buffer)
+			if d.strict {
+				d.decoder = NewStrictYAMLToJSONDecoder(buffer)
+			} else {
+				d.decoder = NewYAMLToJSONDecoder(buffer)
+			}
 		}
 	}
 	err := d.decoder.Decode(into)

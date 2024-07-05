@@ -49,6 +49,6 @@ func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
 		return err
 	}
 	sv := NewStreamVisitor(
-		bytes.NewReader(v.yml), v.mapper, v.dirPath, v.schema)
+		bytes.NewReader(v.yml), v.mapper, v.dirPath, v.schema, WithStrictStreamVisitor())
 	return sv.Visit(fn)
 }
