@@ -27,6 +27,8 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -180,13 +182,14 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.reconciler = endpointslicerec.NewReconciler(
 		c.client,
-		c.nodeLister,
-		c.maxEndpointsPerSlice,
 		c.endpointSliceTracker,
-		c.topologyCache,
 		c.eventRecorder,
 		controllerName,
-		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
+		c.maxEndpointsPerSlice,
+		endpointslicerec.WithTopologyCache(c.topologyCache),
+		endpointslicerec.WithTrafficDistribution(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
+		endpointslicerec.WithPlaceholder(true),
+		endpointslicerec.WithOwnershipEnforced(true),
 	)
 
 	return c
@@ -426,7 +429,37 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 	lastChangeTriggerTime := c.triggerTimeTracker.
 		ComputeEndpointLastChangeTriggerTime(namespace, service, pods)
 
-	err = c.reconciler.Reconcile(logger, service, pods, endpointSlices, lastChangeTriggerTime)
+	errs := []error{}
+
+	desiredEndpointsByAddrTypePort, supportedAddressesTypes, err := endpointslicerec.DesiredEndpointSlicesFromServicePods(logger, pods, service, c.nodeLister)
+	if err != nil {
+		errs = append(errs, err)
+		if desiredEndpointsByAddrTypePort == nil && supportedAddressesTypes == nil {
+			c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
+				"Error listing desired Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
+			return err
+		}
+	}
+
+	labelsFromService := endpointslicerec.LabelsFromService{Service: service}
+
+	runtimeObject := service.DeepCopyObject()
+	runtimeObject.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Service"})
+	err = c.reconciler.Reconcile(
+		logger,
+		runtimeObject,
+		service,
+		desiredEndpointsByAddrTypePort,
+		endpointSlices,
+		supportedAddressesTypes,
+		service.Spec.TrafficDistribution,
+		labelsFromService.SetLabels,
+		lastChangeTriggerTime,
+	)
+	if err != nil {
+		errs = append(errs, err)
+		err = utilerrors.NewAggregate(errs)
+	}
 	if err != nil {
 		c.eventRecorder.Eventf(service, v1.EventTypeWarning, "FailedToUpdateEndpointSlices",
 			"Error updating Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
