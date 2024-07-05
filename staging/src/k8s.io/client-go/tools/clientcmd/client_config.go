@@ -243,10 +243,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		}
 		mergo.Merge(clientConfig, userAuthPartialConfig, mergo.WithOverride)
 
-		serverAuthPartialConfig, err := getServerIdentificationPartialConfig(configAuthInfo, configClusterInfo)
-		if err != nil {
-			return nil, err
-		}
+		serverAuthPartialConfig := getServerIdentificationPartialConfig(configClusterInfo)
 		mergo.Merge(clientConfig, serverAuthPartialConfig, mergo.WithOverride)
 	}
 
@@ -254,32 +251,23 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 }
 
 // clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
-// both, so we have to split the objects and merge them separately
-// we want this order of precedence for the server identification
-// 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  load the ~/.kubernetes_auth file as a default
-func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, configClusterInfo clientcmdapi.Cluster) (*restclient.Config, error) {
-	mergedConfig := &restclient.Config{}
+// both, so we have to split the objects and merge them separately.
 
-	// configClusterInfo holds the information identify the server provided by .kubeconfig
+// getServerIdentificationPartialConfig extracts server identification information from configClusterInfo
+// (the final result of command line flags and merged .kubeconfig files).
+func getServerIdentificationPartialConfig(configClusterInfo clientcmdapi.Cluster) *restclient.Config {
 	configClientConfig := &restclient.Config{}
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
 	configClientConfig.ServerName = configClusterInfo.TLSServerName
-	mergo.Merge(mergedConfig, configClientConfig, mergo.WithOverride)
 
-	return mergedConfig, nil
+	return configClientConfig
 }
 
-// clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
-// both, so we have to split the objects and merge them separately
-// we want this order of precedence for user identification
-// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
-// 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  if there is not enough information to identify the user, load try the ~/.kubernetes_auth file
-// 4.  if there is not enough information to identify the user, prompt if possible
+// getUserIdentificationPartialConfig extracts user identification information from configAuthInfo
+// (the final result of command line flags and merged .kubeconfig files);
+// if the information available there is insufficient, it prompts (if possible) for additional information.
 func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader, persistAuthConfig restclient.AuthProviderConfigPersister, configClusterInfo clientcmdapi.Cluster) (*restclient.Config, error) {
 	mergedConfig := &restclient.Config{}
 
