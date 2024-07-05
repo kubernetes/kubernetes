@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,6 +45,8 @@ import (
 // unstructured objects produced by both encodings must be identical and be themselves
 // roundtrippable to JSON and CBOR.
 func RoundtripToUnstructured(t *testing.T, scheme *runtime.Scheme, funcs fuzzer.FuzzerFuncs, skipped sets.Set[schema.GroupVersionKind]) {
+	funcs = fuzzer.MergeFuzzerFuncs(metafuzzer.Funcs, funcs)
+
 	codecs := serializer.NewCodecFactory(scheme)
 
 	seed := int64(time.Now().Nanosecond())
@@ -80,21 +83,26 @@ func RoundtripToUnstructured(t *testing.T, scheme *runtime.Scheme, funcs fuzzer.
 			fuzzer := fuzzer.FuzzerFor(funcs, rand.NewSource(seed), codecs)
 
 			for i := 0; i < 50; i++ {
-				// We do fuzzing on the internal version of the object, and only then
-				// convert to the external version. This is because custom fuzzing
-				// function are only supported for internal objects.
-				internalObj, err := scheme.New(schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}.WithKind(gvk.Kind))
-				if err != nil {
-					t.Fatalf("couldn't create internal object %v: %v", gvk.Kind, err)
-				}
-				fuzzer.Fuzz(internalObj)
-
 				item, err := scheme.New(gvk)
 				if err != nil {
 					t.Fatalf("couldn't create external object %v: %v", gvk.Kind, err)
 				}
-				if err := scheme.Convert(internalObj, item, nil); err != nil {
-					t.Fatalf("conversion for %v failed: %v", gvk.Kind, err)
+
+				// If possible, we do fuzzing on the internal version of the object,
+				// and only then convert to the external version. This is because
+				// custom fuzzing function are only supported for internal objects.
+				internalObj, err := scheme.New(schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}.WithKind(gvk.Kind))
+				if runtime.IsNotRegisteredError(err) {
+					// No internal version for this kind, fuzz external version directly.
+					fuzzer.Fuzz(item)
+				} else if err != nil {
+					t.Fatalf("couldn't create internal object %v: %v", gvk.Kind, err)
+				} else {
+					fuzzer.Fuzz(internalObj)
+
+					if err := scheme.Convert(internalObj, item, nil); err != nil {
+						t.Fatalf("conversion for %v failed: %v", gvk.Kind, err)
+					}
 				}
 
 				// Decoding into Unstructured requires that apiVersion and kind be
