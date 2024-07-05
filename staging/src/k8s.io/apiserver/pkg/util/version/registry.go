@@ -135,8 +135,8 @@ func NewComponentGlobalsRegistry() *componentGlobalsRegistry {
 }
 
 func (r *componentGlobalsRegistry) Reset() {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	r.componentGlobals = make(map[string]*ComponentGlobals)
 	r.emulationVersionConfig = nil
 	r.featureGatesConfig = nil
