@@ -1,6 +1,8 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.22
+go 1.22.1
+
+toolchain go1.22.2
 
 require (
 	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975
@@ -11,7 +13,7 @@ require (
 	github.com/vektra/mockery/v2 v2.40.3
 	go.uber.org/automaxprocs v1.5.2
 	gotest.tools/gotestsum v1.6.4
-	honnef.co/go/tools v0.5.0-0.dev.0.20240624124555-dec278f2f0d9
+	honnef.co/go/tools v0.5.0-rc.1
 	sigs.k8s.io/logtools v0.8.1
 )
 
