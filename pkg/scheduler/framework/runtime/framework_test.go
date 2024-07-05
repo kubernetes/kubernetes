@@ -1531,7 +1531,6 @@ func TestPreFilterPlugins(t *testing.T) {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
 		state := framework.NewCycleState()
-
 		f.RunPreFilterPlugins(ctx, state, nil)
 		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
 		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
@@ -1721,7 +1720,7 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			result, status := f.RunPreFilterPlugins(ctx, state, nil)
+			result, status, _ := f.RunPreFilterPlugins(ctx, state, nil)
 			if d := cmp.Diff(result, tt.wantPreFilterResult); d != "" {
 				t.Errorf("wrong status. got: %v, want: %v, diff: %s", result, tt.wantPreFilterResult, d)
 			}
