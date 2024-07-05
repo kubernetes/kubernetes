@@ -728,6 +728,258 @@ done
 			return false, nil
 		}, 1*time.Minute, framework.Poll).ShouldNot(gomega.BeTrueBecause("should not see liveness probes"))
 	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, before sending header
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly before sending a header.
+		             Disconnection befere receiving a header is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that is disconnected unexpectedly before sending a header", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/disconnect-headers", 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, while sending a body, normal response
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly while sending a body.
+		             Disconnection while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that is disconnected unexpectedly (normal response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/disconnect-body?code=200", 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, while sending a body, error response
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly while sending a body.
+		             Disconnection while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that is disconnected unexpectedly (error response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/disconnect-body?code=500", 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, before sending a header
+		Description: A Pod is created with liveness probe that hangs up before sending a header. This causes timeout.
+		             Timeout before receiving a header is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that hangs up before sending a header", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/sleep-headers/?time=30", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, while sending a body, normal response
+		Description: A Pod is created with liveness probe that hangs up while sending a body. This causes timeout.
+		             Timeout while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that hangs up while sending a body (normal response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/sleep-body?time=30&code=200", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, while sending a body, error response
+		Description: A Pod is created with liveness probe that hangs up while sending body. This causes timeout.
+		             Timeout while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that hangs up while sending a body (error response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/sleep-body?time=30&code=500", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, after sending a large body (>10KB), normal response
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly after it sent a more than 10KB body.
+		             The body is truncated and the pod is not restarted because of the normal response code.
+	*/
+	ginkgo.It("should *not* be restarted with a liveness probe that is disconnected unexpectedly after sending a large body (normal response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/disconnect-body?size=15&code=200", 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, after sending a large body (>10KB), error response
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly after it sent a more than 10KB body.
+		             The body is truncated and the pod is restarted because of the error response code.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that is disconnected unexpectedly after sending a large body (error response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/disconnect-body?size=15&code=500", 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, after sending a large body (>10KB), normal response
+		Description: A Pod is created with liveness probe that hangs up after it sent a more than 10KB body.
+		             The body is truncated and the pod is not restarted because of the normal response code.
+	*/
+	ginkgo.It("should *not* be restarted with a liveness probe that hangs up after sending a large body (normal response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/sleep-body?time=30&size=15&code=200", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, after sending a large body (>10KB), error response
+		Description: A Pod is created with liveness probe that hangs up after it sent a more than 10KB body.
+		             The body is truncated and the pod is restarted because of the error response code.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that hangs up after sending a large body (error response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/sleep?time=30&size=15&code=500", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, disconnection, before sending a header, redirected
+		Description: A Pod is created with liveness probe that is disconnected unexpectedly before sending a header after once redirects.
+		             Disconnection befere receiving a header is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that is disconnected unexpectedly before sending a header after redirected", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/redirect?loc="+url.QueryEscape("/disconnect-headers"), 8080),
+			InitialDelaySeconds: 5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, hangup, before sending a header, redirected
+		Description: A Pod is created with liveness probe that hangs up before sending a header after once redirects.
+		             This causes timeout. Timeout befere receiving a header is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that hangs up after redirected", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/redirect?loc="+url.QueryEscape("/sleep-headers?time=30"), 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, slow response, normal response
+		Description: A Pod is created with liveness probe that sends a body slowly. This causes timeout.
+		             Timeout while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that responds slowly (normal response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/slow-response?size=9&interval=1&code=200", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, slow response, error response
+		Description: A Pod is created with liveness probe that sends a body slowly. This causes timeout.
+		             Timeout while receiving a body is treated as a failure, which triggers restart.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that responds slowly (error response)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/slow-response?size=9&interval=1&code=500", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      5,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, slow response, normal response, large body (10KB), truncated within timeout
+		Description: A Pod is created with liveness probe that sends a large body slowly. 10KB data is recevied within timeout.
+		             The body is truncated before timeout and the pod is not restarted because of the normal response code.
+	*/
+	ginkgo.It("should *not* be restarted with a liveness probe that responds slowly with a large body (normal response, trancated within timeout)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/slow-response?size=15&interval=1&code=200", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      12,
+			PeriodSeconds:       15,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
+		Testname: Pod http liveness probe with failure, slow response, error response, large body (10KB), truncated within timeout
+		Description: A Pod is created with liveness probe that sends a large body slowly. 10KB data is recevied with in timeout.
+		             The body is truncated before timeout and the pod is restarted because of the error response code.
+	*/
+	ginkgo.It("should be restarted with a liveness probe that responds slowly with a large body (error response, trancated within timeout)", func(ctx context.Context) {
+		livenessProbe := &v1.Probe{
+			ProbeHandler:        httpGetHandler("/slow-response?size=15&interval=1&code=500", 8080),
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      12,
+			PeriodSeconds:       15,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(f.Namespace.Name, nil, livenessProbe)
+		RunLivenessTest(ctx, f, pod, 1, defaultObservationTimeout)
+	})
 })
 
 var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "Probing restartable init container", func() {
