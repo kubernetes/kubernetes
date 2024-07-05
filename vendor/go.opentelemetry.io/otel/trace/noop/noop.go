@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 // Package noop provides an implementation of the OpenTelemetry trace API that
 // produces no telemetry and minimizes used computation resources.
@@ -78,10 +67,12 @@ func (t Tracer) Start(ctx context.Context, _ string, _ ...trace.SpanStartOption)
 		span = Span{sc: sc}
 	} else {
 		// No parent, return a No-Op span with an empty span context.
-		span = Span{}
+		span = noopSpanInstance
 	}
 	return trace.ContextWithSpan(ctx, span), span
 }
+
+var noopSpanInstance trace.Span = Span{}
 
 // Span is an OpenTelemetry No-Op Span.
 type Span struct {
@@ -110,6 +101,9 @@ func (Span) RecordError(error, ...trace.EventOption) {}
 
 // AddEvent does nothing.
 func (Span) AddEvent(string, ...trace.EventOption) {}
+
+// AddLink does nothing.
+func (Span) AddLink(trace.Link) {}
 
 // SetName does nothing.
 func (Span) SetName(string) {}

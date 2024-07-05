@@ -25,10 +25,10 @@ package backoff
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"time"
 
 	grpcbackoff "google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/internal/grpcrand"
 )
 
 // Strategy defines the methodology for backing off after a grpc connection
@@ -67,7 +67,7 @@ func (bc Exponential) Backoff(retries int) time.Duration {
 	}
 	// Randomize backoff delays so that if a cluster of requests start at
 	// the same time, they won't operate in lockstep.
-	backoff *= 1 + bc.Config.Jitter*(grpcrand.Float64()*2-1)
+	backoff *= 1 + bc.Config.Jitter*(rand.Float64()*2-1)
 	if backoff < 0 {
 		return 0
 	}
