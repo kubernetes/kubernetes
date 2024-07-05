@@ -903,8 +903,11 @@ func (test handlerWritesBeforeRequestTimesOut) runT(t *testing.T) {
 		if r.URL.Path == rquestTimesOutPath {
 			defer close(reqHandlerErr.ch)
 
-			// inner handler writes header and then let the request time out.
+			// inner handler writes and then let the request time out.
 			w.WriteHeader(http.StatusBadRequest)
+			if _, err := w.Write([]byte("hello world")); err != nil {
+				t.Errorf("unexpected error from Write: %v", err)
+			}
 			<-callerRoundTripDoneCh
 
 			// we expect the timeout handler to have timed out this request by now and any attempt
@@ -990,7 +993,7 @@ func (test enqueuedRequestTimingOut) runT(t *testing.T) {
 
 		case r.URL.Path == secondRequestEnqueuedPath:
 			// we expect the concurrency to be set to 1 and so this request should never be executed.
-			t.Errorf("Expected second request to be enqueued: %q", secondRequestEnqueuedPath)
+			t.Errorf("Expected second request to be rejected from queue: %q", secondRequestEnqueuedPath)
 		}
 	})
 
