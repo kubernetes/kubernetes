@@ -17,11 +17,15 @@ limitations under the License.
 package fuzzer
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/rand"
 
 	"github.com/google/gofuzz"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
 // FuzzerFuncs returns a list of func(*SomeType, c fuzz.Continue) functions.
@@ -49,4 +53,21 @@ func MergeFuzzerFuncs(funcs ...FuzzerFuncs) FuzzerFuncs {
 		}
 		return result
 	})
+}
+
+func NormalizeJSONRawExtension(ext *runtime.RawExtension) {
+	if json.Valid(ext.Raw) {
+		// RawExtension->JSON encodes struct fields in field index order while map[string]interface{}->JSON encodes
+		// struct fields (i.e. keys in the map) lexicographically. We have to sort the fields here to ensure the
+		// JSON in the (RawExtension->)JSON->map[string]interface{}->JSON round trip results in identical JSON.
+		var u any
+		err := kjson.Unmarshal(ext.Raw, &u)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to encode object: %v", err))
+		}
+		ext.Raw, err = kjson.Marshal(&u)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to encode object: %v", err))
+		}
+	}
 }
