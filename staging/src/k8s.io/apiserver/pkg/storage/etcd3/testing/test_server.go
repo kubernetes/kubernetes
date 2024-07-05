@@ -19,7 +19,7 @@ package testing
 import (
 	"testing"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -27,7 +27,7 @@ import (
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
 type EtcdTestServer struct {
-	V3Client *clientv3.Client
+	V3Client *kubernetes.Client
 }
 
 func (e *EtcdTestServer) Terminate(t testing.TB) {

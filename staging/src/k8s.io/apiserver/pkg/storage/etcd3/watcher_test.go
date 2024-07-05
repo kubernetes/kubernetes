@@ -64,7 +64,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
 }
 
 // TestWatchFromNonZero tests that

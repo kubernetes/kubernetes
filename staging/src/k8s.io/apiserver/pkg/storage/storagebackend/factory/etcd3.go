@@ -33,6 +33,7 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -228,7 +229,7 @@ func newETCD3ProberMonitor(c storagebackend.Config) (*etcd3ProberMonitor, error)
 		return nil, err
 	}
 	return &etcd3ProberMonitor{
-		client:    client,
+		client:    client.Client,
 		prefix:    c.Prefix,
 		endpoints: c.Transport.ServerList,
 	}, nil
@@ -282,7 +283,7 @@ func (t *etcd3ProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetric
 	}, nil
 }
 
-var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+var newETCD3Client = func(c storagebackend.TransportConfig) (*kubernetes.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,
@@ -352,7 +353,7 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		Logger:               etcd3ClientLogger,
 	}
 
-	return clientv3.New(cfg)
+	return kubernetes.New(cfg)
 }
 
 type runningCompactor struct {
@@ -384,10 +385,11 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}
 	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
 	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
-		compactorClient, err := newETCD3Client(c)
+		client, err := newETCD3Client(c)
 		if err != nil {
 			return nil, err
 		}
+		compactorClient := client.Client
 
 		if foundBefore {
 			// replace compactor
@@ -439,7 +441,7 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	// decorate the KV instance so we can track etcd latency per request.
 	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
 
-	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
+	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client.Client, c.DBMetricPollInterval)
 	if err != nil {
 		return nil, nil, err
 	}
