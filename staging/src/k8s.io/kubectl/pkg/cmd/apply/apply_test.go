@@ -2572,7 +2572,7 @@ func TestApplySetParentManagement(t *testing.T) {
 		return false, nil, nil
 	})
 	cmdutil.BehaviorOnFatal(func(s string, i int) {
-		if failDeletes && s == `error: pruning ReplicationController test/test-rc: an error on the server ("") has prevented the request from succeeding` {
+		if failDeletes && s == `error: deleting objects for pruning ReplicationController test/test-rc: an error on the server ("") has prevented the request from succeeding` {
 			t.Logf("got expected error %q", s)
 		} else {
 			t.Fatalf("unexpected exit %d: %s", i, s)

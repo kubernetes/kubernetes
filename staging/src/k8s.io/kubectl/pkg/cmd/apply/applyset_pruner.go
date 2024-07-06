@@ -184,11 +184,13 @@ func (a *ApplySet) deleteObjects(ctx context.Context, dynamicClient dynamic.Inte
 
 		if opt.DryRunStrategy != cmdutil.DryRunClient {
 			if err := runDelete(ctx, namespace, name, mapping, dynamicClient, opt.CascadingStrategy, opt.GracePeriod, opt.DryRunStrategy == cmdutil.DryRunServer); err != nil {
-				return fmt.Errorf("pruning %v: %w", pruneObject.String(), err)
+				return fmt.Errorf("deleting objects for pruning %v: %w", pruneObject.String(), err)
 			}
 		}
 
-		opt.Printer.PrintObj(pruneObject.Object, opt.IOStreams.Out)
+		if err := opt.Printer.PrintObj(pruneObject.Object, opt.IOStreams.Out); err != nil {
+			klog.V(2).Infof("print objects for pruning; namespace=%q, resource=%v, err: %s", namespace, mapping.Resource, err)
+		}
 
 	}
 	return nil

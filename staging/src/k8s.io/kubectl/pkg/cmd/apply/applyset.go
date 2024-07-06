@@ -234,7 +234,7 @@ func (a *ApplySet) LabelsForMember() map[string]string {
 	}
 }
 
-// addLabels sets our tracking labels on each object; this should be called as part of loading the objects.
+// AddLabels sets our tracking labels on each object; this should be called as part of loading the objects.
 func (a *ApplySet) AddLabels(objects ...*resource.Info) error {
 	applysetLabels := a.LabelsForMember()
 	for _, obj := range objects {
