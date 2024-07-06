@@ -681,16 +681,8 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 	// we can assume pInfo must be recorded in inFlightPods and thus inFlightEvents.
 	inFlightPod, ok := p.inFlightPods[pInfo.Pod.UID]
 	if !ok {
-		// This can happen while updating a pod. In that case pInfo.UnschedulablePlugins should
-		// be empty. If it is not, we may have a problem.
-		if len(pInfo.UnschedulablePlugins) != 0 {
-			logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pInfo.Pod))
-			return queueAfterBackoff
-		}
-		if p.inFlightEvents.Len() > len(p.inFlightPods) {
-			return queueAfterBackoff
-		}
-		return queueSkip
+		logger.Error(nil, "In flight Pod isn't found in the scheduling queue. If you see this error log, it's likely a bug in the scheduler.", "pod", klog.KObj(pInfo.Pod))
+		return queueAfterBackoff
 	}
 
 	rejectorPlugins := pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins)
