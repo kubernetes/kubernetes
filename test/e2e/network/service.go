@@ -3519,7 +3519,7 @@ var _ = common.SIGDescribe("Services", func() {
 					svc.ObjectMeta.Namespace == ns &&
 					svc.Annotations["patchedstatus"] == "true"
 				if !found {
-					framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+					framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
 					return false, nil
 				}
 				for _, cond := range svc.Status.Conditions {
@@ -3528,11 +3528,10 @@ var _ = common.SIGDescribe("Services", func() {
 						cond.Message == "Set from e2e test" {
 						framework.Logf("Found Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
 						return found, nil
-					} else {
-						framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
-						return false, nil
 					}
 				}
+				framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
+				return false, nil
 			}
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
