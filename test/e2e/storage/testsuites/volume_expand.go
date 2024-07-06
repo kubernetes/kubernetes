@@ -184,8 +184,18 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
 			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
-			_, err = ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
-			gomega.Expect(err).To(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				updatedPVC, err := f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Get(ctx, l.resource.Pvc.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				updatedPVC.Spec.Resources.Requests[v1.ResourceStorage] = newSize
+				if _, err = f.ClientSet.CoreV1().PersistentVolumeClaims(l.resource.Pvc.Namespace).Update(ctx, updatedPVC, metav1.UpdateOptions{}); err != nil {
+					return err
+				}
+				return nil
+			}).WithContext(ctx).WithPolling(resizePollInterval).WithTimeout(30 * time.Second).Should(gomega.MatchError(apierrors.IsForbidden, "While updating non-expandable PVC"))
 		})
 	} else {
 		ginkgo.It("Verify if offline PVC expansion works", func(ctx context.Context) {
