@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
@@ -395,7 +396,7 @@ type constraint interface {
 type matchAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
-	attributeName string
+	attributeName resourceapi.FullyQualifiedName
 
 	attribute  *resourceapi.DeviceAttribute
 	numDevices int
@@ -408,7 +409,7 @@ func (m *matchAttributeConstraint) add(requestName string, device *resourceapi.D
 		return true
 	}
 
-	attribute := lookupAttribute(device, m.attributeName)
+	attribute := lookupAttribute(device, deviceID, m.attributeName)
 	if attribute == nil {
 		// Doesn't have the attribute.
 		m.logger.V(6).Info("Constraint not satisfied, attribute not set")
@@ -469,11 +470,26 @@ func (m *matchAttributeConstraint) remove(requestName string, device *resourceap
 	m.logger.V(6).Info("Device removed from constraint set", "device", deviceID, "numDevices", m.numDevices)
 }
 
-func lookupAttribute(device *resourceapi.Device, attributeName string) *resourceapi.DeviceAttribute {
-	for i := range device.Attributes {
-		if device.Attributes[i].Name == attributeName {
-			return &device.Attributes[i]
-		}
+func lookupAttribute(device *resourceapi.Device, deviceID DeviceID, attributeName resourceapi.FullyQualifiedName) *resourceapi.DeviceAttribute {
+	// Fully-qualified match?
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName)]; ok {
+		return &attr
+	}
+	index := strings.Index(string(attributeName), "/")
+	if index < 0 {
+		// Should not happen for a valid fully qualified name.
+		return nil
+	}
+
+	if string(attributeName[0:index]) != deviceID.Driver {
+		// Not an attribute of the driver and not found above,
+		// so it is not available.
+		return nil
+	}
+
+	// Domain matches the driver, so let's check just the ID.
+	if attr, ok := device.Attributes[resourceapi.QualifiedName(attributeName[index+1:])]; ok {
+		return &attr
 	}
 
 	return nil
@@ -634,7 +650,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.Dev
 			return false, fmt.Errorf("claim %s: selector #%d: CEL compile error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, expr.Error)
 		}
 
-		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver, Attributes: device.Attributes, Capacities: device.Capacities})
+		matches, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver, Attributes: device.Attributes, Capacity: device.Capacity})
 		if class != nil {
 			alloc.logger.V(6).Info("CEL result", "device", deviceID, "class", klog.KObj(class), "selector", i, "expression", selector.CEL.Expression, "matches", matches, "err", err)
 		} else {

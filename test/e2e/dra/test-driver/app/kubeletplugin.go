@@ -113,8 +113,9 @@ type FileOperations struct {
 	// and how many. It reports nothing if negative.
 	NumDevices int
 
-	// Pre-defined devices Not used if NumDevices >= 0.
-	Devices map[string][]resourceapi.DeviceAttribute
+	// Pre-defined devices, with each device name mapped to
+	// the device attributes. Not used if NumDevices >= 0.
+	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.

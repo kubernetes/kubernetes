@@ -153,7 +153,7 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
-func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string][]resourceapi.DeviceAttribute) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *Driver {
 	d := &Driver{
 		f:            f,
 		fail:         map[MethodInstance]bool{},
@@ -206,7 +206,7 @@ const (
 	parameterModeStructured parameterMode = "structured" // allocation through scheduler
 )
 
-func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string][]resourceapi.DeviceAttribute) {
+func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
 	d.Nodes = map[string]*app.ExamplePlugin{}
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"

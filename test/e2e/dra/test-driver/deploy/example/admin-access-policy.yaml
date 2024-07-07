@@ -23,7 +23,7 @@ spec:
       operations:  ["CREATE", "UPDATE"]
       resources:   ["resourceclaims"]
   validations:
-    - expression: '! object.spec.devices.requests.exists(e, has(e.device) && has(e.device.adminAccess) && e.device.adminAccess)'
+    - expression: '! object.spec.devices.requests.exists(e, has(e.adminAccess) && e.adminAccess)'
       reason: Forbidden
       messageExpression: '"admin access to devices not enabled"' # in namespace " + object.metadata.namespace' - need to use __namespace__, but somehow that also doesn't work.
 ---
@@ -53,7 +53,7 @@ spec:
       operations:  ["CREATE", "UPDATE"]
       resources:   ["resourceclaimtemplates"]
   validations:
-    - expression: '! object.spec.spec.devices.requests.exists(e, has(e.device) && has(e.device.adminAccess) && e.device.adminAccess)'
+    - expression: '! object.spec.spec.devices.requests.exists(e, has(e.adminAccess) && e.adminAccess)'
       reason: Forbidden
       messageExpression: '"admin access to devices not enabled"' # in namespace " + object.metadata.namespace' - need to use __namespace__, but somehow that also doesn't work.
 ---

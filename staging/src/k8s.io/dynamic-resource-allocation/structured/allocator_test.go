@@ -138,22 +138,22 @@ spec:
   devices:
   - name: device-1
     attributes:
-    - name: driverVersion
-      version: 1.0.0
-    - name: numa
-      int: 1
-    capacities:
-    - name: memory
-      quantity: 1Gi # small
+      driverVersion:
+        version: 1.0.0
+      numa:
+        int: 1
+    capacity:
+      memory:
+        quantity: 1Gi # small
   - name: device-2
     attributes:
-    - name: driverVersion
-      version: 1.0.0
-    - name: numa
-      int: 1
-    capacities:
-    - name: memory
-      quantity: 2Gi # large
+      driverVersion:
+        version: 1.0.0
+      numa:
+        int: 1
+    capacity:
+      memory:
+        quantity: 2Gi # large
 `)
 	node2slice := unmarshal[resourceapi.ResourceSlice](t, `
 metadata:
@@ -167,22 +167,22 @@ spec:
   devices:
   - name: device-3
     attributes:
-    - name: driverVersion
-      version: 1.0.0
-    - name: numa
-      int: 1
-    capacities:
-    - name: memory
-      quantity: 1Gi # small
+      driverVersion:
+        version: 1.0.0
+      numa:
+        int: 1
+    capacity:
+      memory:
+        quantity: 1Gi # small
   - name: device-4
     attributes:
-    - name: driverVersion
-      version: 1.0.0
-    - name: numa
-      int: 1
-    capacities:
-    - name: memory
-      quantity: 2Gi # large
+      driverVersion:
+        version: 1.0.0
+      numa:
+        int: 1
+    capacity:
+      memory:
+        quantity: 2Gi # large
 `)
 	simpleClaim := unmarshal[resourceapi.ResourceClaim](t, `
 metadata:
@@ -227,7 +227,7 @@ spec:
       selectors:
       - cel:
           # small
-          expression: device.capacities["driver-a"].memory.compareTo(quantity("1Gi")) >= 0
+          expression: device.capacity["driver-a"].memory.compareTo(quantity("1Gi")) >= 0
     - name: req-1
       countMode: Exact
       count: 1
@@ -235,7 +235,7 @@ spec:
       selectors:
       - cel:
           # large
-          expression: device.capacities["driver-a"].memory.compareTo(quantity("2Gi")) >= 0
+          expression: device.capacity["driver-a"].memory.compareTo(quantity("2Gi")) >= 0
 `)
 
 	allocatedTwoDeviceClaim := unmarshal[resourceapi.AllocationResult](t, `

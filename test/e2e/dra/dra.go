@@ -607,18 +607,18 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			ginkgo.Context("with different ResourceSlices", func() {
 				firstDevice := "pre-defined-device-01"
 				secondDevice := "pre-defined-device-02"
-				devicesPerNode := []map[string][]resourceapi.DeviceAttribute{
+				devicesPerNode := []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					// First node:
-					map[string][]resourceapi.DeviceAttribute{
+					map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 						firstDevice: {
-							{Name: "healthy", BoolValue: ptr.To(true)},
-							{Name: "exists", BoolValue: ptr.To(true)},
+							"healthy": {BoolValue: ptr.To(true)},
+							"exists":  {BoolValue: ptr.To(true)},
 						},
 					},
 					// Second node:
-					map[string][]resourceapi.DeviceAttribute{
+					map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 						secondDevice: {
-							{Name: "healthy", BoolValue: ptr.To(false)},
+							"healthy": {BoolValue: ptr.To(false)},
 							// Has no "exists" attribute!
 						},
 					},

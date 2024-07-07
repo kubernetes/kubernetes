@@ -1100,7 +1100,7 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
-func (wrapper *ResourceSliceWrapper) Device(name string, attrs ...resourceapi.DeviceAttribute) *ResourceSliceWrapper {
+func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
 	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Attributes: attrs})
 	return wrapper
 }

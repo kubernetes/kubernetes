@@ -64,7 +64,7 @@ var (
 	claimName2    = podName + "-" + resourceName + "-2"
 	className     = "my-resource-class"
 	namespace     = "default"
-	attrName      = "healthy" // device attribute only available on non-default node
+	attrName      = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
 
 	deviceClass = &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,15 +98,15 @@ var (
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
-	workerNode2Slice = st.MakeResourceSlice(node2Name, driver).Device("instance-1", resourceapi.DeviceAttribute{Name: attrName, BoolValue: ptr.To(true)}).Obj()
+	workerNode2Slice = st.MakeResourceSlice(node2Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
 	// Yet another node, same as the second one.
 	workerNode3      = &st.MakeNode().Name(node3Name).Label("kubernetes.io/hostname", node3Name).Node
-	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", resourceapi.DeviceAttribute{Name: attrName, BoolValue: ptr.To(true)}).Obj()
+	workerNode3Slice = st.MakeResourceSlice(node3Name, driver).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 
 	brokenSelector = resourceapi.DeviceSelector{
 		CEL: &resourceapi.CELDeviceSelector{
@@ -613,7 +613,7 @@ func TestPlugin(t *testing.T) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+attrName),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
 					},
 				},
 				postfilter: result{
@@ -630,7 +630,7 @@ func TestPlugin(t *testing.T) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `class my-resource-class: selector #0: CEL runtime error: no such key: `+attrName),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `class my-resource-class: selector #0: CEL runtime error: no such key: `+string(attrName)),
 					},
 				},
 				postfilter: result{
@@ -653,7 +653,7 @@ func TestPlugin(t *testing.T) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+attrName),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
 					},
 				},
 				// PreScore not called, only one suitable node.
@@ -674,7 +674,7 @@ func TestPlugin(t *testing.T) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+attrName),
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
 					},
 				},
 				prescore: result{
