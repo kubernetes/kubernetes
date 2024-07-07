@@ -31,8 +31,8 @@ func TestCompile(t *testing.T) {
 	for name, scenario := range map[string]struct {
 		expression         string
 		driver             string
-		attributes         []resourceapi.DeviceAttribute
-		capacities         []resourceapi.DeviceCapacity
+		attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+		capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 		expectCompileError string
 		expectMatchError   string
 		expectMatch        bool
@@ -67,7 +67,7 @@ func TestCompile(t *testing.T) {
 		},
 		"domain-check-positive": {
 			expression:  `"dra.example.com" in device.attributes`,
-			attributes:  []resourceapi.DeviceAttribute{{Name: "dra.example.com/something", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"dra.example.com/something": {BoolValue: ptr.To(true)}},
 			expectMatch: true,
 		},
 		"empty-driver-name": {
@@ -82,97 +82,98 @@ func TestCompile(t *testing.T) {
 		"driver-name-qualifier": {
 			expression:  `device.attributes["dra.example.com"].name`,
 			driver:      "dra.example.com",
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 			expectMatch: true,
 		},
 		"driver-name-qualifier-map-lookup": {
 			expression:  `device.attributes["dra.example.com"]["name"]`,
 			driver:      "dra.example.com",
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 			expectMatch: true,
 		},
 		"bind": {
 			expression:  `cel.bind(dra, device.attributes["dra.example.com"], dra.name)`,
 			driver:      "dra.example.com",
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 			expectMatch: true,
 		},
 		"qualified-attribute-name": {
 			expression:  `device.attributes["other.example.com"].name`,
 			driver:      "dra.example.com",
-			attributes:  []resourceapi.DeviceAttribute{{Name: "other.example.com/name", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"other.example.com/name": {BoolValue: ptr.To(true)}},
 			expectMatch: true,
 		},
 		"bool": {
 			expression:  `device.attributes["dra.example.com"].name`,
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", BoolValue: ptr.To(true)}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {BoolValue: ptr.To(true)}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"int": {
 			expression:  `device.attributes["dra.example.com"].name > 0`,
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", IntValue: ptr.To(int64(1))}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {IntValue: ptr.To(int64(1))}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"string": {
 			expression:  `device.attributes["dra.example.com"].name == "fish"`,
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", StringValue: ptr.To("fish")}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {StringValue: ptr.To("fish")}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"version": {
 			expression:  `device.attributes["dra.example.com"].name.isGreaterThan(semver("0.0.1"))`,
-			attributes:  []resourceapi.DeviceAttribute{{Name: "name", VersionValue: ptr.To("1.0.0")}},
+			attributes:  map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"name": {VersionValue: ptr.To("1.0.0")}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"quantity": {
-			expression: `device.capacities["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacities: []resourceapi.DeviceCapacity{
-				{Name: "name", Quantity: ptr.To(resource.MustParse("1Mi"))},
-			},
+			expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
+			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: ptr.To(resource.MustParse("1Mi"))}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"check-positive": {
-			expression: `"name" in device.capacities["dra.example.com"] && device.capacities["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacities: []resourceapi.DeviceCapacity{
-				{Name: "name", Quantity: ptr.To(resource.MustParse("1Mi"))},
-			},
+			expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
+			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: ptr.To(resource.MustParse("1Mi"))}},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"check-negative": {
-			expression:  `!("name" in device.capacities["dra.example.com"]) || device.capacities["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
+			expression:  `!("name" in device.capacity["dra.example.com"]) || device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
 			expectMatch: true,
 		},
 		"all": {
 			expression: `
-device.capacities["dra.example.com"].quantity.isGreaterThan(quantity("1Ki")) &&
+device.capacity["dra.example.com"].quantity.isGreaterThan(quantity("1Ki")) &&
 device.attributes["dra.example.com"].bool &&
 device.attributes["dra.example.com"].int > 0 &&
 device.attributes["dra.example.com"].string == "fish" &&
-device.attributes["dra.example.com"].version.isGreaterThan(semver("0.0.1"))
+device.attributes["dra.example.com"].version.isGreaterThan(semver("0.0.1")) &&
+device.capacity["dra.example.com"]["quantity"].isGreaterThan(quantity("1Ki")) &&
+device.attributes["dra.example.com"]["bool"] &&
+device.attributes["dra.example.com"]["int"] > 0 &&
+device.attributes["dra.example.com"]["string"] == "fish" &&
+device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 `,
-			attributes: []resourceapi.DeviceAttribute{
-				{Name: "bool", BoolValue: ptr.To(true)},
-				{Name: "int", IntValue: ptr.To(int64(1))},
-				{Name: "string", StringValue: ptr.To("fish")},
-				{Name: "version", VersionValue: ptr.To("1.0.0")},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"bool":    {BoolValue: ptr.To(true)},
+				"int":     {IntValue: ptr.To(int64(1))},
+				"string":  {StringValue: ptr.To("fish")},
+				"version": {VersionValue: ptr.To("1.0.0")},
 			},
-			capacities: []resourceapi.DeviceCapacity{
-				{Name: "quantity", Quantity: ptr.To(resource.MustParse("1Mi"))},
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				"quantity": {Quantity: ptr.To(resource.MustParse("1Mi"))},
 			},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"many": {
 			expression: `device.attributes["dra.example.com"].a && device.attributes["dra.example.com"].b && device.attributes["dra.example.com"].c`,
-			attributes: []resourceapi.DeviceAttribute{
-				{Name: "a", BoolValue: ptr.To(true)},
-				{Name: "b", BoolValue: ptr.To(true)},
-				{Name: "c", BoolValue: ptr.To(true)},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"a": {BoolValue: ptr.To(true)},
+				"b": {BoolValue: ptr.To(true)},
+				"c": {BoolValue: ptr.To(true)},
 			},
 			driver:      "dra.example.com",
 			expectMatch: true,
@@ -193,7 +194,7 @@ device.attributes["dra.example.com"].version.isGreaterThan(semver("0.0.1"))
 				}
 				return
 			}
-			match, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacities: scenario.capacities, Driver: scenario.driver})
+			match, err := result.DeviceMatches(ctx, Device{Attributes: scenario.attributes, Capacity: scenario.capacity, Driver: scenario.driver})
 			if err != nil {
 				if scenario.expectMatchError == "" {
 					t.Fatalf("unexpected evaluation error: %v", err)

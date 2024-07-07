@@ -488,8 +488,8 @@ func Convert_resource_ClassConfiguration_To_v1alpha3_ClassConfiguration(in *reso
 
 func autoConvert_v1alpha3_Device_To_resource_Device(in *v1alpha3.Device, out *resource.Device, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Attributes = *(*[]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacities = *(*[]resource.DeviceCapacity)(unsafe.Pointer(&in.Capacities))
+	out.Attributes = *(*map[resource.QualifiedName]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	out.Capacity = *(*map[resource.QualifiedName]resource.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
 	return nil
 }
 
@@ -500,8 +500,8 @@ func Convert_v1alpha3_Device_To_resource_Device(in *v1alpha3.Device, out *resour
 
 func autoConvert_resource_Device_To_v1alpha3_Device(in *resource.Device, out *v1alpha3.Device, s conversion.Scope) error {
 	out.Name = in.Name
-	out.Attributes = *(*[]v1alpha3.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
-	out.Capacities = *(*[]v1alpha3.DeviceCapacity)(unsafe.Pointer(&in.Capacities))
+	out.Attributes = *(*map[v1alpha3.QualifiedName]v1alpha3.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	out.Capacity = *(*map[v1alpha3.QualifiedName]v1alpha3.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
 	return nil
 }
 
@@ -561,7 +561,6 @@ func Convert_resource_DeviceAllocationResult_To_v1alpha3_DeviceAllocationResult(
 }
 
 func autoConvert_v1alpha3_DeviceAttribute_To_resource_DeviceAttribute(in *v1alpha3.DeviceAttribute, out *resource.DeviceAttribute, s conversion.Scope) error {
-	out.Name = in.Name
 	out.IntValue = (*int64)(unsafe.Pointer(in.IntValue))
 	out.BoolValue = (*bool)(unsafe.Pointer(in.BoolValue))
 	out.StringValue = (*string)(unsafe.Pointer(in.StringValue))
@@ -575,7 +574,6 @@ func Convert_v1alpha3_DeviceAttribute_To_resource_DeviceAttribute(in *v1alpha3.D
 }
 
 func autoConvert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(in *resource.DeviceAttribute, out *v1alpha3.DeviceAttribute, s conversion.Scope) error {
-	out.Name = in.Name
 	out.IntValue = (*int64)(unsafe.Pointer(in.IntValue))
 	out.BoolValue = (*bool)(unsafe.Pointer(in.BoolValue))
 	out.StringValue = (*string)(unsafe.Pointer(in.StringValue))
@@ -589,7 +587,6 @@ func Convert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(in *resource.D
 }
 
 func autoConvert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(in *v1alpha3.DeviceCapacity, out *resource.DeviceCapacity, s conversion.Scope) error {
-	out.Name = in.Name
 	out.Quantity = (*apiresource.Quantity)(unsafe.Pointer(in.Quantity))
 	return nil
 }
@@ -600,7 +597,6 @@ func Convert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(in *v1alpha3.Dev
 }
 
 func autoConvert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity(in *resource.DeviceCapacity, out *v1alpha3.DeviceCapacity, s conversion.Scope) error {
-	out.Name = in.Name
 	out.Quantity = (*apiresource.Quantity)(unsafe.Pointer(in.Quantity))
 	return nil
 }
@@ -754,7 +750,7 @@ func Convert_resource_DeviceConfiguration_To_v1alpha3_DeviceConfiguration(in *re
 
 func autoConvert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3.DeviceConstraint, out *resource.DeviceConstraint, s conversion.Scope) error {
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchAttribute = (*resource.FullyQualifiedName)(unsafe.Pointer(in.MatchAttribute))
 	return nil
 }
 
@@ -765,7 +761,7 @@ func Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *v1alpha3
 
 func autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource.DeviceConstraint, out *v1alpha3.DeviceConstraint, s conversion.Scope) error {
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
-	out.MatchAttribute = (*string)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchAttribute = (*v1alpha3.FullyQualifiedName)(unsafe.Pointer(in.MatchAttribute))
 	return nil
 }
 

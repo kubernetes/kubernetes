@@ -86,16 +86,16 @@ func (in *Device) DeepCopyInto(out *Device) {
 	*out = *in
 	if in.Attributes != nil {
 		in, out := &in.Attributes, &out.Attributes
-		*out = make([]DeviceAttribute, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+		*out = make(map[QualifiedName]DeviceAttribute, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
-	if in.Capacities != nil {
-		in, out := &in.Capacities, &out.Capacities
-		*out = make([]DeviceCapacity, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(map[QualifiedName]DeviceCapacity, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
 		}
 	}
 	return
@@ -403,7 +403,7 @@ func (in *DeviceConstraint) DeepCopyInto(out *DeviceConstraint) {
 	}
 	if in.MatchAttribute != nil {
 		in, out := &in.MatchAttribute, &out.MatchAttribute
-		*out = new(string)
+		*out = new(FullyQualifiedName)
 		**out = **in
 	}
 	return

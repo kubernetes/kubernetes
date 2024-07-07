@@ -145,8 +145,7 @@
         "description": "Device represents one individual hardware instance that can be selected based on its attributes.",
         "properties": {
           "attributes": {
-            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-            "items": {
+            "additionalProperties": {
               "allOf": [
                 {
                   "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.DeviceAttribute"
@@ -154,12 +153,11 @@
               ],
               "default": {}
             },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+            "type": "object"
           },
-          "capacities": {
-            "description": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-            "items": {
+          "capacity": {
+            "additionalProperties": {
               "allOf": [
                 {
                   "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.DeviceCapacity"
@@ -167,8 +165,8 @@
               ],
               "default": {}
             },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
+            "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+            "type": "object"
           },
           "name": {
             "default": "",
@@ -245,7 +243,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.DeviceAttribute": {
-        "description": "DeviceAttribute is a combination of an attribute name and its value. Exactly one value must be set.",
+        "description": "DeviceAttribute must have exactly one field set.",
         "properties": {
           "bool": {
             "description": "BoolValue is a true/false value.",
@@ -256,11 +254,6 @@
             "format": "int64",
             "type": "integer"
           },
-          "name": {
-            "default": "",
-            "description": "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
-            "type": "string"
-          },
           "string": {
             "description": "StringValue is a string. Must not be longer than 64 characters.",
             "type": "string"
@@ -270,19 +263,11 @@
             "type": "string"
           }
         },
-        "required": [
-          "name"
-        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.DeviceCapacity": {
-        "description": "DeviceCapacity is a combination of a capacity name and its value.",
+        "description": "DeviceCapacity must have exactly one field set.",
         "properties": {
-          "name": {
-            "default": "",
-            "description": "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
-            "type": "string"
-          },
           "quantity": {
             "allOf": [
               {
@@ -292,10 +277,6 @@
             "description": "Quantity determines the size of the capacity."
           }
         },
-        "required": [
-          "name",
-          "quantity"
-        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.DeviceClaim": {
@@ -496,7 +477,7 @@
         "description": "DeviceConstraint must have exactly one field set besides Requests.",
         "properties": {
           "matchAttribute": {
-            "description": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+            "description": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
             "type": "string"
           },
           "requests": {

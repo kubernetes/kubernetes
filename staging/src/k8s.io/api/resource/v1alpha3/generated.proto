@@ -132,17 +132,15 @@ message Device {
   // The maximum number of attributes and capacities combined is 32.
   //
   // +optional
-  // +listType=atomic
-  repeated DeviceAttribute attributes = 2;
+  map<string, DeviceAttribute> attributes = 2;
 
-  // Capacities defines the set of capacities for this device.
+  // Capacity defines the set of capacities for this device.
   // The name of each capacity must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
   //
   // +optional
-  // +listType=atomic
-  repeated DeviceCapacity capacities = 3;
+  map<string, DeviceCapacity> capacity = 3;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -185,33 +183,8 @@ message DeviceAllocationResult {
   repeated DeviceAllocationConfiguration config = 2;
 }
 
-// DeviceAttribute is a combination of an attribute name and its value.
-// Exactly one value must be set.
+// DeviceAttribute must have exactly one field set.
 message DeviceAttribute {
-  // Name is a unique identifier for this attribute, which will be
-  // referenced when selecting devices.
-  //
-  // Attributes are defined either by the owner of the specific driver
-  // (usually the vendor) or by some 3rd party (e.g. the Kubernetes
-  // project). Because attributes are sometimes compared across devices,
-  // a given name is expected to mean the same thing and have the same
-  // type on all devices.
-  //
-  // Attribute names must be either a C identifier
-  // (e.g. "theName") or a DNS subdomain followed by a slash ("/")
-  // followed by a C identifier
-  // (e.g. "dra.example.com/theName"). Attributes whose name do not
-  // include the domain prefix are assumed to be part of the driver's
-  // domain. Attributes defined by 3rd parties must include the domain
-  // prefix.
-  //
-  // The maximum length for the DNS subdomain is 63 characters (same as
-  // for driver names) and the maximum length of the C identifier
-  // is 32.
-  //
-  // +required
-  optional string name = 1;
-
   // IntValue is a number.
   //
   // +optional
@@ -234,36 +207,12 @@ message DeviceAttribute {
   optional string version = 5;
 }
 
-// DeviceCapacity is a combination of a capacity name and its value.
+// DeviceCapacity must have exactly one field set.
 message DeviceCapacity {
-  // Name is a unique identifier for this capacity, which will be
-  // referenced when selecting devices.
-  //
-  // Capacities are defined either by the owner of the specific driver
-  // (usually the vendor) or by some 3rd party (e.g. the Kubernetes
-  // project). Because capacities are sometimes compared across devices,
-  // a given name is expected to mean the same thing and have the same
-  // type on all devices.
-  //
-  // Capacity names must be either a C identifier
-  // (e.g. "theName") or a DNS subdomain followed by a slash ("/")
-  // followed by a C identifier
-  // (e.g. "dra.example.com/theName"). Capacities whose name do not
-  // include the domain prefix are assumed to be part of the driver's
-  // domain. Capacities defined by 3rd parties must include the domain
-  // prefix.
-  //
-  // The maximum length for the DNS subdomain is 63 characters (same as
-  // for driver names) and the maximum length of the C identifier
-  // is 32.
-  //
-  // +required
-  optional string name = 1;
-
   // Quantity determines the size of the capacity.
   //
-  // +required
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 2;
+  // +optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 1;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.
@@ -401,6 +350,8 @@ message DeviceConstraint {
   // use a value of the same type for this attribute because that is part of
   // its specification, but if one device doesn't, then it also will not be
   // chosen.
+  //
+  // Must include the domain qualifier.
   //
   // +optional
   optional string matchAttribute = 2;

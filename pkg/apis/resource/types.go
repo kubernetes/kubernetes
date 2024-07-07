@@ -180,49 +180,46 @@ type Device struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	// +listType=atomic
-	Attributes []DeviceAttribute
+	Attributes map[QualifiedName]DeviceAttribute
 
-	// Capacities defines the set of capacities for this device.
+	// Capacity defines the set of capacities for this device.
 	// The name of each capacity must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	// +listType=atomic
-	Capacities []DeviceCapacity
+	Capacity map[QualifiedName]DeviceCapacity
 }
 
 // Limit for the sum of the number of entries in both ResourceSlices.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
-// DeviceAttribute is a combination of an attribute name and its value.
-// Exactly one value must be set.
-type DeviceAttribute struct {
-	// Name is a unique identifier for this attribute, which will be
-	// referenced when selecting devices.
-	//
-	// Attributes are defined either by the owner of the specific driver
-	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
-	// project). Because attributes are sometimes compared across devices,
-	// a given name is expected to mean the same thing and have the same
-	// type on all devices.
-	//
-	// Attribute names must be either a C identifier
-	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
-	// followed by a C identifier
-	// (e.g. "dra.example.com/theName"). Attributes whose name do not
-	// include the domain prefix are assumed to be part of the driver's
-	// domain. Attributes defined by 3rd parties must include the domain
-	// prefix.
-	//
-	// The maximum length for the DNS subdomain is 63 characters (same as
-	// for driver names) and the maximum length of the C identifier
-	// is 32.
-	//
-	// +required
-	Name string
+// QualifiedName is the name of a device attribute or capacity.
+//
+// Attributes and capacities are defined either by the owner of the specific
+// driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes
+// project). Because they are sometimes compared across devices, a given name
+// is expected to mean the same thing and have the same type on all devices.
+//
+// Names must be either a C identifier e.g. "theName") or a DNS subdomain
+// followed by a slash ("/") followed by a C identifier
+// (e.g. "dra.example.com/theName"). Names which do not include the
+// domain prefix are assumed to be part of the driver's domain. Attributes
+// or capacities defined by 3rd parties must include the domain prefix.
+//
+// The maximum length for the DNS subdomain is 63 characters (same as
+// for driver names) and the maximum length of the C identifier
+// is 32.
+type QualifiedName string
 
+// FullyQualifiedName is a QualifiedName where the domain is set.
+type FullyQualifiedName string
+
+// DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
+const DeviceMaxIDLength = 32
+
+// DeviceAttribute must have exactly one field set.
+type DeviceAttribute struct {
 	// The Go field names below have a Value suffix to avoid a conflict between the
 	// field "String" and the corresponding method. That method is required.
 	// The Kubernetes API is defined without that suffix to keep it more natural.
@@ -249,40 +246,13 @@ type DeviceAttribute struct {
 	VersionValue *string
 }
 
-// DeviceCapacity is a combination of a capacity name and its value.
+// DeviceCapacity must have exactly one field set.
 type DeviceCapacity struct {
-	// Name is a unique identifier for this capacity, which will be
-	// referenced when selecting devices.
-	//
-	// Capacities are defined either by the owner of the specific driver
-	// (usually the vendor) or by some 3rd party (e.g. the Kubernetes
-	// project). Because capacities are sometimes compared across devices,
-	// a given name is expected to mean the same thing and have the same
-	// type on all devices.
-	//
-	// Capacity names must be either a C identifier
-	// (e.g. "theName") or a DNS subdomain followed by a slash ("/")
-	// followed by a C identifier
-	// (e.g. "dra.example.com/theName"). Capacities whose name do not
-	// include the domain prefix are assumed to be part of the driver's
-	// domain. Capacities defined by 3rd parties must include the domain
-	// prefix.
-	//
-	// The maximum length for the DNS subdomain is 63 characters (same as
-	// for driver names) and the maximum length of the C identifier
-	// is 32.
-	//
-	// +required
-	Name string
-
 	// Quantity determines the size of the capacity.
 	//
-	// +required
+	// +optional
 	Quantity *resource.Quantity
 }
-
-// DeviceMaxIDLength is the maximum length of the identifier in a device attribute or capacity name (`<domain>/<ID>`).
-const DeviceMaxIDLength = 32
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
@@ -547,8 +517,10 @@ type DeviceConstraint struct {
 	// its specification, but if one device doesn't, then it also will not be
 	// chosen.
 	//
+	// Must include the domain qualifier.
+	//
 	// +optional
-	MatchAttribute *string
+	MatchAttribute *FullyQualifiedName
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.

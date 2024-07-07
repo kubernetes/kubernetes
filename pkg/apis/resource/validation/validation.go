@@ -420,49 +420,41 @@ var (
 		`$`)
 )
 
-func validateAttributes(attributes []resource.DeviceAttribute, fldPath *field.Path) field.ErrorList {
+func validateAttributes(attributes map[resource.QualifiedName]resource.DeviceAttribute, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	attributeNames := sets.New[string]()
-	for i, attribute := range attributes {
-		idxPath := fldPath.Index(i)
-		attributeName := attribute.Name
-		allErrs = append(allErrs, validateAttributeName(attributeName, idxPath.Child("name"))...)
-		if attributeNames.Has(attributeName) {
-			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), attributeName))
-		} else {
-			attributeNames.Insert(attributeName)
-		}
-
-		entries := sets.New[string]()
+	for name, attribute := range attributes {
+		allErrs = append(allErrs, validateQualifiedName(name, fldPath)...)
+		idxPath := fldPath.Key(string(name))
+		numFields := 0
 		if attribute.BoolValue != nil {
-			entries.Insert("bool")
+			numFields++
 		}
 		if attribute.IntValue != nil {
-			entries.Insert("int")
+			numFields++
 		}
 		if attribute.StringValue != nil {
-			entries.Insert("string")
+			numFields++
 		}
 		if attribute.VersionValue != nil {
-			entries.Insert("version")
+			numFields++
 			if !semverRe.MatchString(*attribute.VersionValue) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
 			}
 		}
 
-		switch len(entries) {
+		switch numFields {
 		case 0:
 			allErrs = append(allErrs, field.Required(idxPath, "exactly one value must be set"))
 		case 1:
 			// Okay.
 		default:
-			allErrs = append(allErrs, field.Invalid(idxPath, sets.List(entries), "exactly one field must be set, not several"))
+			allErrs = append(allErrs, field.Invalid(idxPath, attribute, "exactly one field must be set, not several"))
 		}
 	}
 	return allErrs
 }
 
-func validateAttributeName(name string, fldPath *field.Path) field.ErrorList {
+func validateQualifiedName(name resource.QualifiedName, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if name == "" {
 		allErrs = append(allErrs, field.Required(fldPath, "name required"))
@@ -471,7 +463,7 @@ func validateAttributeName(name string, fldPath *field.Path) field.ErrorList {
 
 	// Naming the two parts in a field path is tricky. Treating them as a child field
 	// is not quite right, but close enough...
-	parts := strings.Split(name, "/")
+	parts := strings.Split(string(name), "/")
 	switch len(parts) {
 	case 1:
 		allErrs = append(allErrs, validateCIdentifier(parts[0], fldPath.Child("identifier"))...)

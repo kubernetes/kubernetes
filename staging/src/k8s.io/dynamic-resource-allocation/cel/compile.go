@@ -41,7 +41,7 @@ const (
 	deviceVar     = "device"
 	driverVar     = "driver"
 	attributesVar = "attributes"
-	capacitiesVar = "capacities" // TODO: capacity?
+	capacityVar   = "capacity"
 )
 
 var (
@@ -65,8 +65,8 @@ type Device struct {
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
 	Driver     string
-	Attributes []resourceapi.DeviceAttribute
-	Capacities []resourceapi.DeviceCapacity
+	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -162,13 +162,15 @@ func getCapacityValue(cap resourceapi.DeviceCapacity) (any, error) {
 var boolType = reflect.TypeOf(true)
 
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
+	// TODO (future): avoid building these maps and instead use a proxy
+	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
-	for _, attr := range input.Attributes {
+	for name, attr := range input.Attributes {
 		value, err := getAttributeValue(attr)
 		if err != nil {
-			return false, fmt.Errorf("attribute %s: %w", attr.Name, err)
+			return false, fmt.Errorf("attribute %s: %w", name, err)
 		}
-		domain, id := parseAttributeName(attr.Name, input.Driver)
+		domain, id := parseQualifiedName(name, input.Driver)
 		if attributes[domain] == nil {
 			attributes[domain] = make(map[string]any)
 		}
@@ -176,12 +178,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	}
 
 	capacities := make(map[string]any)
-	for _, cap := range input.Capacities {
+	for name, cap := range input.Capacity {
 		value, err := getCapacityValue(cap)
 		if err != nil {
-			return false, fmt.Errorf("capacity %s: %w", cap.Name, err)
+			return false, fmt.Errorf("capacity %s: %w", name, err)
 		}
-		domain, id := parseAttributeName(cap.Name, input.Driver)
+		domain, id := parseQualifiedName(name, input.Driver)
 		if capacities[domain] == nil {
 			capacities[domain] = make(map[string]any)
 		}
@@ -192,7 +194,7 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
 			attributesVar: newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), attributes, c.emptyMapVal),
-			capacitiesVar: newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), capacities, c.emptyMapVal),
+			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), capacities, c.emptyMapVal),
 		},
 	}
 
@@ -226,7 +228,7 @@ func mustBuildEnv() *environment.EnvSet {
 	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
 		field(driverVar, apiservercel.StringType, true),
 		field(attributesVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
-		field(capacitiesVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
+		field(capacityVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
 	))
 
 	versioned := []environment.VersionedOptions{
@@ -262,14 +264,14 @@ func mustBuildEnv() *environment.EnvSet {
 	return envset
 }
 
-// parseAttributeName splits into domain and identified, using the default domain
+// parseQualifiedName splits into domain and identified, using the default domain
 // if the name does not contain one.
-func parseAttributeName(name, defaultDomain string) (string, string) {
-	sep := strings.Index(name, "/")
+func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (string, string) {
+	sep := strings.Index(string(name), "/")
 	if sep == -1 {
-		return defaultDomain, name
+		return defaultDomain, string(name)
 	}
-	return name[0:sep], name[sep+1:]
+	return string(name[0:sep]), string(name[sep+1:])
 }
 
 // newStringInterfaceMapWithDefault is like

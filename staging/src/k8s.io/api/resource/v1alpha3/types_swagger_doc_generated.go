@@ -59,7 +59,7 @@ var map_Device = map[string]string{
 	"":           "Device represents one individual hardware instance that can be selected based on its attributes.",
 	"name":       "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
 	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacities": "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -87,8 +87,7 @@ func (DeviceAllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceAttribute = map[string]string{
-	"":        "DeviceAttribute is a combination of an attribute name and its value. Exactly one value must be set.",
-	"name":    "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
+	"":        "DeviceAttribute must have exactly one field set.",
 	"int":     "IntValue is a number.",
 	"bool":    "BoolValue is a true/false value.",
 	"string":  "StringValue is a string. Must not be longer than 64 characters.",
@@ -100,8 +99,7 @@ func (DeviceAttribute) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceCapacity = map[string]string{
-	"":         "DeviceCapacity is a combination of a capacity name and its value.",
-	"name":     "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
+	"":         "DeviceCapacity must have exactly one field set.",
 	"quantity": "Quantity determines the size of the capacity.",
 }
 
@@ -171,7 +169,7 @@ func (DeviceConfiguration) SwaggerDoc() map[string]string {
 var map_DeviceConstraint = map[string]string{
 	"":               "DeviceConstraint must have exactly one field set besides Requests.",
 	"requests":       "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
-	"matchAttribute": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+	"matchAttribute": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
 }
 
 func (DeviceConstraint) SwaggerDoc() map[string]string {

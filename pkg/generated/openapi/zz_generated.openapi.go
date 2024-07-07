@@ -45435,15 +45435,11 @@ func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) com
 						},
 					},
 					"attributes": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
@@ -45453,16 +45449,12 @@ func schema_k8sio_api_resource_v1alpha3_Device(ref common.ReferenceCallback) com
 							},
 						},
 					},
-					"capacities": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
+					"capacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Capacities defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-							Type:        []string{"array"},
-							Items: &spec.SchemaOrArray{
+							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
@@ -45588,17 +45580,9 @@ func schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref common.ReferenceCall
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeviceAttribute is a combination of an attribute name and its value. Exactly one value must be set.",
+				Description: "DeviceAttribute must have exactly one field set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for this attribute, which will be referenced when selecting devices.\n\nAttributes are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because attributes are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nAttribute names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Attributes whose name do not include the domain prefix are assumed to be part of the driver's domain. Attributes defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"int": {
 						SchemaProps: spec.SchemaProps{
 							Description: "IntValue is a number.",
@@ -45628,7 +45612,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"name"},
 			},
 		},
 	}
@@ -45638,17 +45621,9 @@ func schema_k8sio_api_resource_v1alpha3_DeviceCapacity(ref common.ReferenceCallb
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeviceCapacity is a combination of a capacity name and its value.",
+				Description: "DeviceCapacity must have exactly one field set.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"name": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Name is a unique identifier for this capacity, which will be referenced when selecting devices.\n\nCapacities are defined either by the owner of the specific driver (usually the vendor) or by some 3rd party (e.g. the Kubernetes project). Because capacities are sometimes compared across devices, a given name is expected to mean the same thing and have the same type on all devices.\n\nCapacity names must be either a C identifier (e.g. \"theName\") or a DNS subdomain followed by a slash (\"/\") followed by a C identifier (e.g. \"dra.example.com/theName\"). Capacities whose name do not include the domain prefix are assumed to be part of the driver's domain. Capacities defined by 3rd parties must include the domain prefix.\n\nThe maximum length for the DNS subdomain is 63 characters (same as for driver names) and the maximum length of the C identifier is 32.",
-							Default:     "",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
 					"quantity": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Quantity determines the size of the capacity.",
@@ -45656,7 +45631,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceCapacity(ref common.ReferenceCallb
 						},
 					},
 				},
-				Required: []string{"name", "quantity"},
 			},
 		},
 		Dependencies: []string{
@@ -45980,7 +45954,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCal
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
