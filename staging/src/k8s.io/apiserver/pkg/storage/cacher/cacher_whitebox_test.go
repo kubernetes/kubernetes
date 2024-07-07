@@ -214,29 +214,26 @@ func TestGetListCacheBypass(t *testing.T) {
 	testCases := map[opts]bool{}
 	testCases[opts{}] = false
 	testCases[opts{Limit: 100}] = false
-	testCases[opts{Continue: continueOnRev1}] = true
-	testCases[opts{Limit: 100, Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "0"}] = false
 	testCases[opts{ResourceVersion: "0", Limit: 100}] = false
-	testCases[opts{ResourceVersion: "0", Continue: continueOnRev1}] = true
-	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 	testCases[opts{ResourceVersion: "1"}] = false
-	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", Continue: continueOnRev1}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: continueOnRev1}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 
 	// Pagination from cached pages
-	testCases[opts{Continue: continueOnRev1, CachedRev1: true}] = false
-	testCases[opts{Limit: 100, Continue: continueOnRev1, CachedRev1: true}] = false
-	testCases[opts{ResourceVersion: "0", Continue: continueOnRev1, CachedRev1: true}] = false
-	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1, CachedRev1: true}] = false
-	testCases[opts{ResourceVersion: "1", Continue: continueOnRev1, CachedRev1: true}] = false
+	for _, cached := range []bool{true, false} {
+		testCases[opts{Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{Limit: 100, Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "0", Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "1", Limit: 100, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "1", Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "1", Limit: 100, Continue: continueOnRev1, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, CachedRev1: cached}] = !cached
+		testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, CachedRev1: cached}] = !cached
+	}
 
 	for opt, expectBypass := range testCases {
 		opt := opt
@@ -245,7 +242,6 @@ func TestGetListCacheBypass(t *testing.T) {
 			testCases[opt] = expectBypass
 		}
 	}
-
 
 	for _, rv := range []string{"", "0", "1"} {
 		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
@@ -299,11 +295,14 @@ func TestGetListCacheBypass(t *testing.T) {
 		testCases[opts{Limit: 100, CachedRev1: true}] = true
 		for opt, expectBypass := range testCases {
 			testGetListCacheBypass(t, storage.ListOptions{
+				Recursive:            true,
 				ResourceVersion:      opt.ResourceVersion,
 				ResourceVersionMatch: opt.ResourceVersionMatch,
 				Predicate: storage.SelectionPredicate{
 					Continue: opt.Continue,
 					Limit:    opt.Limit,
+					Label:    labels.Everything(),
+					Field:    fields.Everything(),
 				},
 			}, opt.CachedRev1, expectBypass)
 		}
@@ -326,11 +325,14 @@ func TestGetListCacheBypass(t *testing.T) {
 		testCases[opts{Limit: 100, CachedRev1: true}] = false
 		for opt, expectBypass := range testCases {
 			testGetListCacheBypass(t, storage.ListOptions{
+				Recursive:            true,
 				ResourceVersion:      opt.ResourceVersion,
 				ResourceVersionMatch: opt.ResourceVersionMatch,
 				Predicate: storage.SelectionPredicate{
 					Continue: opt.Continue,
 					Limit:    opt.Limit,
+					Label:    labels.Everything(),
+					Field:    fields.Everything(),
 				},
 			}, opt.CachedRev1, expectBypass)
 		}

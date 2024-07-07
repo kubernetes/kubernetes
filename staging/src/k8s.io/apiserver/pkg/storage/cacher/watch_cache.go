@@ -153,7 +153,8 @@ type watchCache struct {
 	// to be fresh
 	waitingUntilFresh *conditionalProgressRequester
 
-	storeSnapshots *storeSnapshotter
+	storeSnapshots          *storeSnapshotter
+	eventsSinceLastSnapshot int
 }
 
 func newWatchCache(
@@ -290,8 +291,14 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		w.updateCache(wcEvent)
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
-
-		return updateFunc(elem)
+		err := updateFunc(elem)
+		if err != nil {
+			return err
+		}
+		if orderedStore, ordered := w.store.(orderedLister); ordered {
+			w.storeSnapshots.Set(w.resourceVersion, orderedStore.Clone())
+		}
+		return nil
 	}(); err != nil {
 		return err
 	}
@@ -476,9 +483,8 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	isLegacyResourceVersionMatchExact := opts.ResourceVersionMatch == "" && opts.Predicate.Limit > 0 && nonEmptyResourceVersion
 	switch {
 	case opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact || isLegacyResourceVersionMatchExact:
-		store, ok := w.storeSnapshots.Get(resourceVersion)
-		if !ok {
-			err = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+		store, err := w.exactMatchStorage(resourceVersion)
+		if err != nil {
 			return listResp{}, "", err
 		}
 		return paginatedRead(store, key, "", resourceVersion, opts), "", nil
@@ -489,21 +495,12 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 		if err != nil {
 			return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
-		if nonEmptyResourceVersion {
-			return listResp{}, "", errors.NewBadRequest("specifying resource version is not allowed when using continue")
-		}
-		store, ok := w.storeSnapshots.Get(uint64(continueRV))
-		if !ok {
-			err = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", continueRV))
+		store, err := w.exactMatchStorage(uint64(continueRV))
+		if err != nil {
 			return listResp{}, "", err
 		}
 		return paginatedRead(store, key, continueKey, uint64(continueRV), opts), "", nil
 	default:
-		orderedStore, ordered := w.store.(orderedLister)
-		if opts.Predicate.Limit > 0 && ordered {
-			w.storeSnapshots.Set(w.resourceVersion, orderedStore)
-		}
-
 		// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 		// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 		// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
@@ -519,7 +516,8 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 				}, matchValue.IndexName, err
 			}
 		}
-		if ordered {
+
+		if orderedStore, ordered := w.store.(orderedLister); ordered {
 			result, hasMore := orderedStore.ListPrefix(key, "", 0)
 			return listResp{
 				Items:           result,
@@ -537,6 +535,15 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 			ResourceVersion: w.resourceVersion,
 		}, "", err
 	}
+}
+
+func (w *watchCache) exactMatchStorage(resourceVersion uint64) (orderedLister, error) {
+	store, found := w.storeSnapshots.Get(resourceVersion)
+	if !found {
+		err := errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+		return nil, err
+	}
+	return store, nil
 }
 
 func paginatedRead(store orderedLister, key, continueKey string, resourceVersion uint64, opts storage.ListOptions) listResp {

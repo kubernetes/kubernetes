@@ -17,7 +17,6 @@ limitations under the License.
 package cacher
 
 import (
-	"container/heap"
 	"fmt"
 	"math"
 	"strings"
@@ -408,66 +407,66 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*storeEl
 // storeSnapshotter caches snapshots of store created by cloning the store.
 type storeSnapshotter struct {
 	sync.RWMutex
-	snapshots map[uint64]orderedLister
-	// Using minHeap for fast Clean implementation.
-	revisions minIntHeap
+	snapshots *btree.BTreeG[rvSnapshot]
+}
+
+type rvSnapshot struct {
+	resourceVersion uint64
+	snapshot        orderedLister
 }
 
 func newStoreSnapshotter() *storeSnapshotter {
 	return &storeSnapshotter{
-		snapshots: make(map[uint64]orderedLister),
+		snapshots: btree.NewG[rvSnapshot](32, func(a, b rvSnapshot) bool {
+			return a.resourceVersion < b.resourceVersion
+		}),
 	}
 }
 
 func (c *storeSnapshotter) Get(rv uint64) (orderedLister, bool) {
 	c.RLock()
 	defer c.RUnlock()
-	indexer, ok := c.snapshots[rv]
-	return indexer, ok
+
+	var result *rvSnapshot
+	c.snapshots.DescendLessOrEqual(rvSnapshot{resourceVersion: rv}, func(rvs rvSnapshot) bool {
+		result = &rvs
+		return false
+	})
+	if result == nil {
+		return nil, false
+	}
+	return result.snapshot, true
 }
 
-func (c *storeSnapshotter) Set(rv uint64, store orderedLister) {
+func (c *storeSnapshotter) Includes(rv uint64) bool {
+	c.RLock()
+	defer c.RUnlock()
+
+	oldest, ok := c.snapshots.Min()
+	if !ok {
+		return false
+	}
+
+	return oldest.resourceVersion <= rv
+}
+
+func (c *storeSnapshotter) Set(rv uint64, indexer orderedLister) {
 	c.Lock()
 	defer c.Unlock()
-	if _, ok := c.snapshots[rv]; !ok {
-		heap.Push(&c.revisions, rv)
-	}
-	c.snapshots[rv] = store.Clone()
+	c.snapshots.ReplaceOrInsert(rvSnapshot{resourceVersion: rv, snapshot: indexer})
 }
 
 func (c *storeSnapshotter) Clean(rv uint64) {
 	c.Lock()
 	defer c.Unlock()
-	for len(c.revisions) > 0 && rv >= c.revisions[0] {
-		delete(c.snapshots, c.revisions[0])
-		heap.Pop(&c.revisions)
+	for c.snapshots.Len() > 0 {
+		oldest, ok := c.snapshots.Min()
+		if !ok {
+			break
+		}
+		if rv < oldest.resourceVersion {
+			break
+		}
+		c.snapshots.DeleteMin()
 	}
-}
-
-type minIntHeap []uint64
-
-func (h minIntHeap) Len() int {
-	return len(h)
-}
-
-func (h minIntHeap) Less(i, j int) bool {
-	return h[i] < h[j]
-}
-
-func (h minIntHeap) Swap(i, j int) {
-	h[i], h[j] = h[j], h[i]
-}
-
-func (h *minIntHeap) Push(val interface{}) {
-	*h = append(*h, val.(uint64))
-}
-
-func (h *minIntHeap) Pop() interface{} {
-	old := *h
-
-	size := len(old)
-	val := old[size-1]
-	*h = old[:size-1]
-
-	return val
 }

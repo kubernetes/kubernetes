@@ -788,13 +788,29 @@ func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true, nil
-	case metav1.ResourceVersionMatchNotOlderThan:
+		if !opts.Recursive {
+			return true, nil
+		}
+		rv, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+		if err != nil {
+			return false, err
+		}
+		isCached := c.watchCache.storeSnapshots.Includes(rv)
+		return !isCached, nil
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true, nil
+			if !opts.Recursive {
+				return true, nil
+			}
+			rv, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+			if err != nil {
+				return false, err
+			}
+			isCached := c.watchCache.storeSnapshots.Includes(rv)
+			return !isCached, nil
 		}
+	case metav1.ResourceVersionMatchNotOlderThan:
 	default:
 		return true, nil
 	}
@@ -804,7 +820,7 @@ func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		_, isCached := c.watchCache.storeSnapshots.Get(uint64(rv))
+		isCached := c.watchCache.storeSnapshots.Includes(uint64(rv))
 		return !isCached, nil
 	}
 	// Consistent Read
