@@ -10054,7 +10054,7 @@
           "type": "integer"
         },
         "sources": {
-          "description": "sources is the list of volume projections",
+          "description": "sources is the list of volume projections. Each entry in this list handles one source.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.VolumeProjection"
           },
@@ -11841,7 +11841,7 @@
       "type": "object"
     },
     "io.k8s.api.core.v1.VolumeProjection": {
-      "description": "Projection that may be projected along with other supported volume types",
+      "description": "Projection that may be projected along with other supported volume types. Exactly one of these fields must be set.",
       "properties": {
         "clusterTrustBundle": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ClusterTrustBundleProjection",

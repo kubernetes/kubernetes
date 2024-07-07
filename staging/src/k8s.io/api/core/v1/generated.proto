@@ -4664,7 +4664,8 @@ message ProbeHandler {
 
 // Represents a projected volume source
 message ProjectedVolumeSource {
-  // sources is the list of volume projections
+  // sources is the list of volume projections. Each entry in this list
+  // handles one source.
   // +optional
   // +listType=atomic
   repeated VolumeProjection sources = 1;
@@ -6373,7 +6374,8 @@ message VolumeNodeAffinity {
   optional NodeSelector required = 1;
 }
 
-// Projection that may be projected along with other supported volume types
+// Projection that may be projected along with other supported volume types.
+// Exactly one of these fields must be set.
 message VolumeProjection {
   // secret information about the secret data to project
   // +optional

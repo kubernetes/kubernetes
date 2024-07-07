@@ -1157,7 +1157,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				allErrs = append(allErrs, ValidateLocalNonReservedPath(source.ServiceAccountToken.Path, fldPath.Child("path"))...)
 			}
 		}
-		if projPath := srcPath.Child("clusterTrustBundlePEM"); source.ClusterTrustBundle != nil {
+		if projPath := srcPath.Child("clusterTrustBundle"); source.ClusterTrustBundle != nil {
 			numSources++
 
 			usingName := source.ClusterTrustBundle.Name != nil
@@ -1221,7 +1221,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 			}
 		}
 		if numSources > 1 {
-			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(srcPath, "may not specify more than 1 volume type per source"))
 		}
 	}
 	return allErrs
