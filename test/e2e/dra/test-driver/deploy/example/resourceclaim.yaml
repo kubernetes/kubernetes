@@ -7,5 +7,4 @@ spec:
   devices:
     requests:
     - name: req-0
-      device:
-        deviceClassName: example
+      deviceClassName: example

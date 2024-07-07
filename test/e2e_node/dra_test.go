@@ -597,9 +597,7 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 				Requests: []resourceapi.DeviceRequest{{
 					Name: "my-request",
 					DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-						Device: &resourceapi.DeviceRequestDetail{
-							DeviceClassName: className,
-						},
+						DeviceClassName: className,
 					},
 				}},
 			},

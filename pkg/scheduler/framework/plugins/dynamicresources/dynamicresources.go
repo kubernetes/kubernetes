@@ -742,18 +742,18 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			// initial set of potential nodes before we ask the
 			// driver(s) for information about the specific pod.
 			for _, request := range claim.Spec.Devices.Requests {
-				device := request.Device
-				if device == nil {
-					return nil, statusError(logger, fmt.Errorf("request %s: only device requests are supported", request.Name))
+				details := request.DeviceRequestDetails
+				if details == nil || details.DeviceClassName == "" {
+					return nil, statusError(logger, fmt.Errorf("request %s: unsupported request type", request.Name))
 				}
 
-				class, err := pl.classLister.Get(device.DeviceClassName)
+				class, err := pl.classLister.Get(details.DeviceClassName)
 				if err != nil {
 					// If the class cannot be retrieved, allocation cannot proceed.
 					if apierrors.IsNotFound(err) {
 						// Here we mark the pod as "unschedulable", so it'll sleep in
 						// the unscheduleable queue until a DeviceClass event occurs.
-						return nil, statusUnschedulable(logger, fmt.Sprintf("request %s: resource class %s does not exist", request.Name, device.DeviceClassName))
+						return nil, statusUnschedulable(logger, fmt.Sprintf("request %s: resource class %s does not exist", request.Name, details.DeviceClassName))
 					}
 					// Other error, retry with backoff.
 					return nil, statusError(logger, fmt.Errorf("request %s: look up resource class: %v", request.Name, err))

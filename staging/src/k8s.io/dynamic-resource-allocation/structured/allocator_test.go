@@ -191,10 +191,9 @@ spec:
   devices:
     requests:
     - name: req-0
-      device:
-        countMode: Exact
-        count: 1
-        deviceClassName: driver-a
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
 `)
 
 	allocatedSimpleClaim := unmarshal[resourceapi.AllocationResult](t, `
@@ -222,23 +221,21 @@ spec:
   devices:
     requests:
     - name: req-0
-      device:
-        countMode: Exact
-        count: 1
-        deviceClassName: driver-a
-        selectors:
-        - cel:
-            # small
-            expression: device.capacities["driver-a"].memory.compareTo(quantity("1Gi")) >= 0
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
+      selectors:
+      - cel:
+          # small
+          expression: device.capacities["driver-a"].memory.compareTo(quantity("1Gi")) >= 0
     - name: req-1
-      device:
-        countMode: Exact
-        count: 1
-        deviceClassName: driver-a
-        selectors:
-        - cel:
-            # large
-            expression: device.capacities["driver-a"].memory.compareTo(quantity("2Gi")) >= 0
+      countMode: Exact
+      count: 1
+      deviceClassName: driver-a
+      selectors:
+      - cel:
+          # large
+          expression: device.capacities["driver-a"].memory.compareTo(quantity("2Gi")) >= 0
 `)
 
 	allocatedTwoDeviceClaim := unmarshal[resourceapi.AllocationResult](t, `

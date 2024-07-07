@@ -149,12 +149,12 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 		// has some matching device.
 		for requestIndex := range claim.Spec.Devices.Requests {
 			request := &claim.Spec.Devices.Requests[requestIndex]
-			deviceRequest := request.Device
-			if deviceRequest == nil {
+			details := request.DeviceRequestDetails
+			if details == nil || details.DeviceClassName == "" {
 				// Unknown future request type!
 				return nil, fmt.Errorf("claim %s, request %s: unsupported request type", klog.KObj(claim), request.Name)
 			}
-			for i, selector := range deviceRequest.Selectors {
+			for i, selector := range details.Selectors {
 				if selector.CEL == nil {
 					// Unknown future selector type!
 					return nil, fmt.Errorf("claim %s, request %s, selector #%d: unsupported selector type", klog.KObj(claim), request.Name, i)
@@ -162,21 +162,21 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 			}
 
 			// Should be set. If it isn't, something changed and we should refuse to proceed.
-			if deviceRequest.DeviceClassName == "" {
+			if details.DeviceClassName == "" {
 				return nil, fmt.Errorf("claim %s, request %s: missing device class name", klog.KObj(claim), request.Name)
 			}
-			class, err := alloc.classLister.Get(deviceRequest.DeviceClassName)
+			class, err := alloc.classLister.Get(details.DeviceClassName)
 			if err != nil {
-				return nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, deviceRequest.DeviceClassName, err)
+				return nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, details.DeviceClassName, err)
 			}
 
 			requestData := requestData{
 				class: class,
 			}
 
-			switch request.Device.CountMode {
+			switch request.CountMode {
 			case resourceapi.DeviceCountModeExact:
-				numDevices := request.Device.Count
+				numDevices := request.Count
 				if numDevices > math.MaxInt {
 					// Allowed by API validation, but doesn't make sense.
 					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, numDevices)
@@ -204,7 +204,7 @@ func (sharedAllocator *Allocator) Allocate(ctx context.Context, node *v1.Node) (
 				requestData.numDevices = len(requestData.allDevices)
 				alloc.logger.V(5).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
 			default:
-				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.Device.CountMode)
+				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.CountMode)
 			}
 			alloc.requestData[requestIndices{claimIndex: claimIndex, requestIndex: requestIndex}] = requestData
 			numDevices += requestData.numDevices
@@ -505,8 +505,8 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 	}
 
 	request := &alloc.claimsToAllocate[r.claimIndex].Spec.Devices.Requests[r.requestIndex]
-	doAllDevices := request.Device.CountMode == resourceapi.DeviceCountModeAll
-	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Devices.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", request.Device.AdminAccess)
+	doAllDevices := request.CountMode == resourceapi.DeviceCountModeAll
+	alloc.logger.V(5).Info("Allocating one device", "currentClaim", r.claimIndex, "totalClaims", len(alloc.claimsToAllocate), "currentRequest", r.requestIndex, "totalRequestsPerClaim", len(claim.Spec.Devices.Requests), "currentDevice", r.deviceIndex, "devicesPerRequest", requestData.numDevices, "allDevices", doAllDevices, "adminAccess", request.AdminAccess)
 
 	if doAllDevices {
 		// For "all" devices we already know which ones we need. We
@@ -537,7 +537,7 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if !request.Device.AdminAccess && alloc.allocated[deviceID] {
+				if !request.AdminAccess && alloc.allocated[deviceID] {
 					alloc.logger.V(6).Info("Device in use", "device", deviceID)
 					continue
 				}
@@ -605,7 +605,7 @@ func (alloc *allocator) isSelectable(r requestIndices, slice *resourceapi.Resour
 	}
 
 	request := &alloc.claimsToAllocate[r.claimIndex].Spec.Devices.Requests[r.requestIndex]
-	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.Device.Selectors)
+	match, err := alloc.selectorsMatch(r, device, deviceID, nil, request.Selectors)
 	if err != nil {
 		return false, err
 	}
@@ -665,7 +665,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *resourceapi.Dev
 func (alloc *allocator) allocateDevice(r deviceIndices, device *resourceapi.Device, deviceID DeviceID, must bool) (bool, func(), error) {
 	claim := alloc.claimsToAllocate[r.claimIndex]
 	request := &claim.Spec.Devices.Requests[r.requestIndex]
-	adminAccess := request.Device.AdminAccess
+	adminAccess := request.AdminAccess
 	if !adminAccess && alloc.allocated[deviceID] {
 		alloc.logger.V(6).Info("Device in use", "device", deviceID)
 		return false, nil, nil

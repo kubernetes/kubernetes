@@ -532,9 +532,7 @@ func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) 
 				Requests: []resourceapi.DeviceRequest{{
 					Name: "req1",
 					DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-						Device: &resourceapi.DeviceRequestDetail{
-							DeviceClassName: classname,
-						},
+						DeviceClassName: classname,
 					},
 				}},
 			},
@@ -560,9 +558,7 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 				Requests: []resourceapi.DeviceRequest{{
 					Name: "req1",
 					DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-						Device: &resourceapi.DeviceRequestDetail{
-							DeviceClassName: classname,
-						},
+						DeviceClassName: classname,
 					},
 				}},
 			},
@@ -628,9 +624,7 @@ func makeTemplate(name, namespace, classname string) *resourceapi.ResourceClaimT
 					Requests: []resourceapi.DeviceRequest{{
 						Name: "req1",
 						DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-							Device: &resourceapi.DeviceRequestDetail{
-								DeviceClassName: classname,
-							},
+							DeviceClassName: classname,
 						},
 					}},
 				},

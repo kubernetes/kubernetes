@@ -197,11 +197,11 @@ func structuredClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClai
 func breakCELInClaim(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 	claim = claim.DeepCopy()
 	for i := range claim.Spec.Devices.Requests {
-		for e := range claim.Spec.Devices.Requests[i].Device.Selectors {
-			claim.Spec.Devices.Requests[i].Device.Selectors[e] = brokenSelector
+		for e := range claim.Spec.Devices.Requests[i].Selectors {
+			claim.Spec.Devices.Requests[i].Selectors[e] = brokenSelector
 		}
-		if len(claim.Spec.Devices.Requests[i].Device.Selectors) == 0 {
-			claim.Spec.Devices.Requests[i].Device.Selectors = []resourceapi.DeviceSelector{brokenSelector}
+		if len(claim.Spec.Devices.Requests[i].Selectors) == 0 {
+			claim.Spec.Devices.Requests[i].Selectors = []resourceapi.DeviceSelector{brokenSelector}
 		}
 	}
 	return claim

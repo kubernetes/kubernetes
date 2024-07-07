@@ -615,16 +615,12 @@ func (ctrl *controller) checkPodClaim(ctx context.Context, pod *v1.Pod, podClaim
 		DeviceClasses: make(map[string]*resourceapi.DeviceClass),
 	}
 	for _, request := range claim.Spec.Devices.Requests {
-		deviceRequest := request.Device
-		if deviceRequest == nil {
+		details := request.DeviceRequestDetails
+		if details == nil || details.DeviceClassName == "" {
 			// Some unknown request. Abort!
 			return nil, fmt.Errorf("claim %s: unknown request type in request %s", klog.KObj(claim), request.Name)
 		}
-		deviceClassName := deviceRequest.DeviceClassName
-		if deviceClassName == "" {
-			// Should be set, but we don't care, so no error.
-			continue
-		}
+		deviceClassName := details.DeviceClassName
 		class, err := ctrl.dcLister.Get(deviceClassName)
 		if err != nil {
 			return nil, fmt.Errorf("claim %s: request %s: class %s: %v", klog.KObj(claim), request.Name, deviceClassName, err)

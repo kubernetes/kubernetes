@@ -222,15 +222,15 @@ func (c *ExampleController) allocateOne(ctx context.Context, claim *resourceapi.
 
 	if len(claim.Spec.Devices.Requests) != 1 ||
 		claim.Spec.Devices.Requests[0].DeviceRequestDetails == nil ||
-		claim.Spec.Devices.Requests[0].DeviceRequestDetails.Device == nil ||
-		claim.Spec.Devices.Requests[0].DeviceRequestDetails.Device.CountMode != resourceapi.DeviceCountModeExact ||
-		claim.Spec.Devices.Requests[0].DeviceRequestDetails.Device.Count != 1 {
+		claim.Spec.Devices.Requests[0].DeviceRequestDetails.DeviceClassName == "" ||
+		claim.Spec.Devices.Requests[0].DeviceRequestDetails.CountMode != resourceapi.DeviceCountModeExact ||
+		claim.Spec.Devices.Requests[0].DeviceRequestDetails.Count != 1 {
 		return nil, errors.New("only claims requesting exactly one device are supported")
 	}
 	request := claim.Spec.Devices.Requests[0]
-	deviceRequest := request.DeviceRequestDetails.Device
-	class := deviceClasses[deviceRequest.DeviceClassName]
-	if len(deviceRequest.Selectors) > 0 ||
+	requestDetails := request.DeviceRequestDetails
+	class := deviceClasses[requestDetails.DeviceClassName]
+	if len(requestDetails.Selectors) > 0 ||
 		class != nil && len(class.Spec.Selectors) > 0 {
 		return nil, errors.New("device selectors are not supported")
 	}

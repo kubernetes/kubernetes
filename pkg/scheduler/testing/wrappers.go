@@ -952,11 +952,9 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 		resourceapi.DeviceRequest{
 			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
 			DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-				Device: &resourceapi.DeviceRequestDetail{
-					CountMode:       resourceapi.DeviceCountModeExact,
-					Count:           1,
-					DeviceClassName: deviceClassName,
-				},
+				CountMode:       resourceapi.DeviceCountModeExact,
+				Count:           1,
+				DeviceClassName: deviceClassName,
 			},
 		},
 	)

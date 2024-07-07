@@ -243,9 +243,7 @@ func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClai
 					{
 						Name: requestName,
 						DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-							Device: &resourceapi.DeviceRequestDetail{
-								DeviceClassName: className,
-							},
+							DeviceClassName: className,
 						},
 					},
 				},

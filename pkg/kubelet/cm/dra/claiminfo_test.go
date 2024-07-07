@@ -81,9 +81,7 @@ func TestNewClaimInfoFromClaim(t *testing.T) {
 							{
 								Name: requestName,
 								DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-									Device: &resourceapi.DeviceRequestDetail{
-										DeviceClassName: className,
-									},
+									DeviceClassName: className,
 								},
 							},
 						},

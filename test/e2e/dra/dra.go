@@ -422,11 +422,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("retries pod scheduling after creating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.podInline()
-			deviceClassName := template.Spec.Spec.Devices.Requests[0].Device.DeviceClassName
+			deviceClassName := template.Spec.Spec.Devices.Requests[0].DeviceClassName
 			class, err := f.ClientSet.ResourceV1alpha3().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			deviceClassName += "-b"
-			template.Spec.Spec.Devices.Requests[0].Device.DeviceClassName = deviceClassName
+			template.Spec.Spec.Devices.Requests[0].DeviceClassName = deviceClassName
 			objects = append(objects, template, pod)
 			b.create(ctx, objects...)
 
@@ -445,7 +445,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			pod, template := b.podInline()
 
 			// First modify the class so that it matches no nodes (for classic DRA) and no devices (structured parameters).
-			deviceClassName := template.Spec.Spec.Devices.Requests[0].Device.DeviceClassName
+			deviceClassName := template.Spec.Spec.Devices.Requests[0].DeviceClassName
 			class, err := f.ClientSet.ResourceV1alpha3().DeviceClasses().Get(ctx, deviceClassName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			originalClass := class.DeepCopy()
@@ -653,7 +653,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					)))
 
 					pod, template := b.podInline()
-					template.Spec.Spec.Devices.Requests[0].Device.Selectors = append(template.Spec.Spec.Devices.Requests[0].Device.Selectors,
+					template.Spec.Spec.Devices.Requests[0].Selectors = append(template.Spec.Spec.Devices.Requests[0].Selectors,
 						resourceapi.DeviceSelector{
 							CEL: &resourceapi.CELDeviceSelector{
 								// Runtime error on one node, but not all.
@@ -880,9 +880,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.externalClaim()
-			claim.Spec.Devices.Requests[0].Device.AdminAccess = true
+			claim.Spec.Devices.Requests[0].AdminAccess = true
 			_, claimTemplate := b.podInline()
-			claimTemplate.Spec.Spec.Devices.Requests[0].Device.AdminAccess = true
+			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = true
 			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
@@ -938,9 +938,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						Requests: []resourceapi.DeviceRequest{{
 							Name: "req-0",
 							DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-								Device: &resourceapi.DeviceRequestDetail{
-									DeviceClassName: "my-class",
-								},
+								DeviceClassName: "my-class",
 							},
 						}},
 					},
@@ -1219,9 +1217,7 @@ func (b *builder) claimSpec() resourceapi.ResourceClaimSpec {
 			Requests: []resourceapi.DeviceRequest{{
 				Name: "my-request",
 				DeviceRequestDetails: &resourceapi.DeviceRequestDetails{
-					Device: &resourceapi.DeviceRequestDetail{
-						DeviceClassName: b.className(),
-					},
+					DeviceClassName: b.className(),
 				},
 			}},
 			Config: []resourceapi.DeviceClaimConfiguration{{

@@ -8,5 +8,4 @@ spec:
     devices:
       requests:
       - name: req-0
-        device:
-          deviceClassName: test-class
+        deviceClassName: test-class
