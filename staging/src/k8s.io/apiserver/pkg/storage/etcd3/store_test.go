@@ -161,6 +161,11 @@ func TestPreconditionalDeleteWithSuggestionPass(t *testing.T) {
 	storagetesting.RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx, t, store)
 }
 
+func TestListPaging(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestListPaging(ctx, t, store)
+}
+
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client), store)
