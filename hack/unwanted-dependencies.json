@@ -82,9 +82,7 @@
       ],
       "cloud.google.com/go/compute": [
         "github.com/google/cadvisor",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "google.golang.org/genproto",
-        "google.golang.org/grpc"
+        "google.golang.org/genproto"
       ],
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
@@ -184,25 +182,19 @@
       ],
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
-        "github.com/google/cel-go"
+        "github.com/google/cel-go",
+        "k8s.io/mount-utils"
       ],
       "google.golang.org/appengine": [
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
-        "github.com/prometheus/client_golang",
-        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
-        "google.golang.org/grpc"
+        "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
-        "github.com/grpc-ecosystem/grpc-gateway/v2",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
-        "go.etcd.io/etcd/server/v3",
-        "google.golang.org/genproto/googleapis/api",
-        "google.golang.org/genproto/googleapis/rpc",
-        "google.golang.org/grpc"
+        "go.etcd.io/etcd/server/v3"
       ]
     },
     "unwantedVendored": [

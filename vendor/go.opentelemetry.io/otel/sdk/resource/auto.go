@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package resource // import "go.opentelemetry.io/otel/sdk/resource"
 
@@ -41,8 +30,20 @@ type Detector interface {
 	// must never be done outside of a new major release.
 }
 
-// Detect calls all input detectors sequentially and merges each result with the previous one.
-// It returns the merged error too.
+// Detect returns a new [Resource] merged from all the Resources each of the
+// detectors produces. Each of the detectors are called sequentially, in the
+// order they are passed, merging the produced resource into the previous.
+//
+// This may return a partial Resource along with an error containing
+// [ErrPartialResource] if that error is returned from a detector. It may also
+// return a merge-conflicting Resource along with an error containing
+// [ErrSchemaURLConflict] if merging Resources from different detectors results
+// in a schema URL conflict. It is up to the caller to determine if this
+// returned Resource should be used or not.
+//
+// If one of the detectors returns an error that is not [ErrPartialResource],
+// the resource produced by the detector will not be merged and the returned
+// error will wrap that detector's error.
 func Detect(ctx context.Context, detectors ...Detector) (*Resource, error) {
 	r := new(Resource)
 	return r, detect(ctx, r, detectors)
@@ -50,6 +51,10 @@ func Detect(ctx context.Context, detectors ...Detector) (*Resource, error) {
 
 // detect runs all detectors using ctx and merges the result into res. This
 // assumes res is allocated and not nil, it will panic otherwise.
+//
+// If the detectors or merging resources produces any errors (i.e.
+// [ErrPartialResource] [ErrSchemaURLConflict]), a single error wrapping all of
+// these errors will be returned. Otherwise, nil is returned.
 func detect(ctx context.Context, res *Resource, detectors []Detector) error {
 	var (
 		r    *Resource
@@ -77,6 +82,11 @@ func detect(ctx context.Context, res *Resource, detectors []Detector) error {
 
 	if len(errs) == 0 {
 		return nil
+	}
+	if errors.Is(errs, ErrSchemaURLConflict) {
+		// If there has been a merge conflict, ensure the resource has no
+		// schema URL.
+		res.schemaURL = ""
 	}
 	return errs
 }
