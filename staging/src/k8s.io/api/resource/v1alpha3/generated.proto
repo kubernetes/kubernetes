@@ -409,6 +409,11 @@ message DeviceConstraint {
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
+//
+// A DeviceClassName is currently required. Clients must check that it is
+// indeed set. It's absence indicates that something changes in a way that
+// is not supported by the client yet, in which case it must refuse to
+// handle the request.
 message DeviceRequest {
   // Name can be used to reference this request in a pod.spec.containers[].resources.claims
   // entry and in a constraint of the claim.
@@ -456,8 +461,8 @@ message DeviceRequestAllocationResult {
   optional string device = 4;
 }
 
-// DeviceRequestDetail is currently the only permitted alternative in DeviceRequestDetails.
-message DeviceRequestDetail {
+// DeviceRequestDetails is embedded in DeviceRequest and defines one request.
+message DeviceRequestDetails {
   // DeviceClassName references a specific DeviceClass, which can define
   // additional configuration and selectors to be inherited by this
   // request.
@@ -518,14 +523,6 @@ message DeviceRequestDetail {
   // +optional
   // +default=false
   optional bool adminAccess = 5;
-}
-
-// DeviceRequestDetails is embedded inside DeviceRequest. Exactly one field must be set.
-message DeviceRequestDetails {
-  // Device requests one or more devices.
-  //
-  // +optional
-  optional DeviceRequestDetail device = 1;
 }
 
 // DeviceSelector must have exactly one field set.

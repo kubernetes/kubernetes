@@ -380,6 +380,11 @@ type DeviceClaim struct {
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
+//
+// A DeviceClassName is currently required. Clients must check that it is
+// indeed set. It's absence indicates that something changes in a way that
+// is not supported by the client yet, in which case it must refuse to
+// handle the request.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
@@ -389,19 +394,11 @@ type DeviceRequest struct {
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	*DeviceRequestDetails `json:",inline" protobuf:"bytes,2,name=deviceRequestDetails"`
+	*DeviceRequestDetails `json:",inline" protobuf:"bytes,2,name=deviceRequestDetail"`
 }
 
-// DeviceRequestDetails is embedded inside DeviceRequest. Exactly one field must be set.
+// DeviceRequestDetails is embedded in DeviceRequest and defines one request.
 type DeviceRequestDetails struct {
-	// Device requests one or more devices.
-	//
-	// +optional
-	Device *DeviceRequestDetail `json:"device,omitempty" protobuf:"bytes,1,opt,name=device"`
-}
-
-// DeviceRequestDetail is currently the only permitted alternative in DeviceRequestDetails.
-type DeviceRequestDetail struct {
 	// DeviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
@@ -466,7 +463,7 @@ type DeviceRequestDetail struct {
 
 type DeviceCountMode string
 
-// Valid [DeviceRequestDetail.CountMode] values.
+// Valid [DeviceRequestDetails.CountMode] values.
 const (
 	DeviceCountModeExact = DeviceCountMode("Exact")
 	DeviceCountModeAll   = DeviceCountMode("All")

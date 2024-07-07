@@ -179,7 +179,7 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceRequest = map[string]string{
-	"":     "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
+	"":     "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changes in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
 	"name": "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
 }
 
@@ -199,22 +199,13 @@ func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
 	return map_DeviceRequestAllocationResult
 }
 
-var map_DeviceRequestDetail = map[string]string{
-	"":                "DeviceRequestDetail is currently the only permitted alternative in DeviceRequestDetails.",
+var map_DeviceRequestDetails = map[string]string{
+	"":                "DeviceRequestDetails is embedded in DeviceRequest and defines one request.",
 	"deviceClassName": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
 	"selectors":       "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
 	"countMode":       "CountMode and its related fields define how many devices are needed to satisfy this request. Supported values are:\n\n- Exact: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf countMode is not specified, the default countMode is Exact. If countMode is Exact and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 	"count":           "Count is used only when the count mode is \"Exact\". Must be greater than zero. If CountMode is Exact and this field is not specified, the default is one.",
 	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.",
-}
-
-func (DeviceRequestDetail) SwaggerDoc() map[string]string {
-	return map_DeviceRequestDetail
-}
-
-var map_DeviceRequestDetails = map[string]string{
-	"":       "DeviceRequestDetails is embedded inside DeviceRequest. Exactly one field must be set.",
-	"device": "Device requests one or more devices.",
 }
 
 func (DeviceRequestDetails) SwaggerDoc() map[string]string {

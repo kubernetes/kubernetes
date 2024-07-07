@@ -336,11 +336,11 @@ func validateResourceRequests(requests []resource.DeviceRequest, fldPath *field.
 
 func validateRequest(request *resource.DeviceRequest, fldPath *field.Path, opts Options) field.ErrorList {
 	allErrs := corevalidation.ValidateDNS1123Label(request.Name, fldPath.Child("name"))
-	allErrs = append(allErrs, validateDeviceRequest(request.Device, fldPath.Child("device"), opts)...)
+	allErrs = append(allErrs, validateDeviceRequestDetail(request.DeviceRequestDetails, fldPath.Child("device"), opts)...)
 	return allErrs
 }
 
-func validateDeviceRequest(deviceRequest *resource.DeviceRequestDetail, fldPath *field.Path, opts Options) field.ErrorList {
+func validateDeviceRequestDetail(deviceRequest *resource.DeviceRequestDetails, fldPath *field.Path, opts Options) field.ErrorList {
 	if deviceRequest == nil {
 		return field.ErrorList{field.Required(fldPath, "")}
 	}

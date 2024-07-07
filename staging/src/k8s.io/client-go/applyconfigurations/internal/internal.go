@@ -12318,13 +12318,30 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.DeviceRequest
   map:
     fields:
-    - name: device
+    - name: adminAccess
       type:
-        namedType: io.k8s.api.resource.v1alpha3.DeviceRequestDetail
+        scalar: boolean
+      default: false
+    - name: count
+      type:
+        scalar: numeric
+    - name: countMode
+      type:
+        scalar: string
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
     - name: name
       type:
         scalar: string
       default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.DeviceRequestAllocationResult
   map:
     fields:
@@ -12344,29 +12361,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.resource.v1alpha3.DeviceRequestDetail
-  map:
-    fields:
-    - name: adminAccess
-      type:
-        scalar: boolean
-      default: false
-    - name: count
-      type:
-        scalar: numeric
-    - name: countMode
-      type:
-        scalar: string
-    - name: deviceClassName
-      type:
-        scalar: string
-      default: ""
-    - name: selectors
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
-          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.DeviceSelector
   map:
     fields:

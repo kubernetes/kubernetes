@@ -25,7 +25,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_DeviceRequestDetail(obj *resourceapi.DeviceRequestDetail) {
+func SetDefaults_DeviceRequestDetails(obj *resourceapi.DeviceRequestDetails) {
 	if obj.CountMode == "" {
 		obj.CountMode = resourceapi.DeviceCountModeExact
 	}

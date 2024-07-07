@@ -18,10 +18,18 @@ limitations under the License.
 
 package v1alpha3
 
+import (
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+)
+
 // DeviceRequestDetailsApplyConfiguration represents a declarative configuration of the DeviceRequestDetails type for use
 // with apply.
 type DeviceRequestDetailsApplyConfiguration struct {
-	Device *DeviceRequestDetailApplyConfiguration `json:"device,omitempty"`
+	DeviceClassName *string                            `json:"deviceClassName,omitempty"`
+	Selectors       []DeviceSelectorApplyConfiguration `json:"selectors,omitempty"`
+	CountMode       *resourcev1alpha3.DeviceCountMode  `json:"countMode,omitempty"`
+	Count           *int64                             `json:"count,omitempty"`
+	AdminAccess     *bool                              `json:"adminAccess,omitempty"`
 }
 
 // DeviceRequestDetailsApplyConfiguration constructs a declarative configuration of the DeviceRequestDetails type for use with
@@ -30,10 +38,47 @@ func DeviceRequestDetails() *DeviceRequestDetailsApplyConfiguration {
 	return &DeviceRequestDetailsApplyConfiguration{}
 }
 
-// WithDevice sets the Device field in the declarative configuration to the given value
+// WithDeviceClassName sets the DeviceClassName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Device field is set to the value of the last call.
-func (b *DeviceRequestDetailsApplyConfiguration) WithDevice(value *DeviceRequestDetailApplyConfiguration) *DeviceRequestDetailsApplyConfiguration {
-	b.Device = value
+// If called multiple times, the DeviceClassName field is set to the value of the last call.
+func (b *DeviceRequestDetailsApplyConfiguration) WithDeviceClassName(value string) *DeviceRequestDetailsApplyConfiguration {
+	b.DeviceClassName = &value
+	return b
+}
+
+// WithSelectors adds the given value to the Selectors field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Selectors field.
+func (b *DeviceRequestDetailsApplyConfiguration) WithSelectors(values ...*DeviceSelectorApplyConfiguration) *DeviceRequestDetailsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSelectors")
+		}
+		b.Selectors = append(b.Selectors, *values[i])
+	}
+	return b
+}
+
+// WithCountMode sets the CountMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CountMode field is set to the value of the last call.
+func (b *DeviceRequestDetailsApplyConfiguration) WithCountMode(value resourcev1alpha3.DeviceCountMode) *DeviceRequestDetailsApplyConfiguration {
+	b.CountMode = &value
+	return b
+}
+
+// WithCount sets the Count field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Count field is set to the value of the last call.
+func (b *DeviceRequestDetailsApplyConfiguration) WithCount(value int64) *DeviceRequestDetailsApplyConfiguration {
+	b.Count = &value
+	return b
+}
+
+// WithAdminAccess sets the AdminAccess field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AdminAccess field is set to the value of the last call.
+func (b *DeviceRequestDetailsApplyConfiguration) WithAdminAccess(value bool) *DeviceRequestDetailsApplyConfiguration {
+	b.AdminAccess = &value
 	return b
 }

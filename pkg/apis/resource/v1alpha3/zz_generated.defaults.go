@@ -43,9 +43,7 @@ func SetObjectDefaults_ResourceClaim(in *v1alpha3.ResourceClaim) {
 	for i := range in.Spec.Devices.Requests {
 		a := &in.Spec.Devices.Requests[i]
 		if a.DeviceRequestDetails != nil {
-			if a.DeviceRequestDetails.Device != nil {
-				SetDefaults_DeviceRequestDetail(a.DeviceRequestDetails.Device)
-			}
+			SetDefaults_DeviceRequestDetails(a.DeviceRequestDetails)
 		}
 	}
 }
@@ -61,9 +59,7 @@ func SetObjectDefaults_ResourceClaimTemplate(in *v1alpha3.ResourceClaimTemplate)
 	for i := range in.Spec.Spec.Devices.Requests {
 		a := &in.Spec.Spec.Devices.Requests[i]
 		if a.DeviceRequestDetails != nil {
-			if a.DeviceRequestDetails.Device != nil {
-				SetDefaults_DeviceRequestDetail(a.DeviceRequestDetails.Device)
-			}
+			SetDefaults_DeviceRequestDetails(a.DeviceRequestDetails)
 		}
 	}
 }

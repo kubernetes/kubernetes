@@ -899,7 +899,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
-		"k8s.io/api/resource/v1alpha3.DeviceRequestDetail":                                                      schema_k8sio_api_resource_v1alpha3_DeviceRequestDetail(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestDetails":                                                     schema_k8sio_api_resource_v1alpha3_DeviceRequestDetails(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
 		"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration":                                                schema_k8sio_api_resource_v1alpha3_OpaqueDeviceConfiguration(ref),
@@ -45996,7 +45995,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
+				Description: "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changes in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -46007,18 +46006,61 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
-					"device": {
+					"deviceClassName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Device requests one or more devices.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceRequestDetail"),
+							Description: "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"selectors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSelector"),
+									},
+								},
+							},
+						},
+					},
+					"countMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CountMode and its related fields define how many devices are needed to satisfy this request. Supported values are:\n\n- Exact: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf countMode is not specified, the default countMode is Exact. If countMode is Exact and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"count": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Count is used only when the count mode is \"Exact\". Must be greater than zero. If CountMode is Exact and this field is not specified, the default is one.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"adminAccess": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
 						},
 					},
 				},
-				Required: []string{"name"},
+				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceRequestDetail"},
+			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
 	}
 }
 
@@ -46068,11 +46110,11 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 	}
 }
 
-func schema_k8sio_api_resource_v1alpha3_DeviceRequestDetail(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_resource_v1alpha3_DeviceRequestDetails(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "DeviceRequestDetail is currently the only permitted alternative in DeviceRequestDetails.",
+				Description: "DeviceRequestDetails is embedded in DeviceRequest and defines one request.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"deviceClassName": {
@@ -46130,27 +46172,6 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestDetail(ref common.Reference
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
-	}
-}
-
-func schema_k8sio_api_resource_v1alpha3_DeviceRequestDetails(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "DeviceRequestDetails is embedded inside DeviceRequest. Exactly one field must be set.",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"device": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Device requests one or more devices.",
-							Ref:         ref("k8s.io/api/resource/v1alpha3.DeviceRequestDetail"),
-						},
-					},
-				},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceRequestDetail"},
 	}
 }
 
