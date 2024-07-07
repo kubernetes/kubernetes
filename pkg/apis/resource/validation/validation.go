@@ -331,10 +331,6 @@ func validateResourceRequests(requests []resource.DeviceRequest, fldPath *field.
 		idxPath := fldPath.Index(i)
 		allErrs = append(allErrs, validateRequest(&requests[i], idxPath, opts)...)
 	}
-	if len(requests) == 0 {
-		// We could allow this ("null claim"), but it also could be a user mistake, so we flag it as an error.
-		allErrs = append(allErrs, field.Required(fldPath, "a claim must have at least one request"))
-	}
 	return allErrs
 }
 
