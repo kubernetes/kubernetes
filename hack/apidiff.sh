@@ -69,7 +69,7 @@ shift $((OPTIND - 1))
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
     # This lists all entries in the go.work file as absolute directory paths.
-    kube::util::read-array targets < <(go list -f '{{.Dir}}' -m)
+    kube::util::read-array targets < <(kube::golang::workspace_all)
 fi
 
 # Sanitize paths:
