@@ -268,7 +268,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node1,
 
-			expectResults: objects[any](allocatedSimpleClaim),
+			expectResults: []any{allocatedSimpleClaim},
 		},
 		"other-node": {
 			claimsToAllocate: objects(simpleClaim),
@@ -276,7 +276,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node2,
 
-			expectResults: objects[any](allocatedSimpleClaimNode2),
+			expectResults: []any{allocatedSimpleClaimNode2},
 		},
 		"small-and-large": {
 			claimsToAllocate: objects(twoDeviceClaim),
@@ -284,7 +284,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node1,
 
-			expectResults: objects[any](allocatedTwoDeviceClaim),
+			expectResults: []any{allocatedTwoDeviceClaim},
 		},
 		"small-and-large-backtrack": {
 			claimsToAllocate: objects(twoDeviceClaim),
@@ -299,7 +299,7 @@ devices:
 			}()),
 			node: node1,
 
-			expectResults: objects[any](allocatedTwoDeviceClaim),
+			expectResults: []any{allocatedTwoDeviceClaim},
 		},
 
 		// TODO:
