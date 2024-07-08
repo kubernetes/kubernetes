@@ -98,15 +98,6 @@ func (DeviceAttribute) SwaggerDoc() map[string]string {
 	return map_DeviceAttribute
 }
 
-var map_DeviceCapacity = map[string]string{
-	"":         "DeviceCapacity must have exactly one field set.",
-	"quantity": "Quantity determines the size of the capacity.",
-}
-
-func (DeviceCapacity) SwaggerDoc() map[string]string {
-	return map_DeviceCapacity
-}
-
 var map_DeviceClaim = map[string]string{
 	"":            "DeviceClaim defines how to request devices with a ResourceClaim.",
 	"requests":    "Requests represent individual requests for distinct devices which must all be satisfied. If empty, nothing needs to be allocated.",

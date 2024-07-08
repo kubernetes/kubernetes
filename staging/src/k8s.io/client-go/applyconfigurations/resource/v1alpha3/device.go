@@ -20,6 +20,7 @@ package v1alpha3
 
 import (
 	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resource "k8s.io/apimachinery/pkg/api/resource"
 )
 
 // DeviceApplyConfiguration represents a declarative configuration of the Device type for use
@@ -27,7 +28,7 @@ import (
 type DeviceApplyConfiguration struct {
 	Name       *string                                                      `json:"name,omitempty"`
 	Attributes map[v1alpha3.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity   map[v1alpha3.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
+	Capacity   map[v1alpha3.QualifiedName]resource.Quantity                 `json:"capacity,omitempty"`
 }
 
 // DeviceApplyConfiguration constructs a declarative configuration of the Device type for use with
@@ -62,9 +63,9 @@ func (b *DeviceApplyConfiguration) WithAttributes(entries map[v1alpha3.Qualified
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Capacity field,
 // overwriting an existing map entries in Capacity field with the same key.
-func (b *DeviceApplyConfiguration) WithCapacity(entries map[v1alpha3.QualifiedName]DeviceCapacityApplyConfiguration) *DeviceApplyConfiguration {
+func (b *DeviceApplyConfiguration) WithCapacity(entries map[v1alpha3.QualifiedName]resource.Quantity) *DeviceApplyConfiguration {
 	if b.Capacity == nil && len(entries) > 0 {
-		b.Capacity = make(map[v1alpha3.QualifiedName]DeviceCapacityApplyConfiguration, len(entries))
+		b.Capacity = make(map[v1alpha3.QualifiedName]resource.Quantity, len(entries))
 	}
 	for k, v := range entries {
 		b.Capacity[k] = v

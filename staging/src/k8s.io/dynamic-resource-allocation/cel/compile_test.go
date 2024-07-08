@@ -32,7 +32,7 @@ func TestCompile(t *testing.T) {
 		expression         string
 		driver             string
 		attributes         map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-		capacity           map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+		capacity           map[resourceapi.QualifiedName]resource.Quantity
 		expectCompileError string
 		expectMatchError   string
 		expectMatch        bool
@@ -129,13 +129,13 @@ func TestCompile(t *testing.T) {
 		},
 		"quantity": {
 			expression:  `device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: ptr.To(resource.MustParse("1Mi"))}},
+			capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
 		"check-positive": {
 			expression:  `"name" in device.capacity["dra.example.com"] && device.capacity["dra.example.com"].name.isGreaterThan(quantity("1Ki"))`,
-			capacity:    map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{"name": {Quantity: ptr.To(resource.MustParse("1Mi"))}},
+			capacity:    map[resourceapi.QualifiedName]resource.Quantity{"name": resource.MustParse("1Mi")},
 			driver:      "dra.example.com",
 			expectMatch: true,
 		},
@@ -162,8 +162,8 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 				"string":  {StringValue: ptr.To("fish")},
 				"version": {VersionValue: ptr.To("1.0.0")},
 			},
-			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
-				"quantity": {Quantity: ptr.To(resource.MustParse("1Mi"))},
+			capacity: map[resourceapi.QualifiedName]resource.Quantity{
+				"quantity": resource.MustParse("1Mi"),
 			},
 			driver:      "dra.example.com",
 			expectMatch: true,

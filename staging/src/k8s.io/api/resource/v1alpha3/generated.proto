@@ -140,7 +140,7 @@ message Device {
   // The maximum number of attributes and capacities combined is 32.
   //
   // +optional
-  map<string, DeviceCapacity> capacity = 3;
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -205,14 +205,6 @@ message DeviceAttribute {
   //
   // +optional
   optional string version = 5;
-}
-
-// DeviceCapacity must have exactly one field set.
-message DeviceCapacity {
-  // Quantity determines the size of the capacity.
-  //
-  // +optional
-  optional .k8s.io.apimachinery.pkg.api.resource.Quantity quantity = 1;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.

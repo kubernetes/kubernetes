@@ -158,12 +158,7 @@
           },
           "capacity": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1alpha3.DeviceCapacity"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
             },
             "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "type": "object"
@@ -261,20 +256,6 @@
           "version": {
             "description": "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.resource.v1alpha3.DeviceCapacity": {
-        "description": "DeviceCapacity must have exactly one field set.",
-        "properties": {
-          "quantity": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "Quantity determines the size of the capacity."
           }
         },
         "type": "object"

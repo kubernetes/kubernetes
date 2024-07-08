@@ -12168,7 +12168,7 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         map:
           elementType:
-            namedType: io.k8s.api.resource.v1alpha3.DeviceCapacity
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
     - name: name
       type:
         scalar: string
@@ -12219,12 +12219,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
-- name: io.k8s.api.resource.v1alpha3.DeviceCapacity
-  map:
-    fields:
-    - name: quantity
-      type:
-        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1alpha3.DeviceClaim
   map:
     fields:

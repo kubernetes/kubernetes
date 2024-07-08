@@ -200,7 +200,7 @@ type Device struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
+	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
 }
 
 // Limit for the sum of the number of entries in both ResourceSlices.
@@ -256,14 +256,6 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
-}
-
-// DeviceCapacity must have exactly one field set.
-type DeviceCapacity struct {
-	// Quantity determines the size of the capacity.
-	//
-	// +optional
-	Quantity *resource.Quantity `json:"quantity,omitempty" protobuf:"bytes,1,opt,name=quantity"`
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.

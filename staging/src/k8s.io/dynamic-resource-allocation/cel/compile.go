@@ -31,6 +31,7 @@ import (
 	"github.com/google/cel-go/ext"
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -66,7 +67,7 @@ type Device struct {
 	// string attribute.
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Capacity   map[resourceapi.QualifiedName]resource.Quantity
 }
 
 type compiler struct {
@@ -147,18 +148,6 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 	}
 }
 
-// getCapacityValue returns the native representation of the one value that
-// should be stored in the attribute, otherwise an error. An error is
-// also returned when there is no supported value.
-func getCapacityValue(cap resourceapi.DeviceCapacity) (any, error) {
-	switch {
-	case cap.Quantity != nil:
-		return apiservercel.Quantity{Quantity: cap.Quantity}, nil
-	default:
-		return nil, errors.New("unsupported capacity value")
-	}
-}
-
 var boolType = reflect.TypeOf(true)
 
 func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
@@ -177,24 +166,20 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		attributes[domain].(map[string]any)[id] = value
 	}
 
-	capacities := make(map[string]any)
-	for name, cap := range input.Capacity {
-		value, err := getCapacityValue(cap)
-		if err != nil {
-			return false, fmt.Errorf("capacity %s: %w", name, err)
-		}
+	capacity := make(map[string]any)
+	for name, quantity := range input.Capacity {
 		domain, id := parseQualifiedName(name, input.Driver)
-		if capacities[domain] == nil {
-			capacities[domain] = make(map[string]any)
+		if capacity[domain] == nil {
+			capacity[domain] = make(map[string]apiservercel.Quantity)
 		}
-		capacities[domain].(map[string]any)[id] = value
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
 	}
 
 	variables := map[string]any{
 		deviceVar: map[string]any{
 			driverVar:     input.Driver,
 			attributesVar: newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), attributes, c.emptyMapVal),
-			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), capacities, c.emptyMapVal),
+			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.TypeAdapter(), capacity, c.emptyMapVal),
 		},
 	}
 
@@ -228,7 +213,7 @@ func mustBuildEnv() *environment.EnvSet {
 	deviceType := apiservercel.NewObjectType("kubernetes.DRADevice", fields(
 		field(driverVar, apiservercel.StringType, true),
 		field(attributesVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
-		field(capacityVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
+		field(capacityVar, apiservercel.NewMapType(apiservercel.StringType, apiservercel.NewMapType(apiservercel.StringType, apiservercel.AnyType /* TODO (future): is there a QuantityType that can be used here? */, resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice), true),
 	))
 
 	versioned := []environment.VersionedOptions{

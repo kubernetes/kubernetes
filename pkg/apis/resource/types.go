@@ -197,7 +197,7 @@ type Device struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	Capacity map[QualifiedName]DeviceCapacity
+	Capacity map[QualifiedName]resource.Quantity
 }
 
 // Limit for the sum of the number of entries in both ResourceSlices.
@@ -253,14 +253,6 @@ type DeviceAttribute struct {
 	//
 	// +optional
 	VersionValue *string
-}
-
-// DeviceCapacity must have exactly one field set.
-type DeviceCapacity struct {
-	// Quantity determines the size of the capacity.
-	//
-	// +optional
-	Quantity *resource.Quantity
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
