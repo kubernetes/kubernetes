@@ -341,6 +341,11 @@ func IsPodDisruptionTarget(pod *v1.Pod) bool {
 	return isPodDisruptionTargetConditionTrue(pod.Status)
 }
 
+// IsPodPendingTermination returns true if Pods PendingTermination condition is true
+func IsPodPendingTermination(pod *v1.Pod) bool {
+	return isPodPendingTerminationConditionTrue(pod.Status)
+}
+
 // isPodTerminal returns true if a pod is terminal, all containers are stopped and cannot ever regress.
 // copied from k8s.io/kubernetes/pkg/api/v1/pod
 func isPodTerminal(pod *v1.Pod) bool {
@@ -392,6 +397,28 @@ func getPodDisruptionTargetCondition(status *v1.PodStatus) *v1.PodCondition {
 
 	for i := range status.Conditions {
 		if status.Conditions[i].Type == v1.DisruptionTarget {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
+}
+
+// isPodPendingTerminationConditionTrue returns true if a pod is pending termination; false otherwise.
+func isPodPendingTerminationConditionTrue(status v1.PodStatus) bool {
+	condition := getPodPendingTerminationCondition(&status)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// getPodPendingTerminationCondition extracts the pod pending termination condition from
+// the given status and returns that.
+// Returns nil if the condition is not present.
+func getPodPendingTerminationCondition(status *v1.PodStatus) *v1.PodCondition {
+	if status == nil || status.Conditions == nil {
+		return nil
+	}
+
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == v1.PendingTermination {
 			return &status.Conditions[i]
 		}
 	}

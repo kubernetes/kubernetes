@@ -52,6 +52,12 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 	if !terminating {
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditionSignalsTerminating) {
 			terminating = endpointutil.IsPodDisruptionTarget(pod)
+
+			if !terminating {
+				if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+					terminating = endpointutil.IsPodPendingTermination(pod)
+				}
+			}
 		}
 	}
 
