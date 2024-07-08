@@ -219,6 +219,8 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	joinRunner.AppendPhase(phases.NewControlPlanePreparePhase())
 	joinRunner.AppendPhase(phases.NewCheckEtcdPhase())
 	joinRunner.AppendPhase(phases.NewKubeletStartPhase())
+	joinRunner.AppendPhase(phases.NewEtcdJoinPhase())
+	joinRunner.AppendPhase(phases.NewKubeletWaitBootstrapPhase())
 	joinRunner.AppendPhase(phases.NewControlPlaneJoinPhase())
 	joinRunner.AppendPhase(phases.NewWaitControlPlanePhase())
 

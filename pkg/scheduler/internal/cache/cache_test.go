@@ -2050,6 +2050,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 	cache := newCache(ctx, time.Second, time.Second)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
+		cache.AddNode(logger, st.MakeNode().Name(nodeName).Obj())
 		for j := 0; j < 30; j++ {
 			objName := fmt.Sprintf("%s-pod-%d", nodeName, j)
 			pod := makeBasePod(b, nodeName, objName, "0", "0", "", nil)
@@ -2065,10 +2066,15 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *cacheImpl {
 	logger, ctx := ktesting.NewTestContext(b)
 	ctx, cancel := context.WithCancel(ctx)
+	addedNodes := make(map[string]struct{})
 	defer cancel()
 	cache := newCache(ctx, time.Second, time.Second)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
+		if _, ok := addedNodes[nodeName]; !ok {
+			cache.AddNode(logger, st.MakeNode().Name(nodeName).Obj())
+			addedNodes[nodeName] = struct{}{}
+		}
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)
 		pod := makeBasePod(b, nodeName, objName, "0", "0", "", nil)
 

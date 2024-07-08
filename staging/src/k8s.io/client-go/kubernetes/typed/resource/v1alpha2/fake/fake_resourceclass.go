@@ -45,7 +45,7 @@ var resourceclassesKind = v1alpha2.SchemeGroupVersion.WithKind("ResourceClass")
 func (c *FakeResourceClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClass, err error) {
 	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(resourceclassesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(resourceclassesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeResourceClasses) Get(ctx context.Context, name string, options v1.G
 func (c *FakeResourceClasses) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassList, err error) {
 	emptyResult := &v1alpha2.ResourceClassList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(resourceclassesResource, resourceclassesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(resourceclassesResource, resourceclassesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeResourceClasses) List(ctx context.Context, opts v1.ListOptions) (re
 // Watch returns a watch.Interface that watches the requested resourceClasses.
 func (c *FakeResourceClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(resourceclassesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(resourceclassesResource, opts))
 }
 
 // Create takes the representation of a resourceClass and creates it.  Returns the server's representation of the resourceClass, and an error, if there is any.
 func (c *FakeResourceClasses) Create(ctx context.Context, resourceClass *v1alpha2.ResourceClass, opts v1.CreateOptions) (result *v1alpha2.ResourceClass, err error) {
 	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(resourceclassesResource, resourceClass), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(resourceclassesResource, resourceClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeResourceClasses) Create(ctx context.Context, resourceClass *v1alpha
 func (c *FakeResourceClasses) Update(ctx context.Context, resourceClass *v1alpha2.ResourceClass, opts v1.UpdateOptions) (result *v1alpha2.ResourceClass, err error) {
 	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(resourceclassesResource, resourceClass), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(resourceclassesResource, resourceClass, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeResourceClasses) Delete(ctx context.Context, name string, opts v1.D
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeResourceClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(resourceclassesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(resourceclassesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha2.ResourceClassList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeResourceClasses) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeResourceClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClass, err error) {
 	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(resourceclassesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeResourceClasses) Apply(ctx context.Context, resourceClass *resource
 	}
 	emptyResult := &v1alpha2.ResourceClass{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourceclassesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(resourceclassesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

@@ -213,13 +213,13 @@ type KubeProxyConfiguration struct {
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
 
-	// detectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	// detectLocalMode determines mode to use for detecting local traffic, defaults to ClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. (For dual-stack
 	// clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When
-	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
+	// DetectLocalMode is set to ClusterCIDR, kube-proxy will consider
 	// traffic to be local if its source IP is in this range. (Otherwise it is not
 	// used.)
 	ClusterCIDR string `json:"clusterCIDR"`

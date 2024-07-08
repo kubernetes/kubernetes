@@ -37,7 +37,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -710,7 +709,18 @@ func TestDescribeService(t *testing.T) {
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       corev1.ServiceAffinityNone,
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
 					HealthCheckNodePort:   32222,
+				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP:     "5.6.7.8",
+								IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
+							},
+						},
+					},
 				},
 			},
 			endpointSlices: []*discoveryv1.EndpointSlice{{
@@ -742,13 +752,15 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8 (VIP)
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               9527/TCP
 				NodePort:                 port-tcp  31111/TCP
 				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527
 				Session Affinity:         None
 				External Traffic Policy:  Local
+				Internal Traffic Policy:  Cluster
 				HealthCheck NodePort:     32222
 				Events:                   <none>
 			`)[1:],
@@ -775,7 +787,17 @@ func TestDescribeService(t *testing.T) {
 					LoadBalancerIP:        "5.6.7.8",
 					SessionAffinity:       corev1.ServiceAffinityNone,
 					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
 					HealthCheckNodePort:   32222,
+				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP: "5.6.7.8",
+							},
+						},
+					},
 				},
 			},
 			endpointSlices: []*discoveryv1.EndpointSlice{
@@ -827,13 +849,15 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
 				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527 + 2 more...
 				Session Affinity:         None
 				External Traffic Policy:  Local
+				Internal Traffic Policy:  Local
 				HealthCheck NodePort:     32222
 				Events:                   <none>
 			`)[1:],
@@ -890,7 +914,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      <none>
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
@@ -939,7 +963,7 @@ func TestDescribeService(t *testing.T) {
 				IP Families:              IPv4
 				IP:                       1.2.3.4
 				IPs:                      1.2.3.4
-				IP:                       5.6.7.8
+				Desired LoadBalancer IP:  5.6.7.8
 				Port:                     port-tcp  8080/TCP
 				TargetPort:               targetPort/TCP
 				NodePort:                 port-tcp  31111/TCP
@@ -6343,12 +6367,12 @@ func TestDescribeServiceCIDR(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"ServiceCIDR v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			}),
@@ -6359,12 +6383,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16, fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv4": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16"},
 				},
 			}),
@@ -6375,12 +6399,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv6": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"fd00:1:1::/64"},
 				},
 			}),
@@ -6414,13 +6438,13 @@ func TestDescribeIPAddress(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"IPAddress v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.IPAddress{
+		"IPAddress v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.IPAddressSpec{
-					ParentRef: &networkingv1alpha1.ParentReference{
+				Spec: networkingv1beta1.IPAddressSpec{
+					ParentRef: &networkingv1beta1.ParentReference{
 						Group:     "mygroup",
 						Resource:  "myresource",
 						Namespace: "mynamespace",

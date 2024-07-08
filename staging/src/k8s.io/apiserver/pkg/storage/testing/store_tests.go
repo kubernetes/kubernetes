@@ -28,6 +28,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1245,6 +1246,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 			} else {
 				ExpectContains(t, "incorrect list pods", toInterfaceSlice(tt.expectedAlternatives), out.Items)
+			}
+			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
+				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
 			}
 		})
 	}

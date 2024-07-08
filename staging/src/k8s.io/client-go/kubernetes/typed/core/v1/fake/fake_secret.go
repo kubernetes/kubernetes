@@ -46,7 +46,7 @@ var secretsKind = v1.SchemeGroupVersion.WithKind("Secret")
 func (c *FakeSecrets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Secret, err error) {
 	emptyResult := &v1.Secret{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(secretsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(secretsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeSecrets) Get(ctx context.Context, name string, options metav1.GetOp
 func (c *FakeSecrets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.SecretList, err error) {
 	emptyResult := &v1.SecretList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(secretsResource, secretsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(secretsResource, secretsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeSecrets) List(ctx context.Context, opts metav1.ListOptions) (result
 // Watch returns a watch.Interface that watches the requested secrets.
 func (c *FakeSecrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(secretsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(secretsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeSecrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 func (c *FakeSecrets) Create(ctx context.Context, secret *v1.Secret, opts metav1.CreateOptions) (result *v1.Secret, err error) {
 	emptyResult := &v1.Secret{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(secretsResource, c.ns, secret), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(secretsResource, c.ns, secret, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeSecrets) Create(ctx context.Context, secret *v1.Secret, opts metav1
 func (c *FakeSecrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.UpdateOptions) (result *v1.Secret, err error) {
 	emptyResult := &v1.Secret{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(secretsResource, c.ns, secret), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(secretsResource, c.ns, secret, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeSecrets) Delete(ctx context.Context, name string, opts metav1.Delet
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeSecrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(secretsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(secretsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.SecretList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeSecrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 func (c *FakeSecrets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Secret, err error) {
 	emptyResult := &v1.Secret{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(secretsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeSecrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfi
 	}
 	emptyResult := &v1.Secret{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(secretsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

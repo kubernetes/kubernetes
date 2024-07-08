@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
-	examplev1 "k8s.io/code-generator/examples/HyphenGroup/apis/example/v1"
 )
 
 // TestTypeApplyConfiguration represents a declarative configuration of the TestType type for use
@@ -30,7 +29,7 @@ import (
 type TestTypeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Status                           *examplev1.TestTypeStatus `json:"status,omitempty"`
+	Status                           *TestTypeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // TestType constructs a declarative configuration of the TestType type for use with
@@ -205,8 +204,8 @@ func (b *TestTypeApplyConfiguration) ensureObjectMetaApplyConfigurationExists() 
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *TestTypeApplyConfiguration) WithStatus(value examplev1.TestTypeStatus) *TestTypeApplyConfiguration {
-	b.Status = &value
+func (b *TestTypeApplyConfiguration) WithStatus(value *TestTypeStatusApplyConfiguration) *TestTypeApplyConfiguration {
+	b.Status = value
 	return b
 }
 

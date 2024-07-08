@@ -952,20 +952,16 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 	for i := 0; i < opts.uniqueResourceClaimsPerPod; i++ {
 		claimName := fmt.Sprintf("claim%d-%s-%s", i, pod.Name, pod.Namespace)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: fmt.Sprintf("claim%d", i),
-			Source: corev1.ClaimSource{
-				ResourceClaimName: &claimName,
-			},
+			Name:              fmt.Sprintf("claim%d", i),
+			ResourceClaimName: &claimName,
 		})
 	}
 	for i := 0; i < opts.uniqueResourceClaimTemplatesPerPod; i++ {
 		claimTemplateName := fmt.Sprintf("claimtemplate%d-%s-%s", i, pod.Name, pod.Namespace)
 		podClaimName := fmt.Sprintf("claimtemplate%d", i)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: podClaimName,
-			Source: corev1.ClaimSource{
-				ResourceClaimTemplateName: &claimTemplateName,
-			},
+			Name:                      podClaimName,
+			ResourceClaimTemplateName: &claimTemplateName,
 		})
 	}
 	for i := 0; i < opts.uniqueResourceClaimTemplatesWithClaimPerPod; i++ {
@@ -973,10 +969,8 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		podClaimName := fmt.Sprintf("claimtemplate-with-claim%d", i)
 		claimName := fmt.Sprintf("generated-claim-%s-%s-%d", pod.Name, pod.Namespace, i)
 		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, corev1.PodResourceClaim{
-			Name: podClaimName,
-			Source: corev1.ClaimSource{
-				ResourceClaimTemplateName: &claimTemplateName,
-			},
+			Name:                      podClaimName,
+			ResourceClaimTemplateName: &claimTemplateName,
 		})
 		pod.Status.ResourceClaimStatuses = append(pod.Status.ResourceClaimStatuses, corev1.PodResourceClaimStatus{
 			Name:              podClaimName,

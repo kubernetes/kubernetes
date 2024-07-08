@@ -2,3 +2,4 @@
 
 labels:
   - sig/api-machinery
+  - sig/etcd

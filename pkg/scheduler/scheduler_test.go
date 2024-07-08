@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +42,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
+
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
@@ -54,8 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/ptr"
+	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestSchedulerCreation(t *testing.T) {
@@ -994,18 +997,18 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fakeClient.EventsV1()})
+			defer eventBroadcaster.Shutdown()
+
 			eventRecorder := eventBroadcaster.NewRecorder(scheme.Scheme, fakePermit)
 
 			outOfTreeRegistry := frameworkruntime.Registry{
 				fakePermit: newFakePermitPlugin(eventRecorder),
 			}
 
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+			tCtx := utiltesting.Init(t)
 
 			scheduler, err := New(
-				ctx,
+				tCtx,
 				fakeClient,
 				informerFactory,
 				nil,
@@ -1034,13 +1037,13 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			defer stopFn()
 
 			// Run scheduler.
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
-			go scheduler.Run(ctx)
+			informerFactory.Start(tCtx.Done())
+			informerFactory.WaitForCacheSync(tCtx.Done())
+			go scheduler.Run(tCtx)
 
 			// Send pods to be scheduled.
 			for _, p := range tc.waitSchedulingPods {
-				_, err = fakeClient.CoreV1().Pods("").Create(ctx, p, metav1.CreateOptions{})
+				_, err = fakeClient.CoreV1().Pods("").Create(tCtx, p, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -1049,18 +1052,16 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 			// Wait all pods in waitSchedulingPods to be scheduled.
 			wg.Wait()
 
-			// Ensure that all waitingPods in scheduler can be obtained from any profiles.
-			for _, fwk := range scheduler.Profiles {
-				actualPodNamesInWaitingPods := sets.NewString()
-				fwk.IterateOverWaitingPods(func(pod framework.WaitingPod) {
-					actualPodNamesInWaitingPods.Insert(pod.GetPod().Name)
-				})
-				// Validate the name of pods in waitingPods matches expectations.
-				if actualPodNamesInWaitingPods.Len() != len(tc.expectPodNamesInWaitingPods) ||
-					!actualPodNamesInWaitingPods.HasAll(tc.expectPodNamesInWaitingPods...) {
-					t.Fatalf("Unexpected waitingPods in scheduler profile %s, expect: %#v, got: %#v", fwk.ProfileName(), tc.expectPodNamesInWaitingPods, actualPodNamesInWaitingPods.List())
+			utiltesting.Eventually(tCtx, func(utiltesting.TContext) sets.Set[string] {
+				// Ensure that all waitingPods in scheduler can be obtained from any profiles.
+				actualPodNamesInWaitingPods := sets.New[string]()
+				for _, fwk := range scheduler.Profiles {
+					fwk.IterateOverWaitingPods(func(pod framework.WaitingPod) {
+						actualPodNamesInWaitingPods.Insert(pod.GetPod().Name)
+					})
 				}
-			}
+				return actualPodNamesInWaitingPods
+			}).WithTimeout(permitTimeout).Should(gomega.Equal(sets.New(tc.expectPodNamesInWaitingPods...)), "unexpected waitingPods in scheduler profile")
 		})
 	}
 }
@@ -1185,6 +1186,7 @@ func (f fakePermitPlugin) Name() string {
 
 const (
 	podWaitingReason = "podWaiting"
+	permitTimeout    = 10 * time.Second
 )
 
 func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
@@ -1193,7 +1195,7 @@ func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleStat
 		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
-	return framework.NewStatus(framework.Wait), 100 * time.Second
+	return framework.NewStatus(framework.Wait), permitTimeout
 }
 
 var _ framework.PermitPlugin = &fakePermitPlugin{}

@@ -21,7 +21,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -62,18 +62,18 @@ var _ = common.SIGDescribe(feature.ServiceCIDRs, func() {
 
 	ginkgo.It("should create Services and servce on different Service CIDRs", func(ctx context.Context) {
 		// create a new service CIDR
-		svcCIDR := &networkingv1alpha1.ServiceCIDR{
+		svcCIDR := &networkingv1beta1.ServiceCIDR{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-svc-cidr",
 			},
-			Spec: networkingv1alpha1.ServiceCIDRSpec{
+			Spec: networkingv1beta1.ServiceCIDRSpec{
 				CIDRs: []string{"10.196.196.0/24"},
 			},
 		}
-		_, err := cs.NetworkingV1alpha1().ServiceCIDRs().Create(context.TODO(), svcCIDR, metav1.CreateOptions{})
+		_, err := cs.NetworkingV1beta1().ServiceCIDRs().Create(context.TODO(), svcCIDR, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "error creating ServiceCIDR")
 		if pollErr := wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.RespondingTimeout, false, func(ctx context.Context) (bool, error) {
-			svcCIDR, err := cs.NetworkingV1alpha1().ServiceCIDRs().Get(ctx, svcCIDR.Name, metav1.GetOptions{})
+			svcCIDR, err := cs.NetworkingV1beta1().ServiceCIDRs().Get(ctx, svcCIDR.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -103,13 +103,13 @@ var _ = common.SIGDescribe(feature.ServiceCIDRs, func() {
 
 })
 
-func isReady(serviceCIDR *networkingv1alpha1.ServiceCIDR) bool {
+func isReady(serviceCIDR *networkingv1beta1.ServiceCIDR) bool {
 	if serviceCIDR == nil {
 		return false
 	}
 
 	for _, condition := range serviceCIDR.Status.Conditions {
-		if condition.Type == string(networkingv1alpha1.ServiceCIDRConditionReady) {
+		if condition.Type == string(networkingv1beta1.ServiceCIDRConditionReady) {
 			return condition.Status == metav1.ConditionStatus(metav1.ConditionTrue)
 		}
 	}

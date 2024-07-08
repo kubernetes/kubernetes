@@ -22,7 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
-	examplev1 "k8s.io/code-generator/examples/crd/apis/example/v1"
 )
 
 // ClusterTestTypeApplyConfiguration represents a declarative configuration of the ClusterTestType type for use
@@ -30,7 +29,7 @@ import (
 type ClusterTestTypeApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Status                           *examplev1.ClusterTestTypeStatus `json:"status,omitempty"`
+	Status                           *ClusterTestTypeStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // ClusterTestType constructs a declarative configuration of the ClusterTestType type for use with
@@ -204,8 +203,8 @@ func (b *ClusterTestTypeApplyConfiguration) ensureObjectMetaApplyConfigurationEx
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ClusterTestTypeApplyConfiguration) WithStatus(value examplev1.ClusterTestTypeStatus) *ClusterTestTypeApplyConfiguration {
-	b.Status = &value
+func (b *ClusterTestTypeApplyConfiguration) WithStatus(value *ClusterTestTypeStatusApplyConfiguration) *ClusterTestTypeApplyConfiguration {
+	b.Status = value
 	return b
 }
 

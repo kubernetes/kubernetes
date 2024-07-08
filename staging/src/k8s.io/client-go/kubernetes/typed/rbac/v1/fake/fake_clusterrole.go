@@ -45,7 +45,7 @@ var clusterrolesKind = v1.SchemeGroupVersion.WithKind("ClusterRole")
 func (c *FakeClusterRoles) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClusterRole, err error) {
 	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(clusterrolesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(clusterrolesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeClusterRoles) Get(ctx context.Context, name string, options metav1.
 func (c *FakeClusterRoles) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClusterRoleList, err error) {
 	emptyResult := &v1.ClusterRoleList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(clusterrolesResource, clusterrolesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(clusterrolesResource, clusterrolesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeClusterRoles) List(ctx context.Context, opts metav1.ListOptions) (r
 // Watch returns a watch.Interface that watches the requested clusterRoles.
 func (c *FakeClusterRoles) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(clusterrolesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(clusterrolesResource, opts))
 }
 
 // Create takes the representation of a clusterRole and creates it.  Returns the server's representation of the clusterRole, and an error, if there is any.
 func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.CreateOptions) (result *v1.ClusterRole, err error) {
 	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(clusterrolesResource, clusterRole), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(clusterrolesResource, clusterRole, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeClusterRoles) Create(ctx context.Context, clusterRole *v1.ClusterRo
 func (c *FakeClusterRoles) Update(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.UpdateOptions) (result *v1.ClusterRole, err error) {
 	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(clusterrolesResource, clusterRole), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(clusterrolesResource, clusterRole, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeClusterRoles) Delete(ctx context.Context, name string, opts metav1.
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(clusterrolesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(clusterrolesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ClusterRoleList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeClusterRoles) DeleteCollection(ctx context.Context, opts metav1.Del
 func (c *FakeClusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRole, err error) {
 	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterrolesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeClusterRoles) Apply(ctx context.Context, clusterRole *rbacv1.Cluste
 	}
 	emptyResult := &v1.ClusterRole{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clusterrolesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterrolesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

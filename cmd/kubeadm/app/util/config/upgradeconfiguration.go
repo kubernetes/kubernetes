@@ -45,7 +45,7 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 
 	for gvk, bytes := range gvkmap {
 		// check if this version is supported and possibly not deprecated
-		if err := validateSupportedVersion(gvk.GroupVersion(), allowDeprecated, true); err != nil {
+		if err := validateSupportedVersion(gvk, allowDeprecated, true); err != nil {
 			return nil, err
 		}
 

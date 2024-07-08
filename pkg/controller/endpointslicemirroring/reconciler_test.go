@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
@@ -48,6 +49,7 @@ func TestReconcile(t *testing.T) {
 		subsets                  []corev1.EndpointSubset
 		epLabels                 map[string]string
 		epAnnotations            map[string]string
+		uid                      string
 		endpointsDeletionPending bool
 		maxEndpointsPerSubset    int32
 		existingEndpointSlices   []*discovery.EndpointSlice
@@ -219,9 +221,19 @@ func TestReconcile(t *testing.T) {
 				Hostname: "pod-1",
 			}},
 		}},
+		uid: "d8f2c1f6-5285-4b3c-b3c1-9b89f9e7ed7a",
 		existingEndpointSlices: []*discovery.EndpointSlice{{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-ep-1",
+				Name:      "test-ep-1",
+				Namespace: "test",
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "v1",
+						Kind:       "Endpoints",
+						Name:       "test-ep",
+						UID:        "d8f2c1f6-5285-4b3c-b3c1-9b89f9e7ed7a",
+					},
+				},
 			},
 			AddressType: discovery.AddressTypeIPv4,
 			Ports: []discovery.EndpointPort{{
@@ -237,6 +249,47 @@ func TestReconcile(t *testing.T) {
 		}},
 		expectedNumSlices:     1,
 		expectedClientActions: 0,
+	}, {
+		testName: "Endpoints with 1 subset, port, and address and existing slice with same fields but different OwnerReferences",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		uid: "d8f2c1f6-5285-4b3c-b3c1-9b89f9e7ed7a",
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-ep-1",
+				Namespace: "test",
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion: "v1",
+						Kind:       "Endpoints",
+						Name:       "test-ep",
+						UID:        "fb91e798-1875-4857-b5eb-e2c878157b4d",
+					},
+				},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     pointer.String("http"),
+				Port:     pointer.Int32(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   pointer.String("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
 	}, {
 		testName: "Endpoints with 1 subset, port, and address and existing slice with an additional annotation",
 		subsets: []corev1.EndpointSubset{{
@@ -1012,7 +1065,7 @@ func TestReconcile(t *testing.T) {
 			setupMetrics()
 			namespace := "test"
 			endpoints := corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels, Annotations: tc.epAnnotations},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels, Annotations: tc.epAnnotations, UID: types.UID(tc.uid)},
 				Subsets:    tc.subsets,
 			}
 

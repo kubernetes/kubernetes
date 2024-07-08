@@ -45,7 +45,7 @@ var persistentvolumesKind = v1.SchemeGroupVersion.WithKind("PersistentVolume")
 func (c *FakePersistentVolumes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolume, err error) {
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(persistentvolumesResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(persistentvolumesResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakePersistentVolumes) Get(ctx context.Context, name string, options me
 func (c *FakePersistentVolumes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PersistentVolumeList, err error) {
 	emptyResult := &v1.PersistentVolumeList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(persistentvolumesResource, persistentvolumesKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(persistentvolumesResource, persistentvolumesKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakePersistentVolumes) List(ctx context.Context, opts metav1.ListOption
 // Watch returns a watch.Interface that watches the requested persistentVolumes.
 func (c *FakePersistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(persistentvolumesResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(persistentvolumesResource, opts))
 }
 
 // Create takes the representation of a persistentVolume and creates it.  Returns the server's representation of the persistentVolume, and an error, if there is any.
 func (c *FakePersistentVolumes) Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (result *v1.PersistentVolume, err error) {
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(persistentvolumesResource, persistentVolume), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(persistentvolumesResource, persistentVolume, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakePersistentVolumes) Create(ctx context.Context, persistentVolume *v1
 func (c *FakePersistentVolumes) Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(persistentvolumesResource, persistentVolume), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(persistentvolumesResource, persistentVolume, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -107,7 +107,7 @@ func (c *FakePersistentVolumes) Update(ctx context.Context, persistentVolume *v1
 func (c *FakePersistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(persistentvolumesResource, "status", persistentVolume), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(persistentvolumesResource, "status", persistentVolume, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -123,7 +123,7 @@ func (c *FakePersistentVolumes) Delete(ctx context.Context, name string, opts me
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(persistentvolumesResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(persistentvolumesResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeList{})
 	return err
@@ -133,7 +133,7 @@ func (c *FakePersistentVolumes) DeleteCollection(ctx context.Context, opts metav
 func (c *FakePersistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error) {
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(persistentvolumesResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -155,7 +155,7 @@ func (c *FakePersistentVolumes) Apply(ctx context.Context, persistentVolume *cor
 	}
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(persistentvolumesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -178,7 +178,7 @@ func (c *FakePersistentVolumes) ApplyStatus(ctx context.Context, persistentVolum
 	}
 	emptyResult := &v1.PersistentVolume{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(persistentvolumesResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(persistentvolumesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

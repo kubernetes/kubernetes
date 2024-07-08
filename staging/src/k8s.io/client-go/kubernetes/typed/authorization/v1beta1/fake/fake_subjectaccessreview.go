@@ -39,7 +39,7 @@ var subjectaccessreviewsKind = v1beta1.SchemeGroupVersion.WithKind("SubjectAcces
 func (c *FakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SubjectAccessReview, err error) {
 	emptyResult := &v1beta1.SubjectAccessReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(subjectaccessreviewsResource, subjectAccessReview), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(subjectaccessreviewsResource, subjectAccessReview, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

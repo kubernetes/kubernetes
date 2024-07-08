@@ -8,6 +8,7 @@ package filedesc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"google.golang.org/protobuf/internal/descfmt"
@@ -197,6 +198,16 @@ func (p *Fields) lazyInit() *Fields {
 				}
 				if _, ok := p.byText[d.TextName()]; !ok {
 					p.byText[d.TextName()] = d
+				}
+				if isGroupLike(d) {
+					lowerJSONName := strings.ToLower(d.JSONName())
+					if _, ok := p.byJSON[lowerJSONName]; !ok {
+						p.byJSON[lowerJSONName] = d
+					}
+					lowerTextName := strings.ToLower(d.TextName())
+					if _, ok := p.byText[lowerTextName]; !ok {
+						p.byText[lowerTextName] = d
+					}
 				}
 				if _, ok := p.byNum[d.Number()]; !ok {
 					p.byNum[d.Number()] = d

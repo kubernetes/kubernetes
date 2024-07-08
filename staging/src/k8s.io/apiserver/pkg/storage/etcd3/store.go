@@ -591,6 +591,11 @@ func (s *store) Count(key string) (int64, error) {
 	return getResp.Count, nil
 }
 
+// ReadinessCheck implements storage.Interface.
+func (s *store) ReadinessCheck() error {
+	return nil
+}
+
 // resolveGetListRev is used by GetList to resolve the rev to use in the client.KV.Get request.
 func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts storage.ListOptions) (int64, error) {
 	var withRev int64

@@ -116,6 +116,6 @@ func (ms *mapReflect) NewValue() protoreflect.Value {
 func (ms *mapReflect) IsValid() bool {
 	return !ms.v.IsNil()
 }
-func (ms *mapReflect) protoUnwrap() interface{} {
+func (ms *mapReflect) protoUnwrap() any {
 	return ms.v.Interface()
 }

@@ -535,7 +535,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 		//   2. The last item in the log should be 9999
 		_, err = time.Parse(time.RFC3339, string(ts))
 		assert.NoError(t, err, "timestamp not found")
-		assert.Equal(t, true, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
+		assert.True(t, bytes.HasSuffix(logline, []byte("9999")), "is the complete log found")
 	}
 
 	assert.Equal(t, 2, lineCount, "should have two lines")

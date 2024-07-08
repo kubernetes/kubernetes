@@ -92,7 +92,7 @@ func (o CustomResourceDefinitionsServerOptions) Validate() error {
 
 // Complete fills in missing options.
 func (o *CustomResourceDefinitionsServerOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // Config returns an apiextensions-apiserver configuration.

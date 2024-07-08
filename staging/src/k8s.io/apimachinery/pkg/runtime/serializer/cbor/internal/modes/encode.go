@@ -37,11 +37,10 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		NaNConvert: cbor.NaNConvertReject,
 		InfConvert: cbor.InfConvertReject,
 
-		// Prefer encoding math/big.Int to one of the 64-bit integer types if it fits. When
-		// later decoded into Unstructured, the set of allowable concrete numeric types is
-		// limited to int64 and float64, so the distinction between big integer and integer
-		// can't be preserved.
-		BigIntConvert: cbor.BigIntConvertShortest,
+		// Error on attempt to encode math/big.Int values, which can't be faithfully
+		// roundtripped through Unstructured in general (the dynamic numeric types allowed
+		// in Unstructured are limited to float64 and int64).
+		BigIntConvert: cbor.BigIntConvertReject,
 
 		// MarshalJSON for time.Time writes RFC3339 with nanos.
 		Time: cbor.TimeRFC3339Nano,
@@ -76,6 +75,22 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 		// Encode struct field names to the byte string type rather than the text string
 		// type.
 		FieldName: cbor.FieldNameToByteString,
+
+		// Marshal Go byte arrays to CBOR arrays of integers (as in JSON) instead of byte
+		// strings.
+		ByteArray: cbor.ByteArrayToArray,
+
+		// Marshal []byte to CBOR byte string enclosed in tag 22 (expected later base64
+		// encoding, https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.5.2), to
+		// interoperate with the existing JSON behavior. This indicates to the decoder that,
+		// when decoding into a string (or unstructured), the resulting value should be the
+		// base64 encoding of the original bytes. No base64 encoding or decoding needs to be
+		// performed for []byte-to-CBOR-to-[]byte roundtrips.
+		ByteSliceLaterFormat: cbor.ByteSliceLaterFormatBase64,
+
+		// Disable default recognition of types implementing encoding.BinaryMarshaler, which
+		// is not recognized for JSON encoding.
+		BinaryMarshaler: cbor.BinaryMarshalerNone,
 	}.EncMode()
 	if err != nil {
 		panic(err)

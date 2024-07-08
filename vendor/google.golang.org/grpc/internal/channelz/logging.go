@@ -26,53 +26,49 @@ import (
 
 var logger = grpclog.Component("channelz")
 
-func withParens(id *Identifier) string {
-	return "[" + id.String() + "] "
-}
-
 // Info logs and adds a trace event if channelz is on.
-func Info(l grpclog.DepthLoggerV2, id *Identifier, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Info(l grpclog.DepthLoggerV2, e Entity, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprint(args...),
 		Severity: CtInfo,
 	})
 }
 
 // Infof logs and adds a trace event if channelz is on.
-func Infof(l grpclog.DepthLoggerV2, id *Identifier, format string, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Infof(l grpclog.DepthLoggerV2, e Entity, format string, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprintf(format, args...),
 		Severity: CtInfo,
 	})
 }
 
 // Warning logs and adds a trace event if channelz is on.
-func Warning(l grpclog.DepthLoggerV2, id *Identifier, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Warning(l grpclog.DepthLoggerV2, e Entity, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprint(args...),
 		Severity: CtWarning,
 	})
 }
 
 // Warningf logs and adds a trace event if channelz is on.
-func Warningf(l grpclog.DepthLoggerV2, id *Identifier, format string, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Warningf(l grpclog.DepthLoggerV2, e Entity, format string, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprintf(format, args...),
 		Severity: CtWarning,
 	})
 }
 
 // Error logs and adds a trace event if channelz is on.
-func Error(l grpclog.DepthLoggerV2, id *Identifier, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Error(l grpclog.DepthLoggerV2, e Entity, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprint(args...),
 		Severity: CtError,
 	})
 }
 
 // Errorf logs and adds a trace event if channelz is on.
-func Errorf(l grpclog.DepthLoggerV2, id *Identifier, format string, args ...any) {
-	AddTraceEvent(l, id, 1, &TraceEventDesc{
+func Errorf(l grpclog.DepthLoggerV2, e Entity, format string, args ...any) {
+	AddTraceEvent(l, e, 1, &TraceEvent{
 		Desc:     fmt.Sprintf(format, args...),
 		Severity: CtError,
 	})

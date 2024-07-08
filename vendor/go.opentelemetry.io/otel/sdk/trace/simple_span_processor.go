@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
@@ -36,10 +25,10 @@ var _ SpanProcessor = (*simpleSpanProcessor)(nil)
 // send completed spans to the exporter immediately.
 //
 // This SpanProcessor is not recommended for production use. The synchronous
-// nature of this SpanProcessor make it good for testing, debugging, or
-// showing examples of other feature, but it will be slow and have a high
-// computation resource usage overhead. The BatchSpanProcessor is recommended
-// for production use instead.
+// nature of this SpanProcessor makes it good for testing, debugging, or showing
+// examples of other features, but it will be slow and have a high computation
+// resource usage overhead. The BatchSpanProcessor is recommended for production
+// use instead.
 func NewSimpleSpanProcessor(exporter SpanExporter) SpanProcessor {
 	ssp := &simpleSpanProcessor{
 		exporter: exporter,
@@ -80,10 +69,10 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 		//
 		// A closure is used to keep reference to the exporter and then the
 		// field is zeroed. This ensures the simpleSpanProcessor is shut down
-		// before the exporter. This order is important as it avoids a
-		// potential deadlock. If the exporter shut down operation generates a
-		// span, that span would need to be exported. Meaning, OnEnd would be
-		// called and try acquiring the lock that is held here.
+		// before the exporter. This order is important as it avoids a potential
+		// deadlock. If the exporter shut down operation generates a span, that
+		// span would need to be exported. Meaning, OnEnd would be called and
+		// try acquiring the lock that is held here.
 		ssp.exporterMu.Lock()
 		done, shutdown := stopFunc(ssp.exporter)
 		ssp.exporter = nil
@@ -95,15 +84,15 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 		select {
 		case err = <-done:
 		case <-ctx.Done():
-			// It is possible for the exporter to have immediately shut down
-			// and the context to be done simultaneously. In that case this
-			// outer select statement will randomly choose a case. This will
-			// result in a different returned error for similar scenarios.
-			// Instead, double check if the exporter shut down at the same
-			// time and return that error if so. This will ensure consistency
-			// as well as ensure the caller knows the exporter shut down
-			// successfully (they can already determine if the deadline is
-			// expired given they passed the context).
+			// It is possible for the exporter to have immediately shut down and
+			// the context to be done simultaneously. In that case this outer
+			// select statement will randomly choose a case. This will result in
+			// a different returned error for similar scenarios. Instead, double
+			// check if the exporter shut down at the same time and return that
+			// error if so. This will ensure consistency as well as ensure
+			// the caller knows the exporter shut down successfully (they can
+			// already determine if the deadline is expired given they passed
+			// the context).
 			select {
 			case err = <-done:
 			default:
@@ -119,7 +108,8 @@ func (ssp *simpleSpanProcessor) ForceFlush(context.Context) error {
 	return nil
 }
 
-// MarshalLog is the marshaling function used by the logging system to represent this Span Processor.
+// MarshalLog is the marshaling function used by the logging system to represent
+// this Span Processor.
 func (ssp *simpleSpanProcessor) MarshalLog() interface{} {
 	return struct {
 		Type     string

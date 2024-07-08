@@ -46,7 +46,7 @@ var flundersKind = v1alpha1.SchemeGroupVersion.WithKind("Flunder")
 func (c *FakeFlunders) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Flunder, err error) {
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(flundersResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(flundersResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeFlunders) Get(ctx context.Context, name string, options v1.GetOptio
 func (c *FakeFlunders) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.FlunderList, err error) {
 	emptyResult := &v1alpha1.FlunderList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(flundersResource, flundersKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(flundersResource, flundersKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeFlunders) List(ctx context.Context, opts v1.ListOptions) (result *v
 // Watch returns a watch.Interface that watches the requested flunders.
 func (c *FakeFlunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(flundersResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(flundersResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeFlunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 func (c *FakeFlunders) Create(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.CreateOptions) (result *v1alpha1.Flunder, err error) {
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(flundersResource, c.ns, flunder), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(flundersResource, c.ns, flunder, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeFlunders) Create(ctx context.Context, flunder *v1alpha1.Flunder, op
 func (c *FakeFlunders) Update(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (result *v1alpha1.Flunder, err error) {
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(flundersResource, c.ns, flunder), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(flundersResource, c.ns, flunder, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeFlunders) Update(ctx context.Context, flunder *v1alpha1.Flunder, op
 func (c *FakeFlunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder, opts v1.UpdateOptions) (result *v1alpha1.Flunder, err error) {
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(flundersResource, "status", c.ns, flunder), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(flundersResource, "status", c.ns, flunder, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeFlunders) Delete(ctx context.Context, name string, opts v1.DeleteOp
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeFlunders) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(flundersResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(flundersResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.FlunderList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeFlunders) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *FakeFlunders) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Flunder, err error) {
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(flundersResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeFlunders) Apply(ctx context.Context, flunder *wardlev1alpha1.Flunde
 	}
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(flundersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeFlunders) ApplyStatus(ctx context.Context, flunder *wardlev1alpha1.
 	}
 	emptyResult := &v1alpha1.Flunder{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(flundersResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

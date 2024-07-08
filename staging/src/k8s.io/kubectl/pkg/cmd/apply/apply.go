@@ -43,7 +43,7 @@ import (
 	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/cmd/delete"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -61,7 +61,7 @@ type ApplyFlags struct {
 	RecordFlags *genericclioptions.RecordFlags
 	PrintFlags  *genericclioptions.PrintFlags
 
-	DeleteFlags *delete.DeleteFlags
+	DeleteFlags *cmddelete.DeleteFlags
 
 	FieldManager   string
 	Selector       string
@@ -84,7 +84,7 @@ type ApplyOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	DeleteOptions *delete.DeleteOptions
+	DeleteOptions *cmddelete.DeleteOptions
 
 	ServerSideApply bool
 	ForceConflicts  bool
@@ -182,7 +182,7 @@ var ApplySetToolVersion = version.Get().GitVersion
 func NewApplyFlags(streams genericiooptions.IOStreams) *ApplyFlags {
 	return &ApplyFlags{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
+		DeleteFlags: cmddelete.NewDeleteFlags("The files that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
@@ -681,6 +681,12 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
+		// prune nulls when client-side apply does a create to match what will happen when client-side applying an update.
+		// do this after CreateApplyAnnotation so the annotation matches what will be persisted on an update apply of the same manifest.
+		if u, ok := info.Object.(runtime.Unstructured); ok {
+			pruneNullsFromMap(u.UnstructuredContent())
+		}
+
 		if o.DryRunStrategy != cmdutil.DryRunClient {
 			// Then create the resource and skip the three-way merge
 			obj, err := helper.Create(info.Namespace, true, info.Object)
@@ -757,6 +763,29 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 	}
 
 	return nil
+}
+
+func pruneNullsFromMap(data map[string]interface{}) {
+	for k, v := range data {
+		if v == nil {
+			delete(data, k)
+		} else {
+			pruneNulls(v)
+		}
+	}
+}
+func pruneNullsFromSlice(data []interface{}) {
+	for _, v := range data {
+		pruneNulls(v)
+	}
+}
+func pruneNulls(v interface{}) {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		pruneNullsFromMap(v)
+	case []interface{}:
+		pruneNullsFromSlice(v)
+	}
 }
 
 // Saves the last-applied-configuration annotation in a separate SSA field manager

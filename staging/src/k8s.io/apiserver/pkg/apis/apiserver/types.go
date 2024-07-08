@@ -165,6 +165,25 @@ type AuthenticationConfiguration struct {
 	metav1.TypeMeta
 
 	JWT []JWTAuthenticator
+
+	// If present --anonymous-auth must not be set
+	Anonymous *AnonymousAuthConfig
+}
+
+// AnonymousAuthConfig provides the configuration for the anonymous authenticator.
+type AnonymousAuthConfig struct {
+	Enabled bool
+
+	// If set, anonymous auth is only allowed if the request meets one of the
+	// conditions.
+	Conditions []AnonymousAuthCondition
+}
+
+// AnonymousAuthCondition describes the condition under which anonymous auth
+// should be enabled.
+type AnonymousAuthCondition struct {
+	// Path for which anonymous auth is enabled.
+	Path string
 }
 
 // JWTAuthenticator provides the configuration for a single JWT authenticator.

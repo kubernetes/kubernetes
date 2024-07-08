@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -102,15 +103,15 @@ var (
 
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	otherPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID + "-II").
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
 	podWithClaimTemplate = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimTemplateName: &claimName}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
 				Obj()
 	podWithClaimTemplateInStatus = func() *v1.Pod {
 		pod := podWithClaimTemplate.DeepCopy()
@@ -124,8 +125,8 @@ var (
 	}()
 	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, Source: v1.ClaimSource{ResourceClaimName: &claimName}}).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, Source: v1.ClaimSource{ResourceClaimName: &claimName2}}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
 				Obj()
 
 	workerNode      = &st.MakeNode().Name("worker").Label("kubernetes.io/hostname", "worker").Node
@@ -568,6 +569,115 @@ func TestPlugin(t *testing.T) {
 							if claim.Name == claimName {
 								claim = claim.DeepCopy()
 								claim.Finalizers = structuredAllocatedClaim.Finalizers
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"delayed-allocation-structured-with-resources-has-finalizer": {
+			// As before. but the finalizer is already set. Could happen if
+			// the scheduler got interrupted.
+			pod: podWithClaimName,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := pendingDelayedClaim.DeepCopy()
+				claim.Finalizers = structuredAllocatedClaim.Finalizers
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"delayed-allocation-structured-with-resources-finalizer-gets-removed": {
+			// As before. but the finalizer is already set. Then it gets
+			// removed before the scheduler reaches PreBind.
+			pod: podWithClaimName,
+			claims: func() []*resourcev1alpha2.ResourceClaim {
+				claim := pendingDelayedClaim.DeepCopy()
+				claim.Finalizers = structuredAllocatedClaim.Finalizers
+				return []*resourcev1alpha2.ResourceClaim{claim}
+			}(),
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim.Finalizers = nil
+						return claim
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = structuredAllocatedClaim.Finalizers
+								claim.Status = structuredInUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"delayed-allocation-structured-with-resources-finalizer-gets-added": {
+			// No finalizer initially, then it gets added before
+			// the scheduler reaches PreBind. Shouldn't happen?
+			pod:     podWithClaimName,
+			claims:  []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
+			classes: []*resourcev1alpha2.ResourceClass{structuredResourceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			prepare: prepare{
+				prebind: change{
+					claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+						claim.Finalizers = structuredAllocatedClaim.Finalizers
+						return claim
+					},
+				},
+			},
+			want: want{
+				reserve: result{
+					inFlightClaim: structuredAllocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(structuredAllocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourcev1alpha2.ResourceClaim) *resourcev1alpha2.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
 								claim.Status = structuredInUseClaim.Status
 							}
 							return claim
@@ -1217,12 +1327,13 @@ func TestPlugin(t *testing.T) {
 }
 
 type testContext struct {
-	ctx             context.Context
-	client          *fake.Clientset
-	informerFactory informers.SharedInformerFactory
-	p               *dynamicResources
-	nodeInfos       []*framework.NodeInfo
-	state           *framework.CycleState
+	ctx              context.Context
+	client           *fake.Clientset
+	informerFactory  informers.SharedInformerFactory
+	claimAssumeCache *assumecache.AssumeCache
+	p                *dynamicResources
+	nodeInfos        []*framework.NodeInfo
+	state            *framework.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
@@ -1388,10 +1499,11 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourcev1alpha2.ResourceCl
 	tc.client.PrependReactor("list", "resourceclassparameters", createListReactor(tc.client.Tracker(), "ResourceClassParameters"))
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-
+	tc.claimAssumeCache = assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1alpha2().ResourceClaims().Informer(), "resource claim", "", nil)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
+		runtime.WithResourceClaimCache(tc.claimAssumeCache),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)
 	if err != nil {
@@ -1558,6 +1670,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"backoff-wrong-old-object": {
 			pod:         podWithClaimName,
+			claims:      []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
 			oldObj:      "not-a-claim",
 			newObj:      pendingImmediateClaim,
 			expectedErr: true,
@@ -1586,15 +1699,10 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		},
 		"structured-claim-deallocate": {
 			pod:    podWithClaimName,
-			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim},
-			oldObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := structuredAllocatedClaim.DeepCopy()
-				claim.Name += "-other"
-				return claim
-			}(),
+			claims: []*resourcev1alpha2.ResourceClaim{pendingDelayedClaim, otherStructuredAllocatedClaim},
+			oldObj: otherStructuredAllocatedClaim,
 			newObj: func() *resourcev1alpha2.ResourceClaim {
-				claim := structuredAllocatedClaim.DeepCopy()
-				claim.Name += "-other"
+				claim := otherStructuredAllocatedClaim.DeepCopy()
 				claim.Status.Allocation = nil
 				return claim
 			}(),
@@ -1606,18 +1714,48 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			testCtx := setup(t, nil, tc.claims, nil, nil, nil)
+			oldObj := tc.oldObj
+			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourcev1alpha2.ResourceClaim); ok {
-				// Update the informer because the lister gets called and must have the claim.
-				store := testCtx.informerFactory.Resource().V1alpha2().ResourceClaims().Informer().GetStore()
+				// Add or update through the client and wait until the event is processed.
+				claimKey := claim.Namespace + "/" + claim.Name
 				if tc.oldObj == nil {
-					require.NoError(t, store.Add(claim))
+					// Some test claims already have it. Clear for create.
+					createClaim := claim.DeepCopy()
+					createClaim.UID = ""
+					storedClaim, err := testCtx.client.ResourceV1alpha2().ResourceClaims(createClaim.Namespace).Create(tCtx, createClaim, metav1.CreateOptions{})
+					require.NoError(t, err, "create claim")
+					claim = storedClaim
 				} else {
-					require.NoError(t, store.Update(claim))
+					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					require.NoError(t, err, "retrieve old claim")
+					updateClaim := claim.DeepCopy()
+					// The test claim doesn't have those (generated dynamically), so copy them.
+					updateClaim.UID = cachedClaim.(*resourcev1alpha2.ResourceClaim).UID
+					updateClaim.ResourceVersion = cachedClaim.(*resourcev1alpha2.ResourceClaim).ResourceVersion
+
+					storedClaim, err := testCtx.client.ResourceV1alpha2().ResourceClaims(updateClaim.Namespace).Update(tCtx, updateClaim, metav1.UpdateOptions{})
+					require.NoError(t, err, "update claim")
+					claim = storedClaim
 				}
+
+				// Eventually the assume cache will have it, too.
+				require.EventuallyWithT(t, func(t *assert.CollectT) {
+					cachedClaim, err := testCtx.claimAssumeCache.Get(claimKey)
+					require.NoError(t, err, "retrieve claim")
+					if cachedClaim.(*resourcev1alpha2.ResourceClaim).ResourceVersion != claim.ResourceVersion {
+						t.Errorf("cached claim not updated yet")
+					}
+				}, time.Minute, time.Second, "claim assume cache must have new or updated claim")
+
+				// This has the actual UID and ResourceVersion,
+				// which is relevant for
+				// isSchedulableAfterClaimChange.
+				newObj = claim
 			}
-			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := testCtx.p.isSchedulableAfterClaimChange(logger, tc.pod, oldObj, newObj)
 			if tc.expectedErr {
 				require.Error(t, err)
 				return

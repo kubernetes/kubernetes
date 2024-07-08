@@ -38,7 +38,6 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -74,8 +73,8 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 func TestEtcdStoragePath(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
-	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
-	})
+
+	apiServer := StartRealAPIServerOrDie(t)
 	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)
 

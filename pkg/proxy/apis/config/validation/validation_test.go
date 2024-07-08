@@ -55,7 +55,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 	}
 	newPath := field.NewPath("KubeProxyConfiguration")
 
-	for name, testCase := range map[string]struct {
+	testCases := map[string]struct {
 		mutateConfigFunc func(*kubeproxyconfig.KubeProxyConfiguration)
 		expectedErrs     field.ErrorList
 	}{
@@ -155,12 +155,6 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("ConfigSyncPeriod"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than 0")},
 		},
-		"IPVS mode selected without providing required SyncPeriod": {
-			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
-				config.Mode = kubeproxyconfig.ProxyModeIPVS
-			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyIPVSConfiguration.SyncPeriod"), metav1.Duration{Duration: 0}, "must be greater than 0")},
-		},
 		"interfacePrefix is empty": {
 			mutateConfigFunc: func(config *kubeproxyconfig.KubeProxyConfiguration) {
 				config.DetectLocalMode = kubeproxyconfig.LocalModeInterfaceNamePrefix
@@ -193,7 +187,13 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			},
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("logging.format"), "unsupported format", "Unsupported log format")},
 		},
-	} {
+	}
+
+	for name, testCase := range osKubeProxyConfigTestCases {
+		testCases[name] = testCase
+	}
+
+	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			config := baseConfig.DeepCopy()
 			testCase.mutateConfigFunc(config)

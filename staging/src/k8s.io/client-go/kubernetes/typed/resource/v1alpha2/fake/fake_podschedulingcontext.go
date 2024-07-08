@@ -46,7 +46,7 @@ var podschedulingcontextsKind = v1alpha2.SchemeGroupVersion.WithKind("PodSchedul
 func (c *FakePodSchedulingContexts) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.PodSchedulingContext, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podschedulingcontextsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(podschedulingcontextsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakePodSchedulingContexts) Get(ctx context.Context, name string, option
 func (c *FakePodSchedulingContexts) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.PodSchedulingContextList, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContextList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podschedulingcontextsResource, podschedulingcontextsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(podschedulingcontextsResource, podschedulingcontextsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakePodSchedulingContexts) List(ctx context.Context, opts v1.ListOption
 // Watch returns a watch.Interface that watches the requested podSchedulingContexts.
 func (c *FakePodSchedulingContexts) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(podschedulingcontextsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(podschedulingcontextsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakePodSchedulingContexts) Watch(ctx context.Context, opts v1.ListOptio
 func (c *FakePodSchedulingContexts) Create(ctx context.Context, podSchedulingContext *v1alpha2.PodSchedulingContext, opts v1.CreateOptions) (result *v1alpha2.PodSchedulingContext, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podschedulingcontextsResource, c.ns, podSchedulingContext), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(podschedulingcontextsResource, c.ns, podSchedulingContext, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakePodSchedulingContexts) Create(ctx context.Context, podSchedulingCon
 func (c *FakePodSchedulingContexts) Update(ctx context.Context, podSchedulingContext *v1alpha2.PodSchedulingContext, opts v1.UpdateOptions) (result *v1alpha2.PodSchedulingContext, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podschedulingcontextsResource, c.ns, podSchedulingContext), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(podschedulingcontextsResource, c.ns, podSchedulingContext, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakePodSchedulingContexts) Update(ctx context.Context, podSchedulingCon
 func (c *FakePodSchedulingContexts) UpdateStatus(ctx context.Context, podSchedulingContext *v1alpha2.PodSchedulingContext, opts v1.UpdateOptions) (result *v1alpha2.PodSchedulingContext, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podschedulingcontextsResource, "status", c.ns, podSchedulingContext), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(podschedulingcontextsResource, "status", c.ns, podSchedulingContext, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakePodSchedulingContexts) Delete(ctx context.Context, name string, opt
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePodSchedulingContexts) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podschedulingcontextsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(podschedulingcontextsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha2.PodSchedulingContextList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakePodSchedulingContexts) DeleteCollection(ctx context.Context, opts v
 func (c *FakePodSchedulingContexts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.PodSchedulingContext, err error) {
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podschedulingcontextsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podschedulingcontextsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakePodSchedulingContexts) Apply(ctx context.Context, podSchedulingCont
 	}
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakePodSchedulingContexts) ApplyStatus(ctx context.Context, podScheduli
 	}
 	emptyResult := &v1alpha2.PodSchedulingContext{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(podschedulingcontextsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

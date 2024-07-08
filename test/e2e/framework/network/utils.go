@@ -457,9 +457,8 @@ func (config *NetworkingTestConfig) GetResponseFromTestContainer(ctx context.Con
 
 // GetHTTPCodeFromTestContainer executes a curl via kubectl exec in a test container and returns the status code.
 func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(ctx context.Context, path, targetIP string, targetPort int) (int, error) {
-	cmd := fmt.Sprintf("curl -g -q -s -o /dev/null -w %%{http_code} http://%s:%d%s",
-		targetIP,
-		targetPort,
+	cmd := fmt.Sprintf("curl -g -q -s -o /dev/null -w %%{http_code} http://%s%s",
+		net.JoinHostPort(targetIP, strconv.Itoa(targetPort)),
 		path)
 	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, config.f, config.TestContainerPod.Name, cmd)
 	// We only care about the status code reported by curl,
@@ -1191,7 +1190,7 @@ func UnblockNetwork(ctx context.Context, from string, to string) {
 	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
 	// may fail). Manual intervention is required in such case (recreating the
 	// cluster solves the problem too).
-	err := wait.PollWithContext(ctx, time.Millisecond*100, time.Second*30, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*30, false, func(ctx context.Context) (bool, error) {
 		result, err := e2essh.SSH(ctx, undropCmd, from, framework.TestContext.Provider)
 		if result.Code == 0 && err == nil {
 			return true, nil

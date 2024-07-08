@@ -27,13 +27,16 @@ import (
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
@@ -45,7 +48,13 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
+	componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+	t.Cleanup(func() {
+		componentGlobalsRegistry.Reset()
+	})
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
+
+	utilruntime.Must(componentGlobalsRegistry.Register("test", utilversion.NewEffectiveVersion("1.32"), featuregate.NewFeatureGate()))
 	s := NewServerRunOptions()
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
@@ -121,21 +130,26 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
 		"--lease-reuse-duration-seconds=100",
+		"--emulated-version=test=1.31",
 	}
 	fs.Parse(args)
+	utilruntime.Must(componentGlobalsRegistry.Set())
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		Options: &controlplaneapiserver.Options{
 			GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
-				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
-				MaxRequestsInFlight:         400,
-				MaxMutatingRequestsInFlight: 200,
-				RequestTimeout:              time.Duration(2) * time.Minute,
-				MinRequestTimeout:           1800,
-				JSONPatchMaxCopyBytes:       int64(3 * 1024 * 1024),
-				MaxRequestBodyBytes:         int64(3 * 1024 * 1024),
+				AdvertiseAddress:             netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:        []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:          400,
+				MaxMutatingRequestsInFlight:  200,
+				RequestTimeout:               time.Duration(2) * time.Minute,
+				MinRequestTimeout:            1800,
+				StorageInitializationTimeout: time.Minute,
+				JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
+				MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
+				ComponentGlobalsRegistry:     componentGlobalsRegistry,
+				ComponentName:                utilversion.DefaultKubeComponent,
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -243,9 +257,7 @@ func TestAddFlags(t *testing.T) {
 				EnableContentionProfiling: true,
 			},
 			Authentication: &kubeoptions.BuiltInAuthenticationOptions{
-				Anonymous: &kubeoptions.AnonymousAuthenticationOptions{
-					Allow: false,
-				},
+				Anonymous: s.Authentication.Anonymous,
 				ClientCert: &apiserveroptions.ClientCertAuthenticationOptions{
 					ClientCA: "/client-ca",
 				},
@@ -335,6 +347,10 @@ func TestAddFlags(t *testing.T) {
 	s.Authorization.AreLegacyFlagsSet = nil
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
+	}
+	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
+	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
+		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
 	}
 }

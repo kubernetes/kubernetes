@@ -224,8 +224,8 @@ func TestGetResources(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "test-pod-claim-1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -268,8 +268,8 @@ func TestGetResources(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "test-pod-claim-1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -365,12 +365,11 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-0",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-0"
-									return &s
-								}(),
-							},
+
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-0"
+								return &s
+							}(),
 						},
 					},
 				},
@@ -390,12 +389,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-1",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-1"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-1"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -447,12 +444,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-nil",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-nil"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-nil"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -506,12 +501,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-empty",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-empty"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-empty"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -565,12 +558,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-2",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-2"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-2"
+								return &s
+							}(),
 						},
 					},
 				},
@@ -608,10 +599,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-3",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-3"
 								return &s
-							}()},
+							}(),
 						},
 					},
 				},
@@ -652,10 +643,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-4",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-4"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -717,10 +708,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-5",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-5"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -779,10 +770,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-6",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-6"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -840,10 +831,10 @@ func TestPrepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1005,12 +996,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "another-claim-test",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "another-claim-test"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "another-claim-test"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1054,10 +1043,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-1",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-1"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1096,10 +1085,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-2",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-2"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1146,10 +1135,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-3",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim-3"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1195,10 +1184,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim",
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := "test-pod-claim"
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1244,12 +1233,10 @@ func TestUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: "test-pod-claim-nil",
-							Source: v1.ClaimSource{
-								ResourceClaimName: func() *string {
-									s := "test-pod-claim-nil"
-									return &s
-								}(),
-							},
+							ResourceClaimName: func() *string {
+								s := "test-pod-claim-nil"
+								return &s
+							}(),
 						},
 					},
 					Containers: []v1.Container{
@@ -1395,8 +1382,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "claim1",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName},
+							Name:              "claim1",
+							ResourceClaimName: &resourceClaimName,
 						},
 					},
 				},
@@ -1418,8 +1405,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 				Spec: v1.PodSpec{
 					ResourceClaims: []v1.PodResourceClaim{
 						{
-							Name:   "claim2",
-							Source: v1.ClaimSource{ResourceClaimName: &resourceClaimName2},
+							Name:              "claim2",
+							ResourceClaimName: &resourceClaimName2,
 						},
 					},
 				},
@@ -1502,10 +1489,10 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 					ResourceClaims: []v1.PodResourceClaim{
 						{
 							Name: claimName,
-							Source: v1.ClaimSource{ResourceClaimName: func() *string {
+							ResourceClaimName: func() *string {
 								s := claimName
 								return &s
-							}()},
+							}(),
 						},
 					},
 					Containers: []v1.Container{

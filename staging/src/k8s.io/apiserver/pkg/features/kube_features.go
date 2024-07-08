@@ -53,6 +53,13 @@ const (
 	// caching with ETags containing all APIResources known to the apiserver.
 	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
 
+	// owner: @vinayakankugoyal
+	// kep: https://kep.k8s.io/4633
+	// alpha: v1.31
+	//
+	// Allows us to enable anonymous auth for only certain apiserver endpoints.
+	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
+
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9
@@ -61,16 +68,6 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking featuregate.Feature = "APIListChunking"
-
-	// owner: @MikeSpreitzer @yue9944882
-	// alpha: v1.18
-	// beta: v1.20
-	// stable: 1.29
-	//
-	// Enables managing request concurrency with prioritization and fairness at each server.
-	// The FeatureGate was introduced in release 1.15 but the feature
-	// was not really implemented before 1.18.
-	APIPriorityAndFairness featuregate.Feature = "APIPriorityAndFairness"
 
 	// owner: @ilackams
 	// alpha: v1.7
@@ -283,6 +280,12 @@ const (
 	// Enables support for watch bookmark events.
 	WatchBookmark featuregate.Feature = "WatchBookmark"
 
+	// owner: @wojtek-t
+	// beta: v1.31
+	//
+	// Enables post-start-hook for storage readiness
+	WatchCacheInitializationPostStartHook featuregate.Feature = "WatchCacheInitializationPostStartHook"
+
 	// owner: @serathius
 	// beta: 1.30
 	// Enables watches without resourceVersion to be served from storage.
@@ -298,6 +301,7 @@ const (
 
 	// owner: @p0lyn0mial
 	// alpha: v1.27
+	// beta: v1.31
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
@@ -322,6 +326,17 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+}
+
+// defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
+// To add a new feature, define a key for it above and add it here. The features will be
+// available throughout Kubernetes binaries.
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	// Example:
+	// EmulationVersion: {
+	// 	{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+	// },
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -329,13 +344,13 @@ func init() {
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 
+	AnonymousAuthConfigurableEndpoints: {Default: false, PreRelease: featuregate.Alpha},
+
 	AggregatedDiscoveryEndpoint: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	AdmissionWebhookMatchConditions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	APIListChunking: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
-
-	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
 	APIResponseCompression: {Default: true, PreRelease: featuregate.Beta},
 
@@ -387,11 +402,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	WatchBookmark: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
+	WatchCacheInitializationPostStartHook: {Default: false, PreRelease: featuregate.Beta},
+
 	WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
-	WatchList: {Default: false, PreRelease: featuregate.Alpha},
+	WatchList: {Default: true, PreRelease: featuregate.Beta},
 
 	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 

@@ -260,7 +260,7 @@ jwt:
 			configureClient: configureClientFetchingOIDCCredentials,
 			assertErrFn: func(t *testing.T, errorToCheck error) {
 				expectedError := new(apierrors.StatusError)
-				assert.ErrorAs(t, errorToCheck, &expectedError)
+				require.ErrorAs(t, errorToCheck, &expectedError)
 				assert.Equal(
 					t,
 					`pods is forbidden: User "system:anonymous" cannot list resource "pods" in API group "" in the namespace "default"`,
@@ -552,7 +552,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 
 			ctx := testContext(t)
 			_, err = expiredClient.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
-			assert.Error(t, err)
+			require.Error(t, err)
 
 			tt.configureUpdatingTokenBehaviour(t, oidcServer, signingPrivateKey)
 			idToken, stubRefreshToken := fetchOIDCCredentials(t, tokenURL, caCert)

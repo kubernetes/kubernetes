@@ -238,7 +238,7 @@ func WaitForNamespacesDeleted(ctx context.Context, c clientset.Interface, namesp
 		nsMap[ns] = true
 	}
 	//Now POLL until all namespaces have been eradicated.
-	return wait.PollWithContext(ctx, 2*time.Second, timeout,
+	return wait.PollUntilContextTimeout(ctx, 2*time.Second, timeout, false,
 		func(ctx context.Context) (bool, error) {
 			nsList, err := c.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 			if err != nil {
@@ -416,7 +416,7 @@ func CheckTestingNSDeletedExcept(ctx context.Context, c clientset.Interface, ski
 // WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 // Some components use EndpointSlices other Endpoints, we must verify that both objects meet the requirements.
 func WaitForServiceEndpointsNum(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
-	return wait.PollWithContext(ctx, interval, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, interval, timeout, false, func(ctx context.Context) (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
 		endpoint, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {

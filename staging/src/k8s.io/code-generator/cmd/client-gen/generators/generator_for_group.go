@@ -71,31 +71,25 @@ func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	apiPath := func(group string) string {
-		if group == "core" {
-			return `"/api"`
-		}
-		return `"` + g.apiPath + `"`
-	}
-
-	groupName := g.group
-	if g.group == "core" {
-		groupName = ""
-	}
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPackage)
+	groupName := g.group
 	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
 
+	apiPath := `"` + g.apiPath + `"`
+	if groupName == "" {
+		apiPath = `"/api"`
+	}
+
 	m := map[string]interface{}{
-		"group":                            g.group,
 		"version":                          g.version,
 		"groupName":                        groupName,
 		"GroupGoName":                      g.groupGoName,
 		"Version":                          namer.IC(g.version),
 		"types":                            g.types,
-		"apiPath":                          apiPath(g.group),
+		"apiPath":                          apiPath,
 		"schemaGroupVersion":               c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"runtimeAPIVersionInternal":        c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
 		"restConfig":                       c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),

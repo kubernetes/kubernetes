@@ -30,20 +30,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel/library"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 )
 
 // DefaultCompatibilityVersion returns a default compatibility version for use with EnvSet
 // that guarantees compatibility with CEL features/libraries/parameters understood by
-// an n-1 version
+// the api server min compatibility version
 //
-// This default will be set to no more than n-1 the current Kubernetes major.minor version.
+// This default will be set to no more than the current Kubernetes major.minor version.
 //
-// Note that a default version number less than n-1 indicates a wider range of version
-// compatibility than strictly required for rollback. A wide range of compatibility is
-// desirable because it means that CEL expressions are portable across a wider range
-// of Kubernetes versions.
+// Note that a default version number less than n-1 the current Kubernetes major.minor version
+// indicates a wider range of version compatibility than strictly required for rollback.
+// A wide range of compatibility is desirable because it means that CEL expressions are portable
+// across a wider range of Kubernetes versions.
+// A default version number equal to the current Kubernetes major.minor version
+// indicates fast forward CEL features that can be used when rollback is no longer needed.
 func DefaultCompatibilityVersion() *version.Version {
-	return version.MajorMinor(1, 30)
+	effectiveVer := utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
+	if effectiveVer == nil {
+		effectiveVer = utilversion.DefaultKubeEffectiveVersion()
+	}
+	return effectiveVer.MinCompatibilityVersion()
 }
 
 var baseOpts = append(baseOptsWithoutStrictCost, StrictCostOpt)

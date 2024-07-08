@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -70,8 +71,8 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		networking.Resource("ipaddresses").WithVersion("v1alpha1"),
-		networking.Resource("servicecidrs").WithVersion("v1alpha1"),
+		networking.Resource("ipaddresses").WithVersion("v1beta1"),
+		networking.Resource("servicecidrs").WithVersion("v1beta1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
 		storage.Resource("volumeattributesclasses").WithVersion("v1alpha1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1alpha1"),
@@ -93,6 +94,7 @@ type StorageFactoryConfig struct {
 	Serializer                runtime.StorageSerializer
 	ResourceEncodingOverrides []schema.GroupVersionResource
 	EtcdServersOverrides      []string
+	CurrentVersion            version.EffectiveVersion
 }
 
 // Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.

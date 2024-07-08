@@ -18,6 +18,7 @@ package ipallocator
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -73,6 +74,17 @@ var (
 		},
 		[]string{"cidr", "scope"},
 	)
+	clusterIPAllocationLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "allocation_duration_seconds",
+			Help:           "Duration in seconds to allocate a Cluster IP by ServiceCIDR",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"cidr"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -83,6 +95,7 @@ func registerMetrics() {
 		legacyregistry.MustRegister(clusterIPAvailable)
 		legacyregistry.MustRegister(clusterIPAllocations)
 		legacyregistry.MustRegister(clusterIPAllocationErrors)
+		legacyregistry.MustRegister(clusterIPAllocationLatency)
 	})
 }
 
@@ -90,6 +103,7 @@ func registerMetrics() {
 type metricsRecorderInterface interface {
 	setAllocated(cidr string, allocated int)
 	setAvailable(cidr string, available int)
+	setLatency(cidr string, latency time.Duration)
 	incrementAllocations(cidr, scope string)
 	incrementAllocationErrors(cidr, scope string)
 }
@@ -105,6 +119,10 @@ func (m *metricsRecorder) setAvailable(cidr string, available int) {
 	clusterIPAvailable.WithLabelValues(cidr).Set(float64(available))
 }
 
+func (m *metricsRecorder) setLatency(cidr string, latency time.Duration) {
+	clusterIPAllocationLatency.WithLabelValues(cidr).Observe(latency.Seconds())
+}
+
 func (m *metricsRecorder) incrementAllocations(cidr, scope string) {
 	clusterIPAllocations.WithLabelValues(cidr, scope).Inc()
 }
@@ -116,7 +134,8 @@ func (m *metricsRecorder) incrementAllocationErrors(cidr, scope string) {
 // emptyMetricsRecorder is a null object implements metricsRecorderInterface.
 type emptyMetricsRecorder struct{}
 
-func (*emptyMetricsRecorder) setAllocated(cidr string, allocated int)      {}
-func (*emptyMetricsRecorder) setAvailable(cidr string, available int)      {}
-func (*emptyMetricsRecorder) incrementAllocations(cidr, scope string)      {}
-func (*emptyMetricsRecorder) incrementAllocationErrors(cidr, scope string) {}
+func (*emptyMetricsRecorder) setAllocated(cidr string, allocated int)       {}
+func (*emptyMetricsRecorder) setAvailable(cidr string, available int)       {}
+func (*emptyMetricsRecorder) setLatency(cidr string, latency time.Duration) {}
+func (*emptyMetricsRecorder) incrementAllocations(cidr, scope string)       {}
+func (*emptyMetricsRecorder) incrementAllocationErrors(cidr, scope string)  {}

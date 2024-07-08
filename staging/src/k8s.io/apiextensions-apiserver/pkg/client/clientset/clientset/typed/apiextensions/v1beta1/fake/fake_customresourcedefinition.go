@@ -45,7 +45,7 @@ var customresourcedefinitionsKind = v1beta1.SchemeGroupVersion.WithKind("CustomR
 func (c *FakeCustomResourceDefinitions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(customresourcedefinitionsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(customresourcedefinitionsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeCustomResourceDefinitions) Get(ctx context.Context, name string, op
 func (c *FakeCustomResourceDefinitions) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.CustomResourceDefinitionList, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinitionList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(customresourcedefinitionsResource, customresourcedefinitionsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(customresourcedefinitionsResource, customresourcedefinitionsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeCustomResourceDefinitions) List(ctx context.Context, opts v1.ListOp
 // Watch returns a watch.Interface that watches the requested customResourceDefinitions.
 func (c *FakeCustomResourceDefinitions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(customresourcedefinitionsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(customresourcedefinitionsResource, opts))
 }
 
 // Create takes the representation of a customResourceDefinition and creates it.  Returns the server's representation of the customResourceDefinition, and an error, if there is any.
 func (c *FakeCustomResourceDefinitions) Create(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.CreateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(customresourcedefinitionsResource, customResourceDefinition), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(customresourcedefinitionsResource, customResourceDefinition, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeCustomResourceDefinitions) Create(ctx context.Context, customResour
 func (c *FakeCustomResourceDefinitions) Update(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.UpdateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(customresourcedefinitionsResource, customResourceDefinition), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(customresourcedefinitionsResource, customResourceDefinition, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -107,7 +107,7 @@ func (c *FakeCustomResourceDefinitions) Update(ctx context.Context, customResour
 func (c *FakeCustomResourceDefinitions) UpdateStatus(ctx context.Context, customResourceDefinition *v1beta1.CustomResourceDefinition, opts v1.UpdateOptions) (result *v1beta1.CustomResourceDefinition, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(customresourcedefinitionsResource, "status", customResourceDefinition), emptyResult)
+		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(customresourcedefinitionsResource, "status", customResourceDefinition, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -123,7 +123,7 @@ func (c *FakeCustomResourceDefinitions) Delete(ctx context.Context, name string,
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeCustomResourceDefinitions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(customresourcedefinitionsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(customresourcedefinitionsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.CustomResourceDefinitionList{})
 	return err
@@ -133,7 +133,7 @@ func (c *FakeCustomResourceDefinitions) DeleteCollection(ctx context.Context, op
 func (c *FakeCustomResourceDefinitions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CustomResourceDefinition, err error) {
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(customresourcedefinitionsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -155,7 +155,7 @@ func (c *FakeCustomResourceDefinitions) Apply(ctx context.Context, customResourc
 	}
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -178,7 +178,7 @@ func (c *FakeCustomResourceDefinitions) ApplyStatus(ctx context.Context, customR
 	}
 	emptyResult := &v1beta1.CustomResourceDefinition{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(customresourcedefinitionsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

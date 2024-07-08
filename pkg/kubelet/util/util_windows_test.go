@@ -20,13 +20,12 @@ limitations under the License.
 package util
 
 import (
-	"context"
-	"net"
+	"fmt"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
-	"github.com/Microsoft/go-winio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -98,13 +97,10 @@ func TestLocalEndpoint(t *testing.T) {
 	}
 }
 
-func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
-	return winio.DialPipeContext(ctx, addr)
-}
-
 func TestLocalEndpointRoundTrip(t *testing.T) {
-	npipeDialPointer := reflect.ValueOf(npipeDial).Pointer()
-	expectedDialerName := runtime.FuncForPC(npipeDialPointer).Name()
+	functionPointer := reflect.ValueOf(util.GetAddressAndDialer).Pointer()
+	functionName := runtime.FuncForPC(functionPointer).Name()
+	expectedDialerName := fmt.Sprintf("%s.npipeDial", functionName[:strings.LastIndex(functionName, ".")])
 	expectedAddress := "//./pipe/kubelet-pod-resources"
 
 	fullPath, err := LocalEndpoint(`pod-resources`, "kubelet")
@@ -116,8 +112,6 @@ func TestLocalEndpointRoundTrip(t *testing.T) {
 	dialerPointer := reflect.ValueOf(dialer).Pointer()
 	actualDialerName := runtime.FuncForPC(dialerPointer).Name()
 
-	assert.Equalf(t, npipeDialPointer, dialerPointer,
-		"Expected dialer %s, but get %s", expectedDialerName, actualDialerName)
-
+	assert.Equal(t, expectedDialerName, actualDialerName)
 	assert.Equal(t, expectedAddress, address)
 }

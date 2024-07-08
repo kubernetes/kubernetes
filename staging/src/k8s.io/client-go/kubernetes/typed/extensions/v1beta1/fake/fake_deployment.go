@@ -46,7 +46,7 @@ var deploymentsKind = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(deploymentsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(deploymentsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOp
 func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.DeploymentList, err error) {
 	emptyResult := &v1beta1.DeploymentList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deploymentsResource, deploymentsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(deploymentsResource, deploymentsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeDeployments) List(ctx context.Context, opts v1.ListOptions) (result
 // Watch returns a watch.Interface that watches the requested deployments.
 func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(deploymentsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(deploymentsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch
 func (c *FakeDeployments) Create(ctx context.Context, deployment *v1beta1.Deployment, opts v1.CreateOptions) (result *v1beta1.Deployment, err error) {
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(deploymentsResource, c.ns, deployment), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(deploymentsResource, c.ns, deployment, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeDeployments) Create(ctx context.Context, deployment *v1beta1.Deploy
 func (c *FakeDeployments) Update(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(deploymentsResource, c.ns, deployment), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(deploymentsResource, c.ns, deployment, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakeDeployments) Update(ctx context.Context, deployment *v1beta1.Deploy
 func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Deployment, opts v1.UpdateOptions) (result *v1beta1.Deployment, err error) {
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "status", c.ns, deployment), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(deploymentsResource, "status", c.ns, deployment, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.Delet
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(deploymentsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(deploymentsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.DeploymentList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakeDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Deployment, err error) {
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakeDeployments) Apply(ctx context.Context, deployment *extensionsv1bet
 	}
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *extension
 	}
 	emptyResult := &v1beta1.Deployment{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -200,7 +200,7 @@ func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *extension
 func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
 	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(deploymentsResource, c.ns, "scale", deploymentName), emptyResult)
+		Invokes(testing.NewGetSubresourceActionWithOptions(deploymentsResource, c.ns, "scale", deploymentName, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -212,7 +212,7 @@ func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, o
 func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
 	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &v1beta1.Scale{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(deploymentsResource, "scale", c.ns, scale, opts), &v1beta1.Scale{})
 
 	if obj == nil {
 		return emptyResult, err
@@ -232,7 +232,7 @@ func (c *FakeDeployments) ApplyScale(ctx context.Context, deploymentName string,
 	}
 	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

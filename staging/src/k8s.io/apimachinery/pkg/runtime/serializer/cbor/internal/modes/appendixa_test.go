@@ -69,10 +69,6 @@ func TestAppendixA(t *testing.T) {
 		reject  string   // reason the decoder rejects the example
 		encoded []byte   // re-encoded object (only if different from example encoding)
 		reasons []string // reasons for re-encode difference
-
-		// TODO: The cases with nonempty fixme are known to be not working and fixing them
-		// is an alpha criteria. They're present and skipped for visibility.
-		fixme string
 	}{
 		{
 			example: hex("00"),
@@ -121,7 +117,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c249010000000000000000"),
 			reject:  "decoding tagged positive bigint value to interface{} can't reproduce this value without losing distinction between float and integer",
-			fixme:   "decoding bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("3bffffffffffffffff"),
@@ -130,7 +125,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("c349010000000000000000"),
 			reject:  "-18446744073709551617 overflows int64 and falling back to float64 (as with JSON) loses distinction between float and integer",
-			fixme:   "decoding negative bigint to interface{} must not produce math/big.Int",
 		},
 		{
 			example: hex("20"),
@@ -251,17 +245,14 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("f7"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "the undefined simple value should not successfully decode as nil",
 		},
 		{
 			example: hex("f0"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("f8ff"),
 			reject:  "only simple values false, true, and null have a clear analog",
-			fixme:   "simple values other than false, true, and null should be rejected",
 		},
 		{
 			example: hex("c074323031332d30332d32315432303a30343a30305a"),
@@ -291,11 +282,11 @@ func TestAppendixA(t *testing.T) {
 			},
 		},
 		{
-			example: hex("d74401020304"),
-			decoded: "\x01\x02\x03\x04",
-			encoded: hex("4401020304"),
+			example: hex("d74401020304"), // 23(h'01020304')
+			decoded: "01020304",
+			encoded: hex("483031303230333034"), // '01020304'
 			reasons: []string{
-				reasonTagIgnored,
+				"decoding a byte string enclosed in an expected later encoding tag into an interface{} value automatically converts to the specified encoding for JSON interoperability",
 			},
 		},
 		{
@@ -563,10 +554,6 @@ func TestAppendixA(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%x", tc.example), func(t *testing.T) {
-			if tc.fixme != "" {
-				t.Skip(tc.fixme) // TODO: Remove once all cases are fixed.
-			}
-
 			var decoded interface{}
 			err := modes.Decode.Unmarshal(tc.example, &decoded)
 			if err != nil {

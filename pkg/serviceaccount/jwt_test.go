@@ -247,7 +247,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Token:       rsaToken,
 			Client:      nil,
 			Keys:        []interface{}{},
-			ExpectedErr: false,
+			ExpectedErr: true,
 			ExpectedOK:  false,
 		},
 		"invalid keys (rsa)": {
@@ -385,13 +385,29 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("While creating legacy validator, err: %v", err)
 		}
-		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, validator)
+		staticKeysGetter, err := serviceaccount.StaticPublicKeysGetter(tc.Keys)
+		if err != nil {
+			t.Fatal(err)
+		}
+		keysGetter := &keyIDPrefixer{PublicKeysGetter: staticKeysGetter}
+
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, keysGetter, auds, validator)
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)
 		if _, ok, err := authn.AuthenticateToken(ctx, "invalid token"); err != nil || ok {
 			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
 			continue
+		}
+
+		if tc.ExpectedOK {
+			// if authentication is otherwise expected to succeed, demonstrate changing key ids makes it fail
+			keysGetter.keyIDPrefix = "bogus"
+			if _, ok, err := authn.AuthenticateToken(ctx, tc.Token); err == nil || !strings.Contains(err.Error(), "no keys found") || ok {
+				t.Errorf("%s: Expected err containing 'no keys found', ok=false when key lookup by ID fails", k)
+				continue
+			}
+			keysGetter.keyIDPrefix = ""
 		}
 
 		resp, ok, err := authn.AuthenticateToken(ctx, tc.Token)
@@ -422,6 +438,26 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			continue
 		}
 	}
+}
+
+type keyIDPrefixer struct {
+	serviceaccount.PublicKeysGetter
+	keyIDPrefix string
+}
+
+func (k *keyIDPrefixer) GetPublicKeys(keyIDHint string) []serviceaccount.PublicKey {
+	if k.keyIDPrefix == "" {
+		return k.PublicKeysGetter.GetPublicKeys(keyIDHint)
+	}
+	if keyIDHint != "" {
+		keyIDHint = k.keyIDPrefix + keyIDHint
+	}
+	var retval []serviceaccount.PublicKey
+	for _, key := range k.PublicKeysGetter.GetPublicKeys(keyIDHint) {
+		key.KeyID = k.keyIDPrefix + key.KeyID
+		retval = append(retval, key)
+	}
+	return retval
 }
 
 func checkJSONWebSignatureHasKeyID(t *testing.T, jwsString string, expectedKeyID string) {
@@ -501,4 +537,77 @@ func generateECDSATokenWithMalformedIss(t *testing.T, serviceAccount *v1.Service
 	}
 
 	return string(out)
+}
+
+func TestStaticPublicKeysGetter(t *testing.T) {
+	ecPrivate := getPrivateKey(ecdsaPrivateKey)
+	ecPublic := getPublicKey(ecdsaPublicKey)
+	rsaPublic := getPublicKey(rsaPublicKey)
+
+	testcases := []struct {
+		Name       string
+		Keys       []interface{}
+		ExpectErr  bool
+		ExpectKeys []serviceaccount.PublicKey
+	}{
+		{
+			Name:       "empty",
+			Keys:       nil,
+			ExpectKeys: []serviceaccount.PublicKey{},
+		},
+		{
+			Name: "simple",
+			Keys: []interface{}{ecPublic, rsaPublic},
+			ExpectKeys: []serviceaccount.PublicKey{
+				{KeyID: "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc", PublicKey: ecPublic},
+				{KeyID: "JHJehTTTZlsspKHT-GaJxK7Kd1NQgZJu3fyK6K_QDYU", PublicKey: rsaPublic},
+			},
+		},
+		{
+			Name: "private --> public",
+			Keys: []interface{}{ecPrivate},
+			ExpectKeys: []serviceaccount.PublicKey{
+				{KeyID: "SoABiieYuNx4UdqYvZRVeuC6SihxgLrhLy9peHMHpTc", PublicKey: ecPublic},
+			},
+		},
+		{
+			Name:      "invalid",
+			Keys:      []interface{}{"bogus"},
+			ExpectErr: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.Name, func(t *testing.T) {
+			getter, err := serviceaccount.StaticPublicKeysGetter(tc.Keys)
+			if tc.ExpectErr {
+				if err == nil {
+					t.Fatal("expected construction error, got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected construction error: %v", err)
+			}
+
+			bogusKeys := getter.GetPublicKeys("bogus")
+			if len(bogusKeys) != 0 {
+				t.Fatalf("unexpected bogus keys: %#v", bogusKeys)
+			}
+
+			allKeys := getter.GetPublicKeys("")
+			if !reflect.DeepEqual(tc.ExpectKeys, allKeys) {
+				t.Fatalf("unexpected keys: %#v", allKeys)
+			}
+			for _, key := range allKeys {
+				keysByID := getter.GetPublicKeys(key.KeyID)
+				if len(keysByID) != 1 {
+					t.Fatalf("expected 1 key for id %s, got %d", key.KeyID, len(keysByID))
+				}
+				if !reflect.DeepEqual(key, keysByID[0]) {
+					t.Fatalf("unexpected key for id %s", key.KeyID)
+				}
+			}
+		})
+	}
 }

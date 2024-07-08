@@ -43,5 +43,5 @@ type TestTypeList struct {
 }
 
 type TestTypeStatus struct {
-	Blah string
+	Blah string `json:"blah"`
 }
