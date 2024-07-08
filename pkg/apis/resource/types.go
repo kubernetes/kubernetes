@@ -82,6 +82,23 @@ const (
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 type ResourceSliceSpec struct {
+	// RequiredVersion defines which semantic of a ResourceSliceSpec must
+	// be supported by clients.
+	//
+	// Clients must check this field and ignore all ResourceSlices with a
+	// version that is higher than the one they support. Drivers should use
+	// the lowest version that provides the features they need.
+	//
+	// The version follows semver 2.0.0.
+	//
+	// History:
+	// - 1.31.0: initial definition of simple devices with their own attributes.
+	// - 1.32.0: partitionable devices, default attributes inherited by
+	//   devices from the slice
+	//
+	// +required
+	RequiredVersion string
+
 	// Driver identifies the DRA driver providing the capacity information.
 	// A field selector can be used to list only ResourceSlice
 	// objects with a certain driver name.
@@ -135,6 +152,26 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +listType=atomic
 	Devices []Device
+
+	// SharedCapacity defines the set of shared capacity consumable by
+	// devices in this ResourceSlice.
+	//
+	// Must not have more than 128 entries. Names must be C identifiers
+	// that are unique inside the ResourceSlice.
+	//
+	// Must be empty in ResourceSlices with RequiredVersion < 1.32.
+	//
+	// +optional
+	SharedCapacity map[string]resource.Quantity
+
+	// Attributes contains common device attributes that are the same for
+	// all devices in this ResourceSlice, unless a device specifically
+	// over writes it by defining an attribute of the same name.
+	//
+	// Must be empty in ResourceSlices with RequiredVersion < 1.32.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute
 }
 
 // ResourcePool describes the pool that ResourceSlices belong to.
@@ -198,6 +235,15 @@ type Device struct {
 	//
 	// +optional
 	Capacity map[QualifiedName]resource.Quantity
+
+	// SharedCapacityConsumed defines the set of shared capacity consumed by
+	// this device.
+	//
+	// Must not have more than 32 entries. Must be empty in ResourceSlices
+	// with RequiredVersion < 1.32.
+	//
+	// +optional
+	SharedCapacityConsumed map[string]resource.Quantity
 }
 
 // Limit for the sum of the number of entries in both ResourceSlices.
