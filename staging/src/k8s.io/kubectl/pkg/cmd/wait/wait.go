@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -186,11 +187,16 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 }
 
 func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
-	if strings.ToLower(condition) == "delete" {
+	lowercaseCond := strings.ToLower(condition)
+	switch {
+	case lowercaseCond == "delete":
 		return IsDeleted, nil
-	}
-	if strings.HasPrefix(condition, "condition=") {
-		conditionName := condition[len("condition="):]
+
+	case lowercaseCond == "create":
+		return IsCreated, nil
+
+	case strings.HasPrefix(lowercaseCond, "condition="):
+		conditionName := lowercaseCond[len("condition="):]
 		conditionValue := "true"
 		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
 			conditionValue = conditionName[equalsIndex+1:]
@@ -202,9 +208,9 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 			conditionStatus: conditionValue,
 			errOut:          errOut,
 		}.IsConditionMet, nil
-	}
-	if strings.HasPrefix(condition, "jsonpath=") {
-		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
+
+	case strings.HasPrefix(lowercaseCond, "jsonpath="):
+		jsonPathInput := strings.TrimPrefix(lowercaseCond, "jsonpath=")
 		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
 		if err != nil {
 			return nil, err
@@ -311,6 +317,31 @@ type ConditionFunc func(ctx context.Context, info *resource.Info, o *WaitOptions
 func (o *WaitOptions) RunWait() error {
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
 	defer cancel()
+
+	if strings.ToLower(o.ForCondition) == "create" {
+		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
+		// and we have to use ResourceFinder, which contains the resource name.
+		// In the long run, we should expose resource information from ResourceFinder,
+		// or functions from ResourceBuilder for parsing those. Lastly, this poll
+		// should be replaced with a ListWatch cache.
+		if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, o.Timeout, true, func(context.Context) (done bool, err error) {
+			visitErr := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
+				return nil
+			})
+			if apierrors.IsNotFound(visitErr) {
+				return false, nil
+			}
+			if visitErr != nil {
+				return false, visitErr
+			}
+			return true, nil
+		}); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return fmt.Errorf("%s", wait.ErrWaitTimeout.Error()) // nolint:staticcheck // SA1019
+			}
+			return err
+		}
+	}
 
 	visitCount := 0
 	visitFunc := func(info *resource.Info, err error) error {
