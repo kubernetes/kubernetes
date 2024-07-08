@@ -3120,8 +3120,36 @@ const (
 	// PodScheduled represents status of the scheduling process for this pod.
 	PodScheduled PodConditionType = "PodScheduled"
 	// DisruptionTarget indicates the pod is about to be terminated due to a
-	// disruption (such as preemption, eviction API or garbage-collection).
+	// disruption that is outside the pod's control (such as preemption,
+	// eviction via API, pressure on the node, or garbage-collection). If
+	// the disruption is potentially due to the behavior of the pod itself,
+	// this condition should not be set. This allows job controllers to know
+	// which pods can be safely and automatically retried.
+	//
+	// Service load balancers should proactively remove this pod from the
+	// list of valid endpoints to avoid directing traffic to a terminated
+	// pod.
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// PendingTermination indicates the pod will be terminated by the kubelet
+	// for a reason outside of the normal pod lifecycle. This includes when
+	// a pod is evicted, preempted, reaches its active deadline seconds, or
+	// due to graceful node shutdown. It does not include when the pod is
+	// deleted or an update to a container requires a restart. This condition
+	// is set when the pod begins to terminate on a node but does not guarantee
+	// that termination will complete, and the condition can be removed if
+	// the node is disrupted before the pod transitions to a terminal phase.
+	// The reason of the condition may be used to identify the cause of the
+	// termination.
+	//
+	// The status of the condition will remain True until all resources
+	// assigned to the pod by the node have been cleaned up. This may
+	// occur significantly later than when the phase is set to Succeeded
+	// or Failed (which occurs once all running containers have exited).
+	//
+	// Service load balancers should proactively remove this pod from the
+	// list of valid endpoints to avoid directing traffic to a terminated
+	// pod.
+	PendingTermination PodConditionType = "PendingTermination"
 	// PodReadyToStartContainers pod sandbox is successfully configured and
 	// the pod is ready to launch containers.
 	PodReadyToStartContainers PodConditionType = "PodReadyToStartContainers"
@@ -3148,6 +3176,18 @@ const (
 	// PodReasonPreemptionByScheduler reason in DisruptionTarget pod condition indicates that the
 	// disruption was initiated by scheduler's preemption.
 	PodReasonPreemptionByScheduler = "PreemptionByScheduler"
+
+	// EvictedByKubelet reason in PendingTermination pod condition indicates that the termination
+	// is initiated by kubelet due to the kubelet evicting the pod for any reason.
+	PodReasonEvictionByKubelet = "EvictedByKubelet"
+
+	// PodReasonNodeShutdown reason in PendingTermination pod condition indicates that the node is being
+	// terminated due to graceful shutdown.
+	PodReasonNodeShutdown = "NodeGracefulShutdown"
+
+	// PodReasonCriticalPodPreemption reason in PendingTermination pod condition indicates that a critical
+	// pod preempted this pod.
+	PodReasonCriticalPodPreemption = "CriticalPodPreemption"
 )
 
 // PodCondition contains details for the current condition of this pod.

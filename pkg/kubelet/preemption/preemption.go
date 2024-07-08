@@ -123,6 +123,14 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 				},
 			}
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+			conditions = append(conditions, v1.PodCondition{
+				Type:    v1.PendingTermination,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonCriticalPodPreemption,
+				Message: terminationMsg,
+			})
+		}
 
 		if err := c.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
 			Evict:      true,

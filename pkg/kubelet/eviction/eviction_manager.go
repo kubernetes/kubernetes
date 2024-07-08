@@ -619,6 +619,16 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	var conditions []v1.PodCondition
 	if condition != nil {
 		conditions = append(conditions, *condition)
+	} else {
+		// set a default condition for eviction with the generic reason
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+			conditions = append(conditions, v1.PodCondition{
+				Type:    v1.PendingTermination,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonEvictionByKubelet,
+				Message: evictMsg,
+			})
+		}
 	}
 	if err := m.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
 		Evict:                      true,

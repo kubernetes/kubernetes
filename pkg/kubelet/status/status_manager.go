@@ -439,6 +439,13 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	}
 	status := *oldStatus.DeepCopy()
 
+	// a fully terminated pod is no longer pending termination
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+		if _, condition := podutil.GetPodConditionFromList(status.Conditions, v1.PendingTermination); condition != nil {
+			condition.Status = v1.ConditionFalse
+		}
+	}
+
 	// once a pod has initialized, any missing status is treated as a failure
 	if hasPodInitialized(pod) {
 		for i := range status.ContainerStatuses {

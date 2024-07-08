@@ -1029,10 +1029,45 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 				expectTerminatedUnknown(t, status.ContainerStatuses[0].State)
 			},
 		},
+		{
+			name: "PendingTermination condition is always false",
+			pod: newPod(1, 1, func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyNever
+				pod.Status.Phase = v1.PodRunning
+				pod.Status.InitContainerStatuses = []v1.ContainerStatus{
+					{Name: "init-0", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+				}
+				pod.Status.ContainerStatuses = []v1.ContainerStatus{
+					{Name: "0", LastTerminationState: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
+				}
+				pod.Status.Conditions = []v1.PodCondition{
+					{
+						Type:    v1.PendingTermination,
+						Status:  v1.ConditionTrue,
+						Reason:  "Test",
+						Message: "message",
+					},
+				}
+			}),
+			expectFn: func(t *testing.T, status v1.PodStatus) {
+				if diff := cmp.Diff([]v1.PodCondition{
+					{
+						Type:    v1.PendingTermination,
+						Status:  v1.ConditionFalse,
+						Reason:  "Test",
+						Message: "message",
+					},
+				}, status.Conditions); len(diff) != 0 {
+					t.Fatalf("unexpected conditions: %v", diff)
+				}
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPendingTerminationConditions, true)
+
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
 			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)

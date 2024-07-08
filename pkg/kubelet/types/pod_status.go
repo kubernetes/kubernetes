@@ -42,6 +42,11 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+		if conditionType == v1.PendingTermination {
+			return true
+		}
+	}
 	return false
 }
 

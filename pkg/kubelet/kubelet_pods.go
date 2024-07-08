@@ -1897,6 +1897,25 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
+	// if we are abnormally terminating, and no condition is given, always set at least
+	// the generic PendingTermination condition to ensure that API consumers are aware of
+	// disruption outside the pod's normal lifecycle
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+		if abnormalTermination != nil {
+			if _, condition := podutil.GetPodConditionFromList(s.Conditions, v1.PendingTermination); condition == nil {
+				s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, &v1.PodCondition{
+					Type:    v1.PendingTermination,
+					Status:  v1.ConditionTrue,
+					Reason:  v1.PodReasonTerminationByKubelet,
+					Message: "Pod was terminated on the node.",
+				})
+			} else {
+				// the condition of PendingTermination must be true
+				condition.Status = v1.ConditionTrue
+			}
+		}
+	}
+
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()

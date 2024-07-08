@@ -399,6 +399,14 @@ func (m *managerImpl) processShutdownEvent() error {
 						Message: nodeShutdownMessage,
 					})
 				}
+				if utilfeature.DefaultFeatureGate.Enabled(features.PodPendingTerminationConditions) {
+					conditions = append(conditions, v1.PodCondition{
+						Type:    v1.PendingTermination,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonNodeShutdown,
+						Message: nodeShutdownMessage,
+					})
+				}
 
 				if err := m.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
 					GracePeriodSecondsOverride: &gracePeriodOverride,
