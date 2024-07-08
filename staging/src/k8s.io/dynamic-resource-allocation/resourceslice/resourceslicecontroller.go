@@ -77,7 +77,8 @@ type DriverResources struct {
 // Pool is the collection of devices belonging to the same pool.
 type Pool struct {
 	// NodeSelector may be different for each pool. Must not get set together
-	// with Resources.NodeName.
+	// with Resources.NodeName. It nil and Resources.NodeName is not set,
+	// then devices are availabe on all nodes.
 	NodeSelector *v1.NodeSelector
 
 	// Generation can be left at zero. It gets bumped up automatically
@@ -383,6 +384,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		slice.Spec.Pool.ResourceSliceCount = 1
 		slice.Spec.NodeName = nodeName
 		slice.Spec.NodeSelector = pool.NodeSelector
+		slice.Spec.AllNodes = pool.NodeSelector == nil && nodeName == ""
 		slice.Spec.Devices = pool.Devices
 
 		if loggerV := logger.V(6); loggerV.Enabled() {

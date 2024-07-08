@@ -441,11 +441,10 @@ func (m *matchAttributeConstraint) add(requestName string, device *resourceapi.D
 			return false
 		}
 	case attribute.VersionValue != nil:
+		// semver 2.0.0 requires that version strings are in their
+		// minimal form (in particular, no leading zeros). Therefore a
+		// strict "exact equal" check can do a string comparison.
 		if m.attribute.VersionValue == nil || *attribute.VersionValue != *m.attribute.VersionValue {
-			// TODO: should this be a semver-based comparison? We
-			// could require that vendors use a normalized
-			// representation instead of "01.02.03" in one device
-			// and "1.2.3" in another.
 			m.logger.V(6).Info("Version values different")
 			return false
 		}

@@ -248,7 +248,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources, devicesPerNode ...
 						Generation:         1,
 						ResourceSliceCount: 1,
 					},
-					NodeSelector: &v1.NodeSelector{}, // All nodes.
+					AllNodes: true,
 				},
 			}
 			maxAllocations := resources.MaxAllocations

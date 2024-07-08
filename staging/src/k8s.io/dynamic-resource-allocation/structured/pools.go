@@ -48,13 +48,9 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 			if slice.Spec.NodeName == node.Name {
 				addSlice(pools, slice)
 			}
+		case slice.Spec.AllNodes:
+			addSlice(pools, slice)
 		case slice.Spec.NodeSelector != nil:
-			if len(slice.Spec.NodeSelector.NodeSelectorTerms) == 0 {
-				// Empty selector matches all nodes.
-				addSlice(pools, slice)
-				continue
-			}
-
 			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)
@@ -63,7 +59,7 @@ func GatherPools(ctx context.Context, sliceLister resourcelisters.ResourceSliceL
 				addSlice(pools, slice)
 			}
 		default:
-			// Neither node name nor selector set. This must be some future, unknown extension,
+			// Nothing known was set. This must be some future, unknown extension,
 			// so we don't know how to handle it. We may still be able to allocated from
 			// other pools, so we continue.
 			//

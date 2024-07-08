@@ -258,7 +258,7 @@ devices:
 		slices           []*resourceapi.ResourceSlice
 		node             *v1.Node
 
-		expectResults []*resourceapi.AllocationResult
+		expectResults []any
 		expectError   types.GomegaMatcher // can be used to check for no error or match specific error types
 	}{
 		"empty": {},
@@ -268,7 +268,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node1,
 
-			expectResults: objects(allocatedSimpleClaim),
+			expectResults: objects[any](allocatedSimpleClaim),
 		},
 		"other-node": {
 			claimsToAllocate: objects(simpleClaim),
@@ -276,7 +276,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node2,
 
-			expectResults: objects(allocatedSimpleClaimNode2),
+			expectResults: objects[any](allocatedSimpleClaimNode2),
 		},
 		"small-and-large": {
 			claimsToAllocate: objects(twoDeviceClaim),
@@ -284,7 +284,7 @@ devices:
 			slices:           objects(node1slice, node2slice),
 			node:             node1,
 
-			expectResults: objects(allocatedTwoDeviceClaim),
+			expectResults: objects[any](allocatedTwoDeviceClaim),
 		},
 		"small-and-large-backtrack": {
 			claimsToAllocate: objects(twoDeviceClaim),
@@ -299,7 +299,7 @@ devices:
 			}()),
 			node: node1,
 
-			expectResults: objects(allocatedTwoDeviceClaim),
+			expectResults: objects[any](allocatedTwoDeviceClaim),
 		},
 
 		// TODO:
@@ -346,7 +346,7 @@ devices:
 				matchError = gomega.Not(gomega.HaveOccurred())
 			}
 			g.Expect(err).To(matchError)
-			g.Expect(results).To(gomega.HaveExactElements(tc.expectResults))
+			g.Expect(results).To(gomega.HaveExactElements(tc.expectResults...))
 
 			// Objects that the allocator had access to should not have been modified.
 			g.Expect(toAllocate.claims).To(gomega.HaveExactElements(tc.claimsToAllocate))
