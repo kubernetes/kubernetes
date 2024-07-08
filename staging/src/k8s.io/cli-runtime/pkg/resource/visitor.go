@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,7 @@ const (
 // Watchable describes a resource that can be watched for changes that occur on the server,
 // beginning after the provided resource version.
 type Watchable interface {
-	Watch(resourceVersion string) (watch.Interface, error)
+	Watch(sendInitialEvent bool, resourceVersion string) (watch.Interface, error)
 }
 
 // ResourceMapping allows an object to return the resource mapping associated with
@@ -179,7 +180,7 @@ func (i *Info) Namespaced() bool {
 }
 
 // Watch returns server changes to this object after it was retrieved.
-func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
+func (i *Info) Watch(_ bool, resourceVersion string) (watch.Interface, error) {
 	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion)
 }
 

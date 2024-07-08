@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/ptr"
 )
 
 // Selector is a Visitor for resources that match a label selector.
@@ -81,9 +82,20 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 	})
 }
 
-func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
-		&metav1.ListOptions{ResourceVersion: resourceVersion, LabelSelector: r.LabelSelector, FieldSelector: r.FieldSelector})
+func (r *Selector) Watch(sendInitialEvent bool, resourceVersion string) (watch.Interface, error) {
+	listOption := &metav1.ListOptions{
+		ResourceVersion: resourceVersion,
+		LabelSelector:   r.LabelSelector,
+		FieldSelector:   r.FieldSelector,
+	}
+
+	if sendInitialEvent {
+		listOption.SendInitialEvents = ptr.To(true)
+		listOption.AllowWatchBookmarks = true
+		listOption.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
+	}
+
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(), listOption)
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

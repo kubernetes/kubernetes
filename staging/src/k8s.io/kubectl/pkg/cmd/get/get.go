@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -66,6 +67,7 @@ type GetOptions struct {
 	Watch     bool
 	WatchOnly bool
 	ChunkSize int64
+	WatchList bool
 
 	OutputWatchEvents bool
 
@@ -156,6 +158,7 @@ func NewGetOptions(parent string, streams genericiooptions.IOStreams) *GetOption
 		IOStreams:   streams,
 		ChunkSize:   cmdutil.DefaultChunkSize,
 		ServerPrint: true,
+		WatchList:   os.Getenv("ENABLE_KUBECTL_WATCH_LIST_ALPHA") == "true",
 	}
 }
 
@@ -273,6 +276,10 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	}
 
 	switch {
+	case o.WatchList:
+		if len(o.SortBy) > 0 {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: WatchList requsted, --sort-by will be ignored\n")
+		}
 	case o.Watch:
 		if len(o.SortBy) > 0 {
 			fmt.Fprintf(o.IOStreams.ErrOut, "warning: --watch requested, --sort-by will be ignored for watch events received\n")
@@ -454,7 +461,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, args []string) error {
 		}
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
-	if o.Watch || o.WatchOnly {
+	if o.Watch || o.WatchOnly || o.WatchList {
 		return o.watch(f, args)
 	}
 
@@ -612,6 +619,10 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
 func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
+	if o.WatchOnly || o.WatchList {
+		o.ChunkSize = 1
+	}
+
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -637,7 +648,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	outputObjects := ptr.To(!o.WatchOnly)
+	outputObjects := ptr.To(!o.WatchOnly && !o.WatchList)
 	printer, err := o.ToPrinter(mapping, outputObjects, o.AllNamespaces, false)
 	if err != nil {
 		return err
@@ -689,7 +700,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 	}
 
 	// print watched changes
-	w, err := r.Watch(rv)
+	w, err := r.Watch(o.WatchList, rv)
 	if err != nil {
 		return err
 	}
@@ -699,6 +710,12 @@ func (o *GetOptions) watch(f cmdutil.Factory, args []string) error {
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
+
+			// stop watching if it's a list request and initial-end event is occurred
+			if !o.Watch && o.WatchList && e.Type == watch.Bookmark {
+				return true, nil
+			}
+
 			objToPrint := e.Object
 			if o.OutputWatchEvents {
 				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}

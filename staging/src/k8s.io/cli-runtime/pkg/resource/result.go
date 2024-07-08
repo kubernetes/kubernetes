@@ -220,7 +220,7 @@ func (r *Result) ResourceMapping() (*meta.RESTMapping, error) {
 // (selectors or pure types) can be watched, they will be, otherwise the list
 // will be visited (equivalent to the Infos() call) and if there is a single
 // resource present, it will be watched, otherwise an error will be returned.
-func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
+func (r *Result) Watch(sendInitialEvent bool, resourceVersion string) (watch.Interface, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -236,7 +236,7 @@ func (r *Result) Watch(resourceVersion string) (watch.Interface, error) {
 		if len(info) != 1 {
 			return nil, fmt.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(info))
 		}
-		return info[0].Watch(resourceVersion)
+		return info[0].Watch(sendInitialEvent, resourceVersion)
 	}
-	return w.Watch(resourceVersion)
+	return w.Watch(sendInitialEvent, resourceVersion)
 }
