@@ -682,6 +682,170 @@ func newPod(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
 	}
 }
 
+func newPodWithReadinessGates(readinessGateSpecConditionTypes []v1.PodConditionType, conditions map[v1.PodConditionType]v1.ConditionStatus, now metav1.Time, beforeSec int) *v1.Pod {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			ReadinessGates: []v1.PodReadinessGate{},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{},
+		},
+	}
+	for _, conditionType := range readinessGateSpecConditionTypes {
+		pod.Spec.ReadinessGates = append(pod.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: conditionType})
+	}
+	for conditionType, conditionStatus := range conditions {
+		pod.Status.Conditions = append(pod.Status.Conditions, v1.PodCondition{
+			Type:               conditionType,
+			Status:             conditionStatus,
+			LastTransitionTime: metav1.NewTime(now.Time.Add(-1 * time.Duration(beforeSec) * time.Second)),
+		})
+	}
+	return pod
+}
+
+func TestIsPodReadinessGateConditionTrue(t *testing.T) {
+	now := metav1.Now()
+	defaultReadinessGateConditionType := v1.PodConditionType("readinessGate")
+	tests := []struct {
+		name                         string
+		readinessGateConditionExists bool
+		readinessGateConditionStatus v1.ConditionStatus
+		expected                     bool
+	}{
+		{
+			name:                         "conditionType exists and is true",
+			readinessGateConditionExists: true,
+			readinessGateConditionStatus: v1.ConditionTrue,
+			expected:                     true,
+		},
+		{
+			name:                         "conditionType exists and is false",
+			readinessGateConditionExists: true,
+			readinessGateConditionStatus: v1.ConditionFalse,
+			expected:                     false,
+		},
+		{
+			name:                         "conditionType does not exist. defaults to false",
+			readinessGateConditionExists: false,
+			readinessGateConditionStatus: v1.ConditionFalse, // this value is inconsequential in this test
+			expected:                     false,
+		},
+	}
+
+	for i, test := range tests {
+		conditions := map[v1.PodConditionType]v1.ConditionStatus{}
+		if test.readinessGateConditionExists {
+			conditions[defaultReadinessGateConditionType] = test.readinessGateConditionStatus
+		}
+		pod := newPodWithReadinessGates([]v1.PodConditionType{defaultReadinessGateConditionType}, conditions, now, 0)
+		isPodReadinessGateConditionTrue := IsPodReadinessGateConditionTrue(defaultReadinessGateConditionType, pod.Status)
+		if isPodReadinessGateConditionTrue != test.expected {
+			t.Errorf("[tc #%d] expected readiness gate %s: %t, got: %t", i, defaultReadinessGateConditionType, test.expected, isPodReadinessGateConditionTrue)
+		}
+	}
+}
+
+func TestArePodReadinessGatesTrue(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		name                               string
+		readinessGatesConditionTypesInSpec []v1.PodConditionType
+		readinessGatesInStatus             map[v1.PodConditionType]v1.ConditionStatus
+		expected                           bool
+	}{
+		{
+			name: "all readiness gates exist in status and return true. result true",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{
+				"www.example.com/gate-1",
+				"www.example.com/gate-2",
+				"www.example.com/gate-3",
+			},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{
+				"www.example.com/gate-1": v1.ConditionTrue,
+				"www.example.com/gate-2": v1.ConditionTrue,
+				"www.example.com/gate-3": v1.ConditionTrue,
+			},
+			expected: true,
+		},
+		{
+			name: "all readiness gates exist in status, some return false. result false",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{
+				"www.example.com/gate-1",
+				"www.example.com/gate-2",
+				"www.example.com/gate-3",
+				"www.example.com/gate-4",
+			},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{
+				"www.example.com/gate-1": v1.ConditionTrue,
+				"www.example.com/gate-2": v1.ConditionFalse,
+				"www.example.com/gate-3": v1.ConditionTrue,
+				"www.example.com/gate-4": v1.ConditionTrue,
+			},
+			expected: false,
+		},
+		{
+			name: "some readiness gates exist in status, all existing return true. result false",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{
+				"www.example.com/gate-1",
+				"www.example.com/gate-2",
+				"www.example.com/gate-3",
+				"www.example.com/gate-4",
+			},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{
+				"www.example.com/gate-1": v1.ConditionTrue,
+				"www.example.com/gate-3": v1.ConditionTrue,
+				"www.example.com/gate-4": v1.ConditionTrue,
+			},
+			expected: false,
+		},
+		{
+			name: "some readiness gates exist in status, some existing return false. result false",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{
+				"www.example.com/gate-1",
+				"www.example.com/gate-2",
+				"www.example.com/gate-3",
+				"www.example.com/gate-4",
+			},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{
+				"www.example.com/gate-1": v1.ConditionTrue,
+				"www.example.com/gate-3": v1.ConditionTrue,
+				"www.example.com/gate-4": v1.ConditionFalse,
+			},
+			expected: false,
+		},
+		{
+			name: "no readiness gates exist in status. result false",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{
+				"www.example.com/gate-1",
+				"www.example.com/gate-2",
+				"www.example.com/gate-3",
+				"www.example.com/gate-4",
+			},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{},
+			expected:               false,
+		},
+		{
+			name:                               "readiness gate exists in status but none set in the spec. return true",
+			readinessGatesConditionTypesInSpec: []v1.PodConditionType{},
+			readinessGatesInStatus: map[v1.PodConditionType]v1.ConditionStatus{
+				"www.example.com/gate-1": v1.ConditionFalse,
+				"www.example.com/gate-3": v1.ConditionTrue,
+				"www.example.com/gate-4": v1.ConditionTrue,
+			},
+			expected: true,
+		},
+	}
+	for i, test := range tests {
+		pod := newPodWithReadinessGates(test.readinessGatesConditionTypesInSpec, test.readinessGatesInStatus, now, 0)
+
+		arePodReadinessGatesTrue := ArePodReadinessGatesTrue(pod)
+		if arePodReadinessGatesTrue != test.expected {
+			t.Errorf("[tc #%d] expected readiness gates in spec %v: %t, got: %t", i, test.readinessGatesConditionTypesInSpec, test.expected, arePodReadinessGatesTrue)
+		}
+	}
+}
+
 func TestIsPodAvailable(t *testing.T) {
 	now := metav1.Now()
 	tests := []struct {

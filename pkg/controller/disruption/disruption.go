@@ -916,7 +916,7 @@ func countHealthyPods(pods []*v1.Pod, disruptedPods map[string]metav1.Time, curr
 		if disruptionTime, found := disruptedPods[pod.Name]; found && disruptionTime.Time.Add(DeletionTimeout).After(currentTime) {
 			continue
 		}
-		if apipod.IsPodReady(pod) {
+		if apipod.IsPodReady(pod) && apipod.ArePodReadinessGatesTrue(pod) {
 			currentHealthy++
 		}
 	}
