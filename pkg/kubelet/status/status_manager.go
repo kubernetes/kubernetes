@@ -44,6 +44,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
 // podStatusManagerStateFile is the file name where status manager stores its state
@@ -1049,38 +1050,30 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
 	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
 
+	// Merge conditions not owned by the Kubelet with those that are provided by other actors
 	for _, c := range oldPodStatus.Conditions {
-		if !kubetypes.PodConditionByKubelet(c.Type) {
+		switch {
+		case kubetypes.PodConditionByKubelet(c.Type), kubetypes.PodConditionAndReasonByKubelet(c.Type, c.Reason):
+			// the condition is owned by the kubelet
+		default:
 			podConditions = append(podConditions, c)
 		}
 	}
-
-	transitioningToTerminalPhase := !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase)
-
 	for _, c := range newPodStatus.Conditions {
-		if kubetypes.PodConditionByKubelet(c.Type) {
-			podConditions = append(podConditions, c)
-		} else if kubetypes.PodConditionSharedByKubelet(c.Type) {
-			// we replace or append all the "shared by kubelet" conditions
-			if c.Type == v1.DisruptionTarget {
-				// guard the update of the DisruptionTarget condition with a check to ensure
-				// it will only be sent once all containers have terminated and the phase
-				// is terminal. This avoids sending an unnecessary patch request to add
-				// the condition if the actual status phase transition is delayed.
-				if transitioningToTerminalPhase && !couldHaveRunningContainers {
-					// update the LastTransitionTime again here because the older transition
-					// time set in updateStatusInternal is likely stale as sending of
-					// the condition was delayed until all pod's containers have terminated.
-					updateLastTransitionTime(&newPodStatus, &oldPodStatus, c.Type)
-					if _, c := podutil.GetPodConditionFromList(newPodStatus.Conditions, c.Type); c != nil {
-						// for shared conditions we update or append in podConditions
-						podConditions = statusutil.ReplaceOrAppendPodCondition(podConditions, c)
-					}
-				}
+		switch {
+		case kubetypes.PodConditionByKubelet(c.Type), kubetypes.PodConditionAndReasonByKubelet(c.Type, c.Reason):
+			if kubetypes.PodConditionSharedByKubelet(c.Type) {
+				podConditions = utilpod.ReplaceOrAppendPodCondition(podConditions, &c)
+			} else {
+				podConditions = append(podConditions, c)
 			}
+		default:
+			// the condition is carried forward unmodified
 		}
 	}
 	newPodStatus.Conditions = podConditions
+
+	transitioningToTerminalPhase := !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase)
 
 	// ResourceClaimStatuses is not owned and not modified by kubelet.
 	newPodStatus.ResourceClaimStatuses = oldPodStatus.ResourceClaimStatuses

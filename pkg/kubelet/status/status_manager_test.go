@@ -1598,7 +1598,7 @@ func TestMergePodStatus(t *testing.T) {
 			},
 		},
 		{
-			"don't add DisruptionTarget condition when transitioning into failed phase, but there are might still be running containers; PodDisruptionConditions enabled",
+			"add DisruptionTarget condition as soon as possible; PodDisruptionConditions enabled",
 			true,
 			true,
 			func(input v1.PodStatus) v1.PodStatus { return input },
@@ -1622,12 +1622,52 @@ func TestMergePodStatus(t *testing.T) {
 						Type:   v1.PodScheduled,
 						Status: v1.ConditionTrue,
 					},
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationByKubelet",
+					},
 				},
 				Message: "Message",
 			},
 		},
 		{
-			"preserve DisruptionTarget condition; PodDisruptionConditions enabled",
+			"preserve non-kubelet DisruptionTarget condition; PodDisruptionConditions enabled",
+			true,
+			false,
+			func(input v1.PodStatus) v1.PodStatus {
+				input.Conditions = append(input.Conditions, v1.PodCondition{
+					Type:   v1.DisruptionTarget,
+					Status: v1.ConditionTrue,
+					Reason: "TerminationNotByKubelet",
+				})
+				return input
+			},
+			func(input v1.PodStatus) v1.PodStatus {
+				return input
+			},
+			v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
+					{
+						Type:   v1.DisruptionTarget,
+						Status: v1.ConditionTrue,
+						Reason: "TerminationNotByKubelet",
+					},
+					{
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
+					},
+					{
+						Type:   v1.PodScheduled,
+						Status: v1.ConditionTrue,
+					},
+				},
+				Message: "Message",
+			},
+		},
+		{
+			"remove kubelet-owned DisruptionTarget condition; PodDisruptionConditions enabled",
 			true,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
@@ -1651,11 +1691,6 @@ func TestMergePodStatus(t *testing.T) {
 					{
 						Type:   v1.PodScheduled,
 						Status: v1.ConditionTrue,
-					},
-					{
-						Type:   v1.DisruptionTarget,
-						Status: v1.ConditionTrue,
-						Reason: "TerminationByKubelet",
 					},
 				},
 				Message: "Message",
@@ -1744,7 +1779,7 @@ func TestMergePodStatus(t *testing.T) {
 			},
 		},
 		{
-			"don't override DisruptionTarget condition when remaining in running phase; PodDisruptionConditions enabled",
+			"override DisruptionTarget condition when remaining in running phase; PodDisruptionConditions enabled",
 			true,
 			false,
 			func(input v1.PodStatus) v1.PodStatus {
@@ -1769,7 +1804,11 @@ func TestMergePodStatus(t *testing.T) {
 					{
 						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
-						Reason: "EvictedByEvictionAPI",
+						// The Kubelet owns the lifecycle of pods scheduled to it and makes the final
+						// determination of why the pod was terminated - if a cluster component races
+						// with the Kubelet to set a disruption target, the Kubelet decides which comes
+						// first and updates the reason appropriately.
+						Reason: "TerminationByKubelet",
 					},
 					{
 						Type:   v1.PodReady,
@@ -1784,7 +1823,7 @@ func TestMergePodStatus(t *testing.T) {
 			},
 		},
 		{
-			"don't override DisruptionTarget condition when transitioning to failed phase but there might still be running containers; PodDisruptionConditions enabled",
+			"override DisruptionTarget condition when transitioning to failed phase but there might still be running containers; PodDisruptionConditions enabled",
 			true,
 			true,
 			func(input v1.PodStatus) v1.PodStatus {
@@ -1810,7 +1849,11 @@ func TestMergePodStatus(t *testing.T) {
 					{
 						Type:   v1.DisruptionTarget,
 						Status: v1.ConditionTrue,
-						Reason: "EvictedByEvictionAPI",
+						// The Kubelet owns the lifecycle of pods scheduled to it and makes the final
+						// determination of why the pod was terminated - if a cluster component races
+						// with the Kubelet to set a disruption target, the Kubelet decides which comes
+						// first and updates the reason appropriately.
+						Reason: "TerminationByKubelet",
 					},
 					{
 						Type:   v1.PodReady,
