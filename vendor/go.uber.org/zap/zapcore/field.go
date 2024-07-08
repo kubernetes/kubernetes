@@ -47,7 +47,7 @@ const (
 	ByteStringType
 	// Complex128Type indicates that the field carries a complex128.
 	Complex128Type
-	// Complex64Type indicates that the field carries a complex128.
+	// Complex64Type indicates that the field carries a complex64.
 	Complex64Type
 	// DurationType indicates that the field carries a time.Duration.
 	DurationType
