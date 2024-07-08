@@ -27,14 +27,9 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-kube::util::require-jq
 
-# Doing it this way is MUCH faster than simply saying "all", and there doesn't
-# seem to be a simpler way to express "this whole workspace".
 packages=()
-kube::util::read-array packages < <(
-    go work edit -json | jq -r '.Use[].DiskPath + "/..."'
-)
+kube::util::read-array packages < <(kube::golang::workspace_all)
 
 GOPROXY=off \
     go run ./cmd/import-boss -v "${KUBE_VERBOSE:-0}" "${packages[@]}"

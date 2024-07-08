@@ -972,3 +972,15 @@ kube::golang::build_binaries() {
     done
   fi
 }
+
+# Returns a go package pattern to match all packages in the workspace, requires jq
+#
+# Use like:
+# kube::util::read-array targets < <(kube::golang::workspace_all)
+#
+# Doing it this way is MUCH faster than simply saying "all", and there doesn't
+# seem to be a simpler way to express "this whole workspace".
+kube::golang::workspace_all() {
+  kube::util::require-jq
+  go work edit -json | jq -r '.Use[].DiskPath + "/..."'
+}

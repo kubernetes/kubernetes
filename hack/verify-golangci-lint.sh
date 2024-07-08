@@ -47,8 +47,6 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 kube::golang::setup_env
 export GOBIN="${KUBE_OUTPUT_BIN}"
 
-kube::util::require-jq
-
 invocation=(./hack/verify-golangci-lint.sh "$@")
 golangci=("${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
@@ -156,11 +154,7 @@ cd "${KUBE_ROOT}"
 res=0
 run () {
   if [[ "${#targets[@]}" -eq 0 ]]; then
-    # Doing it this way is MUCH faster than simply saying "all", and there doesn't
-    # seem to be a simpler way to express "this whole workspace".
-    kube::util::read-array targets < <(
-        go work edit -json | jq -r '.Use[].DiskPath + "/..."'
-    )
+    kube::util::read-array targets < <(kube::golang::workspace_all)
   fi
   echo "running ${golangci[*]} ${targets[*]}" >&2
   "${golangci[@]}" "${targets[@]}" 2>&1 | sed -e 's;^;ERROR: ;' >&2 || res=$?
