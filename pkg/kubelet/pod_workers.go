@@ -32,7 +32,6 @@ import (
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -48,19 +47,12 @@ type PodStatusFunc func(podStatus *v1.PodStatus)
 
 // KillPodOptions are options when performing a pod update whose update type is kill.
 type KillPodOptions struct {
+	kubetypes.TerminatePodOptions
 	// CompletedCh is closed when the kill request completes (syncTerminatingPod has completed
 	// without error) or if the pod does not exist, or if the pod has already terminated. This
 	// could take an arbitrary amount of time to be closed, but is never left open once
 	// CouldHaveRunningContainers() returns false.
 	CompletedCh chan<- struct{}
-	// Evict is true if this is a pod triggered eviction - once a pod is evicted some resources are
-	// more aggressively reaped than during normal pod operation (stopped containers).
-	Evict bool
-	// PodStatusFunc is invoked (if set) and overrides the status of the pod at the time the pod is killed.
-	// The provided status is populated from the latest state.
-	PodStatusFunc PodStatusFunc
-	// PodTerminationGracePeriodSecondsOverride is optional override to use if a pod is being killed as part of kill operation.
-	PodTerminationGracePeriodSecondsOverride *int64
 }
 
 // UpdatePodOptions is an options struct to pass to a UpdatePod operation.
@@ -150,6 +142,13 @@ type PodWorkers interface {
 	// due to significant time passing. A pod that is terminated will never be
 	// restarted.
 	UpdatePod(options UpdatePodOptions)
+
+	// TerminatePodAbnormallyAndWait overrides the pod's natural lifecycle and triggers
+	// termination of the pod on the Kubelet and reports the pod as Failed to the API.
+	// It will wait for successful termination of the pod (based on the pod's grace
+	// period) or return an error indicating the pod may still be running.
+	TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error
+
 	// SyncKnownPods removes workers for pods that are not in the desiredPods set
 	// and have been terminated for a significant period of time. Once this method
 	// has been called once, the workers are assumed to be fully initialized and
@@ -257,8 +256,9 @@ type podSyncer interface {
 	// without error. Once this method exits with no error other components are allowed to tear down
 	// supporting resources like volumes and devices. If the context is canceled, the method should
 	// return context.Canceled unless it has successfully finished, which may occur when a shorter
-	// grace period is detected.
-	SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
+	// grace period is detected. If abnormalTermination is set, the Kubelet is acting on the pod outside
+	// of the normal pod lifecycle.
+	SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error
 	// SyncTerminatingRuntimePod is invoked when running containers are found that correspond to
 	// a pod that is no longer known to the kubelet to terminate those containers. It should not
 	// exit without error unless all containers are known to be stopped.
@@ -270,7 +270,7 @@ type podSyncer interface {
 }
 
 type syncPodFnType func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error)
-type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error
+type syncTerminatingPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error
 type syncTerminatingRuntimePodFnType func(ctx context.Context, runningPod *kubecontainer.Pod) error
 type syncTerminatedPodFnType func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error
 
@@ -296,8 +296,8 @@ var _ podSyncer = podSyncerFuncs{}
 func (f podSyncerFuncs) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
 	return f.syncPod(ctx, updateType, pod, mirrorPod, podStatus)
 }
-func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
-	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, podStatusFn)
+func (f podSyncerFuncs) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error {
+	return f.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, abnormalTermination)
 }
 func (f podSyncerFuncs) SyncTerminatingRuntimePod(ctx context.Context, runningPod *kubecontainer.Pod) error {
 	return f.syncTerminatingRuntimePod(ctx, runningPod)
@@ -363,15 +363,12 @@ type podSyncStatus struct {
 	terminatedAt time.Time
 	// gracePeriod is the requested gracePeriod once terminatingAt is nonzero.
 	gracePeriod int64
-	// notifyPostTerminating will be closed once the pod transitions to
-	// terminated. After the pod is in terminated state, nothing should be
-	// added to this list.
-	notifyPostTerminating []chan<- struct{}
-	// statusPostTerminating is a list of the status changes associated
+	// abnormalTerminations is a list of the status changes associated
 	// with kill pod requests. After the pod is in terminated state, nothing
-	// should be added to this list. The worker will execute the last function
-	// in this list on each termination attempt.
-	statusPostTerminating []PodStatusFunc
+	// should be added to this list. The worker will use the last status
+	// provided to update the pod's status. Any completion channels will
+	// be closed once the pod transitions to terminated.
+	abnormalTerminations []KillPodOptions
 
 	// startedTerminating is true once the pod worker has observed the request to
 	// stop a pod (exited syncPod and observed a podWork with WorkType
@@ -453,9 +450,9 @@ func (s *podSyncStatus) mergeLastUpdate(other UpdatePodOptions) {
 		if other.KillPodOptions.Evict {
 			opts.KillPodOptions.Evict = true
 		}
-		if override := other.KillPodOptions.PodTerminationGracePeriodSecondsOverride; override != nil {
+		if override := other.KillPodOptions.GracePeriodSecondsOverride; override != nil {
 			value := *override
-			opts.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &value
+			opts.KillPodOptions.GracePeriodSecondsOverride = &value
 		}
 	}
 	// StartTime is not copied - that is purely for tracking latency of config propagation
@@ -891,24 +888,21 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		options.KillPodOptions = nil
 
 	case status.IsTerminationRequested():
-		if options.KillPodOptions == nil {
-			options.KillPodOptions = &KillPodOptions{}
-		}
-
-		if ch := options.KillPodOptions.CompletedCh; ch != nil {
-			status.notifyPostTerminating = append(status.notifyPostTerminating, ch)
-		}
-		if fn := options.KillPodOptions.PodStatusFunc; fn != nil {
-			status.statusPostTerminating = append(status.statusPostTerminating, fn)
-		}
-
 		gracePeriod, gracePeriodShortened := calculateEffectiveGracePeriod(status, pod, options.KillPodOptions)
 
 		wasGracePeriodShortened = gracePeriodShortened
 		status.gracePeriod = gracePeriod
+
+		if options.KillPodOptions != nil {
+			// record the details of each abnormal termination
+			status.abnormalTerminations = append(status.abnormalTerminations, *options.KillPodOptions)
+		} else {
+			// default the options
+			options.KillPodOptions = &KillPodOptions{}
+		}
 		// always set the grace period for syncTerminatingPod so we don't have to recalculate,
 		// will never be zero.
-		options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
+		options.KillPodOptions.GracePeriodSecondsOverride = &gracePeriod
 
 	default:
 		// KillPodOptions is not valid for sync actions outside of the terminating phase
@@ -989,7 +983,7 @@ func calculateEffectiveGracePeriod(status *podSyncStatus, pod *v1.Pod, options *
 	}
 	// we allow other parts of the kubelet (namely eviction) to request this pod be terminated faster
 	if options != nil {
-		if override := options.PodTerminationGracePeriodSecondsOverride; override != nil {
+		if override := options.GracePeriodSecondsOverride; override != nil {
 			if gracePeriod == 0 || *override < gracePeriod {
 				gracePeriod = *override
 				overridden = true
@@ -1271,15 +1265,15 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 			case update.WorkType == TerminatingPod:
 				var gracePeriod *int64
 				if opt := update.Options.KillPodOptions; opt != nil {
-					gracePeriod = opt.PodTerminationGracePeriodSecondsOverride
+					gracePeriod = opt.GracePeriodSecondsOverride
 				}
-				podStatusFn := p.acknowledgeTerminating(podUID)
+				abnormalTermination := p.acknowledgeTerminating(podUID)
 
 				// if we only have a running pod, terminate it directly
 				if update.Options.RunningPod != nil {
 					err = p.podSyncer.SyncTerminatingRuntimePod(ctx, update.Options.RunningPod)
 				} else {
-					err = p.podSyncer.SyncTerminatingPod(ctx, update.Options.Pod, status, gracePeriod, podStatusFn)
+					err = p.podSyncer.SyncTerminatingPod(ctx, update.Options.Pod, status, gracePeriod, abnormalTermination)
 				}
 
 			default:
@@ -1342,7 +1336,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 // acknowledgeTerminating sets the terminating flag on the pod status once the pod worker sees
 // the termination state so that other components know no new containers will be started in this
 // pod. It then returns the status function, if any, that applies to this pod.
-func (p *podWorkers) acknowledgeTerminating(podUID types.UID) PodStatusFunc {
+func (p *podWorkers) acknowledgeTerminating(podUID types.UID) *kubetypes.TerminatePodOptions {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 
@@ -1356,8 +1350,9 @@ func (p *podWorkers) acknowledgeTerminating(podUID types.UID) PodStatusFunc {
 		status.startedTerminating = true
 	}
 
-	if l := len(status.statusPostTerminating); l > 0 {
-		return status.statusPostTerminating[l-1]
+	if l := len(status.abnormalTerminations); l > 0 {
+		copied := status.abnormalTerminations[l-1].TerminatePodOptions
+		return &copied
 	}
 	return nil
 }
@@ -1411,11 +1406,12 @@ func (p *podWorkers) completeTerminating(podUID types.UID) {
 		klog.V(4).InfoS("Pod worker was terminated but did not have terminatingAt set, likely programmer error", "podUID", podUID)
 	}
 	status.terminatedAt = p.clock.Now()
-	for _, ch := range status.notifyPostTerminating {
-		close(ch)
+	for i, termination := range status.abnormalTerminations {
+		if termination.CompletedCh != nil {
+			close(termination.CompletedCh)
+			status.abnormalTerminations[i].CompletedCh = nil
+		}
 	}
-	status.notifyPostTerminating = nil
-	status.statusPostTerminating = nil
 
 	// the pod has now transitioned to terminated and we want to run syncTerminatedPod
 	// as soon as possible, so if no update is already waiting queue a synthetic update
@@ -1645,48 +1641,46 @@ func (p *podWorkers) removeTerminatedWorker(uid types.UID, status *podSyncStatus
 	return true
 }
 
-// killPodNow returns a KillPodFunc that can be used to kill a pod.
-// It is intended to be injected into other modules that need to kill a pod.
-func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.KillPodFunc {
-	return func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
-		// determine the grace period to use when killing the pod
-		gracePeriod := int64(0)
-		if gracePeriodOverride != nil {
-			gracePeriod = *gracePeriodOverride
-		} else if pod.Spec.TerminationGracePeriodSeconds != nil {
-			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
-		}
+// TerminatePodAbnormallyAndWait instructs the pod worker to interrupt the normal lifecycle of the pod
+// and stop it early. The pod will be be considered Failed unless it has already completed
+// successfully. The method will return when the pod has either completed successfully or we have waited
+// grace period seconds * 1.5 or 10s, whichever is longer.
+func (p *podWorkers) TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
+	// determine the grace period that will be used for the pod
+	gracePeriod := int64(0)
+	if options.GracePeriodSecondsOverride != nil {
+		gracePeriod = *options.GracePeriodSecondsOverride
+	} else if pod.Spec.TerminationGracePeriodSeconds != nil {
+		gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+	}
 
-		// we timeout and return an error if we don't get a callback within a reasonable time.
-		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
-		timeout := gracePeriod + (gracePeriod / 2)
-		minTimeout := int64(10)
-		if timeout < minTimeout {
-			timeout = minTimeout
-		}
-		timeoutDuration := time.Duration(timeout) * time.Second
+	// we timeout and return an error if we don't get a callback within a reasonable time.
+	// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
+	timeout := gracePeriod + (gracePeriod / 2)
+	minTimeout := int64(10)
+	if timeout < minTimeout {
+		timeout = minTimeout
+	}
+	timeoutDuration := time.Duration(timeout) * time.Second
 
-		// open a channel we block against until we get a result
-		ch := make(chan struct{}, 1)
-		podWorkers.UpdatePod(UpdatePodOptions{
-			Pod:        pod,
-			UpdateType: kubetypes.SyncPodKill,
-			KillPodOptions: &KillPodOptions{
-				CompletedCh:                              ch,
-				Evict:                                    isEvicted,
-				PodStatusFunc:                            statusFn,
-				PodTerminationGracePeriodSecondsOverride: gracePeriodOverride,
-			},
-		})
+	// open a channel we block against until we get a result
+	ch := make(chan struct{}, 1)
+	p.UpdatePod(UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodKill,
+		KillPodOptions: &KillPodOptions{
+			CompletedCh:         ch,
+			TerminatePodOptions: options,
+		},
+	})
 
-		// wait for either a response, or a timeout
-		select {
-		case <-ch:
-			return nil
-		case <-time.After(timeoutDuration):
-			recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not kill the pod within specified grace period.")
-			return fmt.Errorf("timeout waiting to kill pod")
-		}
+	// wait for either a response, or a timeout
+	select {
+	case <-ch:
+		return nil
+	case <-time.After(timeoutDuration):
+		p.recorder.Eventf(pod, v1.EventTypeWarning, events.ExceededGracePeriod, "Container runtime did not terminate the pod within specified grace period.")
+		return fmt.Errorf("timeout waiting to terminate pod abnormally")
 	}
 }
 

@@ -140,6 +140,19 @@ func (sp SyncPodType) String() string {
 	}
 }
 
+type TerminatePodOptions struct {
+	// Evict is true if this is a pod triggered eviction - once a pod is evicted some resources are
+	// more aggressively reaped than during normal pod operation (stopped containers).
+	Evict bool
+	// GracePeriodSecondsOverride overrides the pod's default behavior with a different grace period
+	// (usually shorter) for use in anomalous termination.
+	GracePeriodSecondsOverride *int64
+
+	Reason     string
+	Message    string
+	Conditions []v1.PodCondition
+}
+
 // IsMirrorPod returns true if the passed Pod is a Mirror Pod.
 func IsMirrorPod(pod *v1.Pod) bool {
 	if pod.Annotations == nil {

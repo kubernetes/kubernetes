@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -57,7 +58,7 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 	return f.killedPods
 }
 
-func (f *fakePodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(status *v1.PodStatus)) error {
+func (f *fakePodKiller) TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
 	if f.errDuringPodKilling {
 		f.killedPods = []*v1.Pod{}
 		return fmt.Errorf("problem killing pod %v", pod)
@@ -85,7 +86,7 @@ func (f *fakePodProvider) getPods() []*v1.Pod {
 func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller *fakePodKiller) *CriticalPodAdmissionHandler {
 	return &CriticalPodAdmissionHandler{
 		getPodsFunc: podProvider.getPods,
-		killPodFunc: podKiller.killPodNow,
+		terminator:  podKiller,
 		recorder:    &record.FakeRecorder{},
 	}
 }

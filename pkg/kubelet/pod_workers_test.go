@@ -62,6 +62,17 @@ type fakePodWorkers struct {
 	terminatingStaticPods map[string]bool
 }
 
+func (f *fakePodWorkers) TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error {
+	f.UpdatePod(UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodKill,
+		KillPodOptions: &KillPodOptions{
+			TerminatePodOptions: options,
+		},
+	})
+	return nil
+}
+
 func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -410,7 +421,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 				}()
 				return false, nil
 			},
-			syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+			syncTerminatingPod: func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error {
 				func() {
 					lock.Lock()
 					defer lock.Unlock()
@@ -645,8 +656,12 @@ func TestUpdatePod(t *testing.T) {
 				restartRequested:   true, // because we received a create during termination
 				finished:           true,
 				activeUpdate: &UpdatePodOptions{
-					Pod:            newNamedPod("1", "ns", "running-pod", false),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
+					Pod: newNamedPod("1", "ns", "running-pod", false),
+					KillPodOptions: &KillPodOptions{
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: intp(30),
+						},
+					},
 				},
 			}),
 			expectKnownTerminated: true,
@@ -691,8 +706,12 @@ func TestUpdatePod(t *testing.T) {
 				finished:           true,
 				deleted:            true,
 				activeUpdate: &UpdatePodOptions{
-					Pod:            withDeletionTimestamp(newNamedPod("1", "ns", "running-pod", false), time.Unix(1, 0), intp(15)),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(15)},
+					Pod: withDeletionTimestamp(newNamedPod("1", "ns", "running-pod", false), time.Unix(1, 0), intp(15)),
+					KillPodOptions: &KillPodOptions{
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: intp(15),
+						},
+					},
 				},
 			}),
 			expectKnownTerminated: true,
@@ -700,9 +719,55 @@ func TestUpdatePod(t *testing.T) {
 		{
 			name: "a running pod is terminated when an eviction is requested",
 			update: UpdatePodOptions{
-				UpdateType:     kubetypes.SyncPodKill,
-				Pod:            newNamedPod("1", "ns", "running-pod", false),
-				KillPodOptions: &KillPodOptions{Evict: true},
+				UpdateType: kubetypes.SyncPodKill,
+				Pod:        newNamedPod("1", "ns", "running-pod", false),
+				KillPodOptions: &KillPodOptions{
+					TerminatePodOptions: kubetypes.TerminatePodOptions{
+						Evict: true,
+					},
+				},
+			},
+			runtimeStatus: &kubecontainer.PodStatus{ /* we know about this pod */ },
+			prepare: func(t *testing.T, w *timeIncrementingWorkers) func() {
+				w.UpdatePod(UpdatePodOptions{
+					UpdateType: kubetypes.SyncPodCreate,
+					Pod:        newNamedPod("1", "ns", "running-pod", false),
+				})
+				return nil
+			},
+			expect: hasContext(&podSyncStatus{
+				fullname:           "running-pod_ns",
+				syncedAt:           time.Unix(1, 0),
+				startedAt:          time.Unix(3, 0),
+				terminatingAt:      time.Unix(3, 0),
+				terminatedAt:       time.Unix(5, 0),
+				gracePeriod:        30,
+				startedTerminating: true,
+				finished:           true,
+				evicted:            true,
+				activeUpdate: &UpdatePodOptions{
+					Pod: newNamedPod("1", "ns", "running-pod", false),
+					KillPodOptions: &KillPodOptions{
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: intp(30),
+							Evict:                      true,
+						},
+					},
+				},
+				abnormalTerminations: []KillPodOptions{{TerminatePodOptions: kubetypes.TerminatePodOptions{Evict: true}}},
+			}),
+			expectKnownTerminated: true,
+		},
+		{
+			name: "a running runtime pod is terminated when an eviction is requested",
+			update: UpdatePodOptions{
+				UpdateType: kubetypes.SyncPodKill,
+				Pod:        newNamedPod("1", "ns", "running-pod", false),
+				KillPodOptions: &KillPodOptions{
+					TerminatePodOptions: kubetypes.TerminatePodOptions{
+						Evict: true,
+					},
+				},
 			},
 			prepare: func(t *testing.T, w *timeIncrementingWorkers) func() {
 				w.UpdatePod(UpdatePodOptions{
@@ -724,10 +789,13 @@ func TestUpdatePod(t *testing.T) {
 				activeUpdate: &UpdatePodOptions{
 					Pod: newNamedPod("1", "ns", "running-pod", false),
 					KillPodOptions: &KillPodOptions{
-						PodTerminationGracePeriodSecondsOverride: intp(30),
-						Evict:                                    true,
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: intp(30),
+							Evict:                      true,
+						},
 					},
 				},
+				abnormalTerminations: []KillPodOptions{{TerminatePodOptions: kubetypes.TerminatePodOptions{Evict: true}}},
 			}),
 			expectKnownTerminated: true,
 		},
@@ -744,8 +812,12 @@ func TestUpdatePod(t *testing.T) {
 				startedAt:     time.Unix(3, 0),
 				terminatedAt:  time.Unix(3, 0),
 				activeUpdate: &UpdatePodOptions{
-					Pod:            newPodWithPhase("1", "done-pod", v1.PodSucceeded),
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: intp(30)},
+					Pod: newPodWithPhase("1", "done-pod", v1.PodSucceeded),
+					KillPodOptions: &KillPodOptions{
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: intp(30),
+						},
+					},
 				},
 				gracePeriod:        30,
 				startedTerminating: true,
@@ -802,9 +874,13 @@ func TestUpdatePod(t *testing.T) {
 				syncedAt:      time.Unix(1, 0),
 				terminatingAt: time.Unix(1, 0),
 				pendingUpdate: &UpdatePodOptions{
-					UpdateType:     kubetypes.SyncPodKill,
-					RunningPod:     &kubecontainer.Pod{ID: "1", Name: "orphaned-pod", Namespace: "ns"},
-					KillPodOptions: &KillPodOptions{PodTerminationGracePeriodSecondsOverride: &one},
+					UpdateType: kubetypes.SyncPodKill,
+					RunningPod: &kubecontainer.Pod{ID: "1", Name: "orphaned-pod", Namespace: "ns"},
+					KillPodOptions: &KillPodOptions{
+						TerminatePodOptions: kubetypes.TerminatePodOptions{
+							GracePeriodSecondsOverride: &one,
+						},
+					},
 				},
 				gracePeriod:     1,
 				deleted:         true,
@@ -1914,7 +1990,7 @@ func (kl *simpleFakeKubelet) SyncPodWithWaitGroup(ctx context.Context, updateTyp
 	return false, nil
 }
 
-func (kl *simpleFakeKubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+func (kl *simpleFakeKubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, gracePeriod *int64, abnormalTermination *kubetypes.TerminatePodOptions) error {
 	return nil
 }
 
@@ -1998,13 +2074,13 @@ func TestFakePodWorkers(t *testing.T) {
 func TestKillPodNowFunc(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	podWorkers, _, processed := createPodWorkers()
-	killPodFunc := killPodNow(podWorkers, fakeRecorder)
+	podWorkers.recorder = fakeRecorder
 	pod := newNamedPod("test", "ns", "test", false)
 	gracePeriodOverride := int64(0)
-	err := killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
-		status.Phase = v1.PodFailed
-		status.Reason = "reason"
-		status.Message = "message"
+	err := podWorkers.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
+		GracePeriodSecondsOverride: &gracePeriodOverride,
+		Reason:                     "reason",
+		Message:                    "message",
 	})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2434,7 +2510,9 @@ func Test_calculateEffectiveGracePeriod(t *testing.T) {
 			pod.Spec.TerminationGracePeriodSeconds = tc.podSpecTerminationGracePeriodSeconds
 			pod.DeletionGracePeriodSeconds = tc.podDeletionGracePeriodSeconds
 			gracePeriod, _ := calculateEffectiveGracePeriod(&podSyncStatus{}, pod, &KillPodOptions{
-				PodTerminationGracePeriodSecondsOverride: tc.gracePeriodOverride,
+				TerminatePodOptions: kubetypes.TerminatePodOptions{
+					GracePeriodSecondsOverride: tc.gracePeriodOverride,
+				},
 			})
 			if gracePeriod != tc.expectedGracePeriod {
 				t.Errorf("Expected a grace period of %v, but was %v", tc.expectedGracePeriod, gracePeriod)

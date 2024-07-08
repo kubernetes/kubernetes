@@ -24,7 +24,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -37,6 +36,16 @@ import (
 
 const message = "Preempted in order to admit critical pod"
 
+// PodTerminator is responsible for interrupting pods and ending their execution on the
+// node.
+type PodTerminator interface {
+	// TerminatePodAbnormallyAndWait overrides the pod's natural lifecycle and triggers
+	// termination of the pod on the Kubelet and reports the pod as Failed to the API.
+	// It will wait for successful termination of the pod (based on the pod's grace
+	// period) or return an error indicating the pod may still be running.
+	TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error
+}
+
 // CriticalPodAdmissionHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
 // If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
 // so that the critical pod can be admitted.  For evictions, the CriticalPodAdmissionHandler evicts a set of pods that
@@ -46,16 +55,16 @@ const message = "Preempted in order to admit critical pod"
 // finding the fewest total requests of pods is considered besteffort.
 type CriticalPodAdmissionHandler struct {
 	getPodsFunc eviction.ActivePodsFunc
-	killPodFunc eviction.KillPodFunc
+	terminator  PodTerminator
 	recorder    record.EventRecorder
 }
 
 var _ lifecycle.AdmissionFailureHandler = &CriticalPodAdmissionHandler{}
 
-func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, recorder record.EventRecorder) *CriticalPodAdmissionHandler {
+func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, terminator PodTerminator, recorder record.EventRecorder) *CriticalPodAdmissionHandler {
 	return &CriticalPodAdmissionHandler{
 		getPodsFunc: getPodsFunc,
-		killPodFunc: killPodFunc,
+		terminator:  terminator,
 		recorder:    recorder,
 	}
 }
@@ -102,20 +111,25 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		c.recorder.Eventf(pod, v1.EventTypeWarning, events.PreemptContainer, message)
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		klog.V(3).InfoS("Preempting pod to free up resources", "pod", klog.KObj(pod), "podUID", pod.UID, "insufficientResources", insufficientResources)
-		err := c.killPodFunc(pod, true, nil, func(status *v1.PodStatus) {
-			status.Phase = v1.PodFailed
-			status.Reason = events.PreemptContainer
-			status.Message = message
-			if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				podutil.UpdatePodCondition(status, &v1.PodCondition{
+		var terminationMsg = "Pod was preempted by Kubelet to accommodate a critical pod."
+		var conditions []v1.PodCondition
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			conditions = []v1.PodCondition{
+				{
 					Type:    v1.DisruptionTarget,
 					Status:  v1.ConditionTrue,
 					Reason:  v1.PodReasonTerminationByKubelet,
-					Message: "Pod was preempted by Kubelet to accommodate a critical pod.",
-				})
+					Message: terminationMsg,
+				},
 			}
-		})
-		if err != nil {
+		}
+
+		if err := c.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
+			Evict:      true,
+			Reason:     events.PreemptContainer,
+			Message:    message,
+			Conditions: conditions,
+		}); err != nil {
 			klog.ErrorS(err, "Failed to evict pod", "pod", klog.KObj(pod))
 			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
 			continue

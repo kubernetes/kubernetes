@@ -33,7 +33,6 @@ import (
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/utils/clock"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -61,6 +61,17 @@ const (
 	immediateEvictionGracePeriodSeconds = 1
 )
 
+// PodTerminator is responsible for interrupting pods and ending their execution on the
+// node.
+type PodTerminator interface {
+	// TerminatePodAbnormallyAndWait overrides the pod's natural lifecycle and will lead
+	// to termination of the pod on the Kubelet and the phase Failed. It will wait for the
+	// termination to complete a reasonable amount of time proportional to the pod's grace
+	// period. It returns an error if the pod did not terminate in a reasonable amount of
+	// time.
+	TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error
+}
+
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
@@ -68,7 +79,7 @@ type managerImpl struct {
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
-	killPodFunc KillPodFunc
+	terminator PodTerminator
 	// the interface that knows how to do image gc
 	imageGC ImageGC
 	// the interface that knows how to do container gc
@@ -114,7 +125,7 @@ var _ Manager = &managerImpl{}
 func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
-	killPodFunc KillPodFunc,
+	terminator PodTerminator,
 	imageGC ImageGC,
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
@@ -124,7 +135,7 @@ func NewManager(
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                         clock,
-		killPodFunc:                   killPodFunc,
+		terminator:                    terminator,
 		imageGC:                       imageGC,
 		containerGC:                   containerGC,
 		config:                        config,
@@ -605,15 +616,18 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
-	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
-		status.Phase = v1.PodFailed
-		status.Reason = Reason
-		status.Message = evictMsg
-		if condition != nil {
-			podutil.UpdatePodCondition(status, condition)
-		}
-	})
-	if err != nil {
+	var conditions []v1.PodCondition
+	if condition != nil {
+		conditions = append(conditions, *condition)
+	}
+	if err := m.terminator.TerminatePodAbnormallyAndWait(pod, kubetypes.TerminatePodOptions{
+		Evict:                      true,
+		GracePeriodSecondsOverride: &gracePeriodOverride,
+
+		Reason:     Reason,
+		Message:    evictMsg,
+		Conditions: conditions,
+	}); err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 	} else {
 		klog.InfoS("Eviction manager: pod is evicted successfully", "pod", klog.KObj(pod))

@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/clock"
 )
 
@@ -36,6 +37,16 @@ type Manager interface {
 	ShutdownStatus() error
 }
 
+// PodTerminator is responsible for interrupting pods and ending their execution on the
+// node.
+type PodTerminator interface {
+	// TerminatePodAbnormallyAndWait overrides the pod's natural lifecycle and triggers
+	// termination of the pod on the Kubelet and reports the pod as Failed to the API.
+	// It will wait for successful termination of the pod (based on the pod's grace
+	// period) or return an error indicating the pod may still be running.
+	TerminatePodAbnormallyAndWait(pod *v1.Pod, options kubetypes.TerminatePodOptions) error
+}
+
 // Config represents Manager configuration
 type Config struct {
 	Logger                           klog.Logger
@@ -43,7 +54,7 @@ type Config struct {
 	Recorder                         record.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
-	KillPodFunc                      eviction.KillPodFunc
+	Terminator                       PodTerminator
 	SyncNodeStatusFunc               func()
 	ShutdownGracePeriodRequested     time.Duration
 	ShutdownGracePeriodCriticalPods  time.Duration
