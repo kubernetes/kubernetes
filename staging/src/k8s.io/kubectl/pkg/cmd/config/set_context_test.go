@@ -21,10 +21,10 @@ import (
 	"os"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type setContextTest struct {
@@ -122,7 +122,11 @@ func (test setContextTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetContext(buf, pathOptions)
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	cmd := NewCmdConfigSetContext(tf, buf, pathOptions)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
