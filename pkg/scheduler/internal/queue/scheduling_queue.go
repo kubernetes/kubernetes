@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -1092,7 +1093,10 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 // may make pending pods with matching affinity terms schedulable.
 func (p *PriorityQueue) AssignedPodAdded(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
-	p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithMatchingAffinityTerm(logger, pod), AssignedPodAdd, nil, pod)
+
+	// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
+	// because Pod related events shouldn't make Pods that rejected by single-node scheduling requirement schedulable.
+	p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, pod), AssignedPodAdd, nil, pod)
 	p.lock.Unlock()
 }
 
@@ -1115,9 +1119,13 @@ func isPodResourcesResizedDown(pod *v1.Pod) bool {
 func (p *PriorityQueue) AssignedPodUpdated(logger klog.Logger, oldPod, newPod *v1.Pod) {
 	p.lock.Lock()
 	if isPodResourcesResizedDown(newPod) {
+		// In this case, we don't want to pre-filter Pods by getUnschedulablePodsWithCrossTopologyTerm
+		// because Pod related events may make Pods that were rejected by NodeResourceFit schedulable.
 		p.moveAllToActiveOrBackoffQueue(logger, AssignedPodUpdate, oldPod, newPod, nil)
 	} else {
-		p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithMatchingAffinityTerm(logger, newPod), AssignedPodUpdate, oldPod, newPod)
+		// Pre-filter Pods to move by getUnschedulablePodsWithCrossTopologyTerm
+		// because Pod related events only make Pods rejected by cross topology term schedulable.
+		p.movePodsToActiveOrBackoffQueue(logger, p.getUnschedulablePodsWithCrossTopologyTerm(logger, newPod), AssignedPodUpdate, oldPod, newPod)
 	}
 	p.lock.Unlock()
 }
@@ -1258,22 +1266,29 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 	}
 }
 
-// getUnschedulablePodsWithMatchingAffinityTerm returns unschedulable pods which have
-// any affinity term that matches "pod".
+// getUnschedulablePodsWithCrossTopologyTerm returns unschedulable pods which either of following conditions is met:
+// - have any affinity term that matches "pod".
+// - rejected by PodTopologySpread plugin.
 // NOTE: this function assumes lock has been acquired in caller.
-func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
+func (p *PriorityQueue) getUnschedulablePodsWithCrossTopologyTerm(logger klog.Logger, pod *v1.Pod) []*framework.QueuedPodInfo {
 	nsLabels := interpodaffinity.GetNamespaceLabelsSnapshot(logger, pod.Namespace, p.nsLister)
 
 	var podsToMove []*framework.QueuedPodInfo
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
+		if pInfo.UnschedulablePlugins.Has(podtopologyspread.Name) && pod.Namespace == pInfo.Pod.Namespace {
+			// This Pod may be schedulable now by this Pod event.
+			podsToMove = append(podsToMove, pInfo)
+			continue
+		}
+
 		for _, term := range pInfo.RequiredAffinityTerms {
 			if term.Matches(pod, nsLabels) {
 				podsToMove = append(podsToMove, pInfo)
 				break
 			}
 		}
-
 	}
+
 	return podsToMove
 }
 

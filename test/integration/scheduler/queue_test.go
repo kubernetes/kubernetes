@@ -53,6 +53,7 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -361,6 +362,25 @@ func TestCoreResourceEnqueue(t *testing.T) {
 				return nil
 			},
 			wantRequeuedPods: sets.New("pod1"),
+		},
+		{
+			name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
+			initialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+			initialPod:   st.MakePod().Name("pod1").Label("key", "val").Container("image").Node("fake-node").Obj(),
+			pods: []*v1.Pod{
+				// - Pod2 will be rejected by the PodTopologySpread plugin.
+				st.MakePod().Name("pod2").Label("key", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
+			},
+			triggerFn: func(testCtx *testutils.TestContext) error {
+				// Trigger an assigned Pod add event.
+				pod := st.MakePod().Name("pod3").Label("key", "val").Node("fake-node").Container("image").Obj()
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
+					return fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
+				}
+
+				return nil
+			},
+			wantRequeuedPods: sets.New("pod2"),
 		},
 	}
 
