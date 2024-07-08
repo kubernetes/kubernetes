@@ -458,7 +458,7 @@ func TestGetCgroupConfig(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := getCgroupConfig(tc.resourceList, tc.compressibleResources)
+			actual := getCgroupConfigInternal(tc.resourceList, tc.compressibleResources)
 			tc.checks(actual, t)
 		})
 	}

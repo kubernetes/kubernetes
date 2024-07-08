@@ -32,12 +32,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -187,6 +184,29 @@ func (cm *containerManagerImpl) enforceExistingCgroup(cNameStr string, rl v1.Res
 
 // getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
 func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList, compressibleResourcesOnly bool) *ResourceConfig {
+	rc := getCgroupConfigInternal(rl, compressibleResourcesOnly)
+	if rc == nil {
+		return nil
+	}
+
+	// In the case of a None policy, cgroupv2 and systemd cgroup manager, we must make sure systemd is aware of the cpuset cgroup.
+	// By default, systemd will not create it, as we've not chosen to delegate it, and we haven't included it in the Apply() request.
+	// However, this causes a bug where kubelet restarts unnecessarily (cpuset cgroup is created in the cgroupfs, but systemd
+	// doesn't know about it and deletes it, and then kubelet doesn't continue because the cgroup isn't configured as expected).
+	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
+	// and this is sufficient.
+	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
+	// Please see the comment on policy none's GetAllocatableCPUs
+	if cm.cpuManager.GetAllocatableCPUs().IsEmpty() {
+		rc.CPUSet = cm.cpuManager.GetAllCPUs()
+	}
+
+	return rc
+}
+
+// getCgroupConfigInternal are the pieces of getCgroupConfig that don't require the cm object.
+// This is added to unit test without needing to create a full containerManager
+func getCgroupConfigInternal(rl v1.ResourceList, compressibleResourcesOnly bool) *ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
 		return nil
@@ -219,36 +239,7 @@ func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList, compressible
 		}
 		rc.HugePageLimit = HugePageLimits(rl)
 	}
-
-	// In the case of a None policy, cgroupv2 and systemd cgroup manager, we must make sure systemd is aware of the cpuset cgroup.
-	// By default, systemd will not create it, as we've not chosen to delegate it, and we haven't included it in the Apply() request.
-	// However, this causes a bug where kubelet restarts unnecessarily (cpuset cgroup is created in the cgroupfs, but systemd
-	// doesn't know about it and deletes it, and then kubelet doesn't continue because the cgroup isn't configured as expected).
-	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
-	// and this is sufficient.
-	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
-	if cm.NodeConfig.CPUManagerPolicy == string(cpumanager.PolicyNone) {
-		if cm.allCPUs.IsEmpty() {
-			cm.allCPUs = cm.getAllCPUs()
-		}
-		rc.CPUSet = cm.allCPUs
-	}
-
 	return &rc
-}
-
-func (cm *containerManagerImpl) getAllCPUs() cpuset.CPUSet {
-	machineInfo, err := cm.cadvisorInterface.MachineInfo()
-	if err != nil {
-		klog.V(4).InfoS("Failed to get machine info to get default cpuset", "error", err)
-		return cpuset.CPUSet{}
-	}
-	topo, err := topology.Discover(machineInfo)
-	if err != nil {
-		klog.V(4).InfoS("Failed to get topology info to get default cpuset", "error", err)
-		return cpuset.CPUSet{}
-	}
-	return topo.CPUDetails.CPUs()
 }
 
 // GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
