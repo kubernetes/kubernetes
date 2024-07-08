@@ -31,12 +31,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/cpuset"
 )
 
 const (
@@ -194,28 +191,12 @@ func (cm *containerManagerImpl) getCgroupConfig(rl v1.ResourceList) *ResourceCon
 	// An alternative is to delegate the `cpuset` cgroup to the kubelet, but that would require some plumbing in libcontainer,
 	// and this is sufficient.
 	// Only do so on None policy, as Static policy will do its own updating of the cpuset.
-	if cm.NodeConfig.CPUManagerPolicy == string(cpumanager.PolicyNone) {
-		if cm.allCPUs.IsEmpty() {
-			cm.allCPUs = cm.getAllCPUs()
-		}
-		rc.CPUSet = cm.allCPUs
+	// Please see the comment on policy none's GetAllocatableCPUs
+	if cm.cpuManager.GetAllocatableCPUs().IsEmpty() {
+		rc.CPUSet = cm.cpuManager.GetAllCPUs()
 	}
 
 	return &rc
-}
-
-func (cm *containerManagerImpl) getAllCPUs() cpuset.CPUSet {
-	machineInfo, err := cm.cadvisorInterface.MachineInfo()
-	if err != nil {
-		klog.V(4).InfoS("Failed to get machine info to get default cpuset", "error", err)
-		return cpuset.CPUSet{}
-	}
-	topo, err := topology.Discover(machineInfo)
-	if err != nil {
-		klog.V(4).InfoS("Failed to get topology info to get default cpuset", "error", err)
-		return cpuset.CPUSet{}
-	}
-	return topo.CPUDetails.CPUs()
 }
 
 // GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
