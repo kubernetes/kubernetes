@@ -128,13 +128,39 @@ type ResourceSliceSpec struct {
 	// +oneOf=NodeSelection
 	AllNodes bool
 
-	// Devices lists some or all of the devices in this pool.
+	// Devices lists some or all of the devices in this pool. Devices
+	// listed here do not inherit shared attributes from the slice.
 	//
 	// Must not have more than 128 entries.
 	//
 	// +optional
 	// +listType=atomic
 	Devices []Device
+
+	// SharedCapacity defines the set of shared capacity consumable by
+	// partitionable devices in this ResourceSlice.
+	//
+	// Must not have more than 128 entries. Names must be C identifiers
+	// that are unique inside the ResourceSlice.
+	//
+	// +optional
+	SharedCapacity map[string]resource.Quantity
+
+	// Attributes contains common device attributes that are the same for
+	// all partitionable devices in this ResourceSlice, unless a device specifically
+	// over writes it by defining an attribute of the same name.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute
+
+	// Devices lists some or all of the partitionable devices in this pool.
+	// Partitionable devices may inherit shared attributes from the
+	// ResourceSlice and they may (but don't have to) consume shared
+	// capacity.
+	//
+	// +optional
+	// +listType=atomic
+	PartitionableDevices []PartitionableDevice
 }
 
 // ResourcePool describes the pool that ResourceSlices belong to.
@@ -257,6 +283,18 @@ type DeviceAttribute struct {
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
+
+type PartitionableDevice struct {
+	Device // inline
+
+	// SharedCapacityConsumed defines the set of shared capacity consumed by
+	// this device.
+	//
+	// Must not have more than 32 entries.
+	//
+	// +optional
+	SharedCapacityConsumed map[string]resource.Quantity
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
