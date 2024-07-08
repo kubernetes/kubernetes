@@ -146,7 +146,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	setupStorageVersionGC(ctx, kubeClientSetA, informersA)
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
-	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
+	controlplaneapiserver.IdentityLeaseDurationSeconds = 20
 
 	// start serverB with some api disabled
 	// override hostname to ensure unique ips

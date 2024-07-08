@@ -52,10 +52,10 @@ import (
 var (
 	// IdentityLeaseGCPeriod is the interval which the lease GC controller checks for expired leases
 	// IdentityLeaseGCPeriod is exposed so integration tests can tune this value.
-	IdentityLeaseGCPeriod = 3600 * time.Second
+	IdentityLeaseGCPeriod = 20 * time.Second
 	// IdentityLeaseDurationSeconds is the duration of kube-apiserver lease in seconds
 	// IdentityLeaseDurationSeconds is exposed so integration tests can tune this value.
-	IdentityLeaseDurationSeconds = 3600
+	IdentityLeaseDurationSeconds = 20
 	// IdentityLeaseRenewIntervalPeriod is the interval of kube-apiserver renewing its lease in seconds
 	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
