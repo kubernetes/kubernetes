@@ -362,7 +362,7 @@ message DeviceConstraint {
 // also ask for several identical devices.
 //
 // A DeviceClassName is currently required. Clients must check that it is
-// indeed set. It's absence indicates that something changes in a way that
+// indeed set. It's absence indicates that something changed in a way that
 // is not supported by the client yet, in which case it must refuse to
 // handle the request.
 message DeviceRequest {
@@ -861,18 +861,27 @@ message ResourceSliceSpec {
   // new nodes of the same type as some old node might also make new
   // resources available.
   //
-  // Exactly one of NodeName and NodeSelector must be set.
+  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
   //
   // +optional
+  // +oneOf=NodeSelection
   optional string nodeName = 3;
 
   // NodeSelector defines which nodes have access to the resources in the pool.
-  // If it is specified, but empty (has no terms), all nodes have access.
   //
-  // Exactly one of NodeName and NodeSelector must be set.
+  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
   //
   // +optional
+  // +oneOf=NodeSelection
   optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 4;
+
+  // AllNodes indicates that all nodes have access to the resources in the pool.
+  //
+  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
+  //
+  // +optional
+  // +oneOf=NodeSelection
+  optional bool allNodes = 5;
 
   // Devices lists some or all of the devices in this pool.
   //
@@ -880,6 +889,6 @@ message ResourceSliceSpec {
   //
   // +optional
   // +listType=atomic
-  repeated Device devices = 5;
+  repeated Device devices = 6;
 }
 

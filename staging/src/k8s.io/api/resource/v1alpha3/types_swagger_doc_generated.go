@@ -177,7 +177,7 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 }
 
 var map_DeviceRequest = map[string]string{
-	"":     "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changes in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
+	"":     "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
 	"name": "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
 }
 
@@ -398,8 +398,9 @@ var map_ResourceSliceSpec = map[string]string{
 	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
 	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 	"pool":         "Pool describes the pool that this ResourceSlice belongs to.",
-	"nodeName":     "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName and NodeSelector must be set.",
-	"nodeSelector": "NodeSelector defines which nodes have access to the resources in the pool. If it is specified, but empty (has no terms), all nodes have access.\n\nExactly one of NodeName and NodeSelector must be set.",
+	"nodeName":     "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"nodeSelector": "NodeSelector defines which nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"allNodes":     "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
 	"devices":      "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
 }
 

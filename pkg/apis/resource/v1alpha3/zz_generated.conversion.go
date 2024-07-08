@@ -1289,6 +1289,7 @@ func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *v1
 	}
 	out.NodeName = in.NodeName
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllNodes = in.AllNodes
 	out.Devices = *(*[]resource.Device)(unsafe.Pointer(&in.Devices))
 	return nil
 }
@@ -1305,6 +1306,7 @@ func autoConvert_resource_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *re
 	}
 	out.NodeName = in.NodeName
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllNodes = in.AllNodes
 	out.Devices = *(*[]v1alpha3.Device)(unsafe.Pointer(&in.Devices))
 	return nil
 }

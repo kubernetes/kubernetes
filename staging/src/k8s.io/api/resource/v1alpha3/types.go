@@ -77,10 +77,10 @@ type ResourceSlice struct {
 const (
 	// ResourceSliceSelectorNodeName can be used in a [metav1.ListOptions]
 	// field selector to filter based on [ResourceSliceSpec.NodeName].
-	ResourceSliceSelectorNodeName = "nodeName"
+	ResourceSliceSelectorNodeName = "spec.nodeName"
 	// ResourceSliceSelectorDriver can be used in a [metav1.ListOptions]
 	// field selector to filter based on [ResourceSliceSpec.Driver].
-	ResourceSliceSelectorDriver = "driver"
+	ResourceSliceSelectorDriver = "spec.driver"
 )
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
@@ -109,18 +109,27 @@ type ResourceSliceSpec struct {
 	// new nodes of the same type as some old node might also make new
 	// resources available.
 	//
-	// Exactly one of NodeName and NodeSelector must be set.
+	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
 	//
 	// +optional
+	// +oneOf=NodeSelection
 	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
 	// NodeSelector defines which nodes have access to the resources in the pool.
-	// If it is specified, but empty (has no terms), all nodes have access.
 	//
-	// Exactly one of NodeName and NodeSelector must be set.
+	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
 	//
 	// +optional
+	// +oneOf=NodeSelection
 	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,4,opt,name=nodeSelector"`
+
+	// AllNodes indicates that all nodes have access to the resources in the pool.
+	//
+	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	//
+	// +optional
+	// +oneOf=NodeSelection
+	AllNodes bool `json:"allNodes,omitempty" protobuf:"bytes,5,opt,name=allNodes"`
 
 	// Devices lists some or all of the devices in this pool.
 	//
@@ -128,7 +137,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +listType=atomic
-	Devices []Device `json:"devices" protobuf:"bytes,5,name=devices"`
+	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
 }
 
 // ResourcePool describes the pool that ResourceSlices belong to.
@@ -204,7 +213,7 @@ const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 // project). Because they are sometimes compared across devices, a given name
 // is expected to mean the same thing and have the same type on all devices.
 //
-// Names must be either a C identifier e.g. "theName") or a DNS subdomain
+// Names must be either a C identifier (e.g. "theName") or a DNS subdomain
 // followed by a slash ("/") followed by a C identifier
 // (e.g. "dra.example.com/theName"). Names which do not include the
 // domain prefix are assumed to be part of the driver's domain. Attributes
@@ -352,7 +361,7 @@ type DeviceClaim struct {
 // also ask for several identical devices.
 //
 // A DeviceClassName is currently required. Clients must check that it is
-// indeed set. It's absence indicates that something changes in a way that
+// indeed set. It's absence indicates that something changed in a way that
 // is not supported by the client yet, in which case it must refuse to
 // handle the request.
 type DeviceRequest struct {
@@ -364,7 +373,7 @@ type DeviceRequest struct {
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	*DeviceRequestDetails `json:",inline" protobuf:"bytes,2,name=deviceRequestDetail"`
+	*DeviceRequestDetails `json:",inline" protobuf:"bytes,2,name=deviceRequestDetails"`
 }
 
 // DeviceRequestDetails is embedded in DeviceRequest and defines one request.

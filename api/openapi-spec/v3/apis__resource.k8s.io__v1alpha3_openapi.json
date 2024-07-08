@@ -493,7 +493,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1alpha3.DeviceRequest": {
-        "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changes in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
+        "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
         "properties": {
           "adminAccess": {
             "default": false,
@@ -1184,6 +1184,10 @@
       "io.k8s.api.resource.v1alpha3.ResourceSliceSpec": {
         "description": "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
         "properties": {
+          "allNodes": {
+            "description": "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+            "type": "boolean"
+          },
           "devices": {
             "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
             "items": {
@@ -1203,7 +1207,7 @@
             "type": "string"
           },
           "nodeName": {
-            "description": "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName and NodeSelector must be set.",
+            "description": "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
             "type": "string"
           },
           "nodeSelector": {
@@ -1212,7 +1216,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector"
               }
             ],
-            "description": "NodeSelector defines which nodes have access to the resources in the pool. If it is specified, but empty (has no terms), all nodes have access.\n\nExactly one of NodeName and NodeSelector must be set."
+            "description": "NodeSelector defines which nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set."
           },
           "pool": {
             "allOf": [

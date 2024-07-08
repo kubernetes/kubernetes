@@ -29,6 +29,7 @@ type ResourceSliceSpecApplyConfiguration struct {
 	Pool         *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
 	NodeName     *string                            `json:"nodeName,omitempty"`
 	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	AllNodes     *bool                              `json:"allNodes,omitempty"`
 	Devices      []DeviceApplyConfiguration         `json:"devices,omitempty"`
 }
 
@@ -67,6 +68,14 @@ func (b *ResourceSliceSpecApplyConfiguration) WithNodeName(value string) *Resour
 // If called multiple times, the NodeSelector field is set to the value of the last call.
 func (b *ResourceSliceSpecApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
 	b.NodeSelector = value
+	return b
+}
+
+// WithAllNodes sets the AllNodes field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllNodes field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithAllNodes(value bool) *ResourceSliceSpecApplyConfiguration {
+	b.AllNodes = &value
 	return b
 }
 
