@@ -573,6 +573,10 @@ var Annotations = map[string]string{
 
 	"[sig-apps] TTLAfterFinished job should be deleted once it finishes after TTL seconds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-apps] stateful Upgrade [Feature:StatefulUpgrade] stateful upgrade should maintain a functioning cluster": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-architecture] Conformance Tests should have at least two untainted nodes [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
 	"[sig-auth] Certificates API [Privileged:ClusterAdmin] should support CSR API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-auth] Certificates API [Privileged:ClusterAdmin] should support building a client with a CSR": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -582,6 +586,8 @@ var Annotations = map[string]string{
 	"[sig-auth] SelfSubjectReview testing SSR in different API groups authentication/v1": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-auth] SelfSubjectReview testing SSR in different API groups authentication/v1beta1": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-auth] ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume] master upgrade should maintain a functioning cluster": " [Disabled:Unimplemented] [Suite:k8s]",
 
 	"[sig-auth] ServiceAccounts ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -922,6 +928,62 @@ var Annotations = map[string]string{
 	"[sig-cli] Kubectl logs logs should be able to retrieve and filter logs [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-cli] Kubectl rollout undo undo should rollback and update deployment env": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Downgrade [Feature:Downgrade] cluster downgrade should maintain a functioning cluster [Feature:ClusterDowngrade]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] GKE node pools [Feature:GKENodePool] should create a cluster with multiple node pools [Feature:GKENodePool]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] HA-master [Feature:HAMaster] survive addition/removal replicas different zones [Serial] [Disruptive]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] HA-master [Feature:HAMaster] survive addition/removal replicas multizone workers [Serial] [Disruptive]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] HA-master [Feature:HAMaster] survive addition/removal replicas same zone [Serial] [Disruptive]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Nodes [Disruptive] Resize [Slow] should be able to add nodes": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Nodes [Disruptive] Resize [Slow] should be able to delete nodes": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Ports Security Check [Feature:KubeletSecurity] should not be able to proxy to cadvisor port 4194 using proxy subresource": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Ports Security Check [Feature:KubeletSecurity] should not be able to proxy to the readonly kubelet port 10255 using proxy subresource": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Ports Security Check [Feature:KubeletSecurity] should not have port 10255 open on its all public IP addresses": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Ports Security Check [Feature:KubeletSecurity] should not have port 4194 open on its all public IP addresses": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by dropping all inbound packets for a while and ensure they function afterwards": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by dropping all outbound packets for a while and ensure they function afterwards": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by ordering clean reboot and ensure they function upon restart": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by ordering unclean reboot and ensure they function upon restart": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by switching off the network interface and ensure they function upon switch on": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Reboot [Disruptive] [Feature:Reboot] each node by triggering kernel panic and ensure they function upon restart": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Recreate [Feature:Recreate] recreate nodes and ensure they function upon restart": " [Disabled:Broken] [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Restart [Disruptive] [KubeUp] should restart all nodes and ensure all nodes and pods recover": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Upgrade [Feature:Upgrade] cluster upgrade should maintain a functioning cluster [Feature:ClusterUpgrade]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] Upgrade [Feature:Upgrade] master upgrade should maintain a functioning cluster [Feature:MasterUpgrade]": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-cloud-provider-gcp] [Disruptive] NodeLease NodeLease deletion node lease should be deleted when corresponding node is deleted": " [Disabled:SpecialConfig] [Serial] [Suite:k8s]",
+
+	"[sig-cloud-provider] [Feature:CloudProvider] [Disruptive] Nodes should be deleted on API server if it doesn't exist in the cloud provider": " [Serial] [Suite:k8s]",
+
+	"[sig-cluster-lifecycle] [Feature:BootstrapTokens] should delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-cluster-lifecycle] [Feature:BootstrapTokens] should delete the token secret when the secret expired": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-cluster-lifecycle] [Feature:BootstrapTokens] should not delete the token secret when the secret is not expired": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-cluster-lifecycle] [Feature:BootstrapTokens] should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial] [Disruptive]": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-cluster-lifecycle] [Feature:BootstrapTokens] should sign the new added bootstrap tokens": " [Disabled:Unimplemented] [Suite:k8s]",
 
 	"[sig-instrumentation] Events API should delete a collection of events [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1433,6 +1495,10 @@ var Annotations = map[string]string{
 
 	"[sig-network] [Feature:Traffic Distribution] when Service has trafficDistribution=PreferClose should route traffic to an endpoint that is close to the client": " [Disabled:Alpha] [Suite:k8s]",
 
+	"[sig-network] kube-proxy migration [Feature:KubeProxyDaemonSetMigration] Downgrade kube-proxy from a DaemonSet to static pods should maintain a functioning cluster [Feature:KubeProxyDaemonSetDowngrade]": " [Disabled:Unimplemented] [Suite:k8s]",
+
+	"[sig-network] kube-proxy migration [Feature:KubeProxyDaemonSetMigration] Upgrade kube-proxy from static pods to a DaemonSet should maintain a functioning cluster [Feature:KubeProxyDaemonSetUpgrade]": " [Disabled:Unimplemented] [Suite:k8s]",
+
 	"[sig-node] AppArmor load AppArmor profiles can disable an AppArmor profile, using unconfined": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile specified in annotations": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1492,6 +1558,282 @@ var Annotations = map[string]string{
 	"[sig-node] Containers should be able to override the image's default command and arguments [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-node] Containers should use the image defaults if command and args are blank [NodeConformance] [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster truncates the name of a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports scheduled pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports scheduled pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and not setting ReservedFor supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports scheduled pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports scheduled pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with delayed allocation and setting ReservedFor supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports scheduled pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports scheduled pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with immediate allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with local unshared resources reuses an allocated immediate claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with shared network resources shares an allocated immediate claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] cluster with DRA driver controller with structured parameters must manage ResourceSlices [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet with ConfigMap parameters must not run a pod if a claim is not reserved for it": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet with ConfigMap parameters must retry NodePrepareResources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet with ConfigMap parameters must skip NodePrepareResource if not used by any container": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet with ConfigMap parameters must unprepare resources for force-deleted pod": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] kubelet with ConfigMap parameters registers plugin": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using both drapbv1alpha2 and drapbv1alpha3 work": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using only drapbv1alpha2 work": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] multiple drivers using only drapbv1alpha3 work": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on multiple nodes reallocation works": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on multiple nodes with network-attached resources [Serial] [Disruptive] [Slow] must deallocate on non graceful node shutdown": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on multiple nodes with network-attached resources schedules onto different nodes": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on multiple nodes with node-local resources with delayed allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on multiple nodes with node-local resources with immediate allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node retries pod scheduling after creating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node retries pod scheduling after updating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node runs a pod without a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node supports claim and class parameters": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node supports reusing resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node supports sharing a claim concurrently": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node supports sharing a claim sequentially [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with delayed allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with ConfigMap parameters on single node with immediate allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on multiple nodes with node-local resources with delayed allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on multiple nodes with node-local resources with immediate allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node retries pod scheduling after creating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node retries pod scheduling after updating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node runs a pod without a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node supports claim and class parameters": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node supports reusing resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node supports sharing a claim concurrently": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node supports sharing a claim sequentially [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with delayed allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with structured parameters on single node with immediate allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on multiple nodes with node-local resources with delayed allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on multiple nodes with node-local resources with immediate allocation uses all resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node retries pod scheduling after creating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node retries pod scheduling after updating resource class": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node runs a pod without a generated resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node supports claim and class parameters": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node supports reusing resources": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node supports sharing a claim concurrently": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node supports sharing a claim sequentially [Slow]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with delayed allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation deletes generated claims when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation does not delete generated claims when pod is restarting": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation must deallocate after use when using delayed allocation": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation removes reservation from claim when pod is done": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports external claim referenced by multiple containers of multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports external claim referenced by multiple pods": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports init containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports inline claim referenced by multiple containers": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports simple pod referencing external resource claim": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] DRA [Feature:DynamicResourceAllocation] with translated parameters on single node with immediate allocation supports simple pod referencing inline resource claim": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages] Downward API tests for hugepages should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars": " [Suite:k8s]",
 
@@ -1932,6 +2274,12 @@ var Annotations = map[string]string{
 	"[sig-node] [Serial] Pod InPlace Resize Container (scheduler-focused) [Feature:InPlacePodVerticalScaling] pod-resize-scheduler-tests": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] crictl should be able to run crictl on the node": " [Disabled:Broken] [Suite:k8s]",
+
+	"[sig-node] gpu Upgrade [Feature:GPUUpgrade] cluster downgrade should be able to run gpu pod after downgrade [Feature:GPUClusterDowngrade]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] gpu Upgrade [Feature:GPUUpgrade] cluster upgrade should be able to run gpu pod after upgrade [Feature:GPUClusterUpgrade]": " [Disabled:Alpha] [Suite:k8s]",
+
+	"[sig-node] gpu Upgrade [Feature:GPUUpgrade] master upgrade should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]": " [Disabled:Alpha] [Suite:k8s]",
 
 	"[sig-node] kubelet Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.": " [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -13980,6 +14328,76 @@ var Annotations = map[string]string{
 	"[sig-storage] [Serial] Volume metrics PVController should create unbound pv count metrics for pvc controller after creating pv only": " [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[sig-storage] [Serial] Volume metrics PVController should create unbound pvc count metrics for pvc controller after creating pvc only": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-windows] Hybrid cluster network for all supported CNIs should have stable networking for Linux and Windows pods": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] Hybrid cluster network for all supported CNIs should provide Internet connection for Linux containers using DNS [Feature:Networking-DNS]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] Hybrid cluster network for all supported CNIs should provide Internet connection for Windows containers using DNS [Feature:Networking-DNS]": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] Services should be able to create a functioning NodePort service for Windows": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:GPUDevicePlugin] Device Plugin should be able to create a functioning device plugin for Windows": " [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers container command path validation": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers container stats validation": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers metrics should report count of started and failed to start HostProcess containers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers should run as a process on the host/node": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers should run as localgroup accounts": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers should support init containers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers should support querying api-server using in-cluster config": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHostProcessContainers] [MinimumKubeletVersion:1.22] HostProcess containers should support various volume mount types": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:WindowsHyperVContainers] HyperV containers should start a hyperv isolated container": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Cpu Resources [Serial] Container limits should not be exceeded after waiting 2 minutes": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] DNS should support configurable pod DNS servers": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Density [Serial] [Slow] create a batch of pods latency/resource should be within limit when create 10 pods with 0s interval": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] GMSA Full [Serial] [Slow] GMSA support can read and write file to remote SMB folder": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] GMSA Full [Serial] [Slow] GMSA support works end to end": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] GMSA Kubelet [Slow] kubelet GMSA support when creating a pod with correct GMSA credential specs passes the credential specs down to the Pod's containers": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Kubelet-Stats Kubelet stats collection for Windows nodes when running 3 pods should return within 10 seconds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Kubelet-Stats Kubelet stats collection for Windows nodes when windows is booted should return bootid within 10 seconds": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Kubelet-Stats [Serial] Kubelet stats collection for Windows nodes when running 10 pods should return within 10 seconds": " [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Memory Limits [Serial] [Slow] Allocatable node memory should be equal to a calculated allocatable memory value": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Memory Limits [Serial] [Slow] attempt to deploy past allocatable memory limits should fail deployments of pods once there isn't enough memory": " [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should be able create pods and run containers with a given username": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should ignore Linux Specific SecurityContext if set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should not be able to create pods with containers running as CONTAINERADMINISTRATOR when runAsNonRoot is true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should not be able to create pods with containers running as ContainerAdministrator when runAsNonRoot is true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should not be able to create pods with unknown usernames at Container level": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should not be able to create pods with unknown usernames at Pod level": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] SecurityContext should override SecurityContext username if set": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Windows volume mounts check volume mount permissions container should have readOnly permissions on emptyDir": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] Windows volume mounts check volume mount permissions container should have readOnly permissions on hostMapPath": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[sig-windows] [Feature:Windows] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] RebootHost containers [Serial] [Disruptive] [Slow] should run as a reboot process on the host/node": " [Suite:k8s]",
 }
 
 func init() {
