@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -178,7 +179,7 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		return nil, err
 	}
 	// Fallback executor is default, unless feature flag is explicitly disabled.
-	if !cmdutil.RemoteCommandWebsockets.IsDisabled() {
+	if !cmdfeaturegate.RemoteCommandWebsockets.IsDisabled() {
 		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
 		websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
 		if err != nil {

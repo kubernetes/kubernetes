@@ -25,11 +25,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -183,7 +185,7 @@ func InitTestErrorHandler(t *testing.T) {
 
 // WithAlphaEnvs calls func f with the given env-var-based feature gates enabled,
 // and then restores the original values of those variables.
-func WithAlphaEnvs(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+func WithAlphaEnvs(features []cmdfeaturegate.FeatureGate, t *testing.T, f func(*testing.T)) {
 	for _, feature := range features {
 		key := string(feature)
 		if key != "" {
@@ -198,7 +200,7 @@ func WithAlphaEnvs(features []cmdutil.FeatureGate, t *testing.T, f func(*testing
 
 // WithAlphaEnvs calls func f with the given env-var-based feature gates disabled,
 // and then restores the original values of those variables.
-func WithAlphaEnvsDisabled(features []cmdutil.FeatureGate, t *testing.T, f func(*testing.T)) {
+func WithAlphaEnvsDisabled(features []cmdfeaturegate.FeatureGate, t *testing.T, f func(*testing.T)) {
 	for _, feature := range features {
 		key := string(feature)
 		if key != "" {

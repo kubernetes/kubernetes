@@ -25,6 +25,7 @@ import (
 
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -34,6 +35,7 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -141,7 +143,7 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		return nil, err
 	}
 	// Fallback executor is default, unless feature flag is explicitly disabled.
-	if !cmdutil.RemoteCommandWebsockets.IsDisabled() {
+	if !cmdfeaturegate.RemoteCommandWebsockets.IsDisabled() {
 		// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
 		websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
 		if err != nil {

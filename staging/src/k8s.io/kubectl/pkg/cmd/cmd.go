@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/taint"
 	"k8s.io/kubectl/pkg/cmd/top"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -142,7 +143,7 @@ func NewDefaultKubectlCommandWithArgs(o KubectlOptions) *cobra.Command {
 				}
 			}
 		} else if err == nil {
-			if !cmdutil.CmdPluginAsSubcommand.IsDisabled() {
+			if !cmdfeaturegate.CmdPluginAsSubcommand.IsDisabled() {
 				// Command exists(e.g. kubectl create), but it is not certain that
 				// subcommand also exists (e.g. kubectl create networkpolicy)
 				// we also have to eliminate kubectl create -f

@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -422,31 +423,6 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 	return timeout, nil
 }
 
-type FeatureGate string
-
-const (
-	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
-	CmdPluginAsSubcommand   FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
-	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
-	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
-	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	DebugCustomProfile      FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
-)
-
-// IsEnabled returns true iff environment variable is set to true.
-// All other cases, it returns false.
-func (f FeatureGate) IsEnabled() bool {
-	return strings.ToLower(os.Getenv(string(f))) == "true"
-}
-
-// IsDisabled returns true iff environment variable is set to false.
-// All other cases, it returns true.
-// This function is used for the cases where feature is enabled by default,
-// but it may be needed to provide a way to ability to disable this feature.
-func (f FeatureGate) IsDisabled() bool {
-	return strings.ToLower(os.Getenv(string(f))) == "false"
-}
-
 func AddValidateFlags(cmd *cobra.Command) {
 	cmd.Flags().String(
 		"validate",
@@ -530,7 +506,7 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 	cmd.Flags().BoolVar(all, "all", *all, "Select all resources in the namespace of the specified resource types.")
 
 	// Flags associated with the new ApplySet-based alpha
-	if ApplySet.IsEnabled() {
+	if cmdfeaturegate.ApplySet.IsEnabled() {
 		cmd.Flags().StringVar(applySetRef, "applyset", *applySetRef, "[alpha] The name of the ApplySet that tracks which resources are being managed, for the purposes of determining what to prune. Live resources that are part of the ApplySet but have been removed from the provided configs will be deleted. Format: [RESOURCE][.GROUP]/NAME. A Secret will be used if no resource or group is specified.")
 		cmd.Flags().BoolVar(prune, "prune", *prune, "Automatically delete previously applied resource objects that do not appear in the provided configs. For alpha1, use with either -l or --all. For alpha2, use with --applyset.")
 	} else {

@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/portforward"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -1002,7 +1002,7 @@ func TestCreateDialer(t *testing.T) {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
 	// Next, check turning on feature flag explicitly also creates fallback dialer.
-	t.Setenv(string(cmdutil.PortForwardWebsockets), "true")
+	t.Setenv(string(cmdfeaturegate.PortForwardWebsockets), "true")
 	dialer, err = createDialer("GET", url, opts)
 	if err != nil {
 		t.Fatalf("unable to create dialer: %v", err)
@@ -1011,7 +1011,7 @@ func TestCreateDialer(t *testing.T) {
 		t.Errorf("expected fallback dialer, got %#v", dialer)
 	}
 	// Finally, check explicit disabling does NOT create the fallback dialer.
-	t.Setenv(string(cmdutil.PortForwardWebsockets), "false")
+	t.Setenv(string(cmdfeaturegate.PortForwardWebsockets), "false")
 	dialer, err = createDialer("GET", url, opts)
 	if err != nil {
 		t.Fatalf("unable to create dialer: %v", err)

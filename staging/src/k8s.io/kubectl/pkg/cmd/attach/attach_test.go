@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
@@ -570,7 +570,7 @@ func TestCreateExecutor(t *testing.T) {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 	// Next, check turning on feature flag explicitly also creates fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "true")
+	t.Setenv(string(cmdfeaturegate.RemoteCommandWebsockets), "true")
 	executor, err = createExecutor(url, config)
 	if err != nil {
 		t.Fatalf("unable to create executor: %v", err)
@@ -579,7 +579,7 @@ func TestCreateExecutor(t *testing.T) {
 		t.Errorf("expected fallback executor, got %#v", executor)
 	}
 	// Finally, check explicit disabling does NOT create the fallback executor.
-	t.Setenv(string(cmdutil.RemoteCommandWebsockets), "false")
+	t.Setenv(string(cmdfeaturegate.RemoteCommandWebsockets), "false")
 	executor, err = createExecutor(url, config)
 	if err != nil {
 		t.Fatalf("unable to create executor: %v", err)

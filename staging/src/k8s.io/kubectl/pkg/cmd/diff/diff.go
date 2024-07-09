@@ -26,6 +26,8 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -46,7 +49,6 @@ import (
 	"k8s.io/kubectl/pkg/util/prune"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/exec"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -642,7 +644,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 
 	if !o.ServerSideApply {
 		o.OpenAPIGetter = f
-		if !cmdutil.OpenAPIV3Patch.IsDisabled() {
+		if !cmdfeaturegate.OpenAPIV3Patch.IsDisabled() {
 			openAPIV3Client, err := f.OpenAPIV3Client()
 			if err == nil {
 				o.OpenAPIV3Root = openapi3.NewRoot(openAPIV3Client)

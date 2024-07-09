@@ -45,6 +45,7 @@ import (
 	"k8s.io/klog/v2"
 	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -281,7 +282,7 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 	}
 
 	var openAPIV3Root openapi3.Root
-	if !cmdutil.OpenAPIV3Patch.IsDisabled() {
+	if !cmdfeaturegate.OpenAPIV3Patch.IsDisabled() {
 		openAPIV3Client, err := f.OpenAPIV3Client()
 		if err == nil {
 			openAPIV3Root = openapi3.NewRoot(openAPIV3Client)
@@ -1054,7 +1055,7 @@ func (o *ApplyOptions) PrintAndPrunePostProcessor() func() error {
 		}
 
 		if o.Prune {
-			if cmdutil.ApplySet.IsEnabled() && o.ApplySet != nil {
+			if cmdfeaturegate.ApplySet.IsEnabled() && o.ApplySet != nil {
 				if err := o.ApplySet.Prune(ctx, o); err != nil {
 					// Do not update the ApplySet. If pruning failed, we want to keep the superset
 					// of the previous and current resources in the ApplySet, so that the pruning

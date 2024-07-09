@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/completion"
@@ -142,7 +143,7 @@ func createDialer(method string, url *url.URL, opts PortForwardOptions) (httpstr
 		return nil, err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	if !cmdutil.PortForwardWebsockets.IsDisabled() {
+	if !cmdfeaturegate.PortForwardWebsockets.IsDisabled() {
 		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialer(url, opts.Config)
 		if err != nil {
 			return nil, err

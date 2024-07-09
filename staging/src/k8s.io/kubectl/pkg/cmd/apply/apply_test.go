@@ -33,6 +33,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/yaml"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,11 +59,11 @@ import (
 	"k8s.io/client-go/util/csaupgrade"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	cmdfeaturegate "k8s.io/kubectl/pkg/cmd/util/featuregate"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/openapi"
 	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -115,7 +117,7 @@ func noopOpenAPIV3Patch(t *testing.T, f func(t *testing.T)) {
 	f(t)
 }
 func disableOpenAPIV3Patch(t *testing.T, f func(t *testing.T)) {
-	cmdtesting.WithAlphaEnvsDisabled([]cmdutil.FeatureGate{cmdutil.OpenAPIV3Patch}, t, f)
+	cmdtesting.WithAlphaEnvsDisabled([]cmdfeaturegate.FeatureGate{cmdfeaturegate.OpenAPIV3Patch}, t, f)
 }
 
 var applyFeatureToggles = []func(*testing.T, func(t *testing.T)){noopOpenAPIV3Patch, disableOpenAPIV3Patch}
@@ -137,8 +139,8 @@ func TestApplyExtraArgsFail(t *testing.T) {
 }
 
 func TestAlphaEnablement(t *testing.T) {
-	alphas := map[cmdutil.FeatureGate]string{
-		cmdutil.ApplySet: "applyset",
+	alphas := map[cmdfeaturegate.FeatureGate]string{
+		cmdfeaturegate.ApplySet: "applyset",
 	}
 	for feature, flag := range alphas {
 		f := cmdtesting.NewTestFactory()
@@ -149,7 +151,7 @@ func TestAlphaEnablement(t *testing.T) {
 		flags.AddFlags(cmd)
 		require.Nil(t, cmd.Flags().Lookup(flag), "flag %q should not be registered without the %q feature enabled", flag, feature)
 
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{feature}, t, func(t *testing.T) {
+		cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{feature}, t, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 			flags.AddFlags(cmd)
@@ -161,7 +163,7 @@ func TestAlphaEnablement(t *testing.T) {
 func TestApplyFlagValidation(t *testing.T) {
 	tests := []struct {
 		args         [][]string
-		enableAlphas []cmdutil.FeatureGate
+		enableAlphas []cmdfeaturegate.FeatureGate
 		expectedErr  string
 	}{
 		{
@@ -213,7 +215,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"applyset", "mySecret"},
 				{"namespace", "myNs"},
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			enableAlphas: []cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet},
 			expectedErr:  "--force cannot be used with --prune",
 		},
 		{
@@ -236,7 +238,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"applyset", "mySecret"},
 				{"namespace", "myNs"},
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			enableAlphas: []cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet},
 			expectedErr:  "--applyset requires --prune",
 		},
 		{
@@ -246,7 +248,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"selector", "foo=bar"},
 				{"namespace", "myNs"},
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			enableAlphas: []cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet},
 			expectedErr:  "--selector is incompatible with --applyset",
 		},
 		{
@@ -256,7 +258,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"namespace", "myNs"},
 				{"all", "true"},
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			enableAlphas: []cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet},
 			expectedErr:  "--all is incompatible with --applyset",
 		},
 		{
@@ -266,7 +268,7 @@ func TestApplyFlagValidation(t *testing.T) {
 				{"namespace", "myNs"},
 				{"prune-allowlist", "core/v1/ConfigMap"},
 			},
-			enableAlphas: []cmdutil.FeatureGate{cmdutil.ApplySet},
+			enableAlphas: []cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet},
 			expectedErr:  "--prune-allowlist is incompatible with --applyset",
 		},
 	}
@@ -2364,7 +2366,7 @@ func TestApplySetParentValidation(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
 				flags.AddFlags(cmd)
@@ -2509,7 +2511,7 @@ func TestLoadObjects(t *testing.T) {
 	testFiles := []string{"testdata/prune/simple/manifest1", "testdata/prune/simple/manifest2"}
 	for _, testFile := range testFiles {
 		t.Run(testFile, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 
 				cmd := &cobra.Command{}
 				flags := NewApplyFlags(genericiooptions.NewTestIOStreamsDiscard())
@@ -2583,7 +2585,7 @@ func TestApplySetParentManagement(t *testing.T) {
 	// Initially, the rc 'exists' server side but the svc and applyset secret do not
 	// This should 'update' the rc and create the secret
 	ioStreams, _, outbuff, errbuff := genericiooptions.NewTestIOStreams()
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("server-side", "true")
@@ -2616,7 +2618,7 @@ metadata:
 	// Next, do an apply that creates a second resource, the svc, and updates the applyset secret
 	outbuff.Reset()
 	errbuff.Reset()
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("filename", filenameSVC)
@@ -2652,7 +2654,7 @@ metadata:
 	failDeletes = true
 	outbuff.Reset()
 	errbuff.Reset()
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameSVC)
 		cmd.Flags().Set("server-side", "true")
@@ -2687,7 +2689,7 @@ metadata:
 
 	outbuff.Reset()
 	errbuff.Reset()
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameSVC)
 		cmd.Flags().Set("server-side", "true")
@@ -2809,7 +2811,7 @@ func TestApplySetInvalidLiveParent(t *testing.T) {
 			secret.SetLabels(labels)
 			setUpClientsForApplySetWithSSA(t, tf, secret)
 
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 				ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
 				cmd := NewCmdApply("kubectl", tf, ioStreams)
 				cmd.Flags().Set("filename", filenameSVC)
@@ -2838,7 +2840,7 @@ func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
 	defer cmdutil.DefaultBehaviorOnFatal()
 
 	// Initially, the rc 'exists' server side the parent CR does not. This should fail.
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("server-side", "true")
@@ -2850,7 +2852,7 @@ func TestApplySet_ClusterScopedCustomResourceParent(t *testing.T) {
 
 	// Simulate creating the CR parent out of band
 	require.NoError(t, tf.FakeDynamicClient.Tracker().Add(cr))
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("server-side", "true")
@@ -3032,7 +3034,7 @@ func TestApplyWithPruneV2(t *testing.T) {
 			tf.Client = tf.UnstructuredClient
 			tf.OpenAPIV3ClientFunc = FakeOpenAPISchema.OpenAPIV3ClientFunc
 
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 				manifests := []string{"manifest1", "manifest2"}
 				for _, manifest := range manifests {
 					t.Logf("applying manifest %v", manifest)
@@ -3135,7 +3137,7 @@ metadata:
 	cmdutil.BehaviorOnFatal(fatalNoExit(t, ioStreams))
 	defer cmdutil.DefaultBehaviorOnFatal()
 
-	cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+	cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 		cmd := NewCmdApply("kubectl", tf, ioStreams)
 		cmd.Flags().Set("filename", filenameRC)
 		cmd.Flags().Set("server-side", "true")
@@ -3310,7 +3312,7 @@ func TestApplyWithPruneV2Fail(t *testing.T) {
 	testdirs := []string{"testdata/prune/simple"}
 	for _, testdir := range testdirs {
 		t.Run(testdir, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+			cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 				manifests := []string{"manifest1", "manifest2"}
 				for i, manifest := range manifests {
 					if i != 0 {
@@ -3422,7 +3424,7 @@ func TestApplySetDryRun(t *testing.T) {
 		ioStreams, _, outbuff, _ := genericiooptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, true)
 		tf.UnstructuredClient = tf.Client
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("server-side", "true")
@@ -3440,7 +3442,7 @@ func TestApplySetDryRun(t *testing.T) {
 		ioStreams, _, outbuff, _ := genericiooptions.NewTestIOStreams()
 		tf.Client = fakeDryRunClient(t, false)
 		tf.UnstructuredClient = tf.Client
-		cmdtesting.WithAlphaEnvs([]cmdutil.FeatureGate{cmdutil.ApplySet}, t, func(t *testing.T) {
+		cmdtesting.WithAlphaEnvs([]cmdfeaturegate.FeatureGate{cmdfeaturegate.ApplySet}, t, func(t *testing.T) {
 			cmd := NewCmdApply("kubectl", tf, ioStreams)
 			cmd.Flags().Set("filename", filenameRC)
 			cmd.Flags().Set("applyset", nameParentSecret)
