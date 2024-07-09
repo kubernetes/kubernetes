@@ -1236,14 +1236,14 @@ func makeCreatePod(client clientset.Interface, namespace string, podTemplate *v1
 }
 
 func CreatePod(ctx context.Context, client clientset.Interface, namespace string, podCount int, podTemplate PodTemplate) error {
-	var createError error
+	var createErrors []error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
 		pod, err := podTemplate.GetPodTemplate(i, podCount)
 		if err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = err
+			createErrors = append(createErrors, err)
 			return
 		}
 		pod = pod.DeepCopy()
@@ -1253,20 +1253,27 @@ func CreatePod(ctx context.Context, client clientset.Interface, namespace string
 		if err := makeCreatePod(client, namespace, pod); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = err
+			createErrors = append(createErrors, err)
 		}
 	}
 
-	if podCount < 30 {
-		workqueue.ParallelizeUntil(ctx, podCount, podCount, createPodFunc)
-	} else {
-		workqueue.ParallelizeUntil(ctx, 30, podCount, createPodFunc)
+	maxWorkers := 30
+	if podCount < maxWorkers {
+		maxWorkers = podCount
 	}
-	return createError
+	workqueue.ParallelizeUntil(ctx, maxWorkers, podCount, createPodFunc)
+	if len(createErrors) > 0 {
+		var errMsgs []string
+		for _, err := range createErrors {
+			errMsgs = append(errMsgs, err.Error())
+		}
+		return fmt.Errorf("encountered %d error(s) creating pods:\n%s", len(createErrors), strings.Join(errMsgs, "\n"))
+	}
+	return nil
 }
 
 func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interface, namespace string, claimTemplate *v1.PersistentVolumeClaim, factory volumeFactory, podTemplate PodTemplate, count int, bindVolume bool) error {
-	var createError error
+	var createErrors []error
 	lock := sync.Mutex{}
 	createPodFunc := func(i int) {
 		pvcName := fmt.Sprintf("pvc-%d", i)
@@ -1299,7 +1306,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if err := CreatePersistentVolumeClaimWithRetries(client, namespace, pvc); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PVC: %s", err)
+			createErrors = append(createErrors, fmt.Errorf("error creating PVC: %w", err))
 			return
 		}
 
@@ -1307,21 +1314,21 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if _, err := client.CoreV1().PersistentVolumeClaims(namespace).UpdateStatus(ctx, pvc, metav1.UpdateOptions{}); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PVC status: %s", err)
+			createErrors = append(createErrors, fmt.Errorf("error updating PVC status: %w", err))
 			return
 		}
 
 		if err := CreatePersistentVolumeWithRetries(client, pv); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error creating PV: %s", err)
+			createErrors = append(createErrors, fmt.Errorf("error creating PV: %w", err))
 			return
 		}
 		// We need to update statuses separately, as creating pv/pvc resets status to the default one.
 		if _, err := client.CoreV1().PersistentVolumes().UpdateStatus(ctx, pv, metav1.UpdateOptions{}); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error updating PV status: %s", err)
+			createErrors = append(createErrors, fmt.Errorf("error updating PV status: %w", err))
 			return
 		}
 
@@ -1330,7 +1337,7 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = fmt.Errorf("error getting pod template: %s", err)
+			createErrors = append(createErrors, fmt.Errorf("error getting pod template: %w", err))
 			return
 		}
 		pod = pod.DeepCopy()
@@ -1347,17 +1354,24 @@ func CreatePodWithPersistentVolume(ctx context.Context, client clientset.Interfa
 		if err := makeCreatePod(client, namespace, pod); err != nil {
 			lock.Lock()
 			defer lock.Unlock()
-			createError = err
+			createErrors = append(createErrors, fmt.Errorf("error creating pod: %w", err))
 			return
 		}
 	}
 
-	if count < 30 {
-		workqueue.ParallelizeUntil(ctx, count, count, createPodFunc)
-	} else {
-		workqueue.ParallelizeUntil(ctx, 30, count, createPodFunc)
+	maxWorkers := 30
+	if count < maxWorkers {
+		maxWorkers = count
 	}
-	return createError
+	workqueue.ParallelizeUntil(ctx, maxWorkers, count, createPodFunc)
+	if len(createErrors) > 0 {
+		var errMsgs []string
+		for _, err := range createErrors {
+			errMsgs = append(errMsgs, err.Error())
+		}
+		return fmt.Errorf("encountered %d error(s) creating pods with persistent volume:\n%s", len(createErrors), strings.Join(errMsgs, "\n"))
+	}
+	return nil
 }
 
 func NewCustomCreatePodStrategy(podTemplate PodTemplate) TestPodCreateStrategy {
