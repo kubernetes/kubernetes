@@ -585,14 +585,28 @@ type TypedObjectReference struct {
 	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
 }
 
-// PersistentVolumeClaimConditionType is a valid value of PersistentVolumeClaimCondition.Type
+// PersistentVolumeClaimConditionType defines the condition of PV claim.
+// Valid values are:
+//   - "Resizing", "FileSystemResizePending"
+//
+// If RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:
+//   - "ControllerResizeError", "NodeResizeError"
+//
+// If VolumeAttributesClass feature gate is enabled, then following additional values can be expected:
+//   - "ModifyVolumeError", "ModifyingVolume"
 type PersistentVolumeClaimConditionType string
 
+// These are valid conditions of PVC
 const (
 	// PersistentVolumeClaimResizing - a user trigger resize of pvc has been started
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
+
+	// PersistentVolumeClaimControllerResizeError indicates an error while resizing volume for size in the controller
+	PersistentVolumeClaimControllerResizeError PersistentVolumeClaimConditionType = "ControllerResizeError"
+	// PersistentVolumeClaimNodeResizeError indicates an error while resizing volume for size in the node.
+	PersistentVolumeClaimNodeResizeError PersistentVolumeClaimConditionType = "NodeResizeError"
 
 	// Applying the target VolumeAttributesClass encountered an error
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"

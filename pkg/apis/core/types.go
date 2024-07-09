@@ -534,10 +534,17 @@ type TypedObjectReference struct {
 }
 
 // PersistentVolumeClaimConditionType defines the condition of PV claim.
-// Valid values are either "Resizing" or "FileSystemResizePending".
+// Valid values are:
+//   - "Resizing", "FileSystemResizePending"
+//
+// If RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:
+//   - "ControllerResizeError", "NodeResizeError"
+//
+// If VolumeAttributesClass feature gate is enabled, then following additional values can be expected:
+//   - "ModifyVolumeError", "ModifyingVolume"
 type PersistentVolumeClaimConditionType string
 
-// These are valid conditions of Pvc
+// These are valid conditions of PVC
 const (
 	// An user trigger resize of pvc has been started
 	PersistentVolumeClaimResizing PersistentVolumeClaimConditionType = "Resizing"
