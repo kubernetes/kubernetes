@@ -90,10 +90,8 @@ func getOrdinal(pod *v1.Pod) int {
 // getStartOrdinal gets the first possible ordinal (inclusive).
 // Returns spec.ordinals.start if spec.ordinals is set, otherwise returns 0.
 func getStartOrdinal(set *apps.StatefulSet) int {
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if set.Spec.Ordinals != nil {
-			return int(set.Spec.Ordinals.Start)
-		}
+	if set.Spec.Ordinals != nil {
+		return int(set.Spec.Ordinals.Start)
 	}
 	return 0
 }

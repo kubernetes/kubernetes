@@ -2832,7 +2832,7 @@
         },
         "ordinals": {
           "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSetOrdinals",
-          "description": "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested. Using the ordinals field requires the StatefulSetStartOrdinal feature gate to be enabled, which is beta."
+          "description": "ordinals controls the numbering of replica indices in a StatefulSet. The default ordinals behavior assigns a \"0\" index to the first replica and increments the index by one for each additional replica requested."
         },
         "persistentVolumeClaimRetentionPolicy": {
           "$ref": "#/definitions/io.k8s.api.apps.v1.StatefulSetPersistentVolumeClaimRetentionPolicy",
