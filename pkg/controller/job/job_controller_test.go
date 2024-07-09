@@ -232,10 +232,11 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 }
 
 type jobInitialStatus struct {
-	active    int
-	succeed   int
-	failed    int
-	startTime *time.Time
+	active     int
+	succeed    int
+	failed     int
+	startTime  *time.Time
+	conditions []batch.JobCondition
 }
 
 func TestControllerSyncJob(t *testing.T) {
@@ -1154,6 +1155,38 @@ func TestControllerSyncJob(t *testing.T) {
 			podIndexLabelDisabled:  true,
 			expectedReady:          ptr.To[int32](0),
 		},
+		"FailureTarget=False condition added manually is ignored": {
+			jobPodFailurePolicy: true,
+			parallelism:         1,
+			completions:         1,
+			activePods:          1,
+			readyPods:           1,
+			initialStatus: &jobInitialStatus{
+				active: 1,
+				startTime: func() *time.Time {
+					now := time.Now()
+					return &now
+				}(),
+				conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobFailureTarget,
+						Status:  v1.ConditionFalse,
+						Reason:  "ConditionAddedManually",
+						Message: "Testing",
+					},
+				},
+			},
+			expectedActive: 1,
+			expectedReady:  ptr.To[int32](1),
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobFailureTarget,
+					Status:  v1.ConditionFalse,
+					Reason:  "ConditionAddedManually",
+					Message: "Testing",
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -1197,6 +1230,7 @@ func TestControllerSyncJob(t *testing.T) {
 					startTime := metav1.NewTime(*tc.initialStatus.startTime)
 					job.Status.StartTime = &startTime
 				}
+				job.Status.Conditions = append(job.Status.Conditions, tc.initialStatus.conditions...)
 			}
 
 			key, err := controller.KeyFunc(job)
