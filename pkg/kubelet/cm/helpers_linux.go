@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
@@ -217,13 +218,13 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
 		// BEFORE kubelet used a random mount point per cgroups subsystem;
-		// NOW    more deterministic: kubelet use mount point with shortest path;
+		// NOW    more deterministic: kubelet use mount point with /sys/fs/cgroup prefix first, nor shortest path prior;
 		// FUTURE is bright with clear expectation determined in doc.
 		// ref. issue: https://github.com/kubernetes/kubernetes/issues/95488
 
 		for _, subsystem := range mount.Subsystems {
 			previous := mountPoints[subsystem]
-			if previous == "" || len(mount.Mountpoint) < len(previous) {
+			if isRewrite(previous, mount.Mountpoint) {
 				mountPoints[subsystem] = mount.Mountpoint
 			}
 		}
@@ -232,6 +233,26 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 		Mounts:      allCgroups,
 		MountPoints: mountPoints,
 	}, nil
+}
+
+func isRewrite(previous, current string) bool {
+	if previous == current {
+		return false
+	}
+	preHasPrefix := strings.HasPrefix(previous, util.CgroupRoot)
+	curHasPrefix := strings.HasPrefix(current, util.CgroupRoot)
+	// both has prefix or both has no prefix, shortest path prior
+	if preHasPrefix && curHasPrefix && len(current) < len(previous) {
+		return true
+	}
+	if !preHasPrefix && !curHasPrefix && len(current) < len(previous) {
+		return true
+	}
+	// "/sys/fs/cgroup" prefix first
+	if !preHasPrefix && curHasPrefix {
+		return true
+	}
+	return false
 }
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems

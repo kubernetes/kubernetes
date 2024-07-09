@@ -872,3 +872,58 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		}
 	}
 }
+
+func TestIsRewrite(t *testing.T) {
+	tests := []struct {
+		name     string
+		previous string
+		current  string
+		expected bool
+	}{
+		{
+			name:     "Empty previous",
+			previous: "",
+			current:  "/sys/fs/cgroup/memory",
+			expected: true,
+		},
+		{
+			name:     "previous same with current",
+			previous: "/sys/fs/cgroup/memory",
+			current:  "/sys/fs/cgroup/memory",
+			expected: false,
+		},
+		{
+			name:     "Current with cgroup prefix",
+			previous: "/var/lib/cgroup/memory",
+			current:  "/sys/fs/cgroup/memory",
+			expected: true,
+		},
+		{
+			name:     "Both cgroup prefix, current shorter",
+			previous: "/sys/fs/cgroup/cgroup/cpu",
+			current:  "/sys/fs/cgroup/cpu",
+			expected: true,
+		},
+		{
+			name:     "Both without cgroup prefix, current shorter",
+			previous: "/var/lib/docker/cgroup/cpu",
+			current:  "/var/lib/cgroup/cpu",
+			expected: true,
+		},
+		{
+			name:     "No rewrite needed",
+			previous: "/sys/fs/cgroup/memory",
+			current:  "/run/cgroup/memory",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isRewrite(tt.previous, tt.current)
+			if tt.expected != result {
+				t.Errorf("unexpected result, test: %v, expected: %v, actual: %v", tt.name, tt.expected, result)
+			}
+		})
+	}
+}
