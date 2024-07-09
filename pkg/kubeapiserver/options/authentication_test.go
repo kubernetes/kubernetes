@@ -524,7 +524,7 @@ anonymous:
   enabled: false
 `),
 			},
-			expectErr: "anonymous is not supported when when AnonymousAuthConfigurableEnpoints feature gate is disabled",
+			expectErr: "anonymous is not supported when AnonymousAuthConfigurableEnpoints feature gate is disabled",
 		},
 		{
 			name:                     "file-anonymous-disabled-AnonymousAuthConfigurableEndpoints-enabled",
