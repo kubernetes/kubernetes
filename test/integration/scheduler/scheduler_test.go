@@ -561,7 +561,6 @@ func TestNodeEvents(t *testing.T) {
 	// 4. Remove the taint from node2; pod2 should now schedule on node2
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "node-events")
-	defer testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	// 1.1 create pod1
 	pod1, err := testutils.CreatePausePodWithResource(testCtx.ClientSet, "pod1", testCtx.NS.Name, &v1.ResourceList{
@@ -620,7 +619,7 @@ func TestNodeEvents(t *testing.T) {
 		Req(map[v1.ResourceName]string{v1.ResourceCPU: "40m"}).
 		NodeAffinityIn("affinity-key", []string{"affinity-value"}).
 		Toleration("taint-key").Obj()
-	plugPod, err = testCtx.ClientSet.CoreV1().Pods(plugPod.Namespace).Create(context.TODO(), plugPod, metav1.CreateOptions{})
+	plugPod, err = testCtx.ClientSet.CoreV1().Pods(plugPod.Namespace).Create(testCtx.Ctx, plugPod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create pod %v: %v", plugPod.Name, err)
 	}

@@ -1201,7 +1201,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 
 			// Delete the node if necessary.
 			if tt.deleteNode {
-				if err := cs.CoreV1().Nodes().Delete(context.TODO(), nodeName, *metav1.NewDeleteOptions(0)); err != nil {
+				if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 					t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
 				}
 			}
@@ -1457,7 +1457,7 @@ func TestPDBInPreemption(t *testing.T) {
 				}
 				// Add pod condition ready so that PDB is updated.
 				addPodConditionReady(p)
-				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(context.TODO(), p, metav1.UpdateOptions{}); err != nil {
+				if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateStatus(testCtx.Ctx, p, metav1.UpdateOptions{}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -1468,7 +1468,7 @@ func TestPDBInPreemption(t *testing.T) {
 
 			// Create PDBs.
 			for _, pdb := range test.pdbs {
-				_, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).Create(context.TODO(), pdb, metav1.CreateOptions{})
+				_, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).Create(testCtx.Ctx, pdb, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create PDB: %v", err)
 				}
