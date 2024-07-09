@@ -99,7 +99,7 @@ func (s *stateMemory) Delete(podUID string, containerName string, defaultCPUSet 
 		delete(s.assignments, podUID)
 	}
 	s.defaultCPUSet = defaultCPUSet
-	klog.V(2).InfoS("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName, "defaultCPUSet", defaultCPUSet)
+	klog.V(2).InfoS("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName, "currentDefaultCPUSet", defaultCPUSet)
 }
 
 func (s *stateMemory) ClearState() {
