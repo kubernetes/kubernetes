@@ -1432,14 +1432,6 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected:            true,
 		},
 		{
-			name:                "Pod with nominated node, but without nominated node status",
-			pod:                 st.MakePod().Name("p_without_status").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
-			pods:                []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
-			nodes:               []string{"node1"},
-			nominatedNodeStatus: nil,
-			expected:            false,
-		},
-		{
 			name:                "Pod without nominated node",
 			pod:                 st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
 			pods:                []*v1.Pod{},
@@ -1456,8 +1448,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected:            false,
 		},
 		{
-			name: "victim Pods terminating, feature PodDisruptionConditions is enabled",
-			fts:  feature.Features{EnablePodDisruptionConditions: true},
+			name: "preemption victim pod terminating, as indicated by the dedicated DisruptionTarget condition",
 			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
 				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
@@ -1465,34 +1456,17 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "non-victim Pods terminating, feature PodDisruptionConditions is enabled",
-			fts:      feature.Features{EnablePodDisruptionConditions: true},
+			name:     "non-victim Pods terminating",
 			pod:      st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
 			pods:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
 			nodes:    []string{"node1"},
 			expected: true,
 		},
-		{
-			name: "victim Pods terminating, feature PodDisruptionConditions is disabled",
-			fts:  feature.Features{EnablePodDisruptionConditions: false},
-			pod:  st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
-			pods: []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().
-				Condition(v1.DisruptionTarget, v1.ConditionTrue, v1.PodReasonPreemptionByScheduler).Obj()},
-			nodes:    []string{"node1"},
-			expected: false,
-		},
-		{
-			name:     "non-victim Pods terminating, feature PodDisruptionConditions is disabled",
-			fts:      feature.Features{EnablePodDisruptionConditions: false},
-			pod:      st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
-			pods:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
-			nodes:    []string{"node1"},
-			expected: false,
-		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test.fts.EnablePodDisruptionConditions = true
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

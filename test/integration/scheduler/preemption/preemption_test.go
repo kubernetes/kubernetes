@@ -33,17 +33,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -200,41 +197,14 @@ func TestPreemption(t *testing.T) {
 
 	maxTokens := 1000
 	tests := []struct {
-		name                          string
-		existingPods                  []*v1.Pod
-		pod                           *v1.Pod
-		initTokens                    int
-		enablePreFilter               bool
-		unresolvable                  bool
-		preemptedPodIndexes           map[int]struct{}
-		enablePodDisruptionConditions bool
+		name                string
+		existingPods        []*v1.Pod
+		pod                 *v1.Pod
+		initTokens          int
+		enablePreFilter     bool
+		unresolvable        bool
+		preemptedPodIndexes map[int]struct{}
 	}{
-		{
-			name:       "basic pod preemption with PodDisruptionConditions enabled",
-			initTokens: maxTokens,
-			existingPods: []*v1.Pod{
-				initPausePod(&testutils.PausePodConfig{
-					Name:      "victim-pod",
-					Namespace: testCtx.NS.Name,
-					Priority:  &lowPriority,
-					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
-					},
-				}),
-			},
-			pod: initPausePod(&testutils.PausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: testCtx.NS.Name,
-				Priority:  &highPriority,
-				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
-				},
-			}),
-			preemptedPodIndexes:           map[int]struct{}{0: {}},
-			enablePodDisruptionConditions: true,
-		},
 		{
 			name:       "basic pod preemption",
 			initTokens: maxTokens,
@@ -484,7 +454,6 @@ func TestPreemption(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			filter.Tokens = test.initTokens
 			filter.EnablePreFilter = test.enablePreFilter
 			filter.Unresolvable = test.unresolvable
@@ -513,10 +482,8 @@ func TestPreemption(t *testing.T) {
 						t.Errorf("Error %v when getting the updated status for pod %v/%v ", err, p.Namespace, p.Name)
 					}
 					_, cond := podutil.GetPodCondition(&pod.Status, v1.DisruptionTarget)
-					if test.enablePodDisruptionConditions && cond == nil {
+					if cond == nil {
 						t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
-					} else if test.enablePodDisruptionConditions == false && cond != nil {
-						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.DisruptionTarget)
 					}
 				} else {
 					if p.DeletionTimestamp != nil {

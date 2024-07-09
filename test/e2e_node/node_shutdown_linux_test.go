@@ -83,7 +83,7 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		}
 	})
 
-	f.Context("graceful node shutdown when PodDisruptionConditions are enabled", nodefeature.PodDisruptionConditions, func() {
+	f.Context("graceful node shutdown; baseline scenario to verify DisruptionTarget is added", func() {
 
 		const (
 			pollInterval            = 1 * time.Second
@@ -95,7 +95,6 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates = map[string]bool{
 				string(features.GracefulNodeShutdown):                   true,
-				string(features.PodDisruptionConditions):                true,
 				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
 			}
 			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
