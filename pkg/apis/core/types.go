@@ -544,6 +544,11 @@ const (
 	// PersistentVolumeClaimFileSystemResizePending - controller resize is finished and a file system resize is pending on node
 	PersistentVolumeClaimFileSystemResizePending PersistentVolumeClaimConditionType = "FileSystemResizePending"
 
+	// PersistentVolumeClaimControllerResizeError indicates an error while resizing volume for size in the controller
+	PersistentVolumeClaimControllerResizeError PersistentVolumeClaimConditionType = "ControllerResizeError"
+	// PersistentVolumeClaimNodeResizeError indicates an error while resizing volume for size in the node.
+	PersistentVolumeClaimNodeResizeError PersistentVolumeClaimConditionType = "NodeResizeError"
+
 	// Applying the target VolumeAttributesClass encountered an error
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
 	// Volume is being modified
