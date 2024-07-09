@@ -41,6 +41,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	crdintegration "k8s.io/apiextensions-apiserver/test/integration"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
@@ -818,20 +819,46 @@ func (svm *svmTest) createCR(ctx context.Context, t *testing.T, crName, version 
 		Resource: crdName + "s",
 	}
 
-	crdUnstructured := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": crdResource.GroupVersion().String(),
-			"kind":       crdName,
-			"metadata": map[string]interface{}{
-				"name":      crName,
-				"namespace": defaultNamespace,
+	var crdUnstructured *unstructured.Unstructured
+	var lastError error
+	err := wait.ExponentialBackoff(wait.Backoff{
+		Steps:    5,
+		Duration: 1 * time.Second, // Initial delay
+		Factor:   2.0,             // Multiplier for each retry
+		Jitter:   0.1,             // Randomization factor
+	}, func() (bool, error) {
+		crdUnstructured = &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": crdResource.GroupVersion().String(),
+				"kind":       crdName,
+				"metadata": map[string]interface{}{
+					"name":      crName,
+					"namespace": defaultNamespace,
+				},
 			},
-		},
-	}
+		}
 
-	crdUnstructured, err := svm.dynamicClient.Resource(crdResource).Namespace(defaultNamespace).Create(ctx, crdUnstructured, metav1.CreateOptions{})
+		createdCR, err := svm.dynamicClient.
+			Resource(crdResource).
+			Namespace(defaultNamespace).
+			Create(ctx, crdUnstructured, metav1.CreateOptions{})
+		if err != nil {
+			if errors.IsAlreadyExists(err) {
+				// If the CR already exists, no need to retry.
+				return true, nil
+			}
+
+			lastError = err
+			// Return false to indicate failure but continue retrying.
+			return false, nil
+		}
+
+		crdUnstructured = createdCR
+		// Successfully created the CR, no need to retry.
+		return true, nil
+	})
 	if err != nil {
-		t.Fatalf("Failed to create CR: %v", err)
+		t.Fatalf("failed to create CR after retries: %v", lastError)
 	}
 
 	return crdUnstructured
