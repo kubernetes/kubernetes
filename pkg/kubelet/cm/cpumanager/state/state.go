@@ -46,8 +46,6 @@ type Reader interface {
 type writer interface {
 	// SetCPUSet save the container assignment. And save to checkpoint
 	SetCPUSet(podUID string, containerName string, cpuset cpuset.CPUSet, defaultCPUSet cpuset.CPUSet)
-	// SetDefaultCPUSet save the entire cpuset, it should be called during initialization
-	SetDefaultCPUSet(cpuset cpuset.CPUSet) error
 	// SetCPUAssignments save the entire assignments. And save to checkpoint
 	SetCPUAssignments(assignments ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet)
 	// Delete the container assignment. And save to checkpoint

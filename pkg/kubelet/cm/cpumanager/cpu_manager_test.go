@@ -69,11 +69,6 @@ func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.C
 	s.defaultCPUSet = defaultCPUSet
 }
 
-func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) error {
-	s.defaultCPUSet = cset
-	return nil
-}
-
 func (s *mockState) Delete(podUID string, containerName string, defaultCPUSet cpuset.CPUSet) {
 	delete(s.assignments[podUID], containerName)
 	if len(s.assignments[podUID]) == 0 {

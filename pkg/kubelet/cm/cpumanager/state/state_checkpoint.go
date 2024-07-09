@@ -204,20 +204,6 @@ func (sc *stateCheckpoint) SetCPUSet(podUID string, containerName string, cset c
 	}
 }
 
-// SetDefaultCPUSet sets default CPU set
-func (sc *stateCheckpoint) SetDefaultCPUSet(cset cpuset.CPUSet) error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
-	if err := sc.cache.SetDefaultCPUSet(cset); err != nil {
-		return err
-	}
-	err := sc.storeState()
-	if err != nil {
-		klog.InfoS("Store state to checkpoint error", "err", err)
-	}
-	return nil
-}
-
 // SetCPUAssignments sets CPU to pod assignments
 func (sc *stateCheckpoint) SetCPUAssignments(a ContainerCPUAssignments, defaultCPUSet cpuset.CPUSet) {
 	sc.mux.Lock()

@@ -202,7 +202,7 @@ func (p *staticPolicy) validateState(s state.State) error {
 		}
 		// state is empty initialize
 		allCPUs := p.topology.CPUDetails.CPUs()
-		s.SetDefaultCPUSet(allCPUs)
+		s.SetCPUAssignments(state.ContainerCPUAssignments{}, allCPUs)
 		return nil
 	}
 
