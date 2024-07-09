@@ -103,6 +103,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true)
 	runOneQuotaTest(f, false)
+	addAfterEachForCleaningUpPods(f)
 })
 
 const (
