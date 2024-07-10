@@ -40,25 +40,13 @@ import (
 // TestPodGcOrphanedPodsWithFinalizer tests deletion of orphaned pods
 func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	tests := map[string]struct {
-		enableJobPodReplacementPolicy bool
-		phase                         v1.PodPhase
-		wantPhase                     v1.PodPhase
-		wantDisruptionTarget          *v1.PodCondition
+		phase                v1.PodPhase
+		wantPhase            v1.PodPhase
+		wantDisruptionTarget *v1.PodCondition
 	}{
 		"pending pod": {
 			phase:     v1.PodPending,
 			wantPhase: v1.PodFailed,
-			wantDisruptionTarget: &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  "DeletionByPodGC",
-				Message: "PodGC: node no longer exists",
-			},
-		},
-		"pending pod; PodReplacementPolicy enabled": {
-			enableJobPodReplacementPolicy: true,
-			phase:                         v1.PodPending,
-			wantPhase:                     v1.PodFailed,
 			wantDisruptionTarget: &v1.PodCondition{
 				Type:    v1.DisruptionTarget,
 				Status:  v1.ConditionTrue,
@@ -78,7 +66,6 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			testCtx := setup(t, "podgc-orphaned")
 			cs := testCtx.ClientSet
 

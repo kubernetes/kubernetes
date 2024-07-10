@@ -33,14 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/client-go/util/retry"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -307,7 +305,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 }
 
 func addConditionAndDeletePod(r *EvictionREST, ctx context.Context, name string, validation rest.ValidateObjectFunc, options *metav1.DeleteOptions) error {
-	if !dryrun.IsDryRun(options.DryRun) && feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+	if !dryrun.IsDryRun(options.DryRun) {
 		getLatestPod := func(_ context.Context, _, oldObj runtime.Object) (runtime.Object, error) {
 			// Throwaway the newObj. We care only about the latest pod obtained from etcd (oldObj).
 			// So we can add DisruptionTarget condition in conditionAppender without conflicts.
