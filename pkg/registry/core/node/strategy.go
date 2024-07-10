@@ -107,7 +107,7 @@ func dropDisabledFields(node *api.Node, oldNode *api.Node) {
 		node.Status.RuntimeHandlers = nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) && !supplementalGroupsPolicyInUse(oldNode) {
 		node.Status.Features = nil
 	}
 }
@@ -298,4 +298,12 @@ func fieldIsDeprecatedWarnings(obj runtime.Object) []string {
 		warnings = append(warnings, "spec.externalID: this field is deprecated, and is unused by Kubernetes")
 	}
 	return warnings
+}
+
+// supplementalGroupsPolicyInUse returns true if the node.status has NodeFeature
+func supplementalGroupsPolicyInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+	return node.Status.Features != nil
 }
