@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
@@ -223,7 +224,7 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 		for _, subsystem := range mount.Subsystems {
 			previous := mountPoints[subsystem]
-			if previous == "" || len(mount.Mountpoint) < len(previous) {
+			if previous == "" || !strings.HasPrefix(previous, "/sys/fs/cgroup") && strings.HasPrefix(mount.Mountpoint, "/sys/fs/cgroup") || (len(mount.Mountpoint) < len(previous) && strings.HasPrefix(mount.Mountpoint, "/sys/fs/cgroup")) {
 				mountPoints[subsystem] = mount.Mountpoint
 			}
 		}
