@@ -1691,7 +1691,7 @@ func TestBindPlugin(t *testing.T) {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
 					t.Fatalf("Expected the pod to be scheduled. error: %v", err)
 				}
-				pod, err = testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+				pod, err = testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("can't get pod: %v", err)
 				}
@@ -2571,7 +2571,7 @@ func TestActivatePods(t *testing.T) {
 		name := fmt.Sprintf("executor-%v", i)
 		executor := st.MakePod().Name(name).Namespace(ns).Label("executor", "").Container(pause).Obj()
 		pods = append(pods, executor)
-		if _, err := cs.CoreV1().Pods(executor.Namespace).Create(context.TODO(), executor, metav1.CreateOptions{}); err != nil {
+		if _, err := cs.CoreV1().Pods(executor.Namespace).Create(testCtx.Ctx, executor, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create pod %v: %v", executor.Name, err)
 		}
 	}
@@ -2586,7 +2586,7 @@ func TestActivatePods(t *testing.T) {
 	// Create a driver pod.
 	driver := st.MakePod().Name("driver").Namespace(ns).Label("driver", "").Container(pause).Obj()
 	pods = append(pods, driver)
-	if _, err := cs.CoreV1().Pods(driver.Namespace).Create(context.TODO(), driver, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.CoreV1().Pods(driver.Namespace).Create(testCtx.Ctx, driver, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create pod %v: %v", driver.Name, err)
 	}
 
