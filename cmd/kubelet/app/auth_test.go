@@ -179,7 +179,7 @@ func TestAuthnWebhookRequestEncoding(t *testing.T) {
 				t.Fatalf("failed to create authentication client: %v", err)
 			}
 
-			authn, _, err := BuildAuthn(authnClient, kubeletconfig.KubeletAuthentication{
+			authn, _, err := BuildAuthn(context.TODO(), authnClient, kubeletconfig.KubeletAuthentication{
 				Webhook: kubeletconfig.KubeletWebhookAuthentication{
 					Enabled: true,
 				},
