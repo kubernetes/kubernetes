@@ -166,8 +166,8 @@ func TestResizeFunctions(t *testing.T) {
 		},
 		{
 			name: "mark fs resize, when other resource statuses are present",
-			pvc:  basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).get(),
-			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+			pvc:  basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeInfeasible).get(),
+			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeInfeasible).
 				withStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, c clientset.Interface, _ resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkForFSResize(pvc, c)
@@ -183,9 +183,9 @@ func TestResizeFunctions(t *testing.T) {
 		},
 		{
 			name: "mark resize finished",
-			pvc: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+			pvc: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeInfeasible).
 				withStorageResourceStatus(v1.PersistentVolumeClaimNodeResizePending).get(),
-			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeFailed).
+			expectedPVC: basePVC.withResourceStatus(v1.ResourceCPU, v1.PersistentVolumeClaimControllerResizeInfeasible).
 				withStorageResourceStatus("").get(),
 			testFunc: func(pvc *v1.PersistentVolumeClaim, i clientset.Interface, q resource.Quantity) (*v1.PersistentVolumeClaim, error) {
 				return MarkFSResizeFinished(pvc, q, i)

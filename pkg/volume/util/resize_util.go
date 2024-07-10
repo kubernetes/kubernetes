@@ -238,7 +238,7 @@ func MarkFSResizeFinished(
 // of volumes which are in failed state.
 func MarkNodeExpansionFailed(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	newPVC := pvc.DeepCopy()
-	newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizeFailed)
+	newPVC = mergeStorageResourceStatus(newPVC, v1.PersistentVolumeClaimNodeResizeInfeasible)
 
 	patchBytes, err := createPVCPatch(pvc, newPVC, false /* addResourceVersionCheck */)
 	if err != nil {

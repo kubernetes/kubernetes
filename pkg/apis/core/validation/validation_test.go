@@ -18971,7 +18971,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeInfeasible,
 		},
 	})
 
@@ -19001,7 +19001,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimNodeResizeInfeasible,
 		},
 	})
 
@@ -19045,7 +19045,7 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			validResizeKeyCustom: resource.MustParse("10Gi"),
 		},
 		AllocatedResourceStatuses: map[core.ResourceName]core.ClaimResourceStatus{
-			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeFailed,
+			core.ResourceStorage: core.PersistentVolumeClaimControllerResizeInfeasible,
 			validResizeKeyCustom: core.PersistentVolumeClaimControllerResizeInProgress,
 		},
 	})

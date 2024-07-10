@@ -411,7 +411,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				pvcRequestSize:          "11Gi", // expansion to 11Gi will cause expansion to fail on controller
 				allocatedResource:       "11Gi",
 				simulatedCSIDriverError: expansionFailedOnController,
-				expectedResizeStatus:    v1.PersistentVolumeClaimControllerResizeFailed,
+				expectedResizeStatus:    v1.PersistentVolumeClaimControllerResizeInfeasible,
 				recoverySize:            resource.MustParse("4Gi"),
 			},
 			{
@@ -419,7 +419,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				pvcRequestSize:          "9Gi", // expansion to 9Gi will cause expansion to fail on node
 				allocatedResource:       "9Gi",
 				simulatedCSIDriverError: expansionFailedOnNode,
-				expectedResizeStatus:    v1.PersistentVolumeClaimNodeResizeFailed,
+				expectedResizeStatus:    v1.PersistentVolumeClaimNodeResizeInfeasible,
 				recoverySize:            resource.MustParse("5Gi"),
 			},
 		}
@@ -500,7 +500,7 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 	// if expansion succeeded on controller but failed on the node
 	if test.simulatedCSIDriverError == expansionFailedOnNode {
 		ginkgo.By("Wait for expansion to fail on node again")
-		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeResizeFailed)
+		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeResizeInfeasible)
 		framework.ExpectNoError(err, "While waiting for resize status to be set to expansion-failed-on-node")
 
 		ginkgo.By("verify allocated resources after recovery")
