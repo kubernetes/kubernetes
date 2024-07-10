@@ -1126,7 +1126,11 @@ func printReplicationController(obj *api.ReplicationController, options printers
 
 	row.Cells = append(row.Cells, obj.Name, int64(desiredReplicas), int64(currentReplicas), int64(readyReplicas), translateTimestampSince(obj.CreationTimestamp))
 	if options.Wide {
-		names, images := layoutContainerCells(obj.Spec.Template.Spec.Containers)
+		var containers []api.Container
+		if obj.Spec.Template != nil {
+			containers = obj.Spec.Template.Spec.Containers
+		}
+		names, images := layoutContainerCells(containers)
 		row.Cells = append(row.Cells, names, images, labels.FormatLabels(obj.Spec.Selector))
 	}
 	return []metav1.TableRow{row}, nil
