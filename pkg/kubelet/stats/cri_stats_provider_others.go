@@ -20,8 +20,6 @@ limitations under the License.
 package stats
 
 import (
-	"context"
-
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
