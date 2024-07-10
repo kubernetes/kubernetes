@@ -654,27 +654,6 @@ items:
     - list
     - watch
   - apiGroups:
-    - storage.k8s.io
-    resources:
-    - storageclasses
-    verbs:
-    - get
-    - list
-    - watch
-  - apiGroups:
-    - ""
-    resources:
-    - endpoints
-    - services
-    verbs:
-    - get
-  - apiGroups:
-    - ""
-    resources:
-    - secrets
-    verbs:
-    - get
-  - apiGroups:
     - ""
     - events.k8s.io
     resources:
@@ -683,6 +662,12 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1009,38 +994,9 @@ items:
   - apiGroups:
     - ""
     resources:
-    - endpoints
-    verbs:
-    - create
-    - delete
-    - get
-    - update
-  - apiGroups:
-    - ""
-    resources:
-    - services
-    verbs:
-    - create
-    - delete
-    - get
-  - apiGroups:
-    - ""
-    resources:
-    - secrets
-    verbs:
-    - get
-  - apiGroups:
-    - ""
-    resources:
     - nodes
     verbs:
-    - get
     - list
-  - apiGroups:
-    - ""
-    resources:
-    - events
-    verbs:
     - watch
   - apiGroups:
     - ""
@@ -1051,6 +1007,18 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    verbs:
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
