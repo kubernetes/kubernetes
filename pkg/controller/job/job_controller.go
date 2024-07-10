@@ -1879,9 +1879,6 @@ func isPodFailed(p *v1.Pod, job *batch.Job) bool {
 	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
 		// When PodDisruptionConditions is enabled, orphan Pods and unschedulable
 		// terminating Pods are marked as Failed. So we only need to check the phase.
-		// TODO(#113855): Stop limiting this behavior to Jobs with podFailurePolicy.
-		// For now, we do so to avoid affecting all running Jobs without the
-		// availability to opt-out into the old behavior.
 		return p.Status.Phase == v1.PodFailed
 	}
 	if p.Status.Phase == v1.PodFailed {
