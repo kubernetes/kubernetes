@@ -182,7 +182,7 @@ func (o *WebhookServingOptions) ApplyTo(cfg **server.SecureServingInfo, webhookC
 	serverCertFile, serverKeyFile := o.ServerCert.CertKey.CertFile, o.ServerCert.CertKey.KeyFile
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		var err error
-		(*cfg).Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
+		(*cfg).Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles(context.Background(), "serving-cert", serverCertFile, serverKeyFile)
 		if err != nil {
 			return err
 		}
