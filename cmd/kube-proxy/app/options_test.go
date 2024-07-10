@@ -179,81 +179,83 @@ nodePortAddresses:
 	}
 
 	for _, tc := range testCases {
-		expBindAddr := tc.bindAddress
-		if tc.bindAddress[0] == '"' {
-			// Surrounding double quotes will get stripped by the yaml parser.
-			expBindAddr = expBindAddr[1 : len(tc.bindAddress)-1]
-		}
-		expected := &kubeproxyconfig.KubeProxyConfiguration{
-			BindAddress: expBindAddr,
-			ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-				AcceptContentTypes: "abc",
-				Burst:              100,
-				ContentType:        "content-type",
-				Kubeconfig:         "/path/to/kubeconfig",
-				QPS:                7,
-			},
-			ClusterCIDR:      tc.clusterCIDR,
-			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
-			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](2),
-				Min:                   ptr.To[int32](1),
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
-			},
-			FeatureGates:       map[string]bool{},
-			HealthzBindAddress: tc.healthzBindAddress,
-			HostnameOverride:   "foo",
-			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-				MasqueradeAll:      true,
-				MasqueradeBit:      ptr.To[int32](17),
-				LocalhostNodePorts: ptr.To(true),
-				MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
-				SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
-			},
-			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
-				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
-				ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
-			},
-			NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
-				MasqueradeAll: true,
-				MasqueradeBit: ptr.To[int32](18),
-				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
-				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
-			},
-			MetricsBindAddress: tc.metricsBindAddress,
-			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-			OOMScoreAdj:        ptr.To[int32](17),
-			PortRange:          "2-7",
-			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
-			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
-			DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
-				BridgeInterface:     string("cbr0"),
-				InterfaceNamePrefix: string("veth"),
-			},
-			Logging: logsapi.LoggingConfiguration{
-				Format:         "text",
-				FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
-			},
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			expBindAddr := tc.bindAddress
+			if tc.bindAddress[0] == '"' {
+				// Surrounding double quotes will get stripped by the yaml parser.
+				expBindAddr = expBindAddr[1 : len(tc.bindAddress)-1]
+			}
+			expected := &kubeproxyconfig.KubeProxyConfiguration{
+				BindAddress: expBindAddr,
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					AcceptContentTypes: "abc",
+					Burst:              100,
+					ContentType:        "content-type",
+					Kubeconfig:         "/path/to/kubeconfig",
+					QPS:                7,
+				},
+				ClusterCIDR:      tc.clusterCIDR,
+				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](2),
+					Min:                   ptr.To[int32](1),
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
+				},
+				FeatureGates:       map[string]bool{},
+				HealthzBindAddress: tc.healthzBindAddress,
+				HostnameOverride:   "foo",
+				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+					MasqueradeAll:      true,
+					MasqueradeBit:      ptr.To[int32](17),
+					LocalhostNodePorts: ptr.To(true),
+					MinSyncPeriod:      metav1.Duration{Duration: 10 * time.Second},
+					SyncPeriod:         metav1.Duration{Duration: 60 * time.Second},
+				},
+				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+					MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+					SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+					ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+				},
+				NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
+					MasqueradeAll: true,
+					MasqueradeBit: ptr.To[int32](18),
+					MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+					SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+				},
+				MetricsBindAddress: tc.metricsBindAddress,
+				Mode:               kubeproxyconfig.ProxyMode(tc.mode),
+				OOMScoreAdj:        ptr.To[int32](17),
+				PortRange:          "2-7",
+				NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
+				DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
+				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+					BridgeInterface:     "cbr0",
+					InterfaceNamePrefix: "veth",
+				},
+				Logging: logsapi.LoggingConfiguration{
+					Format:         "text",
+					FlushFrequency: logsapi.TimeOrMetaDuration{Duration: metav1.Duration{Duration: 5 * time.Second}, SerializeAsString: true},
+				},
+			}
 
-		options := NewOptions()
+			options := NewOptions()
 
-		baseYAML := fmt.Sprintf(
-			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
-			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
+			baseYAML := fmt.Sprintf(
+				yamlTemplate, tc.bindAddress, tc.clusterCIDR,
+				tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
 
-		// Append additional configuration to the base yaml template
-		yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
+			// Append additional configuration to the base yaml template
+			yaml := fmt.Sprintf("%s\n%s", baseYAML, tc.extraConfig)
 
-		config, err := options.loadConfig([]byte(yaml))
+			config, err := options.loadConfig([]byte(yaml))
 
-		require.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+			require.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 
-		if diff := cmp.Diff(config, expected); diff != "" {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff)
-		}
+			if diff := cmp.Diff(config, expected); diff != "" {
+				t.Fatalf("unexpected config, diff = %s", diff)
+			}
+		})
 	}
 }
 
@@ -557,21 +559,13 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 		},
 	}
 
-	for i := range testCases {
-		gotHealthz := addressFromDeprecatedFlags(testCases[i].healthzBindAddress, testCases[i].healthzPort)
-		gotMetrics := addressFromDeprecatedFlags(testCases[i].metricsBindAddress, testCases[i].metricsPort)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotHealthz := addressFromDeprecatedFlags(tc.healthzBindAddress, tc.healthzPort)
+			gotMetrics := addressFromDeprecatedFlags(tc.metricsBindAddress, tc.metricsPort)
 
-		errFn := func(name, except, got string) {
-			t.Errorf("case %s: expected %v, got %v", name, except, got)
-		}
-
-		if gotHealthz != testCases[i].expHealthz {
-			errFn(testCases[i].name, testCases[i].expHealthz, gotHealthz)
-		}
-
-		if gotMetrics != testCases[i].expMetrics {
-			errFn(testCases[i].name, testCases[i].expMetrics, gotMetrics)
-		}
-
+			require.Equal(t, tc.expHealthz, gotHealthz)
+			require.Equal(t, tc.expMetrics, gotMetrics)
+		})
 	}
 }
