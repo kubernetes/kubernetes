@@ -216,6 +216,13 @@ const (
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
 
+	// owner: @micahhausler
+	// Deprecated: v1.31
+	//
+	// Disable Node Admission plugin validation of CSRs for kubelet signers where CN=system:node:$nodeName.
+	// Remove in v1.33
+	DisableKubeletCSRAdmissionValidation featuregate.Feature = "DisableKubeletCSRAdmissionValidation"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	// alpha: v1.29
@@ -1325,6 +1332,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
+
+	DisableKubeletCSRAdmissionValidation: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
 
 	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
 

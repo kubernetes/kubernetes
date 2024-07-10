@@ -18,6 +18,11 @@ package noderestriction
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"reflect"
 	"strings"
 	"testing"
@@ -41,6 +46,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	certificatesapi "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -213,11 +219,15 @@ type admitTestCase struct {
 	nodesGetter corev1lister.NodeLister
 	attributes  admission.Attributes
 	features    featuregate.FeatureGate
+	setupFunc   func(t *testing.T)
 	err         string
 }
 
 func (a *admitTestCase) run(t *testing.T) {
 	t.Run(a.name, func(t *testing.T) {
+		if a.setupFunc != nil {
+			a.setupFunc(t)
+		}
 		c := NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 		if a.features != nil {
 			c.InspectFeatureGates(a.features)
@@ -375,6 +385,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		}
 		aLabeledPod  = withLabels(coremypod, labelsA)
 		abLabeledPod = withLabels(coremypod, labelsAB)
+
+		privKey, _ = rsa.GenerateKey(rand.Reader, 2048)
 	)
 
 	existingPodsIndex.Add(v1mymirrorpod)
@@ -1238,6 +1250,42 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			attributes: admission.NewAttributesRecord(nil, nil, csiNodeKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeResource, "", admission.Delete, &metav1.UpdateOptions{}, false, mynode),
 			err:        "",
 		},
+		// CSR
+		{
+			name:       "allowed CSR create correct node serving",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "allowed CSR create correct node client",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeAPIServerClientKubeletSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "allowed CSR create non-node CSR",
+			attributes: createCSRAttributes("some-other-identity", certificatesapi.KubeAPIServerClientSignerName, true, privKey, mynode),
+			err:        "",
+		},
+		{
+			name:       "deny CSR create incorrect node",
+			attributes: createCSRAttributes("system:node:othernode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "forbidden: can only create a node CSR with CN=system:node:mynode",
+		},
+		{
+			name:       "allow CSR create incorrect node with feature gate disabled",
+			attributes: createCSRAttributes("system:node:othernode", certificatesapi.KubeletServingSignerName, true, privKey, mynode),
+			err:        "",
+			features:   feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DisableKubeletCSRAdmissionValidation, true)
+			},
+		},
+		{
+			name:       "deny CSR create invalid",
+			attributes: createCSRAttributes("system:node:mynode", certificatesapi.KubeletServingSignerName, false, privKey, mynode),
+			err:        "unable to parse csr: asn1: syntax error: sequence truncated",
+		},
 	}
 	for _, tt := range tests {
 		tt.nodesGetter = existingNodes
@@ -1601,6 +1649,31 @@ func createPodAttributes(pod *api.Pod, user user.Info) admission.Attributes {
 	podResource := api.Resource("pods").WithVersion("v1")
 	podKind := api.Kind("Pod").WithVersion("v1")
 	return admission.NewAttributesRecord(pod, nil, podKind, pod.Namespace, pod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
+}
+
+func createCSRAttributes(cn, signer string, validCsr bool, key any, user user.Info) admission.Attributes {
+	csrResource := certificatesapi.Resource("certificatesigningrequests").WithVersion("v1")
+	csrKind := certificatesapi.Kind("CertificateSigningRequest").WithVersion("v1")
+
+	csrPem := []byte("-----BEGIN CERTIFICATE REQUEST-----\n-----END CERTIFICATE REQUEST-----")
+	if validCsr {
+		structuredCsr := x509.CertificateRequest{
+			Subject: pkix.Name{
+				CommonName: cn,
+			},
+		}
+		csrDer, _ := x509.CreateCertificateRequest(rand.Reader, &structuredCsr, key)
+		csrPem = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDer})
+	}
+
+	csreq := &certificatesapi.CertificateSigningRequest{
+		Spec: certificatesapi.CertificateSigningRequestSpec{
+			Request:    csrPem,
+			SignerName: signer,
+		},
+	}
+	return admission.NewAttributesRecord(csreq, nil, csrKind, "", "", csrResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
+
 }
 
 func TestAdmitResourceSlice(t *testing.T) {
