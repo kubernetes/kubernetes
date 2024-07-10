@@ -78,7 +78,7 @@ func CheckRestrictedVolumes() Check {
 			{
 				MinimumVersion:   api.MajorMinorVersion(1, 0),
 				CheckPod:         restrictedVolumes_1_0,
-				OverrideCheckIDs: []CheckID{checkHostPathVolumesID},
+				OverrideCheckIDs: []CheckID{checkHostPathVolumesID, checkBaselineVolumesID},
 			},
 		},
 	}
