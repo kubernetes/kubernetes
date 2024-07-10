@@ -298,6 +298,12 @@ func (s *serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runt
 	if err != nil {
 		return nil, actual, err
 	}
+
+	// TODO: Make possible to disable this behavior.
+	if err := transcodeRawTypes(obj); err != nil {
+		return nil, actual, err
+	}
+
 	return obj, actual, strict
 }
 
