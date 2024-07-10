@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -213,7 +214,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	// create a CA to sign the API server's kubelet client cert
 	startingCerts := generateClientCert(t)
 
-	dynamicCAContentFromFile, err := dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", startingCerts.caFile)
+	dynamicCAContentFromFile, err := dynamiccertificates.NewDynamicCAContentFromFileWithLogger(klog.FromContext(ctx), "client-ca-bundle", startingCerts.caFile)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -153,7 +153,7 @@ func Run(ctx context.Context, opts options.CompletedOptions) error {
 	if err != nil {
 		return err
 	}
-	server, err := CreateServerChain(completed)
+	server, err := CreateServerChain(ctx, completed)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func Run(ctx context.Context, opts options.CompletedOptions) error {
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
+func CreateServerChain(ctx context.Context, config CompletedConfig) (*aggregatorapiserver.APIAggregator, error) {
 	// 1. CRDs
 	notFoundHandler := notfoundhandler.New(config.ControlPlane.Generic.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := config.APIExtensions.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))

@@ -16,6 +16,10 @@ limitations under the License.
 
 package dynamiccertificates
 
+import (
+	"k8s.io/klog/v2"
+)
+
 // DynamicFileSNIContent provides a SNICertKeyContentProvider that can dynamically react to new file content
 type DynamicFileSNIContent struct {
 	*DynamicCertKeyPairContent
@@ -25,9 +29,19 @@ type DynamicFileSNIContent struct {
 var _ SNICertKeyContentProvider = &DynamicFileSNIContent{}
 var _ ControllerRunner = &DynamicFileSNIContent{}
 
-// NewDynamicSNIContentFromFiles returns a dynamic SNICertKeyContentProvider based on a cert and key filename and explicit names
+// NewDynamicSNIContentFromFiles returns a dynamic SNICertKeyContentProvider based on a cert and key filename and explicit names.
+// It uses a default logger (klog.Background) for logging.
 func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames ...string) (*DynamicFileSNIContent, error) {
-	servingContent, err := NewDynamicServingContentFromFiles(purpose, certFile, keyFile)
+	logger := klog.Background()
+
+	return NewDynamicSNIContentFromFilesWithLogger(logger, purpose, certFile, keyFile, sniNames...)
+}
+
+// NewDynamicSNIContentFromFilesWithLogger returns a dynamic SNICertKeyContentProvider based on a cert and key filename and explicit names
+// It uses the provided logger for logging.
+func NewDynamicSNIContentFromFilesWithLogger(logger klog.Logger, purpose, certFile, keyFile string, sniNames ...string) (*DynamicFileSNIContent, error) {
+	servingContent, err := NewDynamicServingContentFromFilesWithLogger(logger, purpose, certFile, keyFile)
+
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +50,7 @@ func NewDynamicSNIContentFromFiles(purpose, certFile, keyFile string, sniNames .
 		DynamicCertKeyPairContent: servingContent,
 		sniNames:                  sniNames,
 	}
-	if err := ret.loadCertKeyPair(); err != nil {
+	if err := ret.loadCertKeyPair(logger); err != nil {
 		return nil, err
 	}
 

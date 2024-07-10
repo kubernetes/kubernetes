@@ -154,15 +154,22 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		"by the authorities in --requestheader-client-ca-file is allowed.")
 }
 
-// ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
-// if necessary, nil otherwise.
+// Structured logging: ToAuthenticationRequestHeaderConfigWithLogger should be used instead of ToAuthenticationRequestHeaderConfig in code that requires explicit logger injection for better control over logging behavior.
 func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() (*authenticatorfactory.RequestHeaderConfig, error) {
+	logger := klog.Background()
+	return s.ToAuthenticationRequestHeaderConfigWithLogger(logger)
+}
+
+// ToAuthenticationRequestHeaderConfigWithLogger returns a RequestHeaderConfig config object for these options
+// if necessary, nil otherwise. It uses klog.Logger for logging.
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfigWithLogger(logger klog.Logger) (*authenticatorfactory.RequestHeaderConfig, error) {
 	if len(s.ClientCAFile) == 0 {
 		return nil, nil
 	}
 
 	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("request-header", s.ClientCAFile)
 	if err != nil {
+		logger.Error(err, "Failed to create dynamic CA content from file", "file", s.ClientCAFile)
 		return nil, err
 	}
 
