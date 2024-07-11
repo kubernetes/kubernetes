@@ -353,6 +353,7 @@ const (
 	// owner: @tenzen-y
 	// kep: https://kep.k8s.io/3998
 	// alpha: v1.30
+	// beta: v1.31
 	//
 	// Allow users to specify when a Job can be declared as succeeded
 	// based on the set of succeeded pods.
@@ -1064,7 +1065,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobPodReplacementPolicy: {Default: true, PreRelease: featuregate.Beta},
 
-	JobSuccessPolicy: {Default: false, PreRelease: featuregate.Alpha},
+	JobSuccessPolicy: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
