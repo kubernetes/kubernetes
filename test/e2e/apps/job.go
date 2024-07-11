@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -83,6 +82,10 @@ var _ = SIGDescribe("Job", func() {
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
@@ -130,6 +133,10 @@ var _ = SIGDescribe("Job", func() {
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonPodFailurePolicy)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job fails")
 		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job failure in namespace: %s", f.Namespace.Name)
@@ -167,6 +174,10 @@ var _ = SIGDescribe("Job", func() {
 		}
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -247,6 +258,10 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By(fmt.Sprintf("Awaiting for the pod: %s/%s to be deleted", pod.Name, pod.Namespace))
 		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
 		framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
+
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -337,6 +352,10 @@ var _ = SIGDescribe("Job", func() {
 		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
 		framework.ExpectNoError(err, "failed to await for the pod to be deleted: %s/%s", pod.Name, pod.Namespace)
 
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
@@ -368,6 +387,10 @@ var _ = SIGDescribe("Job", func() {
 		job.Spec.Suspend = pointer.BoolPtr(false)
 		job, err = e2ejob.UpdateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Waiting for job to complete")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -537,6 +560,10 @@ done`}
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonFailedIndexes)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Awaiting for the job to fail as there are failed indexes")
 		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
@@ -572,6 +599,10 @@ done`}
 		job.Spec.CompletionMode = &mode
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonMaxFailedIndexesExceeded)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to fail as the number of max failed indexes is exceeded")
 		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
@@ -615,6 +646,10 @@ done`}
 		job.Spec.CompletionMode = &mode
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonFailedIndexes)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to fail as all indexes are failed")
 		err = e2ejob.WaitForJobFailed(f.ClientSet, f.Namespace.Name, job.Name)
@@ -705,6 +740,10 @@ done`}
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
@@ -720,8 +759,13 @@ done`}
 		job := e2ejob.NewTestJob("notTerminate", "exceed-active-deadline", v1.RestartPolicyNever, parallelism, completions, &activeDeadlineSeconds, backoffLimit)
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonDeadlineExceeded)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job past active deadline")
-		err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, time.Duration(activeDeadlineSeconds+15)*time.Second, "DeadlineExceeded")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailed, batchv1.JobReasonDeadlineExceeded)
 		framework.ExpectNoError(err, "failed to ensure job past active deadline in namespace: %s", f.Namespace.Name)
 	})
 
@@ -823,9 +867,13 @@ done`}
 		job := e2ejob.NewTestJob("fail", "backofflimit", v1.RestartPolicyNever, 1, 1, nil, int32(backoff))
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
-		ginkgo.By("Ensuring job exceed backofflimit")
 
-		err = waitForJobFailure(ctx, f.ClientSet, f.Namespace.Name, job.Name, e2ejob.JobTimeout, "BackoffLimitExceeded")
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonBackoffLimitExceeded)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job exceed backofflimit")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailed, batchv1.JobReasonBackoffLimitExceeded)
 		framework.ExpectNoError(err, "failed to ensure job exceed backofflimit in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By(fmt.Sprintf("Checking that %d pod created and status is failed", backoff+1))
@@ -869,6 +917,10 @@ done`}
 		framework.Logf("Creating job %q with a node hostname selector %q with cpu request %q", job.Name, testNodeName, cpuRequest)
 		job, err = e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to have the interim success condition")
+		err = waitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
 		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, completions)
@@ -1186,22 +1238,26 @@ func waitForJobEvent(ctx context.Context, config watchEventConfig) {
 	}
 }
 
-// waitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
-func waitForJobFailure(ctx context.Context, c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
-	return wait.Poll(framework.Poll, timeout, func() (bool, error) {
+// waitForJobCondition waits for the specified Job to have the expected condition with the specific reason.
+func waitForJobCondition(ctx context.Context, c clientset.Interface, ns, jobName string, cType batchv1.JobConditionType, reason string) error {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, c := range curr.Status.Conditions {
-			if c.Type == batchv1.JobFailed && c.Status == v1.ConditionTrue {
-				if reason == "" || reason == c.Reason {
+			if c.Type == cType && c.Status == v1.ConditionTrue {
+				if reason == c.Reason {
 					return true, nil
 				}
 			}
 		}
 		return false, nil
 	})
+	if err != nil {
+		return fmt.Errorf("waiting for Job %q to have the condition %q with reason: %q: %w", jobName, cType, reason, err)
+	}
+	return nil
 }
 
 func findConditionByType(list []batchv1.JobCondition, cType batchv1.JobConditionType) *batchv1.JobCondition {

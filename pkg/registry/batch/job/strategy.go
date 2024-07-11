@@ -404,9 +404,17 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
 			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
+			AllowForSuccessCriteriaMetInExtendedScope:    true,
 		}
 	}
-	return batchvalidation.JobStatusValidationOptions{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		return batchvalidation.JobStatusValidationOptions{
+			AllowForSuccessCriteriaMetInExtendedScope: true,
+		}
+	}
+	return batchvalidation.JobStatusValidationOptions{
+		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet),
+	}
 }
 
 // WarningsOnUpdate returns warnings for the given update.
