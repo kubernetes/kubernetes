@@ -20,10 +20,7 @@ limitations under the License.
 package winstats
 
 import (
-	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -33,6 +30,7 @@ import (
 	"unsafe"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -256,15 +254,21 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 }
 
 func getSystemUUID() (string, error) {
-	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\HardwareConfig`, registry.QUERY_VALUE)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to open registry key HKLM\\SYSTEM\\HardwareConfig")
 	}
-	fields := strings.Fields(string(result))
-	if len(fields) != 2 {
-		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
+	defer k.Close()
+
+	uuid, _, err := k.GetStringValue("LastConfig")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read registry value LastConfig from key HKLM\\SYSTEM\\HardwareConfig")
 	}
-	return fields[1], nil
+
+	uuid = strings.Trim(uuid, "{")
+	uuid = strings.Trim(uuid, "}")
+	uuid = strings.ToUpper(uuid)
+	return uuid, nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
