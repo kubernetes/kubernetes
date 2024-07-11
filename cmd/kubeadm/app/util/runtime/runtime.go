@@ -229,8 +229,15 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 func (runtime *CRIRuntime) ImageExists(image string) bool {
 	ctx, cancel := defaultContext()
 	defer cancel()
-	_, err := runtime.impl.ImageStatus(ctx, runtime.imageService, &runtimeapi.ImageSpec{Image: image}, false)
-	return err == nil
+	resp, err := runtime.impl.ImageStatus(ctx, runtime.imageService, &runtimeapi.ImageSpec{Image: image}, false)
+	if err != nil {
+		klog.Warningf("Failed to get image status, image: %q, error: %v", image, err)
+		return false
+	}
+	if resp == nil || resp.Image == nil {
+		return false
+	}
+	return true
 }
 
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
