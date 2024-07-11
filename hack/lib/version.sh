@@ -37,6 +37,8 @@ kube::version::get_version_vars() {
     return
   fi
 
+  KUBE_GIT_VERSION=$(sed -rn 's/.*io.openshift.build.versions="kubernetes=(1.[0-9]+.[0-9]+)"/v\1/p' openshift-hack/images/hyperkube/Dockerfile.rhel)
+
   # If the kubernetes source was exported through git archive, then
   # we likely don't have a git tree, but these magic values may be filled in.
   # shellcheck disable=SC2016,SC2050
