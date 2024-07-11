@@ -196,7 +196,7 @@ func TestSafeMakeDir(t *testing.T) {
 		{
 			"non-directory",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test/directory",
 			"",
@@ -206,7 +206,7 @@ func TestSafeMakeDir(t *testing.T) {
 		{
 			"non-directory-final",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test",
 			"",
@@ -367,7 +367,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(base, "a/b"), defaultPerm); err != nil {
 					return err
 				}
-				return ioutil.WriteFile(filepath.Join(base, "a/b", "c"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "a/b", "c"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				if err := validateDirExists(filepath.Join(base, "a/b")); err != nil {
@@ -449,7 +449,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "0"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "0"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				return validateDirNotExists(filepath.Join(base, containerSubPathDirectoryName))
@@ -463,7 +463,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(path, defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "container1"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "container1"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				return validateDirExists(filepath.Join(base, containerSubPathDirectoryName, testVol))
@@ -477,7 +477,7 @@ func TestCleanSubPaths(t *testing.T) {
 				if err := os.MkdirAll(filepath.Join(path, "container1"), defaultPerm); err != nil {
 					return nil, err
 				}
-				return nil, ioutil.WriteFile(filepath.Join(path, "container2"), []byte{}, defaultPerm)
+				return nil, os.WriteFile(filepath.Join(path, "container2"), []byte{}, defaultPerm)
 			},
 			validate: func(base string) error {
 				path := filepath.Join(base, containerSubPathDirectoryName, testVol)
@@ -560,7 +560,7 @@ func TestCleanSubPaths(t *testing.T) {
 				}
 
 				file0 := filepath.Join(containerPath, "0")
-				if err := ioutil.WriteFile(file0, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(file0, []byte{}, defaultPerm); err != nil {
 					return nil, err
 				}
 
@@ -575,7 +575,7 @@ func TestCleanSubPaths(t *testing.T) {
 				}
 
 				file3 := filepath.Join(containerPath, "3")
-				if err := ioutil.WriteFile(file3, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(file3, []byte{}, defaultPerm); err != nil {
 					return nil, err
 				}
 
@@ -701,7 +701,7 @@ func TestBindSubPath(t *testing.T) {
 				if err := os.MkdirAll(volpath, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
-				return nil, volpath, subpath, ioutil.WriteFile(subpath, []byte{}, defaultPerm)
+				return nil, volpath, subpath, os.WriteFile(subpath, []byte{}, defaultPerm)
 			},
 			expectError: false,
 		},
@@ -750,7 +750,7 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 				// touch file outside
-				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(child, []byte{}, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
 
@@ -785,7 +785,7 @@ func TestBindSubPath(t *testing.T) {
 					return nil, "", "", err
 				}
 				// touch file outside
-				if err := ioutil.WriteFile(child, []byte{}, defaultPerm); err != nil {
+				if err := os.WriteFile(child, []byte{}, defaultPerm); err != nil {
 					return nil, "", "", err
 				}
 
@@ -1142,7 +1142,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"non-directory",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test/directory",
 			true,
@@ -1150,7 +1150,7 @@ func TestSafeOpen(t *testing.T) {
 		{
 			"non-directory-final",
 			func(base string) error {
-				return ioutil.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
+				return os.WriteFile(filepath.Join(base, "test"), []byte{}, defaultPerm)
 			},
 			"test",
 			false,
