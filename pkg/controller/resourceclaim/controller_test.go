@@ -527,9 +527,6 @@ func TestSyncHandler(t *testing.T) {
 func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: classname,
-		},
 	}
 	if owner != nil {
 		claim.OwnerReferences = []metav1.OwnerReference{*owner}
@@ -545,9 +542,6 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 			GenerateName: generateName,
 			Namespace:    namespace,
 			Annotations:  map[string]string{"resource.kubernetes.io/pod-claim-name": podClaimName},
-		},
-		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: classname,
 		},
 	}
 	if owner != nil {
@@ -604,11 +598,6 @@ func makePod(name, namespace string, uid types.UID, podClaims ...v1.PodResourceC
 func makeTemplate(name, namespace, classname string) *resourceapi.ResourceClaimTemplate {
 	template := &resourceapi.ResourceClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
-		Spec: resourceapi.ResourceClaimTemplateSpec{
-			Spec: resourceapi.ResourceClaimSpec{
-				ResourceClassName: classname,
-			},
-		},
 	}
 	return template
 }
