@@ -3896,3 +3896,79 @@ func Test_getPodRequestedResources(t *testing.T) {
 		})
 	}
 }
+
+func Test_isAffinityViolatingNUMAAllocations(t *testing.T) {
+	testsCases := []struct {
+		description         string
+		machineState        map[int]*state.NUMANodeState
+		topologyHint        *topologymanager.TopologyHint
+		isViolationExpected bool
+	}{
+		{
+			description: "violating NUMA allocations because given affinity asks for NUMA ID 1 which is on different cells group",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{0, 1},
+				},
+				2: {
+					NumberOfAssignments: 1,
+					Cells:               []int{2},
+				},
+				3: {
+					NumberOfAssignments: 0,
+					Cells:               []int{3},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(1, 2),
+			},
+			isViolationExpected: true,
+		},
+		{
+			description: "violating NUMA allocations because given affinity with multiple nodes asks for NUMA ID 1 which is used for a single NUMA node memory allocation",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 0,
+					Cells:               []int{0, 1},
+				},
+				1: {
+					NumberOfAssignments: 1,
+					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(0, 1),
+			},
+			isViolationExpected: true,
+		},
+		{
+			description: "valid affinity, no prior assignments",
+			machineState: map[int]*state.NUMANodeState{
+				0: {
+					NumberOfAssignments: 0,
+					Cells:               []int{0},
+				},
+				1: {
+					NumberOfAssignments: 0,
+					Cells:               []int{1},
+				},
+			},
+			topologyHint: &topologymanager.TopologyHint{
+				NUMANodeAffinity: newNUMAAffinity(0, 1),
+			},
+			isViolationExpected: false,
+		},
+	}
+	for _, tc := range testsCases {
+		t.Run(tc.description, func(t *testing.T) {
+			if isAffinityViolatingNUMAAllocations(tc.machineState, tc.topologyHint.NUMANodeAffinity) != tc.isViolationExpected {
+				t.Errorf("isAffinityViolatingNUMAAllocations with affinity %v expected to return %t, got %t", tc.topologyHint.NUMANodeAffinity.GetBits(), tc.isViolationExpected, !tc.isViolationExpected)
+			}
+		})
+	}
+}
