@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/endpointslice/metrics"
+	metrics "k8s.io/endpointslice/metrics"
 	"k8s.io/endpointslice/topologycache"
 	"k8s.io/endpointslice/trafficdist"
 	endpointsliceutil "k8s.io/endpointslice/util"
@@ -55,6 +55,9 @@ type Reconciler struct {
 	// metricsCache tracks values for total numbers of desired endpoints as well
 	// as the efficiency of EndpointSlice endpoints distribution
 	metricsCache *metrics.Cache
+
+	// metrics ...
+	metrics *metrics.EndpointSliceMetrics
 
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
@@ -90,12 +93,13 @@ func NewReconciler(
 	eventRecorder record.EventRecorder,
 	controllerName string,
 	maxEndpointsPerSlice int32,
+	endpointSliceMetrics *metrics.EndpointSliceMetrics,
 	options ...ReconcilerOption,
 ) *Reconciler {
 	r := &Reconciler{
 		client:               client,
 		endpointSliceTracker: endpointSliceTracker,
-		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
+		metrics:              endpointSliceMetrics,
 		eventRecorder:        eventRecorder,
 		controllerName:       controllerName,
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
@@ -103,6 +107,7 @@ func NewReconciler(
 	for _, option := range options {
 		option(r)
 	}
+	r.metricsCache = metrics.NewCache(maxEndpointsPerSlice, endpointSliceMetrics, r.placeholderEnabled)
 	return r
 }
 
@@ -141,7 +146,7 @@ func (r *Reconciler) Reconcile(
 		desiredEndpointsByAddressType[desiredEndpointSlice.AddressType] = append(desiredEndpointsByAddressType[desiredEndpointSlice.AddressType], desiredEndpointSlice)
 	}
 
-	spMetrics := metrics.NewServicePortCache()
+	spMetrics := metrics.NewObjectPortCache()
 
 	// reconcile for existing.
 	for addressType := range supportedAddressesTypes {
@@ -162,8 +167,8 @@ func (r *Reconciler) Reconcile(
 		slicesToDelete = append(slicesToDelete, pmSlicesToDelete...)
 	}
 
-	serviceNN := types.NamespacedName{Name: ownerObjectMeta.GetName(), Namespace: ownerObjectMeta.GetNamespace()}
-	r.metricsCache.UpdateServicePortCache(serviceNN, spMetrics)
+	ownerNN := types.NamespacedName{Name: ownerObjectMeta.GetName(), Namespace: ownerObjectMeta.GetNamespace()}
+	r.metricsCache.UpdateObjectPortCache(ownerNN, spMetrics)
 
 	return r.finalize(ownerObjectRuntime, ownerObjectMeta, slicesToCreate, slicesToUpdate, slicesToDelete, trafficDistribution, triggerTime)
 }
@@ -191,7 +196,7 @@ func (r *Reconciler) reconcileByAddressType(
 	addressType discovery.AddressType,
 	trafficDistribution *string,
 	setEndpointSliceLabelsAnnotationsFunc SetEndpointSliceLabelsAnnotations,
-	spMetrics *metrics.ServicePortCache,
+	spMetrics *metrics.ObjectPortCache,
 ) ([]*discovery.EndpointSlice, []*discovery.EndpointSlice, []*discovery.EndpointSlice) {
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
@@ -269,8 +274,8 @@ func (r *Reconciler) reconcileByAddressType(
 			})
 	}
 
-	metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
-	metrics.EndpointsRemovedPerSync.WithLabelValues().Observe(float64(totalRemoved))
+	r.metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
+	r.metrics.EndpointsRemovedPerSync.WithLabelValues().Observe(float64(totalRemoved))
 
 	ownerNN := types.NamespacedName{Name: ownerObjectMeta.GetName(), Namespace: ownerObjectMeta.GetNamespace()}
 
@@ -394,7 +399,7 @@ func (r *Reconciler) finalize(
 				return fmt.Errorf("failed to create EndpointSlice for %s %s/%s: %v", ownerObjectRuntime.GetObjectKind().GroupVersionKind(), ownerObjectMeta.GetNamespace(), ownerObjectMeta.GetName(), err)
 			}
 			r.endpointSliceTracker.Update(createdSlice)
-			metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
+			r.metrics.EndpointSliceChanges.WithLabelValues("create").Inc()
 		}
 	}
 
@@ -405,7 +410,7 @@ func (r *Reconciler) finalize(
 			return fmt.Errorf("failed to update %s EndpointSlice for %s %s/%s: %v", ownerObjectRuntime.GetObjectKind().GroupVersionKind(), endpointSlice.Name, ownerObjectMeta.GetNamespace(), ownerObjectMeta.GetName(), err)
 		}
 		r.endpointSliceTracker.Update(updatedSlice)
-		metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
+		r.metrics.EndpointSliceChanges.WithLabelValues("update").Inc()
 	}
 
 	for _, endpointSlice := range slicesToDelete {
@@ -414,7 +419,7 @@ func (r *Reconciler) finalize(
 			return fmt.Errorf("failed to delete %s EndpointSlice for %s %s/%s: %v", ownerObjectRuntime.GetObjectKind().GroupVersionKind(), endpointSlice.Name, ownerObjectMeta.GetNamespace(), ownerObjectMeta.GetName(), err)
 		}
 		r.endpointSliceTracker.ExpectDeletion(endpointSlice)
-		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
+		r.metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
 	topologyLabel := "Disabled"
@@ -431,7 +436,7 @@ func (r *Reconciler) finalize(
 	}
 
 	numSlicesChanged := len(slicesToCreate) + len(slicesToUpdate) + len(slicesToDelete)
-	metrics.EndpointSlicesChangedPerSync.WithLabelValues(topologyLabel, trafficDist).Observe(float64(numSlicesChanged))
+	r.metrics.EndpointSlicesChangedPerSync.WithLabelValues(topologyLabel, trafficDist).Observe(float64(numSlicesChanged))
 
 	return nil
 }
@@ -606,7 +611,7 @@ func (r *Reconciler) reconcileByPortMapping(
 }
 
 func (r *Reconciler) DeleteService(namespace, name string) {
-	r.metricsCache.DeleteService(types.NamespacedName{Namespace: namespace, Name: name})
+	r.metricsCache.DeleteObject(types.NamespacedName{Namespace: namespace, Name: name})
 }
 
 func (r *Reconciler) GetControllerName() string {

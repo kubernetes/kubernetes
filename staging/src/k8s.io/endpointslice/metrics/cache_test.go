@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,13 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+const (
+	endpointSliceSubsystem = "endpoint_slice_controller"
+)
+
 func TestNumEndpointsAndSlices(t *testing.T) {
-	c := NewCache(int32(100))
+	endpointSliceMetrics := NewEndpointSliceMetrics(endpointSliceSubsystem)
+	c := NewCache(int32(100), endpointSliceMetrics, true)
 
 	p80 := int32(80)
 	p443 := int32(443)
@@ -37,32 +42,33 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
 	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
-	spCacheEfficient := NewServicePortCache()
+	spCacheEfficient := NewObjectPortCache()
 	spCacheEfficient.Set(pmKey80, EfficiencyInfo{Endpoints: 45, Slices: 1})
 	spCacheEfficient.Set(pmKey80443, EfficiencyInfo{Endpoints: 35, Slices: 1})
 
-	spCacheInefficient := NewServicePortCache()
+	spCacheInefficient := NewObjectPortCache()
 	spCacheInefficient.Set(pmKey80, EfficiencyInfo{Endpoints: 12, Slices: 5})
 	spCacheInefficient.Set(pmKey80443, EfficiencyInfo{Endpoints: 18, Slices: 8})
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheInefficient)
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheInefficient)
 	expectNumEndpointsAndSlices(t, c, 2, 13, 30)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc2"}, spCacheEfficient)
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc2"}, spCacheEfficient)
 	expectNumEndpointsAndSlices(t, c, 4, 15, 110)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc3"}, spCacheInefficient)
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc3"}, spCacheInefficient)
 	expectNumEndpointsAndSlices(t, c, 6, 28, 140)
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheEfficient)
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, spCacheEfficient)
 	expectNumEndpointsAndSlices(t, c, 6, 17, 190)
 
-	c.DeleteService(types.NamespacedName{Namespace: "ns1", Name: "svc3"})
+	c.DeleteObject(types.NamespacedName{Namespace: "ns1", Name: "svc3"})
 	expectNumEndpointsAndSlices(t, c, 4, 4, 160)
 }
 
 func TestPlaceHolderSlice(t *testing.T) {
-	c := NewCache(int32(100))
+	endpointSliceMetrics := NewEndpointSliceMetrics(endpointSliceSubsystem)
+	c := NewCache(int32(100), endpointSliceMetrics, true)
 
 	p80 := int32(80)
 	p443 := int32(443)
@@ -70,12 +76,30 @@ func TestPlaceHolderSlice(t *testing.T) {
 	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
 	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
 
-	sp := NewServicePortCache()
+	sp := NewObjectPortCache()
 	sp.Set(pmKey80, EfficiencyInfo{Endpoints: 0, Slices: 1})
 	sp.Set(pmKey80443, EfficiencyInfo{Endpoints: 0, Slices: 1})
 
-	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, sp)
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, sp)
 	expectNumEndpointsAndSlices(t, c, 1, 2, 0)
+}
+
+func TestNoPlaceHolderSlice(t *testing.T) {
+	endpointSliceMetrics := NewEndpointSliceMetrics(endpointSliceSubsystem)
+	c := NewCache(int32(100), endpointSliceMetrics, false)
+
+	p80 := int32(80)
+	p443 := int32(443)
+
+	pmKey80443 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
+	pmKey80 := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+
+	sp := NewObjectPortCache()
+	sp.Set(pmKey80, EfficiencyInfo{Endpoints: 0, Slices: 1})
+	sp.Set(pmKey80443, EfficiencyInfo{Endpoints: 0, Slices: 1})
+
+	c.UpdateObjectPortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, sp)
+	expectNumEndpointsAndSlices(t, c, 0, 2, 0)
 }
 
 func expectNumEndpointsAndSlices(t *testing.T, c *Cache, desired int, actual int, numEndpoints int) {
@@ -94,7 +118,8 @@ func expectNumEndpointsAndSlices(t *testing.T, c *Cache, desired int, actual int
 // Tests the mutations to servicesByTrafficDistribution field within Cache
 // object.
 func TestCache_ServicesByTrafficDistribution(t *testing.T) {
-	cache := NewCache(0)
+	endpointSliceMetrics := NewEndpointSliceMetrics(endpointSliceSubsystem)
+	cache := NewCache(0, endpointSliceMetrics, true)
 
 	service1 := types.NamespacedName{Namespace: "ns1", Name: "service1"}
 	service2 := types.NamespacedName{Namespace: "ns1", Name: "service2"}
@@ -152,7 +177,7 @@ func TestCache_ServicesByTrafficDistribution(t *testing.T) {
 	}, desc)
 
 	desc = "service3 gets deleted"
-	cache.DeleteService(service3)
+	cache.DeleteObject(service3)
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
 		corev1.ServiceTrafficDistributionPreferClose: {service1: true},
 		trafficDistributionImplementationSpecific:    {service2: true}, // Delta
@@ -181,12 +206,13 @@ func TestCache_ServicesByTrafficDistribution(t *testing.T) {
 
 }
 
-func benchmarkUpdateServicePortCache(b *testing.B, num int) {
-	c := NewCache(int32(100))
+func benchmarkUpdateObjectPortCache(b *testing.B, num int) {
+	endpointSliceMetrics := NewEndpointSliceMetrics(endpointSliceSubsystem)
+	c := NewCache(int32(100), endpointSliceMetrics, true)
 	ns := "benchmark"
 	httpKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: pointer.Int32(80)}})
 	httpsKey := endpointsliceutil.NewPortMapKey([]discovery.EndpointPort{{Port: pointer.Int32(443)}})
-	spCache := &ServicePortCache{items: map[endpointsliceutil.PortMapKey]EfficiencyInfo{
+	spCache := &ObjectPortCache{items: map[endpointsliceutil.PortMapKey]EfficiencyInfo{
 		httpKey: {
 			Endpoints: 182,
 			Slices:    2,
@@ -199,30 +225,30 @@ func benchmarkUpdateServicePortCache(b *testing.B, num int) {
 
 	for i := 0; i < num; i++ {
 		nName := types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("service-%d", i)}
-		c.UpdateServicePortCache(nName, spCache)
+		c.UpdateObjectPortCache(nName, spCache)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		nName := types.NamespacedName{Namespace: ns, Name: fmt.Sprintf("bench-%d", i)}
-		c.UpdateServicePortCache(nName, spCache)
+		c.UpdateObjectPortCache(nName, spCache)
 	}
 }
 
-func BenchmarkUpdateServicePortCache100(b *testing.B) {
-	benchmarkUpdateServicePortCache(b, 100)
+func BenchmarkUpdateObjectPortCache100(b *testing.B) {
+	benchmarkUpdateObjectPortCache(b, 100)
 }
 
-func BenchmarkUpdateServicePortCache1000(b *testing.B) {
-	benchmarkUpdateServicePortCache(b, 1000)
+func BenchmarkUpdateObjectPortCache1000(b *testing.B) {
+	benchmarkUpdateObjectPortCache(b, 1000)
 }
 
-func BenchmarkUpdateServicePortCache10000(b *testing.B) {
-	benchmarkUpdateServicePortCache(b, 10000)
+func BenchmarkUpdateObjectPortCache10000(b *testing.B) {
+	benchmarkUpdateObjectPortCache(b, 10000)
 }
 
-func BenchmarkUpdateServicePortCache100000(b *testing.B) {
-	benchmarkUpdateServicePortCache(b, 100000)
+func BenchmarkUpdateObjectPortCache100000(b *testing.B) {
+	benchmarkUpdateObjectPortCache(b, 100000)
 }
 
 func ptrTo[T any](obj T) *T {

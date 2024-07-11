@@ -80,6 +80,9 @@ const (
 
 	// topologyQueueItemKey is the key for all items in the topologyQueue.
 	topologyQueueItemKey = "topologyQueueItemKey"
+
+	// EndpointSliceSubsystem - subsystem name used for Endpoint Slices.
+	EndpointSliceSubsystem = "endpoint_slice_controller"
 )
 
 // NewController creates and initializes a new Controller
@@ -93,8 +96,6 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 ) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
-
-	endpointslicemetrics.RegisterMetrics()
 
 	c := &Controller{
 		client: client,
@@ -118,7 +119,8 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		topologyQueue: workqueue.NewTypedRateLimitingQueue[string](
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 		),
-		workerLoopPeriod: time.Second,
+		workerLoopPeriod:     time.Second,
+		endpointSliceMetrics: endpointslicemetrics.NewEndpointSliceMetrics(EndpointSliceSubsystem),
 	}
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -186,6 +188,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.eventRecorder,
 		controllerName,
 		c.maxEndpointsPerSlice,
+		c.endpointSliceMetrics,
 		endpointslicerec.WithTopologyCache(c.topologyCache),
 		endpointslicerec.WithTrafficDistribution(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
 		endpointslicerec.WithPlaceholder(true),
@@ -266,6 +269,8 @@ type Controller struct {
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
+
+	endpointSliceMetrics *endpointslicemetrics.EndpointSliceMetrics
 }
 
 // Run will not return until stopCh is closed.
@@ -336,7 +341,7 @@ func (c *Controller) processNextTopologyWorkItem(logger klog.Logger) bool {
 }
 
 func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
-	trackSync(err)
+	c.trackSync(err)
 
 	if err == nil {
 		c.serviceQueue.Forget(key)
@@ -632,7 +637,7 @@ func (c *Controller) checkNodeTopologyDistribution(logger klog.Logger) {
 }
 
 // trackSync increments the EndpointSliceSyncs metric with the result of a sync.
-func trackSync(err error) {
+func (c *Controller) trackSync(err error) {
 	metricLabel := "success"
 	if err != nil {
 		if endpointslicepkg.IsStaleInformerCacheErr(err) {
@@ -641,7 +646,7 @@ func trackSync(err error) {
 			metricLabel = "error"
 		}
 	}
-	endpointslicemetrics.EndpointSliceSyncs.WithLabelValues(metricLabel).Inc()
+	c.endpointSliceMetrics.EndpointSliceSyncs.WithLabelValues(metricLabel).Inc()
 }
 
 func dropEndpointSlicesPendingDeletion(endpointSlices []*discovery.EndpointSlice) []*discovery.EndpointSlice {

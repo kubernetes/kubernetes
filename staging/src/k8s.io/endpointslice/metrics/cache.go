@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2024 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,17 +26,21 @@ import (
 )
 
 // NewCache returns a new Cache with the specified endpointsPerSlice.
-func NewCache(endpointsPerSlice int32) *Cache {
+func NewCache(endpointsPerSlice int32, endpointSliceMetrics *EndpointSliceMetrics, placeholderEnabled bool) *Cache {
 	return &Cache{
+		endpointSliceMetrics:          endpointSliceMetrics,
 		maxEndpointsPerSlice:          endpointsPerSlice,
-		cache:                         map[types.NamespacedName]*ServicePortCache{},
+		cache:                         map[types.NamespacedName]*ObjectPortCache{},
 		servicesByTrafficDistribution: make(map[string]map[types.NamespacedName]bool),
+		placeholderEnabled:            placeholderEnabled,
 	}
 }
 
 // Cache tracks values for total numbers of desired endpoints as well as the
 // efficiency of EndpointSlice endpoints distribution.
 type Cache struct {
+	endpointSliceMetrics *EndpointSliceMetrics
+
 	// maxEndpointsPerSlice references the maximum number of endpoints that
 	// should be added to an EndpointSlice.
 	maxEndpointsPerSlice int32
@@ -51,13 +55,16 @@ type Cache struct {
 	numSlicesActual int
 	// numSlicesDesired represents the desired number of EndpointSlices.
 	numSlicesDesired int
-	// cache stores a ServicePortCache grouped by NamespacedNames representing
-	// Services.
-	cache map[types.NamespacedName]*ServicePortCache
+	// cache stores a ObjectPortCache grouped by NamespacedNames representing
+	// objects (services, entpoints...).
+	cache map[types.NamespacedName]*ObjectPortCache
 	// Tracks all services partitioned by their trafficDistribution field.
 	//
 	// The type should be read as map[trafficDistribution]setOfServices
 	servicesByTrafficDistribution map[string]map[types.NamespacedName]bool
+	// placeholderEnabled indicates if the placeholder endpointslices must
+	// be created or not.
+	placeholderEnabled bool
 }
 
 const (
@@ -66,10 +73,10 @@ const (
 	trafficDistributionImplementationSpecific = "ImplementationSpecific"
 )
 
-// ServicePortCache tracks values for total numbers of desired endpoints as well
+// ObjectPortCache tracks values for total numbers of desired endpoints as well
 // as the efficiency of EndpointSlice endpoints distribution for each unique
-// Service Port combination.
-type ServicePortCache struct {
+// object (services, endpoints...) Port combination.
+type ObjectPortCache struct {
 	items map[endpointsliceutil.PortMapKey]EfficiencyInfo
 }
 
@@ -81,50 +88,50 @@ type EfficiencyInfo struct {
 	Slices    int
 }
 
-// NewServicePortCache initializes and returns a new ServicePortCache.
-func NewServicePortCache() *ServicePortCache {
-	return &ServicePortCache{
+// NewObjectPortCache initializes and returns a new ObjectPortCache.
+func NewObjectPortCache() *ObjectPortCache {
+	return &ObjectPortCache{
 		items: map[endpointsliceutil.PortMapKey]EfficiencyInfo{},
 	}
 }
 
-// Set updates the ServicePortCache to contain the provided EfficiencyInfo
+// Set updates the ObjectPortCache to contain the provided EfficiencyInfo
 // for the provided PortMapKey.
-func (spc *ServicePortCache) Set(pmKey endpointsliceutil.PortMapKey, eInfo EfficiencyInfo) {
-	spc.items[pmKey] = eInfo
+func (opc *ObjectPortCache) Set(pmKey endpointsliceutil.PortMapKey, eInfo EfficiencyInfo) {
+	opc.items[pmKey] = eInfo
 }
 
 // totals returns the total number of endpoints and slices represented by a
-// ServicePortCache.
-func (spc *ServicePortCache) totals(maxEndpointsPerSlice int) (int, int, int) {
+// ObjectPortCache.
+func (opc *ObjectPortCache) totals(maxEndpointsPerSlice int, placeholderEnabled bool) (int, int, int) {
 	var actualSlices, desiredSlices, endpoints int
-	for _, eInfo := range spc.items {
+	for _, eInfo := range opc.items {
 		endpoints += eInfo.Endpoints
 		actualSlices += eInfo.Slices
 		desiredSlices += numDesiredSlices(eInfo.Endpoints, maxEndpointsPerSlice)
 	}
 	// there is always a placeholder slice
-	if desiredSlices == 0 {
+	if placeholderEnabled && desiredSlices == 0 {
 		desiredSlices = 1
 	}
 	return actualSlices, desiredSlices, endpoints
 }
 
-// UpdateServicePortCache updates a ServicePortCache in the global cache for a
-// given Service and updates the corresponding metrics.
+// UpdateObjectPortCache updates a ObjectPortCache in the global cache for a
+// given Object (Service, Endpoints...) and updates the corresponding metrics.
 // Parameters:
-// * serviceNN refers to a NamespacedName representing the Service.
-// * spCache refers to a ServicePortCache for the specified Service.
-func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *ServicePortCache) {
+// * objectNN refers to a NamespacedName representing the Object (Service, Endpoints...).
+// * spCache refers to a ObjectPortCache for the specified Object (Service, Endpoints...).
+func (c *Cache) UpdateObjectPortCache(objectNN types.NamespacedName, spCache *ObjectPortCache) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	var prevActualSlices, prevDesiredSlices, prevEndpoints int
-	if existingSPCache, ok := c.cache[serviceNN]; ok {
-		prevActualSlices, prevDesiredSlices, prevEndpoints = existingSPCache.totals(int(c.maxEndpointsPerSlice))
+	if existingSPCache, ok := c.cache[objectNN]; ok {
+		prevActualSlices, prevDesiredSlices, prevEndpoints = existingSPCache.totals(int(c.maxEndpointsPerSlice), c.placeholderEnabled)
 	}
 
-	currActualSlices, currDesiredSlices, currEndpoints := spCache.totals(int(c.maxEndpointsPerSlice))
+	currActualSlices, currDesiredSlices, currEndpoints := spCache.totals(int(c.maxEndpointsPerSlice), c.placeholderEnabled)
 	// To keep numEndpoints up to date, add the difference between the number of
 	// endpoints in the provided spCache and any spCache it might be replacing.
 	c.numEndpoints = c.numEndpoints + currEndpoints - prevEndpoints
@@ -132,18 +139,18 @@ func (c *Cache) UpdateServicePortCache(serviceNN types.NamespacedName, spCache *
 	c.numSlicesDesired += currDesiredSlices - prevDesiredSlices
 	c.numSlicesActual += currActualSlices - prevActualSlices
 
-	c.cache[serviceNN] = spCache
+	c.cache[objectNN] = spCache
 	c.updateMetrics()
 }
 
-func (c *Cache) UpdateTrafficDistributionForService(serviceNN types.NamespacedName, trafficDistributionPtr *string) {
+func (c *Cache) UpdateTrafficDistributionForService(objectNN types.NamespacedName, trafficDistributionPtr *string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	defer c.updateMetrics()
 
 	for _, serviceSet := range c.servicesByTrafficDistribution {
-		delete(serviceSet, serviceNN)
+		delete(serviceSet, objectNN)
 	}
 
 	if trafficDistributionPtr == nil {
@@ -163,39 +170,39 @@ func (c *Cache) UpdateTrafficDistributionForService(serviceNN types.NamespacedNa
 		serviceSet = make(map[types.NamespacedName]bool)
 		c.servicesByTrafficDistribution[trafficDistribution] = serviceSet
 	}
-	serviceSet[serviceNN] = true
+	serviceSet[objectNN] = true
 }
 
-// DeleteService removes references of a Service from the global cache and
+// DeleteObject removes references of a Object (Service, Endpoints...) from the global cache and
 // updates the corresponding metrics.
-func (c *Cache) DeleteService(serviceNN types.NamespacedName) {
+func (c *Cache) DeleteObject(objectNN types.NamespacedName) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	for _, serviceSet := range c.servicesByTrafficDistribution {
-		delete(serviceSet, serviceNN)
+		delete(serviceSet, objectNN)
 	}
 
-	if spCache, ok := c.cache[serviceNN]; ok {
-		actualSlices, desiredSlices, endpoints := spCache.totals(int(c.maxEndpointsPerSlice))
+	if spCache, ok := c.cache[objectNN]; ok {
+		actualSlices, desiredSlices, endpoints := spCache.totals(int(c.maxEndpointsPerSlice), c.placeholderEnabled)
 		c.numEndpoints = c.numEndpoints - endpoints
 		c.numSlicesDesired -= desiredSlices
 		c.numSlicesActual -= actualSlices
 		c.updateMetrics()
-		delete(c.cache, serviceNN)
+		delete(c.cache, objectNN)
 	}
 }
 
 // updateMetrics updates metrics with the values from this Cache.
 // Must be called holding lock.
 func (c *Cache) updateMetrics() {
-	NumEndpointSlices.WithLabelValues().Set(float64(c.numSlicesActual))
-	DesiredEndpointSlices.WithLabelValues().Set(float64(c.numSlicesDesired))
-	EndpointsDesired.WithLabelValues().Set(float64(c.numEndpoints))
+	c.endpointSliceMetrics.NumEndpointSlices.WithLabelValues().Set(float64(c.numSlicesActual))
+	c.endpointSliceMetrics.DesiredEndpointSlices.WithLabelValues().Set(float64(c.numSlicesDesired))
+	c.endpointSliceMetrics.EndpointsDesired.WithLabelValues().Set(float64(c.numEndpoints))
 
-	ServicesCountByTrafficDistribution.Reset()
+	c.endpointSliceMetrics.ServicesCountByTrafficDistribution.Reset()
 	for trafficDistribution, services := range c.servicesByTrafficDistribution {
-		ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution).Set(float64(len(services)))
+		c.endpointSliceMetrics.ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution).Set(float64(len(services)))
 	}
 }
 

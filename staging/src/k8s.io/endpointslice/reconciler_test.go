@@ -41,7 +41,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/endpointslice/metrics"
+	metrics "k8s.io/endpointslice/metrics"
 	"k8s.io/endpointslice/topologycache"
 	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
@@ -49,7 +49,8 @@ import (
 )
 
 const (
-	controllerName = "endpointslice-controller.k8s.io"
+	controllerName         = "endpointslice-controller.k8s.io"
+	endpointSliceSubsystem = "endpoint_slice_controller"
 )
 
 func expectAction(t *testing.T, actions []k8stesting.Action, index int, verb, resource string) {
@@ -115,11 +116,11 @@ var defaultMaxEndpointsPerSlice = int32(100)
 // Even when there are no pods, we want to have a placeholder slice for each service
 func TestReconcileEmpty(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -134,7 +135,7 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
 	expectTrackedGeneration(t, r.reconciler.endpointSliceTracker, &slices[0], 1)
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1})
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1}, endpointSliceMetrics)
 }
 
 // Given a single pod matching a service selector and no existing endpoint slices,
@@ -472,9 +473,9 @@ func TestReconcile1Pod(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			endpointSliceMetrics := setupMetrics()
 			triggerTime := time.Now().UTC()
-			r := newServiceReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice)
+			r := newServiceReconciler(client, []*corev1.Node{node1}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 			err := r.reconcileHelper(t, &testCase.service, []*corev1.Pod{pod1}, []*discovery.EndpointSlice{}, triggerTime)
 			if err != nil {
 				t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -540,7 +541,7 @@ func TestReconcile1Pod(t *testing.T) {
 					numUpdated:           0,
 					numDeleted:           0,
 					slicesChangedPerSync: expectSlicesChangedPerSync,
-				})
+				}, endpointSliceMetrics)
 		})
 	}
 }
@@ -582,7 +583,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			endpointSliceMetrics := setupMetrics()
 
 			existingSlices := []*discovery.EndpointSlice{}
 			if tc.existing != nil {
@@ -592,7 +593,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 			}
 
 			numActionsBefore := len(client.Actions())
-			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 			err := r.reconcileHelper(t, &svc, []*corev1.Pod{}, existingSlices, time.Now())
 			if err != nil {
 				t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -617,7 +618,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 					expectTrackedGeneration(t, r.reconciler.endpointSliceTracker, &slices[0], 1)
 				}
 			}
-			expectMetrics(t, tc.wantMetrics)
+			expectMetrics(t, tc.wantMetrics, endpointSliceMetrics)
 		})
 	}
 }
@@ -704,6 +705,7 @@ func TestPlaceHolderSliceCompare(t *testing.T) {
 // Endpoints should be considered ready, even if the backing Pod is not.
 func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	client := newClientset()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 	svc.Spec.PublishNotReadyAddresses = true
@@ -715,7 +717,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -741,7 +743,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 // reconcile should create 3 slices, completely filling 2 of them
 func TestReconcileManyPods(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
@@ -752,7 +754,7 @@ func TestReconcileManyPods(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -764,7 +766,7 @@ func TestReconcileManyPods(t *testing.T) {
 
 	// Two endpoint slices should be completely full, the remainder should be in another one
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 50})
-	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 250, removedPerSync: 0, numCreated: 3, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 3})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 250, removedPerSync: 0, numCreated: 3, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 3}, endpointSliceMetrics)
 }
 
 // now with preexisting slices, we have 250 pods matching a service
@@ -777,7 +779,7 @@ func TestReconcileManyPods(t *testing.T) {
 // this approach requires 1 update + 1 create instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, ports, addressType := newServicePortsAddressType("foo", namespace)
 
@@ -805,7 +807,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, existingSlices, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -818,7 +820,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 
 	// 1 new slice (0->100) + 1 updated slice (62->89)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{89, 61, 100})
-	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 127, removedPerSync: 0, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 127, removedPerSync: 0, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2}, endpointSliceMetrics)
 
 	// ensure cache mutation has not occurred
 	cmc.Check(t)
@@ -836,7 +838,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 // this approach requires 2 creates instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, ports, addressType := newServicePortsAddressType("foo", namespace)
 
@@ -864,7 +866,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, existingSlices, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -876,7 +878,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 
 	// 2 new slices (100, 52) in addition to existing slices (74, 74)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{74, 74, 100, 52})
-	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 4, desiredEndpoints: 300, addedPerSync: 152, removedPerSync: 0, numCreated: 2, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 2})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 4, desiredEndpoints: 300, addedPerSync: 152, removedPerSync: 0, numCreated: 2, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 2}, endpointSliceMetrics)
 
 	// ensure cache mutation has not occurred
 	cmc.Check(t)
@@ -886,6 +888,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 // This test ensures that we are updating those slices and not calling create + delete for each
 func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	client := newClientset()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
@@ -896,7 +899,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -925,6 +928,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 // This test ensures that we are updating those slices and not calling create + delete for each
 func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	client := newClientset()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
@@ -935,7 +939,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -975,6 +979,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 // However, this should not happen for reserved labels
 func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	client := newClientset()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
@@ -985,7 +990,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1014,7 +1019,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 // reconcile repacks the endpoints into 3 slices, and deletes the extras
 func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, ports, addressType := newServicePortsAddressType("foo", namespace)
 
@@ -1039,7 +1044,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	numActionsBefore := len(client.Actions())
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, existingSlices, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1059,7 +1064,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 
 	// thanks to recycling, we get a free repack of endpoints, resulting in 3 full slices instead of 10 mostly empty slices
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 100})
-	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 0, numUpdated: 3, numDeleted: 7, slicesChangedPerSync: 10})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 0, numUpdated: 3, numDeleted: 7, slicesChangedPerSync: 10}, endpointSliceMetrics)
 
 	// ensure cache mutation has not occurred
 	cmc.Check(t)
@@ -1070,7 +1075,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 // for update.
 func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, ports, addressType := newServicePortsAddressType("foo", namespace)
 
@@ -1111,7 +1116,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, true, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, existingSlices, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1119,7 +1124,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	// ensure that both endpoint slices have been updated
 	expectActions(t, client.Actions(), 2, "update", "endpointslices")
-	expectMetrics(t, expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 115, addedPerSync: 15, removedPerSync: 0, numCreated: 0, numUpdated: 2, numDeleted: 0, slicesChangedPerSync: 2})
+	expectMetrics(t, expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 115, addedPerSync: 15, removedPerSync: 0, numCreated: 0, numUpdated: 2, numDeleted: 0, slicesChangedPerSync: 2}, endpointSliceMetrics)
 
 	// additional pods should get added to fuller slice
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{95, 20})
@@ -1132,7 +1137,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 // address type will be replaced with a newer IPv4 type.
 func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 
 	svc, ports, _ := newServicePortsAddressType("foo", namespace)
@@ -1161,7 +1166,7 @@ func TestReconcileEndpointSlicesReplaceDeprecated(t *testing.T) {
 	createEndpointSlices(t, client, namespace, existingSlices)
 
 	cmc := newCacheMutationCheck(existingSlices)
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, existingSlices, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1208,7 +1213,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
+			endpointSliceMetrics := setupMetrics()
 			namespace := "test"
 
 			svc, ports, addressType := newServicePortsAddressType("foo", namespace)
@@ -1226,7 +1231,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 			cmc := newCacheMutationCheck(existingSlices)
 
 			numActionsBefore := len(client.Actions())
-			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 			err := r.reconcileHelper(t, &svc, []*corev1.Pod{pod}, existingSlices, time.Now())
 			if err != nil {
 				t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1260,7 +1265,7 @@ func TestReconcileEndpointSlicesRecreation(t *testing.T) {
 // This test ensures that EndpointSlices are grouped correctly in that case.
 func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 
 	portNameIntStr := intstr.IntOrString{
@@ -1294,7 +1299,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 		pods = append(pods, pod)
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1303,7 +1308,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	// reconcile should create 5 endpoint slices
 	assert.Equal(t, 5, len(client.Actions()), "Expected 5 client actions as part of reconcile")
 	expectActions(t, client.Actions(), 5, "create", "endpointslices")
-	expectMetrics(t, expectedMetrics{desiredSlices: 5, actualSlices: 5, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 5, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 5})
+	expectMetrics(t, expectedMetrics{desiredSlices: 5, actualSlices: 5, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 5, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 5}, endpointSliceMetrics)
 
 	fetchedSlices := fetchEndpointSlices(t, client, namespace)
 
@@ -1372,21 +1377,21 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(fmt.Sprintf("maxEndpointsPerSlice: %d", testCase.maxEndpointsPerSlice), func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
-			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, testCase.maxEndpointsPerSlice)
+			endpointSliceMetrics := setupMetrics()
+			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, testCase.maxEndpointsPerSlice, endpointSliceMetrics)
 			err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 			if err != nil {
 				t.Fatalf("Expected no error on reconcile, got %v", err)
 			}
 			expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), testCase.expectedSliceLengths)
-			expectMetrics(t, testCase.expectedMetricValues)
+			expectMetrics(t, testCase.expectedMetricValues, endpointSliceMetrics)
 		})
 	}
 }
 
 func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	client := newClientset()
-	setupMetrics()
+	endpointSliceMetrics := setupMetrics()
 	namespace := "test"
 	svc, _, _ := newServicePortsAddressType("foo", namespace)
 
@@ -1396,7 +1401,7 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 		pods = append(pods, newPod(i, namespace, true, 1, false))
 	}
 
-	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 	err := r.reconcileHelper(t, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
@@ -1406,14 +1411,14 @@ func TestReconcileEndpointSlicesMetrics(t *testing.T) {
 	assert.Equal(t, 1, len(actions), "Expected 1 additional client actions as part of reconcile")
 	assert.True(t, actions[0].Matches("create", "endpointslices"), "First action should be create endpoint slice")
 
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 20, addedPerSync: 20, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1})
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 20, addedPerSync: 20, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1}, endpointSliceMetrics)
 
 	fetchedSlices := fetchEndpointSlices(t, client, namespace)
 	err = r.reconcileHelper(t, &svc, pods[0:10], []*discovery.EndpointSlice{&fetchedSlices[0]}, time.Now())
 	if err != nil {
 		t.Fatalf("Expected no error on reconcile, got %v", err)
 	}
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2})
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 2}, endpointSliceMetrics)
 }
 
 // When a Service has a non-nil deletionTimestamp we want to avoid creating any
@@ -1486,8 +1491,8 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
-			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+			endpointSliceMetrics := setupMetrics()
+			r := newServiceReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 
 			namespace := "test"
 			svc, ports, addressType := newServicePortsAddressType("foo", namespace)
@@ -1749,8 +1754,8 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
-			setupMetrics()
-			r := newServiceReconciler(client, tc.existingNodes, defaultMaxEndpointsPerSlice)
+			endpointSliceMetrics := setupMetrics()
+			r := newServiceReconciler(client, tc.existingNodes, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 
 			svc := service.DeepCopy()
 			svc.Spec.PublishNotReadyAddresses = tc.publishNotReady
@@ -1775,7 +1780,7 @@ func TestReconcilerPodMissingNode(t *testing.T) {
 			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
 				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
 			}
-			expectMetrics(t, tc.expectedMetrics)
+			expectMetrics(t, tc.expectedMetrics, endpointSliceMetrics)
 
 		})
 	}
@@ -1978,8 +1983,8 @@ func TestReconcileTopology(t *testing.T) {
 			createEndpointSlices(t, client, ns, tc.existingSlices)
 			logger, _ := ktesting.NewTestContext(t)
 
-			setupMetrics()
-			r := newServiceReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice)
+			endpointSliceMetrics := setupMetrics()
+			r := newServiceReconciler(client, tc.nodes, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 			if tc.topologyCacheEnabled {
 				r.reconciler.topologyCache = topologycache.NewTopologyCache()
 				r.reconciler.topologyCache.SetNodes(logger, tc.nodes)
@@ -1995,7 +2000,7 @@ func TestReconcileTopology(t *testing.T) {
 			}
 
 			cmc.Check(t)
-			expectMetrics(t, tc.expectedMetrics)
+			expectMetrics(t, tc.expectedMetrics, endpointSliceMetrics)
 			fetchedSlices := fetchEndpointSlices(t, client, ns)
 			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
 				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
@@ -2215,9 +2220,9 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newClientset()
 			logger, _ := ktesting.NewTestContext(t)
-			setupMetrics()
+			endpointSliceMetrics := setupMetrics()
 
-			r := newServiceReconciler(client, nodes, defaultMaxEndpointsPerSlice)
+			r := newServiceReconciler(client, nodes, defaultMaxEndpointsPerSlice, endpointSliceMetrics)
 			r.reconciler.trafficDistributionEnabled = tc.trafficDistributionFeatureGateEnabled
 			r.reconciler.topologyCache = topologycache.NewTopologyCache()
 			r.reconciler.topologyCache.SetNodes(logger, nodes)
@@ -2256,7 +2261,7 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				t.Errorf("Reconcile(...): EndpointSlices have endpoints with incorrect number of cross-zone hints; gotEndpointsWithCrossZoneHints=%v, want=%v", gotEndpointsWithCrossZoneHints, tc.wantEndpointsWithCrossZoneHints)
 			}
 
-			expectMetrics(t, tc.wantMetrics)
+			expectMetrics(t, tc.wantMetrics, endpointSliceMetrics)
 		})
 	}
 }
@@ -2268,7 +2273,7 @@ type serviceReconcilerHelper struct {
 	nodeLister corelisters.NodeLister
 }
 
-func newServiceReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32) *serviceReconcilerHelper {
+func newServiceReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPerSlice int32, endpointSliceMetrics *metrics.EndpointSliceMetrics) *serviceReconcilerHelper {
 	eventRecorder := record.NewFakeRecorder(10)
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	nodeInformer := informerFactory.Core().V1().Nodes()
@@ -2283,6 +2288,7 @@ func newServiceReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpo
 		eventRecorder,
 		controllerName,
 		maxEndpointsPerSlice,
+		endpointSliceMetrics,
 		WithPlaceholder(true),
 		WithOwnershipEnforced(true),
 	)
@@ -2453,89 +2459,89 @@ type expectedMetrics struct {
 	servicesCountByTrafficDistribution map[string]int
 }
 
-func expectMetrics(t *testing.T, em expectedMetrics) {
+func expectMetrics(t *testing.T, em expectedMetrics, endpointSliceMetrics *metrics.EndpointSliceMetrics) {
 	t.Helper()
 
-	actualDesiredSlices, err := testutil.GetGaugeMetricValue(metrics.DesiredEndpointSlices.WithLabelValues())
+	actualDesiredSlices, err := testutil.GetGaugeMetricValue(endpointSliceMetrics.DesiredEndpointSlices.WithLabelValues())
 	handleErr(t, err, "desiredEndpointSlices")
 	if actualDesiredSlices != float64(em.desiredSlices) {
 		t.Errorf("Expected desiredEndpointSlices to be %d, got %v", em.desiredSlices, actualDesiredSlices)
 	}
 
-	actualNumSlices, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
+	actualNumSlices, err := testutil.GetGaugeMetricValue(endpointSliceMetrics.NumEndpointSlices.WithLabelValues())
 	handleErr(t, err, "numEndpointSlices")
 	if actualNumSlices != float64(em.actualSlices) {
 		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
 	}
 
-	actualEndpointsDesired, err := testutil.GetGaugeMetricValue(metrics.EndpointsDesired.WithLabelValues())
+	actualEndpointsDesired, err := testutil.GetGaugeMetricValue(endpointSliceMetrics.EndpointsDesired.WithLabelValues())
 	handleErr(t, err, "desiredEndpoints")
 	if actualEndpointsDesired != float64(em.desiredEndpoints) {
 		t.Errorf("Expected desiredEndpoints to be %d, got %v", em.desiredEndpoints, actualEndpointsDesired)
 	}
 
-	actualAddedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsAddedPerSync.WithLabelValues())
+	actualAddedPerSync, err := testutil.GetHistogramMetricValue(endpointSliceMetrics.EndpointsAddedPerSync.WithLabelValues())
 	handleErr(t, err, "endpointsAddedPerSync")
 	if actualAddedPerSync != float64(em.addedPerSync) {
 		t.Errorf("Expected endpointsAddedPerSync to be %d, got %v", em.addedPerSync, actualAddedPerSync)
 	}
 
-	actualRemovedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointsRemovedPerSync.WithLabelValues())
+	actualRemovedPerSync, err := testutil.GetHistogramMetricValue(endpointSliceMetrics.EndpointsRemovedPerSync.WithLabelValues())
 	handleErr(t, err, "endpointsRemovedPerSync")
 	if actualRemovedPerSync != float64(em.removedPerSync) {
 		t.Errorf("Expected endpointsRemovedPerSync to be %d, got %v", em.removedPerSync, actualRemovedPerSync)
 	}
 
-	actualCreated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("create"))
+	actualCreated, err := testutil.GetCounterMetricValue(endpointSliceMetrics.EndpointSliceChanges.WithLabelValues("create"))
 	handleErr(t, err, "endpointSliceChangesCreated")
 	if actualCreated != float64(em.numCreated) {
 		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
 	}
 
-	actualUpdated, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("update"))
+	actualUpdated, err := testutil.GetCounterMetricValue(endpointSliceMetrics.EndpointSliceChanges.WithLabelValues("update"))
 	handleErr(t, err, "endpointSliceChangesUpdated")
 	if actualUpdated != float64(em.numUpdated) {
 		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
 	}
 
-	actualDeleted, err := testutil.GetCounterMetricValue(metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	actualDeleted, err := testutil.GetCounterMetricValue(endpointSliceMetrics.EndpointSliceChanges.WithLabelValues("delete"))
 	handleErr(t, err, "endpointSliceChangesDeleted")
 	if actualDeleted != float64(em.numDeleted) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
 	}
 
-	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
+	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(endpointSliceMetrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", ""))
 	handleErr(t, err, "slicesChangedPerSync")
 	if actualSlicesChangedPerSync != float64(em.slicesChangedPerSync) {
 		t.Errorf("Expected slicesChangedPerSync to be %d, got %v", em.slicesChangedPerSync, actualSlicesChangedPerSync)
 	}
 
-	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Auto", ""))
+	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(endpointSliceMetrics.EndpointSlicesChangedPerSync.WithLabelValues("Auto", ""))
 	handleErr(t, err, "slicesChangedPerSyncTopology")
 	if actualSlicesChangedPerSyncTopology != float64(em.slicesChangedPerSyncTopology) {
 		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
 	}
 
-	actualSlicesChangedPerSyncTrafficDist, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
+	actualSlicesChangedPerSyncTrafficDist, err := testutil.GetHistogramMetricValue(endpointSliceMetrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
 	handleErr(t, err, "slicesChangedPerSyncTrafficDist")
 	if actualSlicesChangedPerSyncTrafficDist != float64(em.slicesChangedPerSyncTrafficDist) {
 		t.Errorf("Expected slicesChangedPerSyncTrafficDist to be %d, got %v", em.slicesChangedPerSyncTrafficDist, actualSlicesChangedPerSyncTopology)
 	}
 
-	actualSyncSuccesses, err := testutil.GetCounterMetricValue(metrics.EndpointSliceSyncs.WithLabelValues("success"))
+	actualSyncSuccesses, err := testutil.GetCounterMetricValue(endpointSliceMetrics.EndpointSliceSyncs.WithLabelValues("success"))
 	handleErr(t, err, "syncSuccesses")
 	if actualSyncSuccesses != float64(em.syncSuccesses) {
 		t.Errorf("Expected endpointSliceSyncSuccesses to be %d, got %v", em.syncSuccesses, actualSyncSuccesses)
 	}
 
-	actualSyncErrors, err := testutil.GetCounterMetricValue(metrics.EndpointSliceSyncs.WithLabelValues("error"))
+	actualSyncErrors, err := testutil.GetCounterMetricValue(endpointSliceMetrics.EndpointSliceSyncs.WithLabelValues("error"))
 	handleErr(t, err, "syncErrors")
 	if actualSyncErrors != float64(em.syncErrors) {
 		t.Errorf("Expected endpointSliceSyncErrors to be %d, got %v", em.syncErrors, actualSyncErrors)
 	}
 
 	for _, trafficDistribution := range []string{"PreferClose", "ImplementationSpecific"} {
-		gotServicesCount, err := testutil.GetGaugeMetricValue(metrics.ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution))
+		gotServicesCount, err := testutil.GetGaugeMetricValue(endpointSliceMetrics.ServicesCountByTrafficDistribution.WithLabelValues(trafficDistribution))
 		var wantServicesCount int
 		if em.servicesCountByTrafficDistribution != nil {
 			wantServicesCount = em.servicesCountByTrafficDistribution[trafficDistribution]
@@ -2553,15 +2559,9 @@ func handleErr(t *testing.T, err error, metricName string) {
 	}
 }
 
-func setupMetrics() {
-	metrics.RegisterMetrics()
-	metrics.NumEndpointSlices.Reset()
-	metrics.DesiredEndpointSlices.Reset()
-	metrics.EndpointsDesired.Reset()
-	metrics.EndpointsAddedPerSync.Reset()
-	metrics.EndpointsRemovedPerSync.Reset()
-	metrics.EndpointSliceChanges.Reset()
-	metrics.EndpointSlicesChangedPerSync.Reset()
-	metrics.EndpointSliceSyncs.Reset()
-	metrics.ServicesCountByTrafficDistribution.Reset()
+func setupMetrics() *metrics.EndpointSliceMetrics {
+	endpointSliceMetrics := metrics.NewEndpointSliceMetrics(endpointSliceSubsystem)
+	endpointSliceMetrics.Reset()
+
+	return endpointSliceMetrics
 }
