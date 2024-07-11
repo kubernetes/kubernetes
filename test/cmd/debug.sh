@@ -567,3 +567,95 @@ run_kubectl_debug_netadmin_node_tests() {
   set +o nounset
   set +o errexit
 }
+
+run_kubectl_debug_custom_profile_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl debug custom profile"
+
+  ### Pod Troubleshooting by ephemeral containers with netadmin profile
+  # Pre-Condition: Pod "nginx" is created
+  kubectl run target-debug "--image=${IMAGE_NGINX:?}" "${kube_flags[@]:?}"
+  kube::test::get_object_assert pod "{{range.items}}{{${id_field:?}}}:{{end}}" 'target-debug:'
+
+  cat > "${TMPDIR:-/tmp}"/custom_profile.json << EOF
+{
+  "env": [
+    {
+      "name": "ENV_VAR1",
+      "value": "value1"
+    },
+    {
+      "name": "ENV_VAR2",
+      "value": "value2"
+    }
+  ]
+}
+EOF
+
+cat > "${TMPDIR:-/tmp}"/custom_profile.yaml << EOF
+env:
+  - name: ENV_VAR3
+    value: value3
+  - name: ENV_VAR4
+    value: value4
+EOF
+
+  # Command: add a new debug container with general profile
+  output_message=$(kubectl debug target-debug -it --image=busybox --attach=false -c debug-container --profile=general --custom="${TMPDIR:-/tmp}"/custom_profile.json "${kube_flags[@]:?}")
+
+  # Post-Conditions
+  kube::test::get_object_assert pod/target-debug '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 0).env 0)).name}}' 'ENV_VAR1'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 0).env 0)).value}}' 'value1'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 0).env 1)).name}}' 'ENV_VAR2'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 0).env 1)).value}}' 'value2'
+
+  # Command: add a new debug container with general profile
+  kubectl debug target-debug -it --image=busybox --attach=false -c debug-container-2 --profile=general --custom="${TMPDIR:-/tmp}"/custom_profile.yaml "${kube_flags[@]:?}"
+
+  # Post-Conditions
+  kube::test::get_object_assert pod/target-debug '{{range.spec.ephemeralContainers}}{{.name}}:{{end}}' 'debug-container:debug-container-2:'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 1).env 0)).name}}' 'ENV_VAR3'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 1).env 0)).value}}' 'value3'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 1).env 1)).name}}' 'ENV_VAR4'
+  kube::test::get_object_assert pod/target-debug '{{((index (index .spec.ephemeralContainers 1).env 1)).value}}' 'value4'
+
+  # Command: create a copy of target with a new debug container
+  kubectl debug target-debug -it --copy-to=target-copy --image=busybox --container=debug-container-3 --attach=false --profile=general --custom="${TMPDIR:-/tmp}"/custom_profile.json "${kube_flags[@]:?}"
+  # Post-Conditions
+  kube::test::get_object_assert pod/target-copy '{{range.spec.containers}}{{.name}}:{{end}}' 'target-debug:debug-container-3:'
+  kube::test::get_object_assert pod/target-copy '{{((index (index .spec.containers 1).env 0)).name}}' 'ENV_VAR1'
+  kube::test::get_object_assert pod/target-copy '{{((index (index .spec.containers 1).env 0)).value}}' 'value1'
+  kube::test::get_object_assert pod/target-copy '{{((index (index .spec.containers 1).env 1)).name}}' 'ENV_VAR2'
+  kube::test::get_object_assert pod/target-copy '{{((index (index .spec.containers 1).env 1)).value}}' 'value2'
+
+  # Clean up
+  kubectl delete pod target-copy "${kube_flags[@]:?}"
+  kubectl delete pod target-debug "${kube_flags[@]:?}"
+
+  ### Debug node with custom profile
+  # Pre-Condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+  # Command: create a new node debugger pod
+  output_message=$(kubectl debug --profile general node/127.0.0.1 --image=busybox --custom="${TMPDIR:-/tmp}"/custom_profile.yaml --attach=false "${kube_flags[@]:?}" -- true)
+  # Post-Conditions
+  kube::test::get_object_assert pod "{{(len .items)}}" '1'
+  debugger=$(kubectl get pod -o go-template="{{(index .items 0)${id_field:?}}}")
+  kube::test::if_has_string "${output_message:?}" "${debugger:?}"
+  kube::test::get_object_assert "pod/${debugger:?}" "{{${image_field:?}}}" 'busybox'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{.spec.nodeName}}' '127.0.0.1'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{((index (index .spec.containers 0).env 0)).name}}' 'ENV_VAR3'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{((index (index .spec.containers 0).env 0)).value}}' 'value3'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{((index (index .spec.containers 0).env 1)).name}}' 'ENV_VAR4'
+  kube::test::get_object_assert "pod/${debugger:?}" '{{((index (index .spec.containers 0).env 1)).value}}' 'value4'
+  # Clean up
+  # pod.spec.nodeName is set by kubectl debug node which causes the delete to hang,
+  # presumably waiting for a kubelet that's not present. Force the delete.
+  kubectl delete --force pod "${debugger:?}" "${kube_flags[@]:?}"
+
+  set +o nounset
+  set +o errexit
+}
