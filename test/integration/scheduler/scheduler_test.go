@@ -678,28 +678,13 @@ func TestPodSchedulingContextSSA(t *testing.T) {
 		}
 	}
 
-	defer func() {
-		if err := testCtx.ClientSet.ResourceV1alpha3().ResourceClasses().DeleteCollection(testCtx.Ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
-			t.Errorf("Unexpected error deleting ResourceClasses: %v", err)
-		}
-	}()
-	class := &resourceapi.ResourceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "my-class",
-		},
-		DriverName: "does-not-matter",
-	}
-	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClasses().Create(testCtx.Ctx, class, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("Failed to create class: %v", err)
-	}
-
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "my-claim",
 			Namespace: testCtx.NS.Name,
 		},
 		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: class.Name,
+			Controller: "dra.example.com",
 		},
 	}
 	if _, err := testCtx.ClientSet.ResourceV1alpha3().ResourceClaims(claim.Namespace).Create(testCtx.Ctx, claim, metav1.CreateOptions{}); err != nil {

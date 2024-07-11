@@ -256,6 +256,7 @@
   - k8s.io/apiserver/pkg/cel
   - k8s.io/apiserver/pkg/cel/environment
   - k8s.io/client-go
+  - k8s.io/component-helpers/scheduling/corev1/nodeaffinity
   - k8s.io/dynamic-resource-allocation
   - k8s.io/klog
   - k8s.io/kubelet

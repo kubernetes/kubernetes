@@ -772,7 +772,20 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					)
 					b.create(ctx, pod, template)
 
-					framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace), "pod must not get scheduled because of a CEL runtime error")
+					framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "scheduling failure", f.Timeouts.PodStartShort, func(pod *v1.Pod) (bool, error) {
+						for _, condition := range pod.Status.Conditions {
+							if condition.Type == "PodScheduled" {
+								if condition.Status != "False" {
+									gomega.StopTrying("pod got scheduled unexpectedly").Now()
+								}
+								if strings.Contains(condition.Message, "CEL runtime error") {
+									// This is what we are waiting for.
+									return true, nil
+								}
+							}
+						}
+						return false, nil
+					}), "pod must not get scheduled because of a CEL runtime error")
 				})
 			})
 		case parameterModeClassicDRA:

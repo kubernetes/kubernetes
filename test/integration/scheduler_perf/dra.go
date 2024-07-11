@@ -202,7 +202,7 @@ func (op *createResourceDriverOp) run(tCtx ktesting.TContext) {
 		tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
 			err := tCtx.Client().ResourceV1alpha3().ResourceSlices().DeleteCollection(tCtx,
 				metav1.DeleteOptions{},
-				metav1.ListOptions{FieldSelector: "driverName=" + op.DriverName},
+				metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + op.DriverName},
 			)
 			tCtx.ExpectNoError(err, "delete node resource slices")
 		})
@@ -234,18 +234,21 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 			Name: nodeName,
 		},
 
-		NodeName:   nodeName,
-		DriverName: driverName,
-
-		ResourceModel: resourceapi.ResourceModel{
-			NamedResources: &resourceapi.NamedResourcesResources{},
+		Spec: resourceapi.ResourceSliceSpec{
+			Driver:   driverName,
+			NodeName: nodeName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
 		},
 	}
 
 	for i := 0; i < capacity; i++ {
-		slice.ResourceModel.NamedResources.Instances = append(slice.ResourceModel.NamedResources.Instances,
-			resourceapi.NamedResourcesInstance{
-				Name: fmt.Sprintf("instance-%d", i),
+		slice.Spec.Devices = append(slice.Spec.Devices,
+			resourceapi.Device{
+				Name:  fmt.Sprintf("instance-%d", i),
+				Basic: &resourceapi.BasicDevice{},
 			},
 		)
 	}

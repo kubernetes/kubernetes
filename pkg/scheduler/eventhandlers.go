@@ -532,28 +532,10 @@ func addAllEventHandlers(
 				)
 				handlers = append(handlers, handlerRegistration)
 			}
-		case framework.ResourceClass:
+		case framework.DeviceClass:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClasses().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClass, "ResourceClass"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
-		case framework.ResourceClaimParameters:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClaimParameters().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClaimParameters, "ResourceClaimParameters"),
-				); err != nil {
-					return err
-				}
-				handlers = append(handlers, handlerRegistration)
-			}
-		case framework.ResourceClassParameters:
-			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha3().ResourceClassParameters().Informer().AddEventHandler(
-					buildEvtResHandler(at, framework.ResourceClassParameters, "ResourceClassParameters"),
+				if handlerRegistration, err = informerFactory.Resource().V1alpha3().DeviceClasses().Informer().AddEventHandler(
+					buildEvtResHandler(at, framework.DeviceClass, "DeviceClass"),
 				); err != nil {
 					return err
 				}

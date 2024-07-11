@@ -900,8 +900,8 @@ func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *Per
 type ResourceClaimWrapper struct{ resourceapi.ResourceClaim }
 
 // MakeResourceClaim creates a ResourceClaim wrapper.
-func MakeResourceClaim() *ResourceClaimWrapper {
-	return &ResourceClaimWrapper{resourceapi.ResourceClaim{}}
+func MakeResourceClaim(controller string) *ResourceClaimWrapper {
+	return &ResourceClaimWrapper{resourceapi.ResourceClaim{Spec: resourceapi.ResourceClaimSpec{Controller: controller}}}
 }
 
 // FromResourceClaim creates a ResourceClaim wrapper from some existing object.
@@ -946,72 +946,34 @@ func (wrapper *ResourceClaimWrapper) OwnerReference(name, uid string, gvk schema
 	return wrapper
 }
 
-// ParametersRef sets a reference to a ResourceClaimParameters.resource.k8s.io.
-func (wrapper *ResourceClaimWrapper) ParametersRef(name string) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Spec.ParametersRef = &resourceapi.ResourceClaimParametersReference{
-		Name:     name,
-		Kind:     "ResourceClaimParameters",
-		APIGroup: "resource.k8s.io",
-	}
-	return wrapper
-}
-
-// ResourceClassName sets the resource class name of the inner object.
-func (wrapper *ResourceClaimWrapper) ResourceClassName(name string) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Spec.ResourceClassName = name
+// Request adds one device request for the given device class.
+func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceClaimWrapper {
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name: fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
+			// Cannot rely on defaulting here, this is used in unit tests.
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			DeviceClassName: deviceClassName,
+		},
+	)
 	return wrapper
 }
 
 // Allocation sets the allocation of the inner object.
-func (wrapper *ResourceClaimWrapper) Allocation(driverName string, allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
-	wrapper.ResourceClaim.Status.DriverName = driverName
+func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
 	wrapper.ResourceClaim.Status.Allocation = allocation
 	return wrapper
 }
 
 // Structured turns a "normal" claim into one which was allocated via structured parameters.
-// This modifies the allocation result and adds the reserved finalizer if the claim
-// is allocated. The claim has to become local to a node. The assumption is that
-// "named resources" are used.
-func (wrapper *ResourceClaimWrapper) Structured(nodeName string, namedResourcesInstances ...string) *ResourceClaimWrapper {
+// The only difference is that there is no controller name and the special finalizer
+// gets added.
+func (wrapper *ResourceClaimWrapper) Structured() *ResourceClaimWrapper {
+	wrapper.Spec.Controller = ""
 	if wrapper.ResourceClaim.Status.Allocation != nil {
 		wrapper.ResourceClaim.Finalizers = append(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer)
-		for i, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
-			resourceHandle.Data = ""
-			resourceHandle.StructuredData = &resourceapi.StructuredResourceHandle{
-				NodeName: nodeName,
-			}
-			wrapper.ResourceClaim.Status.Allocation.ResourceHandles[i] = resourceHandle
-		}
-		if len(wrapper.ResourceClaim.Status.Allocation.ResourceHandles) == 0 {
-			wrapper.ResourceClaim.Status.Allocation.ResourceHandles = []resourceapi.ResourceHandle{{
-				DriverName: wrapper.ResourceClaim.Status.DriverName,
-				StructuredData: &resourceapi.StructuredResourceHandle{
-					NodeName: nodeName,
-				},
-			}}
-		}
-		for _, resourceHandle := range wrapper.ResourceClaim.Status.Allocation.ResourceHandles {
-			for _, name := range namedResourcesInstances {
-				result := resourceapi.DriverAllocationResult{
-					AllocationResultModel: resourceapi.AllocationResultModel{
-						NamedResources: &resourceapi.NamedResourcesAllocationResult{
-							Name: name,
-						},
-					},
-				}
-				resourceHandle.StructuredData.Results = append(resourceHandle.StructuredData.Results, result)
-			}
-		}
-		wrapper.ResourceClaim.Status.Allocation.AvailableOnNodes = &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{{
-				MatchExpressions: []v1.NodeSelectorRequirement{{
-					Key:      "kubernetes.io/hostname",
-					Operator: v1.NodeSelectorOpIn,
-					Values:   []string{nodeName},
-				}},
-			}},
-		}
+		wrapper.ResourceClaim.Status.Allocation.Controller = ""
 	}
 	return wrapper
 }
@@ -1120,8 +1082,9 @@ type ResourceSliceWrapper struct {
 func MakeResourceSlice(nodeName, driverName string) *ResourceSliceWrapper {
 	wrapper := new(ResourceSliceWrapper)
 	wrapper.Name = nodeName + "-" + driverName
-	wrapper.NodeName = nodeName
-	wrapper.DriverName = driverName
+	wrapper.Spec.NodeName = nodeName
+	wrapper.Spec.Pool.Name = nodeName
+	wrapper.Spec.Driver = driverName
 	return wrapper
 }
 
@@ -1129,119 +1092,14 @@ func (wrapper *ResourceSliceWrapper) Obj() *resourceapi.ResourceSlice {
 	return &wrapper.ResourceSlice
 }
 
-func (wrapper *ResourceSliceWrapper) NamedResourcesInstances(names ...string) *ResourceSliceWrapper {
-	wrapper.ResourceModel = resourceapi.ResourceModel{NamedResources: &resourceapi.NamedResourcesResources{}}
+func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrapper {
 	for _, name := range names {
-		wrapper.ResourceModel.NamedResources.Instances = append(wrapper.ResourceModel.NamedResources.Instances,
-			resourceapi.NamedResourcesInstance{Name: name},
-		)
+		wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name})
 	}
 	return wrapper
 }
 
-type ClaimParametersWrapper struct {
-	resourceapi.ResourceClaimParameters
-}
-
-func MakeClaimParameters() *ClaimParametersWrapper {
-	return &ClaimParametersWrapper{}
-}
-
-// FromClaimParameters creates a ResourceClaimParameters wrapper from an existing object.
-func FromClaimParameters(other *resourceapi.ResourceClaimParameters) *ClaimParametersWrapper {
-	return &ClaimParametersWrapper{*other.DeepCopy()}
-}
-
-func (wrapper *ClaimParametersWrapper) Obj() *resourceapi.ResourceClaimParameters {
-	return &wrapper.ResourceClaimParameters
-}
-
-func (wrapper *ClaimParametersWrapper) Name(s string) *ClaimParametersWrapper {
-	wrapper.SetName(s)
-	return wrapper
-}
-
-func (wrapper *ClaimParametersWrapper) UID(s string) *ClaimParametersWrapper {
-	wrapper.SetUID(types.UID(s))
-	return wrapper
-}
-
-func (wrapper *ClaimParametersWrapper) Namespace(s string) *ClaimParametersWrapper {
-	wrapper.SetNamespace(s)
-	return wrapper
-}
-
-func (wrapper *ClaimParametersWrapper) GeneratedFrom(value *resourceapi.ResourceClaimParametersReference) *ClaimParametersWrapper {
-	wrapper.ResourceClaimParameters.GeneratedFrom = value
-	return wrapper
-}
-
-func (wrapper *ClaimParametersWrapper) NamedResourcesRequests(driverName string, selectors ...string) *ClaimParametersWrapper {
-	requests := resourceapi.DriverRequests{
-		DriverName: driverName,
-	}
-	for _, selector := range selectors {
-		request := resourceapi.ResourceRequest{
-			ResourceRequestModel: resourceapi.ResourceRequestModel{
-				NamedResources: &resourceapi.NamedResourcesRequest{
-					Selector: selector,
-				},
-			},
-		}
-		requests.Requests = append(requests.Requests, request)
-	}
-	wrapper.DriverRequests = append(wrapper.DriverRequests, requests)
-	return wrapper
-}
-
-type ClassParametersWrapper struct {
-	resourceapi.ResourceClassParameters
-}
-
-func MakeClassParameters() *ClassParametersWrapper {
-	return &ClassParametersWrapper{}
-}
-
-// FromClassParameters creates a ResourceClassParameters wrapper from an existing object.
-func FromClassParameters(other *resourceapi.ResourceClassParameters) *ClassParametersWrapper {
-	return &ClassParametersWrapper{*other.DeepCopy()}
-}
-
-func (wrapper *ClassParametersWrapper) Obj() *resourceapi.ResourceClassParameters {
-	return &wrapper.ResourceClassParameters
-}
-
-func (wrapper *ClassParametersWrapper) Name(s string) *ClassParametersWrapper {
-	wrapper.SetName(s)
-	return wrapper
-}
-
-func (wrapper *ClassParametersWrapper) UID(s string) *ClassParametersWrapper {
-	wrapper.SetUID(types.UID(s))
-	return wrapper
-}
-
-func (wrapper *ClassParametersWrapper) Namespace(s string) *ClassParametersWrapper {
-	wrapper.SetNamespace(s)
-	return wrapper
-}
-
-func (wrapper *ClassParametersWrapper) GeneratedFrom(value *resourceapi.ResourceClassParametersReference) *ClassParametersWrapper {
-	wrapper.ResourceClassParameters.GeneratedFrom = value
-	return wrapper
-}
-
-func (wrapper *ClassParametersWrapper) NamedResourcesFilters(driverName string, selectors ...string) *ClassParametersWrapper {
-	for _, selector := range selectors {
-		filter := resourceapi.ResourceFilter{
-			DriverName: driverName,
-			ResourceFilterModel: resourceapi.ResourceFilterModel{
-				NamedResources: &resourceapi.NamedResourcesFilter{
-					Selector: selector,
-				},
-			},
-		}
-		wrapper.Filters = append(wrapper.Filters, filter)
-	}
+func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
+	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{Attributes: attrs}})
 	return wrapper
 }
