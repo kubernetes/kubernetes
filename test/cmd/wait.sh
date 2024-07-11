@@ -26,7 +26,14 @@ run_wait_tests() {
 
     create_and_use_new_namespace
 
-    ### Wait for deletion using --all flag
+    # wait --for=create should time out
+    set +o errexit
+    # Command: Wait with jsonpath support fields not exist in the first place
+    output_message=$(kubectl wait --for=create deploy/test-1 --timeout=1s 2>&1)
+    set -o errexit
+
+    # Post-Condition: Wait failed
+    kube::test::if_has_string "${output_message}" 'timed out waiting for the condition'
 
     # create test data
     kubectl create deployment test-1 --image=busybox
@@ -120,3 +127,4 @@ EOF
     set +o nounset
     set +o errexit
 }
+
