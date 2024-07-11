@@ -1562,22 +1562,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completions",
 			},
 		},
-		"immutable completions for indexed job when AllowElasticIndexedJobs is false": {
-			old: batch.Job{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: batch.JobSpec{
-					Selector: validGeneratedSelector,
-					Template: validPodTemplateSpecForGenerated,
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32(1)
-			},
-			err: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "spec.completions",
-			},
-		},
 		"immutable selector": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -1883,7 +1867,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completionMode",
 			},
 		},
-		"immutable completions for non-indexed job when AllowElasticIndexedJobs is true": {
+		"immutable completions for non-indexed job": {
 			old: batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
@@ -1900,7 +1884,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				Type:  field.ErrorTypeInvalid,
 				Field: "spec.completions",
 			},
-			opts: JobValidationOptions{AllowElasticIndexedJobs: true},
 		},
 
 		"immutable node affinity": {
@@ -2153,9 +2136,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32(2)
 				job.Spec.Parallelism = pointer.Int32(2)
 			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
-			},
 		},
 		"previous parallelism != previous completions, new parallelism == new completions": {
 			old: batch.Job{
@@ -2172,9 +2152,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32(3)
 				job.Spec.Parallelism = pointer.Int32(3)
 			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
-			},
 		},
 		"indexed job updating completions and parallelism to different values is invalid": {
 			old: batch.Job{
@@ -2190,9 +2167,6 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Completions = pointer.Int32(2)
 				job.Spec.Parallelism = pointer.Int32(3)
-			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -2214,9 +2188,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = nil
 				job.Spec.Parallelism = pointer.Int32(3)
 			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
-			},
 			err: &field.Error{
 				Type:  field.ErrorTypeRequired,
 				Field: "spec.completions",
@@ -2237,9 +2208,6 @@ func TestValidateJobUpdate(t *testing.T) {
 				job.Spec.Completions = pointer.Int32(2)
 				job.Spec.Parallelism = pointer.Int32(1)
 			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
-			},
 		},
 		"indexed job with completions unchanged, parallelism increased higher than completions": {
 			old: batch.Job{
@@ -2255,9 +2223,6 @@ func TestValidateJobUpdate(t *testing.T) {
 			update: func(job *batch.Job) {
 				job.Spec.Completions = pointer.Int32(2)
 				job.Spec.Parallelism = pointer.Int32(3)
-			},
-			opts: JobValidationOptions{
-				AllowElasticIndexedJobs: true,
 			},
 		},
 	}

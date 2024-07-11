@@ -1144,7 +1144,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RuntimeClassInImageCriAPI: {Default: false, PreRelease: featuregate.Alpha},
 
-	ElasticIndexedJob: {Default: true, PreRelease: featuregate.Beta},
+	ElasticIndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.32
 
 	SchedulerQueueingHints: {Default: false, PreRelease: featuregate.Beta},
 

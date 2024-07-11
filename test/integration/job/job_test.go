@@ -34,10 +34,8 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -2756,25 +2754,10 @@ func TestElasticIndexedJob(t *testing.T) {
 		wantTerminating      *int32
 	}
 	cases := map[string]struct {
-		featureGate bool
-		jobUpdates  []jobUpdate
-		wantErr     *apierrors.StatusError
+		jobUpdates []jobUpdate
+		wantErr    *apierrors.StatusError
 	}{
-		"feature flag off, mutation not allowed": {
-			jobUpdates: []jobUpdate{
-				{
-					completions:     ptr.To[int32](4),
-					wantTerminating: ptr.To[int32](0),
-				},
-			},
-			wantErr: apierrors.NewInvalid(
-				schema.GroupKind{Group: "batch", Kind: "Job"},
-				"test-job",
-				field.ErrorList{field.Invalid(field.NewPath("spec", "completions"), 4, "field is immutable")},
-			),
-		},
 		"scale up": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				{
 					// Scale up completions 3->4 then succeed indexes 0-3
@@ -2786,7 +2769,6 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"scale down": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				// First succeed index 1 and fail index 2 while completions is still original value (3).
 				{
@@ -2810,7 +2792,6 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"index finishes successfully, scale down, scale up": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				// First succeed index 2 while completions is still original value (3).
 				{
@@ -2837,7 +2818,6 @@ func TestElasticIndexedJob(t *testing.T) {
 			},
 		},
 		"scale down to 0, verify that the job succeeds": {
-			featureGate: true,
 			jobUpdates: []jobUpdate{
 				{
 					completions:     ptr.To[int32](0),
@@ -2850,7 +2830,6 @@ func TestElasticIndexedJob(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, tc.featureGate)
 			closeFn, restConfig, clientSet, ns := setup(t, "indexed")
 			defer closeFn()
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
