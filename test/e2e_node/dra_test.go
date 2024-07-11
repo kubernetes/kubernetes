@@ -30,17 +30,20 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	draplugin "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
@@ -417,10 +420,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources is in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
-			_, kubeletPlugin2 := start(ctx)
-			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+			kubeletPlugin1, kubeletPlugin2 := start(ctx)
 
-			unblock := kubeletPlugin.BlockNodePrepareResources()
+			unblock := kubeletPlugin1.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for pod to be in Pending state")
@@ -478,9 +480,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		}
 
 		matchResourcesByNodeName := func(nodeName string) types.GomegaMatcher {
-			return gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"NodeName": gomega.Equal(nodeName),
-			})
+			return gomega.HaveField("Spec.NodeName", gomega.Equal(nodeName))
 		}
 
 		f.It("must be removed on kubelet startup", f.WithDisruptive(), func(ctx context.Context) {
@@ -562,7 +562,7 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
 		// A separate test checks this explicitly.
-		framework.ExpectNoError(clientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: "driverName=" + driverName}))
+		framework.ExpectNoError(clientSet.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
 	})
 	ginkgo.DeferCleanup(plugin.Stop)
 
@@ -573,18 +573,17 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 // NOTE: as scheduler and controller manager are not running by the Node e2e,
 // the objects must contain all required data to be processed correctly by the API server
 // and placed on the node without involving the scheduler and the DRA controller
-func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, pluginNames []string) *v1.Pod {
-	// ResourceClass
-	class := &resourceapi.ResourceClass{
+func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, nodename, namespace, className, claimName, podName string, deferPodDeletion bool, driverNames []string) *v1.Pod {
+	// DeviceClass
+	class := &resourceapi.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: className,
 		},
-		DriverName: "controller",
 	}
-	_, err := clientSet.ResourceV1alpha3().ResourceClasses().Create(ctx, class, metav1.CreateOptions{})
+	_, err := clientSet.ResourceV1alpha3().DeviceClasses().Create(ctx, class, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClasses().Delete, className, metav1.DeleteOptions{})
+	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().DeviceClasses().Delete, className, metav1.DeleteOptions{})
 
 	// ResourceClaim
 	podClaimName := "resource-claim"
@@ -593,7 +592,12 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			Name: claimName,
 		},
 		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: className,
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{{
+					Name:            "my-request",
+					DeviceClassName: className,
+				}},
+			},
 		},
 	}
 	createdClaim, err := clientSet.ResourceV1alpha3().ResourceClaims(namespace).Create(ctx, claim, metav1.CreateOptions{})
@@ -601,7 +605,18 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 
 	ginkgo.DeferCleanup(clientSet.ResourceV1alpha3().ResourceClaims(namespace).Delete, claimName, metav1.DeleteOptions{})
 
-	// Pod
+	// The pod checks its own env with grep. Each driver injects its own parameters,
+	// with the driver name as part of the variable name. Sorting ensures that a
+	// single grep can match the output of env when that gets turned into a single
+	// line because the order is deterministic.
+	nameToEnv := func(driverName string) string {
+		return "DRA_" + regexp.MustCompile(`[^a-z0-9]`).ReplaceAllString(driverName, "_")
+	}
+	var expectedEnv []string
+	sort.Strings(driverNames)
+	for _, driverName := range driverNames {
+		expectedEnv = append(expectedEnv, nameToEnv(driverName)+"=PARAM1_VALUE")
+	}
 	containerName := "testcontainer"
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -623,7 +638,9 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 					Resources: v1.ResourceRequirements{
 						Claims: []v1.ResourceClaim{{Name: podClaimName}},
 					},
-					Command: []string{"/bin/sh", "-c", "env | grep DRA_PARAM1=PARAM1_VALUE"},
+					// If injecting env variables fails, the pod fails and this error shows up in
+					// ... Terminated:&ContainerStateTerminated{ExitCode:1,Signal:0,Reason:Error,Message:ERROR: ...
+					Command: []string{"/bin/sh", "-c", "if ! echo $(env) | grep -q " + strings.Join(expectedEnv, ".*") + "; then echo ERROR: unexpected env: $(env) >/dev/termination-log; exit 1 ; fi"},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,
@@ -637,21 +654,36 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 	}
 
 	// Update claim status: set ReservedFor and AllocationResult
-	// NOTE: This is usually done by the DRA controller
-	resourceHandlers := make([]resourceapi.ResourceHandle, len(pluginNames))
-	for i, pluginName := range pluginNames {
-		resourceHandlers[i] = resourceapi.ResourceHandle{
-			DriverName: pluginName,
-			Data:       "{\"EnvVars\":{\"DRA_PARAM1\":\"PARAM1_VALUE\"},\"NodeName\":\"\"}",
+	// NOTE: This is usually done by the DRA controller or the scheduler.
+	results := make([]resourceapi.DeviceRequestAllocationResult, len(driverNames))
+	config := make([]resourceapi.DeviceAllocationConfiguration, len(driverNames))
+	for i, driverName := range driverNames {
+		results[i] = resourceapi.DeviceRequestAllocationResult{
+			Driver:  driverName,
+			Pool:    "some-pool",
+			Device:  "some-device",
+			Request: claim.Spec.Devices.Requests[0].Name,
+		}
+		config[i] = resourceapi.DeviceAllocationConfiguration{
+			Source: resourceapi.AllocationConfigSourceClaim,
+			DeviceConfiguration: resourceapi.DeviceConfiguration{
+				Opaque: &resourceapi.OpaqueDeviceConfiguration{
+					Driver:     driverName,
+					Parameters: runtime.RawExtension{Raw: []byte(`{"` + nameToEnv(driverName) + `":"PARAM1_VALUE"}`)},
+				},
+			},
 		}
 	}
+
 	createdClaim.Status = resourceapi.ResourceClaimStatus{
-		DriverName: "controller",
 		ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 			{Resource: "pods", Name: podName, UID: createdPod.UID},
 		},
 		Allocation: &resourceapi.AllocationResult{
-			ResourceHandles: resourceHandlers,
+			Devices: resourceapi.DeviceAllocationResult{
+				Results: results,
+				Config:  config,
+			},
 		},
 	}
 	_, err = clientSet.ResourceV1alpha3().ResourceClaims(namespace).UpdateStatus(ctx, createdClaim, metav1.UpdateOptions{})
@@ -665,10 +697,13 @@ func createTestResourceSlice(ctx context.Context, clientSet kubernetes.Interface
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 		},
-		NodeName:   nodeName,
-		DriverName: driverName,
-		ResourceModel: resourceapi.ResourceModel{
-			NamedResources: &resourceapi.NamedResourcesResources{},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodeName,
+			Driver:   driverName,
+			Pool: resourceapi.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
 		},
 	}
 

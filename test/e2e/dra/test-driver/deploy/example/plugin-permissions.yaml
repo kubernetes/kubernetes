@@ -47,7 +47,7 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha2"]
+      apiVersions: ["v1alpha3"]
       operations:  ["CREATE", "UPDATE", "DELETE"]
       resources:   ["resourceslices"]
   variables:
@@ -59,7 +59,7 @@ spec:
       request.userInfo.username == "system:serviceaccount:dra-kubelet-plugin-namespace:dra-kubelet-plugin-service-account"
   - name: objectNodeName
     expression: >-
-      (request.operation == "DELETE" ? oldObject : object).?nodeName.orValue("")
+      (request.operation == "DELETE" ? oldObject : object).spec.?nodeName.orValue("")
   validations:
   - expression: >-
       !variables.isKubeletPlugin || variables.hasNodeName
