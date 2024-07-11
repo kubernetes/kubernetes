@@ -370,6 +370,9 @@ func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logge
 }
 
 // getPVTopologies retrieves pvTopology from a given PV and returns the array
+// This function doesn't check spec.nodeAffinity
+// because it's read-only after creation and thus cannot be updated
+// and nodeAffinity is being handled in node affinity plugin
 func (pl *VolumeZone) getPVTopologies(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
 	podPVTopologies := make([]pvTopology, 0)
 	for _, key := range topologyLabels {
