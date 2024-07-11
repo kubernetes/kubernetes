@@ -1240,7 +1240,7 @@ func (pl *dynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 // deallocated to help get the Pod schedulable. If yes, it picks one and
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
-func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (pl *dynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Unschedulable, "plugin disabled")
 	}

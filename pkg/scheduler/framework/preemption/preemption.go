@@ -147,7 +147,7 @@ type Evaluator struct {
 //
 //   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
-func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 
 	// 0) Fetch the latest version of <pod>.
@@ -162,13 +162,18 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
-	if ok, msg := ev.PodEligibleToPreemptOthers(pod, m[pod.Status.NominatedNodeName]); !ok {
+	nominatedNodeStatus := m.Get(pod.Status.NominatedNodeName)
+	if ok, msg := ev.PodEligibleToPreemptOthers(pod, nominatedNodeStatus); !ok {
 		logger.V(5).Info("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
 		return nil, framework.NewStatus(framework.Unschedulable, msg)
 	}
 
 	// 2) Find all preemption candidates.
-	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, pod, m)
+	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, framework.AsStatus(err)
+	}
+	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, allNodes, pod, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, framework.AsStatus(err)
 	}
@@ -177,12 +182,13 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	if len(candidates) == 0 {
 		fitError := &framework.FitError{
 			Pod:         pod,
-			NumAllNodes: len(nodeToStatusMap),
+			NumAllNodes: len(allNodes),
 			Diagnosis: framework.Diagnosis{
-				NodeToStatusMap: nodeToStatusMap,
+				NodeToStatus: nodeToStatusMap,
 				// Leave UnschedulablePlugins or PendingPlugins as nil as it won't be used on moving Pods.
 			},
 		}
+		fitError.Diagnosis.NodeToStatus.SetAbsentNodesStatus(framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling"))
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
 		return framework.NewPostFilterResultWithNominatedNode(""), framework.NewStatus(framework.Unschedulable, fitError.Error())
 	}
@@ -209,16 +215,16 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) ([]Candidate, framework.NodeToStatusMap, error) {
-	allNodes, err := ev.Handler.SnapshotSharedLister().NodeInfos().List()
-	if err != nil {
-		return nil, nil, err
-	}
+func (ev *Evaluator) findCandidates(ctx context.Context, allNodes []*framework.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
 	if len(allNodes) == 0 {
 		return nil, nil, errors.New("no nodes available")
 	}
 	logger := klog.FromContext(ctx)
-	potentialNodes, unschedulableNodeStatus := nodesWherePreemptionMightHelp(allNodes, m)
+	// Get a list of nodes with failed predicates (Unschedulable) that may be satisfied by removing pods from the node.
+	potentialNodes, err := m.NodesForStatusCode(ev.Handler.SnapshotSharedLister().NodeInfos(), framework.Unschedulable)
+	if err != nil {
+		return nil, nil, err
+	}
 	if len(potentialNodes) == 0 {
 		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -226,7 +232,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 			logger.Error(err, "Could not clear the nominatedNodeName field of pod", "pod", klog.KObj(pod))
 			// We do not return as this error is not critical.
 		}
-		return nil, unschedulableNodeStatus, nil
+		return nil, framework.NewDefaultNodeToStatus(), nil
 	}
 
 	pdbs, err := getPodDisruptionBudgets(ev.PdbLister)
@@ -242,11 +248,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pod *v1.Pod, m framewor
 		}
 		loggerV.Info("Selected candidates from a pool of nodes", "potentialNodesCount", len(potentialNodes), "offset", offset, "sampleLength", len(sample), "sample", sample, "candidates", numCandidates)
 	}
-	candidates, nodeStatuses, err := ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, numCandidates)
-	for node, nodeStatus := range unschedulableNodeStatus {
-		nodeStatuses[node] = nodeStatus
-	}
-	return candidates, nodeStatuses, err
+	return ev.DryRunPreemption(ctx, pod, potentialNodes, pdbs, offset, numCandidates)
 }
 
 // callExtenders calls given <extenders> to select the list of feasible candidates.
@@ -410,27 +412,6 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 	return nil
 }
 
-// nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
-// that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.NodeToStatusMap) ([]*framework.NodeInfo, framework.NodeToStatusMap) {
-	var potentialNodes []*framework.NodeInfo
-	nodeStatuses := make(framework.NodeToStatusMap)
-	unresolvableStatus := framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
-	for _, node := range nodes {
-		nodeName := node.Node().Name
-		// We only attempt preemption on nodes with status 'Unschedulable'. For
-		// diagnostic purposes, we propagate UnschedulableAndUnresolvable if either
-		// implied by absence in map or explicitly set.
-		status, ok := m[nodeName]
-		if status.Code() == framework.Unschedulable {
-			potentialNodes = append(potentialNodes, node)
-		} else if !ok || status.Code() == framework.UnschedulableAndUnresolvable {
-			nodeStatuses[nodeName] = unresolvableStatus
-		}
-	}
-	return potentialNodes, nodeStatuses
-}
-
 func getPodDisruptionBudgets(pdbLister policylisters.PodDisruptionBudgetLister) ([]*policy.PodDisruptionBudget, error) {
 	if pdbLister != nil {
 		return pdbLister.List(labels.Everything())
@@ -569,13 +550,14 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn framework.PodNominator
 // candidates, ones that do not violate PDB are preferred over ones that do.
 // NOTE: This method is exported for easier testing in default preemption.
 func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
-	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, framework.NodeToStatusMap, error) {
+	pdbs []*policy.PodDisruptionBudget, offset int32, numCandidates int32) ([]Candidate, *framework.NodeToStatus, error) {
+
 	fh := ev.Handler
 	nonViolatingCandidates := newCandidateList(numCandidates)
 	violatingCandidates := newCandidateList(numCandidates)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	nodeStatuses := make(framework.NodeToStatusMap)
+	nodeStatuses := framework.NewDefaultNodeToStatus()
 	var statusesLock sync.Mutex
 	var errs []error
 	checkNode := func(i int) {
@@ -609,7 +591,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 		if status.Code() == framework.Error {
 			errs = append(errs, status.AsError())
 		}
-		nodeStatuses[nodeInfoCopy.Node().Name] = status
+		nodeStatuses.Set(nodeInfoCopy.Node().Name, status)
 		statusesLock.Unlock()
 	}
 	fh.Parallelizer().Until(ctx, len(potentialNodes), checkNode, ev.PluginName)

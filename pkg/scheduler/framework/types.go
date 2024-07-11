@@ -336,12 +336,10 @@ const ExtenderName = "Extender"
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
-	// NodeToStatusMap records the status of each retriable node (status Unschedulable)
+	// NodeToStatus records the status of nodes and generic status for absent ones.
 	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
 	// Nodes that pass PreFilter/Filter plugins are not included in this map.
-	// While this map may contain UnschedulableAndUnresolvable statuses, the absence of
-	// a node should be interpreted as UnschedulableAndUnresolvable.
-	NodeToStatusMap NodeToStatusMap
+	NodeToStatus *NodeToStatus
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
 	// UnschedulablePlugins are plugins that returns Pending.
@@ -401,9 +399,15 @@ func (f *FitError) Error() string {
 		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
 		// Otherwise, we will have duplicated reasons in the error message.
 		reasons := make(map[string]int)
-		for _, status := range f.Diagnosis.NodeToStatusMap {
+		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *Status) {
 			for _, reason := range status.Reasons() {
 				reasons[reason]++
+			}
+		})
+		if f.Diagnosis.NodeToStatus.Len() < f.NumAllNodes {
+			// Adding predefined reasons for nodes that are absent in NodeToStatusMap
+			for _, reason := range f.Diagnosis.NodeToStatus.AbsentNodesStatus().Reasons() {
+				reasons[reason] += f.NumAllNodes - f.Diagnosis.NodeToStatus.Len()
 			}
 		}
 

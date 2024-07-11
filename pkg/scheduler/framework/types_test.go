@@ -1394,13 +1394,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
 					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: Node(s) failed PreFilter plugin FalsePreFilter.",
 		},
@@ -1409,13 +1409,13 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "Node(s) failed PreFilter plugin FalsePreFilter",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// They're inserted by the framework.
 					// We don't include them in the reason message because they'd be just duplicates.
 					"node1": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed PreFilter plugin FalsePreFilter"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				// PostFilterMsg will be included.
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
@@ -1426,11 +1426,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1439,11 +1439,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 3 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1453,11 +1453,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1.",
 		},
@@ -1466,11 +1466,11 @@ func TestFitError_Error(t *testing.T) {
 			numAllNodes: 3,
 			diagnosis: Diagnosis{
 				PreFilterMsg: "",
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					"node1": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node2": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-1"),
 					"node3": NewStatus(Unschedulable, "Node(s) failed Filter plugin FalseFilter-2"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 				PostFilterMsg: "Error running PostFilter plugin FailedPostFilter",
 			},
 			wantReasonMsg: "0/3 nodes are available: 1 Node(s) failed Filter plugin FalseFilter-2, 2 Node(s) failed Filter plugin FalseFilter-1. Error running PostFilter plugin FailedPostFilter",
@@ -1479,10 +1479,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Permit on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// There should be only one node here.
 					"node1": NewStatus(Unschedulable, "Node failed Permit plugin Permit-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Permit plugin Permit-1.",
 		},
@@ -1490,10 +1490,10 @@ func TestFitError_Error(t *testing.T) {
 			name:        "failed to Reserve on node",
 			numAllNodes: 1,
 			diagnosis: Diagnosis{
-				NodeToStatusMap: NodeToStatusMap{
+				NodeToStatus: NewNodeToStatus(map[string]*Status{
 					// There should be only one node here.
 					"node1": NewStatus(Unschedulable, "Node failed Reserve plugin Reserve-1"),
-				},
+				}, NewStatus(UnschedulableAndUnresolvable)),
 			},
 			wantReasonMsg: "0/1 nodes are available: 1 Node failed Reserve plugin Reserve-1.",
 		},
