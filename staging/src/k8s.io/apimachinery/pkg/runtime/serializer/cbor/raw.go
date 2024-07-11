@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sync"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -42,6 +43,23 @@ var rawTypeTranscodeFuncs = map[reflect.Type]func(reflect.Value) error{
 			return fmt.Errorf("failed to transcode RawExtension to JSON: %w", err)
 		}
 		re.Raw = j
+		return nil
+	},
+	reflect.TypeFor[metav1.FieldsV1](): func(rv reflect.Value) error {
+		if !rv.CanAddr() {
+			return nil
+		}
+		fields := rv.Addr().Interface().(*metav1.FieldsV1)
+		if fields.Raw == nil {
+			// When Raw is nil it encodes to null. Don't change nil Raw values during
+			// transcoding, they would have unmarshalled from JSON as nil too.
+			return nil
+		}
+		j, err := fields.MarshalJSON()
+		if err != nil {
+			return fmt.Errorf("failed to transcode FieldsV1 to JSON: %w", err)
+		}
+		fields.Raw = j
 		return nil
 	},
 }
