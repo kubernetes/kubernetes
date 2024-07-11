@@ -43,6 +43,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -1266,36 +1267,42 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 	}{
 		{
 			name:      "QueueImmediately queues pod to activeQ",
-			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)},
+			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnQueueImmediately,
 			expectedQ: activeQ,
 		},
 		{
 			name:      "QueueAfterBackoff queues pod to backoffQ if Pod is backing off",
-			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)},
+			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnQueueAfterBackoff,
 			expectedQ: backoffQ,
 		},
 		{
 			name:      "QueueAfterBackoff queues pod to activeQ if Pod is not backing off",
-			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)},
+			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnQueueAfterBackoff,
 			duration:  DefaultPodInitialBackoffDuration, // backoff is finished
 			expectedQ: activeQ,
 		},
 		{
 			name:      "QueueSkip queues pod to unschedulablePods",
-			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)},
+			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnQueueSkip,
 			expectedQ: unschedulablePods,
 		},
 		{
-			name:    "QueueHintFunction is not called when Pod is gated",
-			podInfo: setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
+			name:    "QueueHintFunction is not called when Pod is gated by SchedulingGates plugin",
+			podInfo: setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New(names.SchedulingGates, "foo")}),
 			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) framework.QueueingHint {
-				return framework.QueueImmediately
+				panic("it shouldn't be called")
 			},
 			expectedQ: unschedulablePods,
+		},
+		{
+			name:      "QueueHintFunction is called when Pod is gated by a plugin other than SchedulingGates",
+			podInfo:   setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")}),
+			hint:      queueHintReturnQueueAfterBackoff,
+			expectedQ: activeQ,
 		},
 	}
 
@@ -1309,14 +1316,13 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 					QueueingHintFn: test.hint,
 				},
 			}
-			test.podInfo.UnschedulablePlugins = sets.New("foo")
 			cl := testingclock.NewFakeClock(now)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl))
-			// add to unsched pod pool
 			q.activeQ.Add(q.newQueuedPodInfo(test.podInfo.Pod))
 			if p, err := q.Pop(); err != nil || p.Pod != test.podInfo.Pod {
 				t.Errorf("Expected: %v after Pop, but got: %v", test.podInfo.Pod.Name, p.Pod.Name)
 			}
+			// add to unsched pod pool
 			q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
 
 			cl.Step(test.duration)
