@@ -44,15 +44,10 @@ func TestController(t *testing.T) {
 	driverName := "mock-driver"
 	className := "mock-class"
 	otherDriverName := "other-driver"
-	otherClassName := "other-class"
 	ourFinalizer := driverName + "/deletion-protection"
 	otherFinalizer := otherDriverName + "/deletion-protection"
-	classes := []*resourceapi.ResourceClass{
-		createClass(className, driverName),
-		createClass(otherClassName, otherDriverName),
-	}
-	claim := createClaim(claimName, claimNamespace, className)
-	otherClaim := createClaim(claimName, claimNamespace, otherClassName)
+	claim := createClaim(claimName, claimNamespace, driverName)
+	otherClaim := createClaim(claimName, claimNamespace, otherDriverName)
 	podName := "pod"
 	podKey := "schedulingCtx:default/pod"
 	pod := createPod(podName, claimNamespace, nil)
@@ -87,12 +82,11 @@ func TestController(t *testing.T) {
 		claim.Finalizers = append(claim.Finalizers, finalizer)
 		return claim
 	}
-	allocation := resourceapi.AllocationResult{}
+	allocation := resourceapi.AllocationResult{Controller: driverName}
 	withAllocate := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 		// Any allocated claim must have our finalizer.
 		claim = withFinalizer(claim, ourFinalizer)
 		claim.Status.Allocation = &allocation
-		claim.Status.DriverName = driverName
 		return claim
 	}
 	withDeallocate := func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
@@ -128,7 +122,6 @@ func TestController(t *testing.T) {
 	for name, test := range map[string]struct {
 		key                                  string
 		driver                               mockDriver
-		classes                              []*resourceapi.ResourceClass
 		pod                                  *corev1.Pod
 		schedulingCtx, expectedSchedulingCtx *resourceapi.PodSchedulingContext
 		claim, expectedClaim                 *resourceapi.ResourceClaim
@@ -143,7 +136,6 @@ func TestController(t *testing.T) {
 		},
 		"wrong-driver": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         otherClaim,
 			expectedClaim: otherClaim,
 		},
@@ -151,7 +143,6 @@ func TestController(t *testing.T) {
 		// not deleted, reallocate -> deallocate
 		"immediate-allocated-reallocate": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withDeallocate(withAllocate(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
 			expectedClaim: claim,
@@ -160,7 +151,6 @@ func TestController(t *testing.T) {
 		// not deleted, reallocate, deallocate failure -> requeue
 		"immediate-allocated-fail-deallocation-during-reallocate": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withDeallocate(withAllocate(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withDeallocate(withAllocate(claim)),
@@ -170,7 +160,6 @@ func TestController(t *testing.T) {
 		// deletion time stamp set, our finalizer set, not allocated  -> remove finalizer
 		"deleted-finalizer-removal": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
 			expectedClaim: withDeletionTimestamp(claim),
@@ -178,7 +167,6 @@ func TestController(t *testing.T) {
 		// deletion time stamp set, our finalizer set, not allocated, stopping fails  -> requeue
 		"deleted-finalizer-stop-failure": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withFinalizer(withDeletionTimestamp(claim), ourFinalizer),
@@ -187,14 +175,12 @@ func TestController(t *testing.T) {
 		// deletion time stamp set, other finalizer set, not allocated  -> do nothing
 		"deleted-finalizer-no-removal": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
 			expectedClaim: withFinalizer(withDeletionTimestamp(claim), otherFinalizer),
 		},
 		// deletion time stamp set, finalizer set, allocated  -> deallocate
 		"deleted-allocated": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: nil}),
 			expectedClaim: withDeletionTimestamp(claim),
@@ -202,7 +188,6 @@ func TestController(t *testing.T) {
 		// deletion time stamp set, finalizer set, allocated, deallocation fails  -> requeue
 		"deleted-deallocate-failure": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withAllocate(withDeletionTimestamp(claim)),
 			driver:        m.expectDeallocate(map[string]error{claimName: errors.New("fake error")}),
 			expectedClaim: withAllocate(withDeletionTimestamp(claim)),
@@ -211,14 +196,12 @@ func TestController(t *testing.T) {
 		// deletion time stamp set, finalizer not set -> do nothing
 		"deleted-no-finalizer": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         withDeletionTimestamp(claim),
 			expectedClaim: withDeletionTimestamp(claim),
 		},
 		// waiting for first consumer -> do nothing
 		"pending": {
 			key:           claimKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: claim,
 		},
@@ -235,7 +218,6 @@ func TestController(t *testing.T) {
 		// no potential nodes -> shouldn't occur
 		"no-nodes": {
 			key:                   podKey,
-			classes:               classes,
 			claim:                 claim,
 			expectedClaim:         claim,
 			pod:                   podWithClaim,
@@ -246,7 +228,6 @@ func TestController(t *testing.T) {
 		// potential nodes -> provide unsuitable nodes
 		"info": {
 			key:           podKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -258,21 +239,9 @@ func TestController(t *testing.T) {
 			expectedError:         errPeriodic.Error(),
 		},
 
-		// potential nodes, selected node, missing class -> failure
-		"missing-class": {
-			key:                   podKey,
-			claim:                 claim,
-			expectedClaim:         claim,
-			pod:                   podWithClaim,
-			schedulingCtx:         withSelectedNode(withPotentialNodes(podSchedulingCtx)),
-			expectedSchedulingCtx: withSelectedNode(withPotentialNodes(podSchedulingCtx)),
-			expectedError:         `pod claim my-pod-claim: resourceclass.resource.k8s.io "mock-class" not found`,
-		},
-
 		// potential nodes, selected node -> allocate
 		"allocate": {
 			key:           podKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: withReservedFor(withAllocate(claim), pod),
 			pod:           podWithClaim,
@@ -287,7 +256,6 @@ func TestController(t *testing.T) {
 		// potential nodes, selected node, all unsuitable -> update unsuitable nodes
 		"is-potential-node": {
 			key:           podKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -301,7 +269,6 @@ func TestController(t *testing.T) {
 		// max potential nodes, other selected node, all unsuitable -> update unsuitable nodes with truncation at start
 		"is-potential-node-truncate-first": {
 			key:           podKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -315,7 +282,6 @@ func TestController(t *testing.T) {
 		// max potential nodes, other selected node, all unsuitable (but in reverse order) -> update unsuitable nodes with truncation at end
 		"pod-selected-is-potential-node-truncate-last": {
 			key:           podKey,
-			classes:       classes,
 			claim:         claim,
 			expectedClaim: claim,
 			pod:           podWithClaim,
@@ -332,9 +298,6 @@ func TestController(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 
 			initialObjects := []runtime.Object{}
-			for _, class := range test.classes {
-				initialObjects = append(initialObjects, class)
-			}
 			if test.pod != nil {
 				initialObjects = append(initialObjects, test.pod)
 			}
@@ -345,7 +308,6 @@ func TestController(t *testing.T) {
 				initialObjects = append(initialObjects, test.claim)
 			}
 			kubeClient, informerFactory := fakeK8s(initialObjects)
-			rcInformer := informerFactory.Resource().V1alpha3().ResourceClasses()
 			claimInformer := informerFactory.Resource().V1alpha3().ResourceClaims()
 			podInformer := informerFactory.Core().V1().Pods()
 			podSchedulingInformer := informerFactory.Resource().V1alpha3().PodSchedulingContexts()
@@ -356,8 +318,6 @@ func TestController(t *testing.T) {
 
 			for _, obj := range initialObjects {
 				switch obj.(type) {
-				case *resourceapi.ResourceClass:
-					require.NoError(t, rcInformer.Informer().GetStore().Add(obj), "add resource class")
 				case *resourceapi.ResourceClaim:
 					require.NoError(t, claimInformer.Informer().GetStore().Add(obj), "add resource claim")
 				case *corev1.Pod:
@@ -375,7 +335,6 @@ func TestController(t *testing.T) {
 			ctrl := New(ctx, driverName, driver, kubeClient, informerFactory)
 			informerFactory.Start(ctx.Done())
 			if !cache.WaitForCacheSync(ctx.Done(),
-				informerFactory.Resource().V1alpha3().ResourceClasses().Informer().HasSynced,
 				informerFactory.Resource().V1alpha3().ResourceClaims().Informer().HasSynced,
 				informerFactory.Resource().V1alpha3().PodSchedulingContexts().Informer().HasSynced,
 			) {
@@ -459,30 +418,6 @@ func (m mockDriver) expectUnsuitableNodes(expected map[string][]string, err erro
 	return m
 }
 
-func (m mockDriver) GetClassParameters(ctx context.Context, class *resourceapi.ResourceClass) (interface{}, error) {
-	m.t.Logf("GetClassParameters(%s)", class)
-	result, ok := m.classParameters[class.Name]
-	if !ok {
-		m.t.Fatal("unexpected GetClassParameters call")
-	}
-	if err, ok := result.(error); ok {
-		return nil, err
-	}
-	return result, nil
-}
-
-func (m mockDriver) GetClaimParameters(ctx context.Context, claim *resourceapi.ResourceClaim, class *resourceapi.ResourceClass, classParameters interface{}) (interface{}, error) {
-	m.t.Logf("GetClaimParameters(%s)", claim)
-	result, ok := m.claimParameters[claim.Name]
-	if !ok {
-		m.t.Fatal("unexpected GetClaimParameters call")
-	}
-	if err, ok := result.(error); ok {
-		return nil, err
-	}
-	return result, nil
-}
-
 func (m mockDriver) Allocate(ctx context.Context, claims []*ClaimAllocation, selectedNode string) {
 	m.t.Logf("Allocate(number of claims %d)", len(claims))
 	for _, claimAllocation := range claims {
@@ -532,23 +467,14 @@ func (m mockDriver) UnsuitableNodes(ctx context.Context, pod *corev1.Pod, claims
 	return nil
 }
 
-func createClass(className, driverName string) *resourceapi.ResourceClass {
-	return &resourceapi.ResourceClass{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: className,
-		},
-		DriverName: driverName,
-	}
-}
-
-func createClaim(claimName, claimNamespace, className string) *resourceapi.ResourceClaim {
+func createClaim(claimName, claimNamespace, driverName string) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      claimName,
 			Namespace: claimNamespace,
 		},
 		Spec: resourceapi.ResourceClaimSpec{
-			ResourceClassName: className,
+			Controller: driverName,
 		},
 	}
 }

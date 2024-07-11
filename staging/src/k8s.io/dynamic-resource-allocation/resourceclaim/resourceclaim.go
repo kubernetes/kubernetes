@@ -26,15 +26,10 @@ package resourceclaim
 import (
 	"errors"
 	"fmt"
-	"os"
-	"strings"
-	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 )
 
 var (
@@ -81,78 +76,6 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 	}
 }
 
-// NewNameLookup returns an object which handles determining the name of
-// a ResourceClaim. In contrast to the stand-alone Name it is compatible
-// also with Kubernetes < 1.28.
-//
-// Providing a client is optional. If none is available, then code can pass nil
-// and users can set the DRA_WITH_DETERMINISTIC_RESOURCE_CLAIM_NAMES env
-// variable to an arbitrary non-empty value to use the naming from Kubernetes <
-// 1.28.
-func NewNameLookup(client kubernetes.Interface) *Lookup {
-	return &Lookup{client: client}
-}
-
-// Lookup stores the state which is necessary to look up ResourceClaim names.
-type Lookup struct {
-	client       kubernetes.Interface
-	usePodStatus atomic.Pointer[bool]
-}
-
-// Name is a variant of the stand-alone Name with support also for Kubernetes < 1.28.
-func (l *Lookup) Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
-	usePodStatus := l.usePodStatus.Load()
-	if usePodStatus == nil {
-		if value, _ := os.LookupEnv("DRA_WITH_DETERMINISTIC_RESOURCE_CLAIM_NAMES"); value != "" {
-			usePodStatus = ptr.To(false)
-		} else if l.client != nil {
-			// Check once. This does not detect upgrades or
-			// downgrades, but that is good enough for the simple
-			// test scenarios that the Kubernetes < 1.28 support is
-			// meant for.
-			info, err := l.client.Discovery().ServerVersion()
-			if err != nil {
-				return nil, false, fmt.Errorf("look up server version: %v", err)
-			}
-			if info.Major == "" {
-				// Fake client...
-				usePodStatus = ptr.To(true)
-			} else {
-				switch strings.Compare(info.Major, "1") {
-				case -1:
-					// Huh?
-					usePodStatus = ptr.To(false)
-				case 0:
-					// info.Minor may have a suffix which makes it larger than 28.
-					// We don't care about pre-releases here.
-					usePodStatus = ptr.To(strings.Compare("28", info.Minor) <= 0)
-				case 1:
-					// Kubernetes 2? Yeah!
-					usePodStatus = ptr.To(true)
-				}
-			}
-		} else {
-			// No information. Let's assume recent Kubernetes.
-			usePodStatus = ptr.To(true)
-		}
-		l.usePodStatus.Store(usePodStatus)
-	}
-
-	if *usePodStatus {
-		return Name(pod, podClaim)
-	}
-
-	switch {
-	case podClaim.ResourceClaimName != nil:
-		return podClaim.ResourceClaimName, false, nil
-	case podClaim.ResourceClaimTemplateName != nil:
-		name := pod.Name + "-" + podClaim.Name
-		return &name, true, nil
-	default:
-		return nil, false, fmt.Errorf(`pod "%s/%s", spec.resourceClaim %q: %w`, pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
-	}
-}
-
 // IsForPod checks that the ResourceClaim is the one that
 // was created for the Pod. It returns an error that is informative
 // enough to be returned by the caller without adding further details
@@ -182,10 +105,4 @@ func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
 func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 	// Currently no restrictions on sharing...
 	return true
-}
-
-// IsAllocatedWithStructuredParameters checks whether the claim is allocated
-// and the allocation was done with structured parameters.
-func IsAllocatedWithStructuredParameters(claim *resourceapi.ResourceClaim) bool {
-	return claim.Status.Allocation != nil && claim.Status.Allocation.Controller == ""
 }
