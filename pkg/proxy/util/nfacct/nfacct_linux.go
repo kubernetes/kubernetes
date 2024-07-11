@@ -59,13 +59,26 @@ type runner struct {
 	handler handler
 }
 
-// New returns a new Interface.
+// New returns a new Interface. If the netfilter_nfacct subsystem is
+// not available in the kernel it will return error.
 func New() (Interface, error) {
 	hndlr, err := newNetlinkHandler()
 	if err != nil {
 		return nil, err
 	}
-	return newInternal(hndlr)
+
+	rnr, err := newInternal(hndlr)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if nfacct is supported on the current kernel by attempting to retrieve a counter.
+	// the following GET call should either succeed or return ENOENT.
+	_, err = rnr.Get("IMayExist")
+	if err != nil && !errors.Is(err, ErrObjectNotFound) {
+		return nil, ErrNotSupported
+	}
+	return rnr, nil
 }
 
 // newInternal returns a new Interface with the given handler.
@@ -155,6 +168,7 @@ var ErrObjectAlreadyExists = errors.New("object already exists")
 var ErrNameExceedsMaxLength = fmt.Errorf("object name exceeds the maximum allowed length of %d characters", MaxLength)
 var ErrEmptyName = errors.New("object name cannot be empty")
 var ErrUnexpected = errors.New("unexpected error")
+var ErrNotSupported = errors.New("nfacct sub-system not available")
 
 func handleError(err error) error {
 	switch {
