@@ -627,9 +627,6 @@ func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
 func (p *PriorityQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
-	if podInfo.Gated {
-		return false
-	}
 	boTime := p.getBackoffTime(podInfo)
 	return boTime.After(p.clock.Now())
 }
@@ -1240,6 +1237,12 @@ func (p *PriorityQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
 func (p *PriorityQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInfo) time.Duration {
+	if podInfo.Attempts == 0 {
+		// When the Pod hasn't experienced any scheduling attempts,
+		// they aren't obliged to get a backoff penalty at all.
+		return 0
+	}
+
 	duration := p.podInitialBackoffDuration
 	for i := 1; i < podInfo.Attempts; i++ {
 		// Use subtraction instead of addition or multiplication to avoid overflow.
