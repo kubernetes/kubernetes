@@ -291,6 +291,7 @@ func TestControllerSyncJob(t *testing.T) {
 		podIndexLabelDisabled   bool
 		jobPodReplacementPolicy bool
 		jobPodFailurePolicy     bool
+		jobSuccessPolicy        bool
 	}{
 		"job start": {
 			parallelism:       2,
@@ -1187,6 +1188,38 @@ func TestControllerSyncJob(t *testing.T) {
 				},
 			},
 		},
+		"SuccessCriteriaMet=False condition added manually is ignored": {
+			jobSuccessPolicy: true,
+			parallelism:      1,
+			completions:      1,
+			activePods:       1,
+			readyPods:        1,
+			initialStatus: &jobInitialStatus{
+				active: 1,
+				startTime: func() *time.Time {
+					now := time.Now()
+					return &now
+				}(),
+				conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobSuccessCriteriaMet,
+						Status:  v1.ConditionFalse,
+						Reason:  "ConditionAddedManually",
+						Message: "Testing",
+					},
+				},
+			},
+			expectedActive: 1,
+			expectedReady:  ptr.To[int32](1),
+			expectedConditions: []batch.JobCondition{
+				{
+					Type:    batch.JobSuccessCriteriaMet,
+					Status:  v1.ConditionFalse,
+					Reason:  "ConditionAddedManually",
+					Message: "Testing",
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -1195,6 +1228,7 @@ func TestControllerSyncJob(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodIndexLabel, !tc.podIndexLabelDisabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.jobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobPodFailurePolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.jobSuccessPolicy)
 			// job manager setup
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
