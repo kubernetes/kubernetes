@@ -227,14 +227,16 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 		t.Fatalf("CR not stored at version v1")
 	}
 
+	gvr := svmv1alpha1.GroupVersionResource{
+		Group:    crd.Spec.Group,
+		Version:  "v1",
+		Resource: crd.Spec.Names.Plural,
+	}
+
+	svmTest.assertGraphBuilderReady(ctx, t, gvr) // temporary workaround for the controller not retrying this error
+
 	// migrate CRs from v1 to v2
-	svm, err := svmTest.createSVMResource(
-		ctx, t, "crdsvm",
-		svmv1alpha1.GroupVersionResource{
-			Group:    crd.Spec.Group,
-			Version:  "v1",
-			Resource: crd.Spec.Names.Plural,
-		})
+	svm, err := svmTest.createSVMResource(ctx, t, "crdsvm", gvr)
 	if err != nil {
 		t.Fatalf("Failed to create SVM resource: %v", err)
 	}

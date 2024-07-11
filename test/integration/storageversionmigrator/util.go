@@ -253,6 +253,7 @@ type svmTest struct {
 	server                      *kubeapiservertesting.TestServer
 	apiextensionsclient         *apiextensionsclientset.Clientset
 	filePathForEncryptionConfig string
+	graphBuilder                *garbagecollector.GraphBuilder
 }
 
 func svmSetup(ctx context.Context, t *testing.T) *svmTest {
@@ -358,6 +359,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		policyFile:                  policyFile,
 		logFile:                     logFile,
 		filePathForEncryptionConfig: filePathForEncryptionConfig,
+		graphBuilder:                gc.GetDependencyGraphBuilder(),
 	}
 
 	t.Cleanup(func() {
@@ -1033,19 +1035,21 @@ func (svm *svmTest) isCRStoredAtVersion(t *testing.T, version, crName string) bo
 func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName string) bool {
 	t.Helper()
 
+	triggerCR := svm.createCR(ctx, t, "triggercr", "v1")
+	svm.deleteCR(ctx, t, triggerCR.GetName(), "v1")
+
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
 		1*time.Minute,
 		true,
 		func(ctx context.Context) (bool, error) {
-			triggerCR := svm.createCR(ctx, t, "triggercr", "v1")
-			svm.deleteCR(ctx, t, triggerCR.GetName(), "v1")
 			svmResource, err := svm.getSVM(ctx, t, crdSVMName)
 			if err != nil {
 				t.Fatalf("Failed to get SVM resource: %v", err)
 			}
 			if svmResource.Status.ResourceVersion == "" {
+				t.Logf("%q SVM has no resourceVersion", crdSVMName)
 				return false, nil
 			}
 
@@ -1053,10 +1057,36 @@ func (svm *svmTest) isCRDMigrated(ctx context.Context, t *testing.T, crdSVMName 
 				return true, nil
 			}
 
+			t.Logf("%q SVM has not successfully migratied, %#v", crdSVMName, svmResource.Status.Conditions)
+
 			return false, nil
 		},
 	)
 	return err == nil
+}
+
+func (svm *svmTest) assertGraphBuilderReady(ctx context.Context, t *testing.T, gvr svmv1alpha1.GroupVersionResource) {
+	t.Helper()
+
+	if err := wait.PollUntilContextTimeout(
+		ctx,
+		500*time.Millisecond,
+		1*time.Minute,
+		true,
+		func(ctx context.Context) (bool, error) {
+			_, err := svm.graphBuilder.GetMonitor(ctx, schema.GroupVersionResource{
+				Group:    gvr.Group,
+				Version:  gvr.Version,
+				Resource: gvr.Resource,
+			})
+			if err != nil {
+				t.Logf("failed to get monitor %v", err)
+			}
+			return err == nil, nil
+		},
+	); err != nil {
+		t.Fatalf("graph builder is not ready: %v", err)
+	}
 }
 
 type versions struct {
