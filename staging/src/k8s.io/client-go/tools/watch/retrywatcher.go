@@ -126,6 +126,35 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 			return false, 0
 		}
 
+		// Check if the watch failed due to the client not having permission to watch the resource or the credentials
+		// being invalid (e.g. expired token).
+		if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
+			// Add more detail since the forbidden message returned by the Kubernetes API is just "unknown".
+			klog.ErrorS(err, msg+": ensure the client has valid credentials and watch permissions on the resource")
+
+			if apiStatus, ok := err.(apierrors.APIStatus); ok {
+				statusErr := apiStatus.Status()
+
+				sent := rw.send(watch.Event{
+					Type:   watch.Error,
+					Object: &statusErr,
+				})
+				if !sent {
+					// This likely means the RetryWatcher is stopping but return false so the caller to doReceive can
+					// verify this and potentially retry.
+					klog.Error("Failed to send the Unauthorized or Forbidden watch event")
+
+					return false, 0
+				}
+			} else {
+				// This should never happen since apierrors only handles apierrors.APIStatus. Still, this is an
+				// unrecoverable error, so still allow it to return true below.
+				klog.ErrorS(err, msg+": encountered an unexpected Unauthorized or Forbidden error type")
+			}
+
+			return true, 0
+		}
+
 		klog.ErrorS(err, msg)
 		// Retry
 		return false, 0
