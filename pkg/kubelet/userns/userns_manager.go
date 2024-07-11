@@ -386,6 +386,8 @@ func (m *UsernsManager) createUserNs(pod *v1.Pod) (userNs userNamespace, err err
 func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
 	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 
+	// TODO: If the default value for hostUsers ever changes, change the default value of
+	// userNamespacesEnabled as well
 	if pod == nil || pod.Spec.HostUsers == nil {
 		// if the feature is enabled, specify to use the node mode...
 		if featureEnabled {
@@ -511,4 +513,8 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 	}
 
 	return nil
+}
+
+func EnabledUserNamespacesSupport() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 }
