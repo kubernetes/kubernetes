@@ -107,7 +107,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericiooptions.IOStreams) *c
 		Short:                 i18n.T("Forward one or more local ports to a pod"),
 		Long:                  portforwardLong,
 		Example:               portforwardExample,
-		ValidArgsFunction:     completion.PodResourceNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceAndPortCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(opts.Complete(f, cmd, args))
 			cmdutil.CheckErr(opts.Validate())
@@ -136,19 +136,27 @@ type defaultPortForwarder struct {
 	genericiooptions.IOStreams
 }
 
-func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+func createDialer(method string, url *url.URL, opts PortForwardOptions) (httpstream.Dialer, error) {
 	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	if cmdutil.PortForwardWebsockets.IsEnabled() {
+	if !cmdutil.PortForwardWebsockets.IsDisabled() {
 		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialer(url, opts.Config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
 		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, httpstream.IsUpgradeFailure)
+	}
+	return dialer, nil
+}
+
+func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+	dialer, err := createDialer(method, url, opts)
+	if err != nil {
+		return err
 	}
 	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {

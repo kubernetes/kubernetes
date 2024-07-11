@@ -22,14 +22,14 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 )
 
-// DeploymentStrategyApplyConfiguration represents an declarative configuration of the DeploymentStrategy type for use
+// DeploymentStrategyApplyConfiguration represents a declarative configuration of the DeploymentStrategy type for use
 // with apply.
 type DeploymentStrategyApplyConfiguration struct {
 	Type          *v1beta2.DeploymentStrategyType            `json:"type,omitempty"`
 	RollingUpdate *RollingUpdateDeploymentApplyConfiguration `json:"rollingUpdate,omitempty"`
 }
 
-// DeploymentStrategyApplyConfiguration constructs an declarative configuration of the DeploymentStrategy type for use with
+// DeploymentStrategyApplyConfiguration constructs a declarative configuration of the DeploymentStrategy type for use with
 // apply.
 func DeploymentStrategy() *DeploymentStrategyApplyConfiguration {
 	return &DeploymentStrategyApplyConfiguration{}

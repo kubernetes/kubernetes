@@ -848,9 +848,8 @@ template:
     - conditionType: conditionTypeValue
     resourceClaims:
     - name: nameValue
-      source:
-        resourceClaimName: resourceClaimNameValue
-        resourceClaimTemplateName: resourceClaimTemplateNameValue
+      resourceClaimName: resourceClaimNameValue
+      resourceClaimTemplateName: resourceClaimTemplateNameValue
     restartPolicy: restartPolicyValue
     runtimeClassName: runtimeClassNameValue
     schedulerName: schedulerNameValue
@@ -875,6 +874,7 @@ template:
         type: typeValue
       supplementalGroups:
       - 4
+      supplementalGroupsPolicy: supplementalGroupsPolicyValue
       sysctls:
       - name: nameValue
         value: valueValue

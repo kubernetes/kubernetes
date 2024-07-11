@@ -39,7 +39,6 @@ import (
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -83,10 +82,6 @@ type VolumeOptions struct {
 	// i.e. with required capacity, accessMode, labels matching PVC.Selector and
 	// so on.
 	PVC *v1.PersistentVolumeClaim
-	// Unique name of Kubernetes cluster.
-	ClusterName string
-	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
-	CloudTags *map[string]string
 	// Volume provisioning parameters from StorageClass
 	Parameters map[string]string
 }
@@ -171,11 +166,6 @@ type VolumePlugin interface {
 	// Specifying mount options in a volume plugin that doesn't support
 	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
-
-	// SupportsBulkVolumeVerification checks if volume plugin type is capable
-	// of enabling bulk polling of all nodes. This can speed up verification of
-	// attached volumes by quite a bit, but underlying pluging must support it.
-	SupportsBulkVolumeVerification() bool
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports
 	// mount -o context=XYZ for a given volume.
@@ -382,9 +372,6 @@ type VolumeHost interface {
 	// context.
 	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
 
-	// Get cloud provider from kubelet.
-	GetCloudProvider() cloudprovider.Interface
-
 	// Get mounter interface.
 	GetMounter(pluginName string) mount.Interface
 
@@ -431,7 +418,7 @@ type VolumePluginMgr struct {
 	plugins                   map[string]VolumePlugin
 	prober                    DynamicPluginProber
 	probedPlugins             map[string]VolumePlugin
-	loggedDeprecationWarnings sets.String
+	loggedDeprecationWarnings sets.Set[string]
 	Host                      VolumeHost
 }
 
@@ -573,7 +560,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
-	pm.loggedDeprecationWarnings = sets.NewString()
+	pm.loggedDeprecationWarnings = sets.New[string]()
 
 	if prober == nil {
 		// Use a dummy prober to prevent nil deference.
@@ -1010,7 +997,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
-					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.2",
+					Image:   "registry.k8s.io/build-image/debian-base:bookworm-v1.0.3",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && find /scrub -mindepth 1 -delete && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{

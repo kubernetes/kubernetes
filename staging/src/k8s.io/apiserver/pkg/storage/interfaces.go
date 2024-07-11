@@ -29,6 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Feature is the name of each feature in storage that we check in feature_support_checker.
+type Feature = string
+
+// RequestWatchProgress is an etcd feature that may use to check if it supported or not.
+var RequestWatchProgress Feature = "RequestWatchProgress"
+
 // Versioner abstracts setting and retrieving metadata fields from database response
 // onto the object ot list. It is required to maintain storage invariants - updating an
 // object twice with the same data except for the ResourceVersion and SelfLink must be
@@ -236,6 +242,9 @@ type Interface interface {
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+
+	// ReadinessCheck checks if the storage is ready for accepting requests.
+	ReadinessCheck() error
 
 	// RequestWatchProgress requests the a watch stream progress status be sent in the
 	// watch response stream as soon as possible.

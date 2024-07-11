@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// VolumeNodeAffinityApplyConfiguration represents an declarative configuration of the VolumeNodeAffinity type for use
+// VolumeNodeAffinityApplyConfiguration represents a declarative configuration of the VolumeNodeAffinity type for use
 // with apply.
 type VolumeNodeAffinityApplyConfiguration struct {
 	Required *NodeSelectorApplyConfiguration `json:"required,omitempty"`
 }
 
-// VolumeNodeAffinityApplyConfiguration constructs an declarative configuration of the VolumeNodeAffinity type for use with
+// VolumeNodeAffinityApplyConfiguration constructs a declarative configuration of the VolumeNodeAffinity type for use with
 // apply.
 func VolumeNodeAffinity() *VolumeNodeAffinityApplyConfiguration {
 	return &VolumeNodeAffinityApplyConfiguration{}

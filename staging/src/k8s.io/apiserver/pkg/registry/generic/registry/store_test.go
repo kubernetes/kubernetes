@@ -399,7 +399,6 @@ func (m *sequentialNameGenerator) GenerateName(base string) string {
 }
 
 func TestStoreCreateWithRetryNameGenerate(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, true)
 
 	namedObj := func(id int) *example.Pod {
 		return &example.Pod{
@@ -448,6 +447,7 @@ func TestStoreCreateWithRetryNameGenerate(t *testing.T) {
 }
 
 func TestStoreCreateWithRetryNameGenerateFeatureDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, false)
 	namedObj := func(id int) *example.Pod {
 		return &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("prefix-%d", id), Namespace: "test"},
@@ -2446,6 +2446,14 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		if err != nil {
 			t.Fatalf("Couldn't create cacher: %v", err)
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+			// The tests assume that Get/GetList/Watch calls shouldn't fail.
+			// However, 429 error can now be returned if watchcache is under initialization.
+			// To avoid rewriting all tests, we wait for watchcache to initialize.
+			if err := cacher.Wait(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		}
 		d := destroyFunc
 		s = cacher
 		destroyFunc = func() {
@@ -2973,6 +2981,8 @@ func (p *predictableNameGenerator) GenerateName(base string) string {
 }
 
 func TestStoreCreateGenerateNameConflict(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetryGenerateName, false)
+
 	// podA will be stored with name foo12345
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "test"},

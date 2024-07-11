@@ -58,7 +58,7 @@ func TestHealthyEventedPLEG(t *testing.T) {
 	// test if healthy when event channel has 5 events
 	isHealthy, err := pleg.Healthy()
 	require.NoError(t, err)
-	assert.Equal(t, true, isHealthy)
+	assert.True(t, isHealthy)
 
 	// send remaining 95 events and make channel out of capacity
 	for _, event := range events[5:] {
@@ -67,7 +67,7 @@ func TestHealthyEventedPLEG(t *testing.T) {
 	// pleg is unhealthy when channel is out of capacity
 	isHealthy, err = pleg.Healthy()
 	require.Error(t, err)
-	assert.Equal(t, false, isHealthy)
+	assert.False(t, isHealthy)
 }
 
 func TestUpdateRunningPodMetric(t *testing.T) {

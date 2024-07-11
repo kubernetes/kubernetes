@@ -108,22 +108,22 @@ func (f *fixture) newController(ctx context.Context) (*Controller, informers.Sha
 	return c, i, k8sI
 }
 
-func (f *fixture) run(ctx context.Context, fooName string) {
-	f.runController(ctx, fooName, true, false)
+func (f *fixture) run(ctx context.Context, fooRef cache.ObjectName) {
+	f.runController(ctx, fooRef, true, false)
 }
 
-func (f *fixture) runExpectError(ctx context.Context, fooName string) {
-	f.runController(ctx, fooName, true, true)
+func (f *fixture) runExpectError(ctx context.Context, fooRef cache.ObjectName) {
+	f.runController(ctx, fooRef, true, true)
 }
 
-func (f *fixture) runController(ctx context.Context, fooName string, startInformers bool, expectError bool) {
+func (f *fixture) runController(ctx context.Context, fooRef cache.ObjectName, startInformers bool, expectError bool) {
 	c, i, k8sI := f.newController(ctx)
 	if startInformers {
 		i.Start(ctx.Done())
 		k8sI.Start(ctx.Done())
 	}
 
-	err := c.syncHandler(ctx, fooName)
+	err := c.syncHandler(ctx, fooRef)
 	if !expectError && err != nil {
 		f.t.Errorf("error syncing foo: %v", err)
 	} else if expectError && err == nil {
@@ -240,13 +240,9 @@ func (f *fixture) expectUpdateFooStatusAction(foo *samplecontroller.Foo) {
 	f.actions = append(f.actions, action)
 }
 
-func getKey(foo *samplecontroller.Foo, t *testing.T) string {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(foo)
-	if err != nil {
-		t.Errorf("Unexpected error getting key for foo %v: %v", foo.Name, err)
-		return ""
-	}
-	return key
+func getRef(foo *samplecontroller.Foo, t *testing.T) cache.ObjectName {
+	ref := cache.MetaObjectToName(foo)
+	return ref
 }
 
 func TestCreatesDeployment(t *testing.T) {
@@ -261,7 +257,7 @@ func TestCreatesDeployment(t *testing.T) {
 	f.expectCreateDeploymentAction(expDeployment)
 	f.expectUpdateFooStatusAction(foo)
 
-	f.run(ctx, getKey(foo, t))
+	f.run(ctx, getRef(foo, t))
 }
 
 func TestDoNothing(t *testing.T) {
@@ -277,7 +273,7 @@ func TestDoNothing(t *testing.T) {
 	f.kubeobjects = append(f.kubeobjects, d)
 
 	f.expectUpdateFooStatusAction(foo)
-	f.run(ctx, getKey(foo, t))
+	f.run(ctx, getRef(foo, t))
 }
 
 func TestUpdateDeployment(t *testing.T) {
@@ -298,7 +294,7 @@ func TestUpdateDeployment(t *testing.T) {
 
 	f.expectUpdateFooStatusAction(foo)
 	f.expectUpdateDeploymentAction(expDeployment)
-	f.run(ctx, getKey(foo, t))
+	f.run(ctx, getRef(foo, t))
 }
 
 func TestNotControlledByUs(t *testing.T) {
@@ -315,7 +311,7 @@ func TestNotControlledByUs(t *testing.T) {
 	f.deploymentLister = append(f.deploymentLister, d)
 	f.kubeobjects = append(f.kubeobjects, d)
 
-	f.runExpectError(ctx, getKey(foo, t))
+	f.runExpectError(ctx, getRef(foo, t))
 }
 
 func int32Ptr(i int32) *int32 { return &i }

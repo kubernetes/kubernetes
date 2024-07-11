@@ -105,7 +105,7 @@ func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64, opts 
 	w.RLock()
 	defer w.RUnlock()
 
-	return w.getAllEventsSinceLocked(resourceVersion, opts)
+	return w.getAllEventsSinceLocked(resourceVersion, "", opts)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -140,30 +140,41 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 
 type immediateTickerFactory struct{}
 
-func (t *immediateTickerFactory) NewTicker(d time.Duration) clock.Ticker {
-	return &immediateTicker{stopCh: make(chan struct{})}
+func (t *immediateTickerFactory) NewTimer(d time.Duration) clock.Timer {
+	timer := immediateTicker{
+		c: make(chan time.Time),
+	}
+	timer.Reset(d)
+	return &timer
 }
 
 type immediateTicker struct {
-	stopCh chan struct{}
+	c chan time.Time
+}
+
+func (t *immediateTicker) Reset(d time.Duration) (active bool) {
+	select {
+	case <-t.c:
+		active = true
+	default:
+	}
+	go func() {
+		t.c <- time.Now()
+	}()
+	return active
 }
 
 func (t *immediateTicker) C() <-chan time.Time {
-	ch := make(chan time.Time)
-	go func() {
-		for {
-			select {
-			case ch <- time.Now():
-			case <-t.stopCh:
-				return
-			}
-		}
-	}()
-	return ch
+	return t.c
 }
 
-func (t *immediateTicker) Stop() {
-	close(t.stopCh)
+func (t *immediateTicker) Stop() bool {
+	select {
+	case <-t.c:
+		return true
+	default:
+		return false
+	}
 }
 
 func (w *testWatchCache) RequestWatchProgress(ctx context.Context) error {
@@ -451,7 +462,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, nil)
+	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -470,7 +481,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -489,7 +500,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -507,7 +518,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, matchValues)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", matchValues)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -524,6 +535,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
+	forceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, &cache.Indexers{})
 	defer store.Stop()
@@ -534,7 +546,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, nil)
+	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -614,7 +626,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 				store.Add(makeTestPod("bar", 4))
 			}()
 
-			_, _, _, err := store.WaitUntilFreshAndList(ctx, 4, nil)
+			_, _, _, err := store.WaitUntilFreshAndList(ctx, 4, "", nil)
 			if !errors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
@@ -643,7 +655,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	defer store.Stop()
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(ctx, 0, "", nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -666,7 +678,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, "", nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -75,6 +75,15 @@ kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, const
 			fileContents: bytes.Join([][]byte{
 				cfgFiles["InitConfiguration_v1beta3"],
 				cfgFiles["ClusterConfiguration_v1beta3"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name: "v1beta4.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta4"],
+				cfgFiles["ClusterConfiguration_v1beta4"],
 				cfgFiles["Kube-proxy_componentconfig"],
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),

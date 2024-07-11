@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceFilterModelApplyConfiguration represents an declarative configuration of the ResourceFilterModel type for use
+// ResourceFilterModelApplyConfiguration represents a declarative configuration of the ResourceFilterModel type for use
 // with apply.
 type ResourceFilterModelApplyConfiguration struct {
 	NamedResources *NamedResourcesFilterApplyConfiguration `json:"namedResources,omitempty"`
 }
 
-// ResourceFilterModelApplyConfiguration constructs an declarative configuration of the ResourceFilterModel type for use with
+// ResourceFilterModelApplyConfiguration constructs a declarative configuration of the ResourceFilterModel type for use with
 // apply.
 func ResourceFilterModel() *ResourceFilterModelApplyConfiguration {
 	return &ResourceFilterModelApplyConfiguration{}

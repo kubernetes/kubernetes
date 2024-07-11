@@ -40,16 +40,14 @@ import (
 // TestPodGcOrphanedPodsWithFinalizer tests deletion of orphaned pods
 func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 	tests := map[string]struct {
-		enablePodDisruptionConditions bool
 		enableJobPodReplacementPolicy bool
 		phase                         v1.PodPhase
 		wantPhase                     v1.PodPhase
 		wantDisruptionTarget          *v1.PodCondition
 	}{
-		"PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodPending,
-			wantPhase:                     v1.PodFailed,
+		"pending pod": {
+			phase:     v1.PodPending,
+			wantPhase: v1.PodFailed,
 			wantDisruptionTarget: &v1.PodCondition{
 				Type:    v1.DisruptionTarget,
 				Status:  v1.ConditionTrue,
@@ -57,8 +55,7 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 				Message: "PodGC: node no longer exists",
 			},
 		},
-		"PodDisruptionConditions and PodReplacementPolicy enabled": {
-			enablePodDisruptionConditions: true,
+		"pending pod; PodReplacementPolicy enabled": {
 			enableJobPodReplacementPolicy: true,
 			phase:                         v1.PodPending,
 			wantPhase:                     v1.PodFailed,
@@ -69,32 +66,18 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 				Message: "PodGC: node no longer exists",
 			},
 		},
-		"Only PodReplacementPolicy enabled; no PodDisruptionCondition": {
-			enablePodDisruptionConditions: false,
-			enableJobPodReplacementPolicy: true,
-			phase:                         v1.PodPending,
-			wantPhase:                     v1.PodFailed,
+		"succeeded pod": {
+			phase:     v1.PodSucceeded,
+			wantPhase: v1.PodSucceeded,
 		},
-		"PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
-			phase:                         v1.PodPending,
-			wantPhase:                     v1.PodPending,
-		},
-		"PodDisruptionConditions enabled; succeeded pod": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodSucceeded,
-			wantPhase:                     v1.PodSucceeded,
-		},
-		"PodDisruptionConditions enabled; failed pod": {
-			enablePodDisruptionConditions: true,
-			phase:                         v1.PodFailed,
-			wantPhase:                     v1.PodFailed,
+		"failed pod": {
+			phase:     v1.PodFailed,
+			wantPhase: v1.PodFailed,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			testCtx := setup(t, "podgc-orphaned")
 			cs := testCtx.ClientSet
@@ -170,31 +153,18 @@ func TestPodGcOrphanedPodsWithFinalizer(t *testing.T) {
 // TestTerminatingOnOutOfServiceNode tests deletion pods terminating on out-of-service nodes
 func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 	tests := map[string]struct {
-		enablePodDisruptionConditions bool
 		enableJobPodReplacementPolicy bool
 		withFinalizer                 bool
 		wantPhase                     v1.PodPhase
 	}{
-		"pod has phase changed to Failed when PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
-			withFinalizer:                 true,
-			wantPhase:                     v1.PodFailed,
+		"pod has phase changed to Failed": {
+			withFinalizer: true,
+			wantPhase:     v1.PodFailed,
 		},
-		"pod has phase unchanged when PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
-			withFinalizer:                 true,
-			wantPhase:                     v1.PodPending,
+		"pod is getting deleted when no finalizer": {
+			withFinalizer: false,
 		},
-		"pod is getting deleted when no finalizer and PodDisruptionConditions enabled": {
-			enablePodDisruptionConditions: true,
-			withFinalizer:                 false,
-		},
-		"pod is getting deleted when no finalizer and PodDisruptionConditions disabled": {
-			enablePodDisruptionConditions: false,
-			withFinalizer:                 false,
-		},
-		"pod has phase changed when PodDisruptionConditions disabled, but JobPodReplacementPolicy enabled": {
-			enablePodDisruptionConditions: false,
+		"pod has phase changed when JobPodReplacementPolicy enabled": {
 			enableJobPodReplacementPolicy: true,
 			withFinalizer:                 true,
 			wantPhase:                     v1.PodFailed,
@@ -203,7 +173,6 @@ func TestTerminatingOnOutOfServiceNode(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			testCtx := setup(t, "podgc-out-of-service")
@@ -385,7 +354,6 @@ func TestPodGcForPodsWithDuplicatedFieldKeys(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, true)
 			testCtx := setup(t, "podgc-orphaned")
 			cs := testCtx.ClientSet
 

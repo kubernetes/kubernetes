@@ -40,7 +40,7 @@ import (
 
 func TestEndpointSliceMirroring(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -313,7 +313,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)
@@ -488,7 +488,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := clientset.NewForConfig(server.ClientConfig)

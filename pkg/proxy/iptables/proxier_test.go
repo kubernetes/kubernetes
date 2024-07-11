@@ -49,12 +49,11 @@ import (
 	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
-	"k8s.io/kubernetes/pkg/proxy/metrics"
-
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -94,7 +93,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		ipfamily = v1.IPv6Protocol
 		podCIDR = "fd00:10::/64"
 	}
-	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
+	detectLocal := proxyutil.NewDetectLocalByCIDR(podCIDR)
 
 	networkInterfacer := proxyutiltest.NewFakeNetwork()
 	itf := net.Interface{Index: 0, MTU: 0, Name: "lo", HardwareAddr: nil, Flags: 0}
@@ -114,6 +113,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	networkInterfacer.AddInterfaceAddr(&itf1, addrs1)
 
 	p := &Proxier{
+		ipFamily:                 ipfamily,
 		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
@@ -136,6 +136,10 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		localhostNodePorts:       true,
 		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
+		nfAcctCounters: map[string]bool{
+			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
+			metrics.LocalhostNodePortAcceptedNFAcctCounter:     true,
+		},
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
@@ -409,7 +413,7 @@ func countRules(logger klog.Logger, tableName utiliptables.Table, ruleData strin
 }
 
 func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesTotal.WithLabelValues(string(tableName)))
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesTotal.WithLabelValues(string(tableName)))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -418,7 +422,7 @@ func countRulesFromMetric(logger klog.Logger, tableName utiliptables.Table) int 
 }
 
 func countRulesFromLastSyncMetric(logger klog.Logger, tableName utiliptables.Table) int {
-	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IptablesRulesLastSync.WithLabelValues(string(tableName)))
+	numRulesFloat, err := testutil.GetGaugeMetricValue(metrics.IPTablesRulesLastSync.WithLabelValues(string(tableName)))
 	if err != nil {
 		logger.Error(err, "metrics are not registered?")
 		return -1
@@ -1544,7 +1548,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -1718,7 +1722,7 @@ func TestOverallIPTablesRules(t *testing.T) {
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m tcp -p tcp -d 1.2.3.4 --dport 80 -j DROP
 		-A KUBE-EXTERNAL-SERVICES -m comment --comment "ns2/svc2:p80 has no local endpoints" -m addrtype --dst-type LOCAL -m tcp -p tcp --dport 3001 -j DROP
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
@@ -1744,8 +1748,11 @@ func TestOverallIPTablesRules(t *testing.T) {
 		:KUBE-SVC-NUKIZ6OKUXPJNT4C - [0:0]
 		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
 		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+		-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3001 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
 		-A KUBE-NODEPORTS -m comment --comment ns2/svc2:p80 -m tcp -p tcp --dport 3001 -j KUBE-EXT-GNZBNJ2PO5MGZ6GT
+		-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3003 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-X27LE4BHSL4DOUIK
 		-A KUBE-NODEPORTS -m comment --comment ns3/svc3:p80 -m tcp -p tcp --dport 3003 -j KUBE-EXT-X27LE4BHSL4DOUIK
+		-A KUBE-NODEPORTS -m comment --comment ns5/svc5:p80 -m tcp -p tcp -d 127.0.0.0/8 --dport 3002 -m nfacct --nfacct-name localhost_nps_accepted_pkts -j KUBE-EXT-NUKIZ6OKUXPJNT4C
 		-A KUBE-NODEPORTS -m comment --comment ns5/svc5:p80 -m tcp -p tcp --dport 3002 -j KUBE-EXT-NUKIZ6OKUXPJNT4C
 		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
 		-A KUBE-SERVICES -m comment --comment "ns2/svc2:p80 cluster IP" -m tcp -p tcp -d 172.30.0.42 --dport 80 -j KUBE-SVC-GNZBNJ2PO5MGZ6GT
@@ -2545,22 +2552,47 @@ func TestHealthCheckNodePort(t *testing.T) {
 }
 
 func TestDropInvalidRule(t *testing.T) {
-	for _, tcpLiberal := range []bool{false, true} {
-		t.Run(fmt.Sprintf("tcpLiberal %t", tcpLiberal), func(t *testing.T) {
-			ipt := iptablestest.NewFake()
-			fp := NewFakeProxier(ipt)
-			fp.conntrackTCPLiberal = tcpLiberal
-			fp.syncProxyRules()
-
-			var expected string
-			if !tcpLiberal {
-				expected = "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP"
-			}
-			expected += dedent.Dedent(`
+	kubeForwardChainRules := dedent.Dedent(`
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 				-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-				`)
+	`)
 
+	testCases := []struct {
+		nfacctEnsured  bool
+		tcpLiberal     bool
+		dropRule       string
+		nfAcctCounters map[string]bool
+	}{
+		{
+			nfacctEnsured:  false,
+			tcpLiberal:     false,
+			nfAcctCounters: map[string]bool{},
+			dropRule:       "-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP",
+		},
+		{
+			nfacctEnsured: true,
+			tcpLiberal:    false,
+			nfAcctCounters: map[string]bool{
+				metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
+			},
+			dropRule: fmt.Sprintf("-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name %s -j DROP", metrics.IPTablesCTStateInvalidDroppedNFAcctCounter),
+		},
+		{
+			nfacctEnsured:  false,
+			tcpLiberal:     true,
+			nfAcctCounters: map[string]bool{},
+			dropRule:       "",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("tcpLiberal is %t and nfacctEnsured is %t", tc.tcpLiberal, tc.nfacctEnsured), func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			fp := NewFakeProxier(ipt)
+			fp.conntrackTCPLiberal = tc.tcpLiberal
+			fp.nfAcctCounters = tc.nfAcctCounters
+			fp.syncProxyRules()
+
+			expected := tc.dropRule + kubeForwardChainRules
 			assertIPTablesChainEqual(t, getLine(), utiliptables.TableFilter, kubeForwardChain, expected, fp.iptablesData.String())
 		})
 	}
@@ -4143,12 +4175,12 @@ func TestHealthCheckNodePortWhenTerminating(t *testing.T) {
 	}
 }
 
-func TestProxierMetricsIptablesTotalRules(t *testing.T) {
+func TestProxierMetricsIPTablesTotalRules(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 
 	svcIP := "172.30.0.41"
 	svcPort := 80
@@ -5588,7 +5620,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			fp := NewFakeProxier(ipt)
 			fp.masqueradeAll = tc.masqueradeAll
 			if !tc.localDetector {
-				fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
+				fp.localDetector = proxyutil.NewNoOpLocalDetector()
 			}
 			setupTest(fp)
 
@@ -5828,7 +5860,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	logger, _ := klogtesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	defer legacyregistry.Reset()
 
 	// Create initial state
@@ -5892,7 +5924,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -5975,7 +6007,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6029,7 +6061,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6093,7 +6125,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-SERVICES -m comment --comment "ns4/svc4:p80 has no endpoints" -m tcp -p tcp -d 172.30.0.44 --dport 80 -j REJECT
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6149,7 +6181,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6206,7 +6238,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6262,7 +6294,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6320,7 +6352,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6357,7 +6389,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if fp.needFullSync {
 		t.Fatalf("Proxier unexpectedly already needs a full sync?")
 	}
-	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	partialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
 	if err != nil {
 		t.Fatalf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6391,7 +6423,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	if !fp.needFullSync {
 		t.Errorf("Proxier did not fail on previous partial resync?")
 	}
-	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	updatedPartialRestoreFailures, err := testutil.GetCounterMetricValue(metrics.IPTablesPartialRestoreFailuresTotal)
 	if err != nil {
 		t.Errorf("Could not get partial restore failures metric: %v", err)
 	}
@@ -6411,7 +6443,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		:KUBE-FORWARD - [0:0]
 		:KUBE-PROXY-FIREWALL - [0:0]
 		-A KUBE-FIREWALL -m comment --comment "block incoming localnet connections" -d 127.0.0.0/8 ! -s 127.0.0.0/8 -m conntrack ! --ctstate RELATED,ESTABLISHED,DNAT -j DROP
-		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -m nfacct --nfacct-name ct_state_invalid_dropped_pkts -j DROP
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
 		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 		COMMIT
@@ -6472,7 +6504,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPTables)
 	testCases := []struct {
 		name                                                string
 		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy

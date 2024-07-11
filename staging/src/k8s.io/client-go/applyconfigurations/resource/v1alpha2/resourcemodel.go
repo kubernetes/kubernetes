@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// ResourceModelApplyConfiguration represents an declarative configuration of the ResourceModel type for use
+// ResourceModelApplyConfiguration represents a declarative configuration of the ResourceModel type for use
 // with apply.
 type ResourceModelApplyConfiguration struct {
 	NamedResources *NamedResourcesResourcesApplyConfiguration `json:"namedResources,omitempty"`
 }
 
-// ResourceModelApplyConfiguration constructs an declarative configuration of the ResourceModel type for use with
+// ResourceModelApplyConfiguration constructs a declarative configuration of the ResourceModel type for use with
 // apply.
 func ResourceModel() *ResourceModelApplyConfiguration {
 	return &ResourceModelApplyConfiguration{}

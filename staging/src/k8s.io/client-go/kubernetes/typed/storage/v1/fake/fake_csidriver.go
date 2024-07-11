@@ -45,7 +45,7 @@ var csidriversKind = v1.SchemeGroupVersion.WithKind("CSIDriver")
 func (c *FakeCSIDrivers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CSIDriver, err error) {
 	emptyResult := &v1.CSIDriver{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(csidriversResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(csidriversResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeCSIDrivers) Get(ctx context.Context, name string, options metav1.Ge
 func (c *FakeCSIDrivers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.CSIDriverList, err error) {
 	emptyResult := &v1.CSIDriverList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(csidriversResource, csidriversKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(csidriversResource, csidriversKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeCSIDrivers) List(ctx context.Context, opts metav1.ListOptions) (res
 // Watch returns a watch.Interface that watches the requested cSIDrivers.
 func (c *FakeCSIDrivers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(csidriversResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(csidriversResource, opts))
 }
 
 // Create takes the representation of a cSIDriver and creates it.  Returns the server's representation of the cSIDriver, and an error, if there is any.
 func (c *FakeCSIDrivers) Create(ctx context.Context, cSIDriver *v1.CSIDriver, opts metav1.CreateOptions) (result *v1.CSIDriver, err error) {
 	emptyResult := &v1.CSIDriver{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(csidriversResource, cSIDriver), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(csidriversResource, cSIDriver, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeCSIDrivers) Create(ctx context.Context, cSIDriver *v1.CSIDriver, op
 func (c *FakeCSIDrivers) Update(ctx context.Context, cSIDriver *v1.CSIDriver, opts metav1.UpdateOptions) (result *v1.CSIDriver, err error) {
 	emptyResult := &v1.CSIDriver{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(csidriversResource, cSIDriver), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(csidriversResource, cSIDriver, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeCSIDrivers) Delete(ctx context.Context, name string, opts metav1.De
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeCSIDrivers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(csidriversResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(csidriversResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.CSIDriverList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeCSIDrivers) DeleteCollection(ctx context.Context, opts metav1.Delet
 func (c *FakeCSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSIDriver, err error) {
 	emptyResult := &v1.CSIDriver{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(csidriversResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeCSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1.CSIDriv
 	}
 	emptyResult := &v1.CSIDriver{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csidriversResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(csidriversResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

@@ -832,7 +832,7 @@ func createFlowSchema(ctx context.Context, f *framework.Framework, flowSchemaNam
 // by checking: (1) the dangling priority level reference condition in the flow
 // schema status, and (2) metrics. The function times out after 30 seconds.
 func waitForSteadyState(ctx context.Context, f *framework.Framework, flowSchemaName string, priorityLevelName string) {
-	framework.ExpectNoError(wait.PollWithContext(ctx, time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
 		fs, err := f.ClientSet.FlowcontrolV1().FlowSchemas().Get(ctx, flowSchemaName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

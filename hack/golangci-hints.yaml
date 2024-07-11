@@ -90,6 +90,7 @@ linters:
     - revive
     - staticcheck
     - stylecheck
+    - testifylint
     - unused
 
 linters-settings: # please keep this alphabetized
@@ -127,12 +128,23 @@ linters-settings: # please keep this alphabetized
           # The following packages have been migrated to contextual logging.
           # Packages matched here do not have to be listed above because
           # "contextual" implies "structured".
+          contextual k8s.io/api/.*
           contextual k8s.io/apimachinery/pkg/util/runtime/.*
           contextual k8s.io/client-go/metadata/.*
           contextual k8s.io/client-go/tools/events/.*
           contextual k8s.io/client-go/tools/record/.*
           contextual k8s.io/component-helpers/.*
+          contextual k8s.io/cri-api/.*
+          contextual k8s.io/cri-client/.*
           contextual k8s.io/dynamic-resource-allocation/.*
+          contextual k8s.io/endpointslice/.*
+          contextual k8s.io/kms/.*
+          contextual k8s.io/kube-controller-manager/.*
+          contextual k8s.io/kube-proxy/.*
+          contextual k8s.io/kube-scheduler/.*
+          contextual k8s.io/sample-apiserver/.*
+          contextual k8s.io/sample-cli-plugin/.*
+          contextual k8s.io/sample-controller/.*
           contextual k8s.io/kubernetes/cmd/kube-proxy/.*
           contextual k8s.io/kubernetes/cmd/kube-scheduler/.*
           contextual k8s.io/kubernetes/pkg/controller/.*
@@ -168,3 +180,5 @@ linters-settings: # please keep this alphabetized
   staticcheck:
     checks:
       - "all"
+  testifylint:
+    enable-all: true

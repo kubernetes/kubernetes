@@ -1,6 +1,3 @@
-//go:build !providerless
-// +build !providerless
-
 /*
 Copyright 2024 The Kubernetes Authors.
 

@@ -37,6 +37,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	"k8s.io/kubernetes/pkg/controlplane"
+	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/pointer"
 )
@@ -51,7 +52,7 @@ const (
 func TestStorageVersionGarbageCollection(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)
@@ -174,7 +175,7 @@ func createTestAPIServerIdentityLease(t *testing.T, client kubernetes.Interface,
 			Name:      name,
 			Namespace: metav1.NamespaceSystem,
 			Labels: map[string]string{
-				controlplane.IdentityLeaseComponentLabelKey: controlplane.KubeAPIServer,
+				controlplaneapiserver.IdentityLeaseComponentLabelKey: controlplane.KubeAPIServer,
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{

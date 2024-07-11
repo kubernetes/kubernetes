@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -68,7 +69,7 @@ func TestDriverParameter(t *testing.T) {
 	for _, testcase := range testcases {
 		actual, err := loadDriverDefinition(testcase.filename)
 		if testcase.err == "" {
-			assert.NoError(t, err, testcase.name)
+			require.NoError(t, err, testcase.name)
 		} else {
 			if assert.Error(t, err, testcase.name) {
 				assert.Equal(t, testcase.err, err.Error())

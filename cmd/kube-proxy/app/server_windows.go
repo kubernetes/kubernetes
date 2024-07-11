@@ -51,7 +51,6 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 // Proxier. It should fill in any platform-specific fields and perform other
 // platform-specific setup.
 func (s *ProxyServer) platformSetup(ctx context.Context) error {
-	winkernel.RegisterMetrics()
 	// Preserve backward-compatibility with the old secondary IP behavior
 	if s.PrimaryIPFamily == v1.IPv4Protocol {
 		s.NodeIPs[v1.IPv6Protocol] = net.IPv6zero

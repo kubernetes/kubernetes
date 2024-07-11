@@ -133,7 +133,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 	ginkgo.It("should preempt lower priority pods using ReadWriteOncePod volumes", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
-		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
+		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes, nil)
 
 		l.priorityClass = &schedulingv1.PriorityClass{
 			ObjectMeta: metav1.ObjectMeta{Name: "e2e-test-read-write-once-pod-" + string(uuid.NewUUID())},
@@ -189,7 +189,7 @@ func (t *readWriteOncePodTestSuite) DefineTests(driver storageframework.TestDriv
 	ginkgo.It("should block a second pod from using an in-use ReadWriteOncePod volume on the same node", func(ctx context.Context) {
 		// Create the ReadWriteOncePod PVC.
 		accessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}
-		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes)
+		l.volume = storageframework.CreateVolumeResourceWithAccessModes(ctx, driver, l.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange, accessModes, nil)
 
 		podConfig := e2epod.Config{
 			NS:           f.Namespace.Name,

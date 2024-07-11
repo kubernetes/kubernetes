@@ -46,7 +46,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
@@ -114,7 +113,6 @@ func NewAttachDetachController(
 	csiNodeInformer storageinformersv1.CSINodeInformer,
 	csiDriverInformer storageinformersv1.CSIDriverInformer,
 	volumeAttachmentInformer storageinformersv1.VolumeAttachmentInformer,
-	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
@@ -135,8 +133,10 @@ func NewAttachDetachController(
 		podIndexer:  podInformer.Informer().GetIndexer(),
 		nodeLister:  nodeInformer.Lister(),
 		nodesSynced: nodeInformer.Informer().HasSynced,
-		cloud:       cloud,
-		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+		pvcQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "pvcs"},
+		),
 	}
 
 	adc.csiNodeLister = csiNodeInformer.Lister()
@@ -277,9 +277,6 @@ type attachDetachController struct {
 	volumeAttachmentLister storagelistersv1.VolumeAttachmentLister
 	volumeAttachmentSynced kcache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -319,7 +316,7 @@ type attachDetachController struct {
 	broadcaster record.EventBroadcaster
 
 	// pvcQueue is used to queue pvc objects
-	pvcQueue workqueue.RateLimitingInterface
+	pvcQueue workqueue.TypedRateLimitingInterface[string]
 
 	// csiMigratedPluginManager detects in-tree plugins that have been migrated to CSI
 	csiMigratedPluginManager csimigration.PluginManager
@@ -606,11 +603,11 @@ func (adc *attachDetachController) processNextItem(logger klog.Logger) bool {
 	}
 	defer adc.pvcQueue.Done(keyObj)
 
-	if err := adc.syncPVCByKey(logger, keyObj.(string)); err != nil {
+	if err := adc.syncPVCByKey(logger, keyObj); err != nil {
 		// Rather than wait for a full resync, re-add the key to the
 		// queue to be processed.
 		adc.pvcQueue.AddRateLimited(keyObj)
-		runtime.HandleError(fmt.Errorf("Failed to sync pvc %q, will retry again: %v", keyObj.(string), err))
+		runtime.HandleError(fmt.Errorf("failed to sync pvc %q, will retry again: %w", keyObj, err))
 		return true
 	}
 
@@ -807,10 +804,6 @@ func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume
 
 func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
-}
-
-func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
-	return adc.cloud
 }
 
 func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {

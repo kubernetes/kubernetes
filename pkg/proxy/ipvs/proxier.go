@@ -53,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
@@ -127,7 +126,7 @@ func NewDualStackProxier(
 	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
@@ -140,7 +139,7 @@ func NewDualStackProxier(
 	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, ipt[0], ipvs, ipset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[0], hostname, nodeIPs[v1.IPv4Protocol], recorder,
+		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol], recorder,
 		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
@@ -149,7 +148,7 @@ func NewDualStackProxier(
 	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, ipt[1], ipvs, ipset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
-		localDetectors[1], hostname, nodeIPs[v1.IPv6Protocol], recorder,
+		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol], recorder,
 		healthzServer, scheduler, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -207,7 +206,7 @@ type Proxier struct {
 	conntrack      conntrack.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	localDetector  proxyutiliptables.LocalTrafficDetector
+	localDetector  proxyutil.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
 	recorder       events.EventRecorder
@@ -282,7 +281,7 @@ func NewProxier(
 	udpTimeout time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetector proxyutiliptables.LocalTrafficDetector,
+	localDetector proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
@@ -1445,7 +1444,7 @@ func (proxier *Proxier) syncProxyRules() {
 		} else {
 			proxier.logger.Error(err, "Failed to execute iptables-restore", "rules", proxier.iptablesData.Bytes())
 		}
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.IPTablesRestoreFailuresTotal.Inc()
 		return
 	}
 	for name, lastChangeTriggerTimes := range endpointUpdateResult.LastChangeTriggerTimes {

@@ -199,11 +199,11 @@ func testSchema() *schema.Structural {
 					"flags": {
 						Generic: schema.Generic{
 							Type: "object",
-							AdditionalProperties: &schema.StructuralOrBool{
-								Structural: &schema.Structural{
-									Generic: schema.Generic{
-										Type: "boolean",
-									},
+						},
+						AdditionalProperties: &schema.StructuralOrBool{
+							Structural: &schema.Structural{
+								Generic: schema.Generic{
+									Type: "boolean",
 								},
 							},
 						},
@@ -317,12 +317,12 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
-						Generic: schema.Generic{
-							Type: "string",
-						},
-					}},
 				},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+				}},
 			},
 			// expected JSON is {"":"","":"",...} so our length should be (3000000 - 2) / 6
 			ExpectedMaxElements: 393215,
@@ -382,12 +382,12 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			InputSchema: &schema.Structural{
 				Generic: schema.Generic{
 					Type: "object",
-					AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
-						Generic: schema.Generic{
-							Type: "string",
-						},
-					}},
 				},
+				AdditionalProperties: &schema.StructuralOrBool{Structural: &schema.Structural{
+					Generic: schema.Generic{
+						Type: "string",
+					},
+				}},
 				ValueValidation: &schema.ValueValidation{
 					Format:        "string",
 					MaxProperties: maxPtr(15),
@@ -519,15 +519,15 @@ func genNestedSchema(depth int) *schema.Structural {
 	generator = func(d int) schema.Structural {
 		nodeTemplate := schema.Structural{
 			Generic: schema.Generic{
-				Type:                 "object",
-				AdditionalProperties: &schema.StructuralOrBool{},
+				Type: "object",
 			},
+			AdditionalProperties: &schema.StructuralOrBool{},
 		}
 		if d == 1 {
 			return nodeTemplate
 		} else {
 			mapType := generator(d - 1)
-			nodeTemplate.Generic.AdditionalProperties.Structural = &mapType
+			nodeTemplate.AdditionalProperties.Structural = &mapType
 			return nodeTemplate
 		}
 	}

@@ -13,15 +13,29 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kustomize/kyaml/errors"
-	"sigs.k8s.io/kustomize/kyaml/internal/forked/github.com/go-yaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/sliceutil"
 	"sigs.k8s.io/kustomize/kyaml/utils"
 	"sigs.k8s.io/kustomize/kyaml/yaml/internal/k8sgen/pkg/labels"
+	yaml "sigs.k8s.io/yaml/goyaml.v3"
 )
 
 // MakeNullNode returns an RNode that represents an empty document.
 func MakeNullNode() *RNode {
 	return NewRNode(&Node{Tag: NodeTagNull})
+}
+
+// MakePersistentNullNode returns an RNode that should be persisted,
+// even when merging
+func MakePersistentNullNode(value string) *RNode {
+	n := NewRNode(
+		&Node{
+			Tag:   NodeTagNull,
+			Value: value,
+			Kind:  yaml.ScalarNode,
+		},
+	)
+	n.ShouldKeep = true
+	return n
 }
 
 // IsMissingOrNull is true if the RNode is nil or explicitly tagged null.
@@ -213,6 +227,9 @@ type RNode struct {
 	// list entry: list entry value
 	// object root: object root
 	value *yaml.Node
+
+	// Whether we should keep this node, even if otherwise we would clear it
+	ShouldKeep bool
 
 	Match []string
 }

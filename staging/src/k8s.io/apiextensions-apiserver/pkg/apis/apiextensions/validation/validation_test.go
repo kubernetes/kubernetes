@@ -7282,7 +7282,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 }
 
 func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.T) {
-	allValidationsErrors := []validationMatch{
+	allRuleValidationsErrors := []validationMatch{
 		invalid("spec", "validation", "openAPIV3Schema", "properties[x]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "properties[a]", "x-kubernetes-validations[0]", "rule"),
@@ -7291,28 +7291,51 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "x-kubernetes-validations[0]", "rule"),
 		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "additionalProperties", "x-kubernetes-validations[0]", "rule"),
 	}
+	allMessageExpressionValidationsErrors := []validationMatch{
+		invalid("spec", "validation", "openAPIV3Schema", "properties[x]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[obj]", "properties[a]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[array]", "items", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "x-kubernetes-validations[0]", "messageExpression"),
+		invalid("spec", "validation", "openAPIV3Schema", "properties[map]", "additionalProperties", "x-kubernetes-validations[0]", "messageExpression"),
+	}
 
 	tests := []struct {
-		name        string
-		storedRule  string
-		updatedRule string
-		errors      []validationMatch
+		name                     string
+		storedRule               string
+		updatedRule              string
+		storedMessageExpression  string
+		updatedMessageExpression string
+		errors                   []validationMatch
 	}{
 		{
-			name:        "functions declared for storage mode allowed if expression is unchanged from what is stored",
-			storedRule:  "test() == true",
-			updatedRule: "test() == true",
+			name:                     "functions declared for storage mode allowed if expressions are unchanged from what is stored",
+			storedRule:               "test() == true",
+			updatedRule:              "test() == true",
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test: %s'.format([test()])",
 		},
 		{
-			name:        "functions declared for storage mode not allowed if expression is changed",
-			storedRule:  "test() == false",
-			updatedRule: "test() == true",
-			errors:      allValidationsErrors,
+			name:                     "functions declared for storage mode not allowed if rule expression is changed",
+			storedRule:               "test() == false",
+			updatedRule:              "test() == true", // rule was changed
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test: %s'.format([test()])",
+			errors:                   allRuleValidationsErrors,
+		},
+		{
+			name:                     "functions declared for storage mode not allowed if message expression is changed",
+			storedRule:               "test() == true",
+			updatedRule:              "test() == true",
+			storedMessageExpression:  "'test: %s'.format([test()])",
+			updatedMessageExpression: "'test - updated: %s'.format([test()])", // messageExpression was changed
+			errors:                   allMessageExpressionValidationsErrors,
 		},
 	}
 
 	// Include the test library, which includes the test() function in the storage environment during test
-	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998))
+	base := environment.MustBaseEnvSet(version.MajorMinor(1, 998), true)
 	envSet, err := base.Extend(environment.VersionedOptions{
 		IntroducedVersion: version.MajorMinor(1, 999),
 		EnvOptions:        []cel.EnvOption{library.Test()},
@@ -7322,10 +7345,11 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 	}
 
 	for _, tc := range tests {
-		fn := func(rule string) *apiextensions.CustomResourceDefinition {
+		fn := func(rule, messageExpression string) *apiextensions.CustomResourceDefinition {
 			validationRules := []apiextensions.ValidationRule{
 				{
-					Rule: rule,
+					Rule:              rule,
+					MessageExpression: messageExpression,
 				},
 			}
 			return &apiextensions.CustomResourceDefinition{
@@ -7382,8 +7406,8 @@ func TestValidateCustomResourceDefinitionValidationRuleCompatibility(t *testing.
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			}
 		}
-		old := fn(tc.storedRule)
-		resource := fn(tc.updatedRule)
+		old := fn(tc.storedRule, tc.storedMessageExpression)
+		resource := fn(tc.updatedRule, tc.updatedMessageExpression)
 
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.TODO()
@@ -10104,7 +10128,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			if tt.opts.celEnvironmentSet == nil {
-				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+				tt.opts.celEnvironmentSet = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true)
 			}
 			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 
@@ -10635,7 +10659,7 @@ func TestCelContext(t *testing.T) {
 			celContext := RootCELContext(tt.schema)
 			celContext.converter = converter
 			opts := validationOptions{
-				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()),
+				celEnvironmentSet: environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true),
 			}
 			openAPIV3Schema := &specStandardValidatorV3{
 				allowDefaults:            opts.allowDefaults,

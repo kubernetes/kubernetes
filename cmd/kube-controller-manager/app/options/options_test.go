@@ -30,6 +30,7 @@ import (
 	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
@@ -115,11 +116,7 @@ var args = []string{
 	"--enable-hostpath-provisioner=true",
 	"--cluster-signing-duration=10h",
 	"--flex-volume-plugin-dir=/flex-volume-plugin",
-	"--volume-host-cidr-denylist=127.0.0.1/28,feed::/16",
-	"--volume-host-allow-local-loopback=false",
-	"--horizontal-pod-autoscaler-downscale-delay=2m",
 	"--horizontal-pod-autoscaler-sync-period=45s",
-	"--horizontal-pod-autoscaler-upscale-delay=1m",
 	"--horizontal-pod-autoscaler-downscale-stabilization=3m",
 	"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
 	"--horizontal-pod-autoscaler-initial-readiness-delay=50s",
@@ -316,8 +313,6 @@ func TestAddFlags(t *testing.T) {
 			&poautosclerconfig.HPAControllerConfiguration{
 				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 				HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
@@ -372,8 +367,6 @@ func TestAddFlags(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
-				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
-				VolumeHostAllowLocalLoopback: false,
 			},
 		},
 		PodGCController: &PodGCControllerOptions{
@@ -438,6 +431,7 @@ func TestAddFlags(t *testing.T) {
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 			},
 			RemoteKubeConfigFileOptional: true,
+			Anonymous:                    &apiserver.AnonymousAuthConfig{Enabled: true},
 		},
 		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
 			AllowCacheTTL:                10 * time.Second,
@@ -579,8 +573,6 @@ func TestApplyTo(t *testing.T) {
 			HPAController: poautosclerconfig.HPAControllerConfiguration{
 				ConcurrentHorizontalPodAutoscalerSyncs:              10,
 				HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-				HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-				HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 				HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
@@ -623,8 +615,6 @@ func TestApplyTo(t *testing.T) {
 						IncrementTimeoutHostPath: 45,
 					},
 				},
-				VolumeHostCIDRDenylist:       []string{"127.0.0.1/28", "feed::/16"},
-				VolumeHostAllowLocalLoopback: false,
 			},
 			PodGCController: podgcconfig.PodGCControllerConfiguration{
 				TerminatedPodGCThreshold: 12000,
@@ -1045,8 +1035,6 @@ func TestValidateControllersOptions(t *testing.T) {
 				&poautosclerconfig.HPAControllerConfiguration{
 					ConcurrentHorizontalPodAutoscalerSyncs:              0,
 					HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
-					HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
-					HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
 					HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
 					HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 					HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
@@ -1334,34 +1322,25 @@ func TestControllerManagerAliases(t *testing.T) {
 }
 
 func TestWatchListClientFlagUsage(t *testing.T) {
-	assertWatchListClientFeatureDefaultValue(t)
-
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
 
-	fgFlagName := "feature-gates"
-	fg := fs.Lookup(fgFlagName)
-	if fg == nil {
-		t.Fatalf("didn't find %q flag", fgFlagName)
-	}
-
-	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=false)"
-	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
-		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
-	}
+	assertWatchListClientFeatureDefaultValue(t)
+	assertWatchListCommandLineDefaultValue(t, fs)
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
-	assertWatchListClientFeatureDefaultValue(t)
-
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
+
+	assertWatchListClientFeatureDefaultValue(t)
+	assertWatchListCommandLineDefaultValue(t, fs)
 
 	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
 	if err := fs.Parse(args); err != nil {
@@ -1376,8 +1355,21 @@ func TestWatchListClientFlagChange(t *testing.T) {
 
 func assertWatchListClientFeatureDefaultValue(t *testing.T) {
 	watchListClientDefaultValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if watchListClientDefaultValue {
-		t.Fatalf("expected %q feature gate to be disabled for KCM", clientgofeaturegate.WatchListClient)
+	if !watchListClientDefaultValue {
+		t.Fatalf("expected %q feature gate to be enabled for KCM", clientgofeaturegate.WatchListClient)
+	}
+}
+
+func assertWatchListCommandLineDefaultValue(t *testing.T, fs *pflag.FlagSet) {
+	fgFlagName := "feature-gates"
+	fg := fs.Lookup(fgFlagName)
+	if fg == nil {
+		t.Fatalf("didn't find %q flag", fgFlagName)
+	}
+
+	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=true)"
+	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
+		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
 	}
 }
 

@@ -125,14 +125,13 @@ func TestManager(t *testing.T) {
 		shutdownGracePeriodCriticalPods  time.Duration
 		systemInhibitDelay               time.Duration
 		overrideSystemInhibitDelay       time.Duration
-		enablePodDisruptionConditions    bool
 		expectedDidOverrideInhibitDelay  bool
 		expectedPodToGracePeriodOverride map[string]int64
 		expectedError                    error
 		expectedPodStatuses              map[string]v1.PodStatus
 	}{
 		{
-			desc: "verify pod status; PodDisruptionConditions enabled",
+			desc: "verify pod status",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "running-pod"},
@@ -160,7 +159,6 @@ func TestManager(t *testing.T) {
 			shutdownGracePeriodCriticalPods:  time.Duration(10 * time.Second),
 			systemInhibitDelay:               time.Duration(40 * time.Second),
 			overrideSystemInhibitDelay:       time.Duration(40 * time.Second),
-			enablePodDisruptionConditions:    true,
 			expectedDidOverrideInhibitDelay:  false,
 			expectedPodToGracePeriodOverride: map[string]int64{"running-pod": 20, "failed-pod": 20, "succeeded-pod": 20},
 			expectedPodStatuses: map[string]v1.PodStatus{
@@ -212,7 +210,6 @@ func TestManager(t *testing.T) {
 			shutdownGracePeriodCriticalPods:  time.Duration(10 * time.Second),
 			systemInhibitDelay:               time.Duration(40 * time.Second),
 			overrideSystemInhibitDelay:       time.Duration(40 * time.Second),
-			enablePodDisruptionConditions:    false,
 			expectedDidOverrideInhibitDelay:  false,
 			expectedPodToGracePeriodOverride: map[string]int64{"normal-pod-nil-grace-period": 20, "critical-pod-nil-grace-period": 10},
 			expectedPodStatuses: map[string]v1.PodStatus{
@@ -220,11 +217,27 @@ func TestManager(t *testing.T) {
 					Phase:   v1.PodFailed,
 					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.DisruptionTarget,
+							Status:  v1.ConditionTrue,
+							Reason:  "TerminationByKubelet",
+							Message: "Pod was terminated in response to imminent node shutdown.",
+						},
+					},
 				},
 				"critical-pod-nil-grace-period": {
 					Phase:   v1.PodFailed,
 					Message: "Pod was terminated in response to imminent node shutdown.",
 					Reason:  "Terminated",
+					Conditions: []v1.PodCondition{
+						{
+							Type:    v1.DisruptionTarget,
+							Status:  v1.ConditionTrue,
+							Reason:  "TerminationByKubelet",
+							Message: "Pod was terminated in response to imminent node shutdown.",
+						},
+					},
 				},
 			},
 		},
@@ -331,7 +344,6 @@ func TestManager(t *testing.T) {
 			systemDbus = func() (dbusInhibiter, error) {
 				return fakeDbus, nil
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.PodDisruptionConditions, tc.enablePodDisruptionConditions)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
 			proberManager := probetest.FakeManager{}
@@ -364,7 +376,7 @@ func TestManager(t *testing.T) {
 				assert.NoError(t, err, "expected manager.Start() to not return error")
 				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
 				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
-				assert.Equal(t, manager.Admit(nil).Admit, true)
+				assert.True(t, manager.Admit(nil).Admit)
 
 				// Send fake shutdown event
 				select {
@@ -386,7 +398,7 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
-				assert.Equal(t, manager.Admit(nil).Admit, false)
+				assert.False(t, manager.Admit(nil).Admit)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {

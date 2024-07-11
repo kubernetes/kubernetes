@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// DeploymentConditionApplyConfiguration represents an declarative configuration of the DeploymentCondition type for use
+// DeploymentConditionApplyConfiguration represents a declarative configuration of the DeploymentCondition type for use
 // with apply.
 type DeploymentConditionApplyConfiguration struct {
 	Type               *v1beta1.DeploymentConditionType `json:"type,omitempty"`
@@ -35,7 +35,7 @@ type DeploymentConditionApplyConfiguration struct {
 	Message            *string                          `json:"message,omitempty"`
 }
 
-// DeploymentConditionApplyConfiguration constructs an declarative configuration of the DeploymentCondition type for use with
+// DeploymentConditionApplyConfiguration constructs a declarative configuration of the DeploymentCondition type for use with
 // apply.
 func DeploymentCondition() *DeploymentConditionApplyConfiguration {
 	return &DeploymentConditionApplyConfiguration{}

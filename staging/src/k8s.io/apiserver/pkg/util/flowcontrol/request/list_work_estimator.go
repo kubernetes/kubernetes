@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
+	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
@@ -165,15 +167,16 @@ func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	match := opts.ResourceVersionMatch
 	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 
 	// Serve consistent reads from storage if ConsistentListFromCache is disabled
-	consistentReadFromStorage := resourceVersion == "" && !consistentListFromCacheEnabled
+	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
 	// Watch cache doesn't support continuations, so serve them from etcd.
 	hasContinuation := len(opts.Continue) > 0
-	// Serve paginated requests about revision "0" from watch cache to avoid overwhelming etcd.
-	hasLimit := opts.Limit > 0 && resourceVersion != "0"
 	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
-	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+	isLegacyExactMatch := opts.Limit > 0 && match == "" && len(resourceVersion) > 0 && resourceVersion != "0"
+	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan || isLegacyExactMatch
 
-	return consistentReadFromStorage || hasContinuation || hasLimit || unsupportedMatch
+	return consistentReadFromStorage || hasContinuation || unsupportedMatch
 }

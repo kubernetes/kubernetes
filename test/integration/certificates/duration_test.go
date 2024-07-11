@@ -53,7 +53,7 @@ import (
 func TestCSRDuration(t *testing.T) {
 	t.Parallel()
 
-	s := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	t.Cleanup(s.TearDownFn)
 
 	_, ctx := ktesting.NewTestContext(t)

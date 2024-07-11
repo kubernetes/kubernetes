@@ -22,6 +22,28 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+var simpleValues *cbor.SimpleValueRegistry = func() *cbor.SimpleValueRegistry {
+	var opts []func(*cbor.SimpleValueRegistry) error
+	for sv := 0; sv <= 255; sv++ {
+		// Reject simple values 0-19, 23, and 32-255. The simple values 24-31 are reserved
+		// and considered ill-formed by the CBOR specification. We only accept false (20),
+		// true (21), and null (22).
+		switch sv {
+		case 20: // false
+		case 21: // true
+		case 22: // null
+		case 24, 25, 26, 27, 28, 29, 30, 31: // reserved
+		default:
+			opts = append(opts, cbor.WithRejectedSimpleValue(cbor.SimpleValue(sv)))
+		}
+	}
+	simpleValues, err := cbor.NewSimpleValueRegistryFromDefaults(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return simpleValues
+}()
+
 var Decode cbor.DecMode = func() cbor.DecMode {
 	decode, err := cbor.DecOptions{
 		// Maps with duplicate keys are well-formed but invalid according to the CBOR spec
@@ -75,8 +97,12 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// Produce string concrete values when decoding a CBOR byte string into interface{}.
 		DefaultByteStringType: reflect.TypeOf(""),
 
-		// Allow CBOR byte strings to be decoded into string destination values.
-		ByteStringToString: cbor.ByteStringToStringAllowed,
+		// Allow CBOR byte strings to be decoded into string destination values. If a byte
+		// string is enclosed in an "expected later encoding" tag
+		// (https://www.rfc-editor.org/rfc/rfc8949.html#section-3.4.5.2), then the text
+		// encoding indicated by that tag (e.g. base64) will be applied to the contents of
+		// the byte string.
+		ByteStringToString: cbor.ByteStringToStringAllowedWithExpectedLaterEncoding,
 
 		// Allow CBOR byte strings to match struct fields when appearing as a map key.
 		FieldNameByteString: cbor.FieldNameByteStringAllowed,
@@ -84,6 +110,35 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// When decoding an unrecognized tag to interface{}, return the decoded tag content
 		// instead of the default, a cbor.Tag representing a (number, content) pair.
 		UnrecognizedTagToAny: cbor.UnrecognizedTagContentToAny,
+
+		// Decode time tags to interface{} as strings containing RFC 3339 timestamps.
+		TimeTagToAny: cbor.TimeTagToRFC3339Nano,
+
+		// For parity with JSON, strings can be decoded into time.Time if they are RFC 3339
+		// timestamps.
+		ByteStringToTime: cbor.ByteStringToTimeAllowed,
+
+		// Reject NaN and infinite floating-point values since they don't have a JSON
+		// representation (RFC 8259 Section 6).
+		NaN: cbor.NaNDecodeForbidden,
+		Inf: cbor.InfDecodeForbidden,
+
+		// When unmarshaling a byte string into a []byte, assume that the byte string
+		// contains base64-encoded bytes, unless explicitly counterindicated by an "expected
+		// later encoding" tag. This is consistent with the because of unmarshaling a JSON
+		// text into a []byte.
+		ByteStringExpectedFormat: cbor.ByteStringExpectedBase64,
+
+		// Reject the arbitrary-precision integer tags because they can't be faithfully
+		// roundtripped through the allowable Unstructured types.
+		BignumTag: cbor.BignumTagForbidden,
+
+		// Reject anything other than the simple values true, false, and null.
+		SimpleValues: simpleValues,
+
+		// Disable default recognition of types implementing encoding.BinaryUnmarshaler,
+		// which is not recognized for JSON decoding.
+		BinaryUnmarshaler: cbor.BinaryUnmarshalerNone,
 	}.DecMode()
 	if err != nil {
 		panic(err)

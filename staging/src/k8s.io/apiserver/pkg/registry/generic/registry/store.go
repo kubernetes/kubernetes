@@ -226,6 +226,10 @@ type Store struct {
 	// storageVersionHash as empty in the discovery document.
 	StorageVersioner runtime.GroupVersioner
 
+	// ReadinessCheckFunc checks if the storage is ready for accepting requests.
+	// The field is optional, if set needs to be thread-safe.
+	ReadinessCheckFunc func() error
+
 	// DestroyFunc cleans up clients used by the underlying Storage; optional.
 	// If set, DestroyFunc has to be implemented in thread-safe way and
 	// be prepared for being called more than once.
@@ -234,6 +238,7 @@ type Store struct {
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
+var _ rest.StorageWithReadiness = &Store{}
 var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
 
@@ -290,6 +295,14 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 // New implements RESTStorage.New.
 func (e *Store) New() runtime.Object {
 	return e.NewFunc()
+}
+
+// ReadinessCheck checks if the storage is ready for accepting requests.
+func (e *Store) ReadinessCheck() error {
+	if e.ReadinessCheckFunc != nil {
+		return e.ReadinessCheckFunc()
+	}
+	return nil
 }
 
 // Destroy cleans up its resources on shutdown.
@@ -1518,7 +1531,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return err
 	}
 
-	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)
+	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource, e.NewFunc())
 	if err != nil {
 		return err
 	}
@@ -1613,6 +1626,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 				})
 			}
 		}
+	}
+	if e.Storage.Storage != nil {
+		e.ReadinessCheckFunc = e.Storage.Storage.ReadinessCheck
 	}
 
 	return nil

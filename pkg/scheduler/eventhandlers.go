@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
@@ -204,7 +205,20 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		logger.Error(err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
 
-	sched.SchedulingQueue.AssignedPodAdded(logger, pod)
+	// SchedulingQueue.AssignedPodAdded has a problem:
+	// It internally pre-filters Pods to move to activeQ,
+	// while taking only in-tree plugins into consideration.
+	// Consequently, if custom plugins that subscribes Pod/Add events reject Pods,
+	// those Pods will never be requeued to activeQ by an assigned Pod related events,
+	// and they may be stuck in unschedulableQ.
+	//
+	// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
+	// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodAdd, nil, pod, nil)
+	} else {
+		sched.SchedulingQueue.AssignedPodAdded(logger, pod)
+	}
 }
 
 func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
@@ -225,7 +239,20 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod)
+	// SchedulingQueue.AssignedPodUpdated has a problem:
+	// It internally pre-filters Pods to move to activeQ,
+	// while taking only in-tree plugins into consideration.
+	// Consequently, if custom plugins that subscribes Pod/Update events reject Pods,
+	// those Pods will never be requeued to activeQ by an assigned Pod related events,
+	// and they may be stuck in unschedulableQ.
+	//
+	// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
+	// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
+	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodUpdate, oldPod, newPod, nil)
+	} else {
+		sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod)
+	}
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
@@ -288,6 +315,7 @@ func addAllEventHandlers(
 	sched *Scheduler,
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
+	resourceClaimCache *assumecache.AssumeCache,
 	gvkMap map[framework.GVK]framework.ActionType,
 ) error {
 	var (
@@ -456,11 +484,9 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1alpha2().ResourceClaims().Informer().AddEventHandler(
+				handlerRegistration = resourceClaimCache.AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceClaim, "ResourceClaim"),
-				); err != nil {
-					return err
-				}
+				)
 				handlers = append(handlers, handlerRegistration)
 			}
 		case framework.ResourceClass:

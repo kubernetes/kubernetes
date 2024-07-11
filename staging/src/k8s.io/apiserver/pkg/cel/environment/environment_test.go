@@ -262,7 +262,7 @@ func TestBaseEnvironment(t *testing.T) {
 			for _, tv := range tc.typeVersionCombinations {
 				t.Run(fmt.Sprintf("version=%s,envType=%s", tv.version.String(), tv.envType), func(t *testing.T) {
 
-					envSet := MustBaseEnvSet(tv.version)
+					envSet := MustBaseEnvSet(tv.version, true)
 					if tc.opts != nil {
 						var err error
 						envSet, err = envSet.Extend(tc.opts...)

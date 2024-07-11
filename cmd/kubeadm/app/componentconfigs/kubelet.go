@@ -26,7 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -170,7 +170,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		warnDefaultComponentConfigValue(kind, "authentication.webhook.enabled", kubeletAuthenticationWebhookEnabled, *kc.config.Authentication.Webhook.Enabled)
 	}
 
-	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
+	// Serve a /healthz webserver on 127.0.0.1:10248 that kubeadm can talk to
 	if kc.config.HealthzBindAddress == "" {
 		kc.config.HealthzBindAddress = kubeletHealthzBindAddress
 	} else if kc.config.HealthzBindAddress != kubeletHealthzBindAddress {

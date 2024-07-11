@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// LeaseSpecApplyConfiguration represents an declarative configuration of the LeaseSpec type for use
+// LeaseSpecApplyConfiguration represents a declarative configuration of the LeaseSpec type for use
 // with apply.
 type LeaseSpecApplyConfiguration struct {
 	HolderIdentity       *string       `json:"holderIdentity,omitempty"`
@@ -32,7 +32,7 @@ type LeaseSpecApplyConfiguration struct {
 	LeaseTransitions     *int32        `json:"leaseTransitions,omitempty"`
 }
 
-// LeaseSpecApplyConfiguration constructs an declarative configuration of the LeaseSpec type for use with
+// LeaseSpecApplyConfiguration constructs a declarative configuration of the LeaseSpec type for use with
 // apply.
 func LeaseSpec() *LeaseSpecApplyConfiguration {
 	return &LeaseSpecApplyConfiguration{}

@@ -67,9 +67,9 @@ var (
 // Determining the name depends on Kubernetes >= 1.28.
 func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOwner bool, err error) {
 	switch {
-	case podClaim.Source.ResourceClaimName != nil:
-		return podClaim.Source.ResourceClaimName, false, nil
-	case podClaim.Source.ResourceClaimTemplateName != nil:
+	case podClaim.ResourceClaimName != nil:
+		return podClaim.ResourceClaimName, false, nil
+	case podClaim.ResourceClaimTemplateName != nil:
 		for _, status := range pod.Status.ResourceClaimStatuses {
 			if status.Name == podClaim.Name {
 				return status.ResourceClaimName, true, nil
@@ -143,9 +143,9 @@ func (l *Lookup) Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string,
 	}
 
 	switch {
-	case podClaim.Source.ResourceClaimName != nil:
-		return podClaim.Source.ResourceClaimName, false, nil
-	case podClaim.Source.ResourceClaimTemplateName != nil:
+	case podClaim.ResourceClaimName != nil:
+		return podClaim.ResourceClaimName, false, nil
+	case podClaim.ResourceClaimTemplateName != nil:
 		name := pod.Name + "-" + podClaim.Name
 		return &name, true, nil
 	default:

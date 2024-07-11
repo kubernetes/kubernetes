@@ -20,17 +20,14 @@ package v1alpha2
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // ResourceClassParametersGetter has a method to return a ResourceClassParametersInterface.
@@ -55,154 +52,18 @@ type ResourceClassParametersInterface interface {
 
 // resourceClassParameters implements ResourceClassParametersInterface
 type resourceClassParameters struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1alpha2.ResourceClassParameters, *v1alpha2.ResourceClassParametersList, *resourcev1alpha2.ResourceClassParametersApplyConfiguration]
 }
 
 // newResourceClassParameters returns a ResourceClassParameters
 func newResourceClassParameters(c *ResourceV1alpha2Client, namespace string) *resourceClassParameters {
 	return &resourceClassParameters{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1alpha2.ResourceClassParameters, *v1alpha2.ResourceClassParametersList, *resourcev1alpha2.ResourceClassParametersApplyConfiguration](
+			"resourceclassparameters",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1alpha2.ResourceClassParameters { return &v1alpha2.ResourceClassParameters{} },
+			func() *v1alpha2.ResourceClassParametersList { return &v1alpha2.ResourceClassParametersList{} }),
 	}
-}
-
-// Get takes name of the resourceClassParameters, and returns the corresponding resourceClassParameters object, and an error if there is any.
-func (c *resourceClassParameters) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClassParameters, err error) {
-	result = &v1alpha2.ResourceClassParameters{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ResourceClassParameters that match those selectors.
-func (c *resourceClassParameters) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClassParametersList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha2.ResourceClassParametersList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested resourceClassParameters.
-func (c *resourceClassParameters) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a resourceClassParameters and creates it.  Returns the server's representation of the resourceClassParameters, and an error, if there is any.
-func (c *resourceClassParameters) Create(ctx context.Context, resourceClassParameters *v1alpha2.ResourceClassParameters, opts v1.CreateOptions) (result *v1alpha2.ResourceClassParameters, err error) {
-	result = &v1alpha2.ResourceClassParameters{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClassParameters).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a resourceClassParameters and updates it. Returns the server's representation of the resourceClassParameters, and an error, if there is any.
-func (c *resourceClassParameters) Update(ctx context.Context, resourceClassParameters *v1alpha2.ResourceClassParameters, opts v1.UpdateOptions) (result *v1alpha2.ResourceClassParameters, err error) {
-	result = &v1alpha2.ResourceClassParameters{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		Name(resourceClassParameters.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClassParameters).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the resourceClassParameters and deletes it. Returns an error if one occurs.
-func (c *resourceClassParameters) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *resourceClassParameters) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched resourceClassParameters.
-func (c *resourceClassParameters) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClassParameters, err error) {
-	result = &v1alpha2.ResourceClassParameters{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied resourceClassParameters.
-func (c *resourceClassParameters) Apply(ctx context.Context, resourceClassParameters *resourcev1alpha2.ResourceClassParametersApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClassParameters, err error) {
-	if resourceClassParameters == nil {
-		return nil, fmt.Errorf("resourceClassParameters provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(resourceClassParameters)
-	if err != nil {
-		return nil, err
-	}
-	name := resourceClassParameters.Name
-	if name == nil {
-		return nil, fmt.Errorf("resourceClassParameters.Name must be provided to Apply")
-	}
-	result = &v1alpha2.ResourceClassParameters{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("resourceclassparameters").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

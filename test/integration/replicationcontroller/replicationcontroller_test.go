@@ -114,7 +114,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 func rmSetup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	tCtx := ktesting.Init(t)
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 
 	config := restclient.CopyConfig(server.ClientConfig)
 	clientSet, err := clientset.NewForConfig(config)

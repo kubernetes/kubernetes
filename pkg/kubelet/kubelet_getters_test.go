@@ -121,14 +121,14 @@ func TestHandlerSupportsUserNamespaces(t *testing.T) {
 	})
 
 	got, err := kubelet.HandlerSupportsUserNamespaces("has-support")
-	assert.Equal(t, true, got)
+	assert.True(t, got)
 	assert.NoError(t, err)
 
 	got, err = kubelet.HandlerSupportsUserNamespaces("has-no-support")
-	assert.Equal(t, false, got)
+	assert.False(t, got)
 	assert.NoError(t, err)
 
 	got, err = kubelet.HandlerSupportsUserNamespaces("unknown")
-	assert.Equal(t, false, got)
+	assert.False(t, got)
 	assert.Error(t, err)
 }

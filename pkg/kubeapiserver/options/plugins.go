@@ -31,7 +31,6 @@ import (
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
-	"k8s.io/kubernetes/plugin/pkg/admission/disableservicelinks"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/extendedresourcetoleration"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
@@ -49,7 +48,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
-	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageobjectinuseprotection"
@@ -82,7 +80,6 @@ var AllOrderedPlugins = []string{
 	podtolerationrestriction.PluginName,     // PodTolerationRestriction
 	eventratelimit.PluginName,               // EventRateLimit
 	extendedresourcetoleration.PluginName,   // ExtendedResourceToleration
-	label.PluginName,                        // PersistentVolumeLabel
 	setdefault.PluginName,                   // DefaultStorageClass
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
 	gc.PluginName,                           // OwnerReferencesPermissionEnforcement
@@ -94,7 +91,6 @@ var AllOrderedPlugins = []string{
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
-	disableservicelinks.PluginName,          // DisableServiceLinks
 
 	// new admission plugins should generally be inserted above here
 	// webhook, resourcequota, and deny plugins must go at the end
@@ -116,7 +112,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	defaultingressclass.Register(plugins)
 	denyserviceexternalips.Register(plugins)
 	deny.Register(plugins) // DEPRECATED as no real meaning
-	disableservicelinks.Register(plugins)
 	eventratelimit.Register(plugins)
 	extendedresourcetoleration.Register(plugins)
 	gc.Register(plugins)
@@ -126,7 +121,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
 	nodetaint.Register(plugins)
-	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
 	podnodeselector.Register(plugins)
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
@@ -144,8 +138,8 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
-func DefaultOffAdmissionPlugins() sets.String {
-	defaultOnPlugins := sets.NewString(
+func DefaultOffAdmissionPlugins() sets.Set[string] {
+	defaultOnPlugins := sets.New(
 		lifecycle.PluginName,                    // NamespaceLifecycle
 		limitranger.PluginName,                  // LimitRanger
 		serviceaccount.PluginName,               // ServiceAccount
@@ -168,5 +162,5 @@ func DefaultOffAdmissionPlugins() sets.String {
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
-	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
+	return sets.New(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }

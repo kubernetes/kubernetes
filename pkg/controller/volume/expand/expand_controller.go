@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -80,9 +79,6 @@ type expandController struct {
 	pvcLister  corelisters.PersistentVolumeClaimLister
 	pvcsSynced cache.InformerSynced
 
-	// cloud provider used by volume host
-	cloud cloudprovider.Interface
-
 	// volumePluginMgr used to initialize and fetch volume plugins
 	volumePluginMgr volume.VolumePluginMgr
 
@@ -91,7 +87,7 @@ type expandController struct {
 
 	operationGenerator operationexecutor.OperationGenerator
 
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	translator CSINameTranslator
 
@@ -103,17 +99,18 @@ func NewExpandController(
 	ctx context.Context,
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	translator CSINameTranslator,
 	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
 
 	expc := &expandController{
-		kubeClient:               kubeClient,
-		cloud:                    cloud,
-		pvcLister:                pvcInformer.Lister(),
-		pvcsSynced:               pvcInformer.Informer().HasSynced,
-		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
+		kubeClient: kubeClient,
+		pvcLister:  pvcInformer.Lister(),
+		pvcsSynced: pvcInformer.Informer().HasSynced,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
+		),
 		translator:               translator,
 		csiMigratedPluginManager: csiMigratedPluginManager,
 	}
@@ -186,7 +183,7 @@ func (expc *expandController) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer expc.queue.Done(key)
 
-	err := expc.syncHandler(ctx, key.(string))
+	err := expc.syncHandler(ctx, key)
 	if err == nil {
 		expc.queue.Forget(key)
 		return true
@@ -405,10 +402,6 @@ func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec
 
 func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
-}
-
-func (expc *expandController) GetCloudProvider() cloudprovider.Interface {
-	return expc.cloud
 }
 
 func (expc *expandController) GetMounter(pluginName string) mount.Interface {

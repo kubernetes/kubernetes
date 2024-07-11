@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// ResourceClaimApplyConfiguration represents an declarative configuration of the ResourceClaim type for use
+// ResourceClaimApplyConfiguration represents a declarative configuration of the ResourceClaim type for use
 // with apply.
 type ResourceClaimApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// ResourceClaimApplyConfiguration constructs an declarative configuration of the ResourceClaim type for use with
+// ResourceClaimApplyConfiguration constructs a declarative configuration of the ResourceClaim type for use with
 // apply.
 func ResourceClaim() *ResourceClaimApplyConfiguration {
 	return &ResourceClaimApplyConfiguration{}

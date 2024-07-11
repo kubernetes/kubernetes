@@ -22,14 +22,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// EphemeralContainerApplyConfiguration represents an declarative configuration of the EphemeralContainer type for use
+// EphemeralContainerApplyConfiguration represents a declarative configuration of the EphemeralContainer type for use
 // with apply.
 type EphemeralContainerApplyConfiguration struct {
 	EphemeralContainerCommonApplyConfiguration `json:",inline"`
 	TargetContainerName                        *string `json:"targetContainerName,omitempty"`
 }
 
-// EphemeralContainerApplyConfiguration constructs an declarative configuration of the EphemeralContainer type for use with
+// EphemeralContainerApplyConfiguration constructs a declarative configuration of the EphemeralContainer type for use with
 // apply.
 func EphemeralContainer() *EphemeralContainerApplyConfiguration {
 	return &EphemeralContainerApplyConfiguration{}

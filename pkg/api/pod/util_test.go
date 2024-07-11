@@ -841,10 +841,8 @@ func TestDropDynamicResourceAllocation(t *testing.T) {
 			},
 			ResourceClaims: []api.PodResourceClaim{
 				{
-					Name: "my-claim",
-					Source: api.ClaimSource{
-						ResourceClaimName: &resourceClaimName,
-					},
+					Name:              "my-claim",
+					ResourceClaimName: &resourceClaimName,
 				},
 			},
 		},
@@ -3441,5 +3439,138 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDropSupplementalGroupsPolicy(t *testing.T) {
+	supplementalGroupsPolicyMerge := api.SupplementalGroupsPolicyMerge
+	podWithSupplementalGroupsPolicy := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SupplementalGroupsPolicy: &supplementalGroupsPolicyMerge,
+				},
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+			Status: api.PodStatus{
+				ContainerStatuses: []api.ContainerStatus{
+					{
+						Name:  "c1",
+						Image: "image",
+						User: &api.ContainerUser{
+							Linux: &api.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 1000},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	podWithoutSupplementalGroupsPolicy := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{},
+				Containers: []api.Container{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+			Status: api.PodStatus{
+				ContainerStatuses: []api.ContainerStatus{
+					{
+						Name:  "c1",
+						Image: "image",
+					},
+				},
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description                 string
+		hasSupplementalGroupsPolicy bool
+		pod                         func() *api.Pod
+	}{
+		{
+			description:                 "with SupplementalGroupsPolicy and User",
+			hasSupplementalGroupsPolicy: true,
+			pod:                         podWithSupplementalGroupsPolicy,
+		},
+		{
+			description:                 "without SupplementalGroupsPolicy and User",
+			hasSupplementalGroupsPolicy: false,
+			pod:                         podWithoutSupplementalGroupsPolicy,
+		},
+		{
+			description:                 "is nil",
+			hasSupplementalGroupsPolicy: false,
+			pod:                         func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasSupplementalGroupsPolicy, oldPod := oldPodInfo.hasSupplementalGroupsPolicy, oldPodInfo.pod()
+				newPodHasSupplementalGroupsPolicy, newPod := newPodInfo.hasSupplementalGroupsPolicy, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(
+					fmt.Sprintf(
+						"feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description,
+					),
+					func(t *testing.T) {
+						featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, enabled)
+
+						var oldPodSpec *api.PodSpec
+						var oldPodStatus *api.PodStatus
+						if oldPod != nil {
+							oldPodSpec = &oldPod.Spec
+							oldPodStatus = &oldPod.Status
+						}
+						dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+
+						// old pod should never be changed
+						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+							t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+						}
+						switch {
+						case enabled || oldPodHasSupplementalGroupsPolicy:
+							// new pod shouldn't change if feature enabled or if old pod has SupplementalGroupsPolicy and User set
+							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+							}
+						case newPodHasSupplementalGroupsPolicy:
+							// new pod should be changed
+							if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod was not changed")
+							}
+							// new pod should not have SupplementalGroupsPolicy and User fields
+							if !reflect.DeepEqual(newPod, podWithoutSupplementalGroupsPolicy()) {
+								t.Errorf("new pod has SupplementalGroups and User: %v", cmp.Diff(newPod, podWithoutSupplementalGroupsPolicy()))
+							}
+						default:
+							// new pod should not need to be changed
+							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+							}
+						}
+					},
+				)
+			}
+		}
 	}
 }

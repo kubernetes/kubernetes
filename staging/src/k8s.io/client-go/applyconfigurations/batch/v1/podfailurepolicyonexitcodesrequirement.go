@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/batch/v1"
 )
 
-// PodFailurePolicyOnExitCodesRequirementApplyConfiguration represents an declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use
+// PodFailurePolicyOnExitCodesRequirementApplyConfiguration represents a declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use
 // with apply.
 type PodFailurePolicyOnExitCodesRequirementApplyConfiguration struct {
 	ContainerName *string                                 `json:"containerName,omitempty"`
@@ -30,7 +30,7 @@ type PodFailurePolicyOnExitCodesRequirementApplyConfiguration struct {
 	Values        []int32                                 `json:"values,omitempty"`
 }
 
-// PodFailurePolicyOnExitCodesRequirementApplyConfiguration constructs an declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use with
+// PodFailurePolicyOnExitCodesRequirementApplyConfiguration constructs a declarative configuration of the PodFailurePolicyOnExitCodesRequirement type for use with
 // apply.
 func PodFailurePolicyOnExitCodesRequirement() *PodFailurePolicyOnExitCodesRequirementApplyConfiguration {
 	return &PodFailurePolicyOnExitCodesRequirementApplyConfiguration{}

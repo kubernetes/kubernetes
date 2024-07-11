@@ -78,6 +78,15 @@ func ValidateAuthenticationConfiguration(c *api.AuthenticationConfiguration, dis
 		}
 	}
 
+	if c.Anonymous != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.AnonymousAuthConfigurableEndpoints) {
+			allErrs = append(allErrs, field.Forbidden(field.NewPath("anonymous"), "anonymous is not supported when AnonymousAuthConfigurableEnpoints feature gate is disabled"))
+		}
+		if !c.Anonymous.Enabled && len(c.Anonymous.Conditions) > 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("anonymous", "conditions"), c.Anonymous.Conditions, "enabled should be set to true when conditions are defined"))
+		}
+	}
+
 	return allErrs
 }
 
@@ -91,7 +100,8 @@ func CompileAndValidateJWTAuthenticator(authenticator api.JWTAuthenticator, disa
 func validateJWTAuthenticator(authenticator api.JWTAuthenticator, fldPath *field.Path, disallowedIssuers sets.Set[string], structuredAuthnFeatureEnabled bool) (authenticationcel.CELMapper, field.ErrorList) {
 	var allErrs field.ErrorList
 
-	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	// strictCost is set to true which enables the strict cost for CEL validation.
+	compiler := authenticationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	state := &validationState{}
 
 	allErrs = append(allErrs, validateIssuer(authenticator.Issuer, disallowedIssuers, fldPath.Child("issuer"))...)
@@ -722,7 +732,8 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 		return nil, allErrs
 	}
 
-	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+	// strictCost is set to true which enables the strict cost for CEL validation.
+	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	seenExpressions := sets.NewString()
 	var compilationResults []authorizationcel.CompilationResult
 

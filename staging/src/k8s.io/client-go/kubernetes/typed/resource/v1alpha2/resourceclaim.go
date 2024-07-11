@@ -20,17 +20,14 @@ package v1alpha2
 
 import (
 	"context"
-	json "encoding/json"
-	"fmt"
-	"time"
 
 	v1alpha2 "k8s.io/api/resource/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	resourcev1alpha2 "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
+	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	rest "k8s.io/client-go/rest"
 )
 
 // ResourceClaimsGetter has a method to return a ResourceClaimInterface.
@@ -43,6 +40,7 @@ type ResourceClaimsGetter interface {
 type ResourceClaimInterface interface {
 	Create(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.CreateOptions) (*v1alpha2.ResourceClaim, error)
 	Update(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.UpdateOptions) (*v1alpha2.ResourceClaim, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 	UpdateStatus(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.UpdateOptions) (*v1alpha2.ResourceClaim, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
@@ -51,206 +49,25 @@ type ResourceClaimInterface interface {
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClaim, err error)
 	Apply(ctx context.Context, resourceClaim *resourcev1alpha2.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClaim, err error)
+	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
 	ApplyStatus(ctx context.Context, resourceClaim *resourcev1alpha2.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClaim, err error)
 	ResourceClaimExpansion
 }
 
 // resourceClaims implements ResourceClaimInterface
 type resourceClaims struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithListAndApply[*v1alpha2.ResourceClaim, *v1alpha2.ResourceClaimList, *resourcev1alpha2.ResourceClaimApplyConfiguration]
 }
 
 // newResourceClaims returns a ResourceClaims
 func newResourceClaims(c *ResourceV1alpha2Client, namespace string) *resourceClaims {
 	return &resourceClaims{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithListAndApply[*v1alpha2.ResourceClaim, *v1alpha2.ResourceClaimList, *resourcev1alpha2.ResourceClaimApplyConfiguration](
+			"resourceclaims",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *v1alpha2.ResourceClaim { return &v1alpha2.ResourceClaim{} },
+			func() *v1alpha2.ResourceClaimList { return &v1alpha2.ResourceClaimList{} }),
 	}
-}
-
-// Get takes name of the resourceClaim, and returns the corresponding resourceClaim object, and an error if there is any.
-func (c *resourceClaims) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha2.ResourceClaim, err error) {
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ResourceClaims that match those selectors.
-func (c *resourceClaims) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha2.ResourceClaimList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha2.ResourceClaimList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested resourceClaims.
-func (c *resourceClaims) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a resourceClaim and creates it.  Returns the server's representation of the resourceClaim, and an error, if there is any.
-func (c *resourceClaims) Create(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.CreateOptions) (result *v1alpha2.ResourceClaim, err error) {
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClaim).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a resourceClaim and updates it. Returns the server's representation of the resourceClaim, and an error, if there is any.
-func (c *resourceClaims) Update(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.UpdateOptions) (result *v1alpha2.ResourceClaim, err error) {
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(resourceClaim.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClaim).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *resourceClaims) UpdateStatus(ctx context.Context, resourceClaim *v1alpha2.ResourceClaim, opts v1.UpdateOptions) (result *v1alpha2.ResourceClaim, err error) {
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(resourceClaim.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(resourceClaim).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the resourceClaim and deletes it. Returns an error if one occurs.
-func (c *resourceClaims) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *resourceClaims) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched resourceClaim.
-func (c *resourceClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha2.ResourceClaim, err error) {
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied resourceClaim.
-func (c *resourceClaims) Apply(ctx context.Context, resourceClaim *resourcev1alpha2.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClaim, err error) {
-	if resourceClaim == nil {
-		return nil, fmt.Errorf("resourceClaim provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(resourceClaim)
-	if err != nil {
-		return nil, err
-	}
-	name := resourceClaim.Name
-	if name == nil {
-		return nil, fmt.Errorf("resourceClaim.Name must be provided to Apply")
-	}
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(*name).
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *resourceClaims) ApplyStatus(ctx context.Context, resourceClaim *resourcev1alpha2.ResourceClaimApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha2.ResourceClaim, err error) {
-	if resourceClaim == nil {
-		return nil, fmt.Errorf("resourceClaim provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(resourceClaim)
-	if err != nil {
-		return nil, err
-	}
-
-	name := resourceClaim.Name
-	if name == nil {
-		return nil, fmt.Errorf("resourceClaim.Name must be provided to Apply")
-	}
-
-	result = &v1alpha2.ResourceClaim{}
-	err = c.client.Patch(types.ApplyPatchType).
-		Namespace(c.ns).
-		Resource("resourceclaims").
-		Name(*name).
-		SubResource("status").
-		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

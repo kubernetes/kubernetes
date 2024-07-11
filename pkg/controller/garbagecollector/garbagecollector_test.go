@@ -414,12 +414,12 @@ func TestProcessEvent(t *testing.T) {
 
 		dependencyGraphBuilder := &GraphBuilder{
 			informersStarted: alwaysStarted,
-			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			graphChanges:     workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*event]()),
 			uidToNode: &concurrentUIDToNode{
 				uidToNodeLock: sync.RWMutex{},
 				uidToNode:     make(map[types.UID]*node),
 			},
-			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			attemptToDelete:  workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*node]()),
 			absentOwnerCache: NewReferenceCache(2),
 		}
 		for i := 0; i < len(scenario.events); i++ {
@@ -2318,9 +2318,9 @@ func TestConflictingData(t *testing.T) {
 			restMapper := &testRESTMapper{meta.MultiRESTMapper{tweakableRM, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}}
 
 			// set up our workqueues
-			attemptToDelete := newTrackingWorkqueue()
-			attemptToOrphan := newTrackingWorkqueue()
-			graphChanges := newTrackingWorkqueue()
+			attemptToDelete := newTrackingWorkqueue[*node]()
+			attemptToOrphan := newTrackingWorkqueue[*node]()
+			graphChanges := newTrackingWorkqueue[*event]()
 
 			gc := &GarbageCollector{
 				metadataClient:   metadataClient,
@@ -2459,9 +2459,9 @@ type stepContext struct {
 	gc              *GarbageCollector
 	eventRecorder   *record.FakeRecorder
 	metadataClient  *fakemetadata.FakeMetadataClient
-	attemptToDelete *trackingWorkqueue
-	attemptToOrphan *trackingWorkqueue
-	graphChanges    *trackingWorkqueue
+	attemptToDelete *trackingWorkqueue[*node]
+	attemptToOrphan *trackingWorkqueue[*node]
+	graphChanges    *trackingWorkqueue[*event]
 }
 
 type step struct {
@@ -2521,7 +2521,7 @@ func insertEvent(e *event) step {
 		check: func(ctx stepContext) {
 			ctx.t.Helper()
 			// drain queue into items
-			var items []interface{}
+			var items []*event
 			for ctx.gc.dependencyGraphBuilder.graphChanges.Len() > 0 {
 				item, _ := ctx.gc.dependencyGraphBuilder.graphChanges.Get()
 				ctx.gc.dependencyGraphBuilder.graphChanges.Done(item)
@@ -2711,7 +2711,7 @@ func assertState(s state) step {
 						break
 					}
 
-					a := ctx.graphChanges.pendingList[i].(*event)
+					a := ctx.graphChanges.pendingList[i]
 					if !reflect.DeepEqual(e, a) {
 						objectDiff := ""
 						if !reflect.DeepEqual(e.obj, a.obj) {
@@ -2739,18 +2739,18 @@ func assertState(s state) step {
 						ctx.t.Errorf("attemptToDelete: expected %d events, got %d", len(s.pendingAttemptToDelete), ctx.attemptToDelete.Len())
 						break
 					}
-					a := ctx.attemptToDelete.pendingList[i].(*node).identity
-					a_virtual := ctx.attemptToDelete.pendingList[i].(*node).virtual
+					a := ctx.attemptToDelete.pendingList[i].identity
+					aVirtual := ctx.attemptToDelete.pendingList[i].virtual
 					if !reflect.DeepEqual(e, a) {
 						ctx.t.Errorf("attemptToDelete[%d]: expected %v, got %v", i, e, a)
 					}
-					if e_virtual != a_virtual {
+					if e_virtual != aVirtual {
 						ctx.t.Errorf("attemptToDelete[%d]: expected virtual node %v, got non-virtual node %v", i, e, a)
 					}
 				}
 				if ctx.attemptToDelete.Len() > len(s.pendingAttemptToDelete) {
 					for i, a := range ctx.attemptToDelete.pendingList[len(s.pendingAttemptToDelete):] {
-						ctx.t.Errorf("attemptToDelete[%d]: unexpected node: %v", len(s.pendingAttemptToDelete)+i, a.(*node).identity)
+						ctx.t.Errorf("attemptToDelete[%d]: unexpected node: %v", len(s.pendingAttemptToDelete)+i, a.identity)
 					}
 				}
 			}
@@ -2762,14 +2762,14 @@ func assertState(s state) step {
 						ctx.t.Errorf("attemptToOrphan: expected %d events, got %d", len(s.pendingAttemptToOrphan), ctx.attemptToOrphan.Len())
 						break
 					}
-					a := ctx.attemptToOrphan.pendingList[i].(*node).identity
+					a := ctx.attemptToOrphan.pendingList[i].identity
 					if !reflect.DeepEqual(e, a) {
 						ctx.t.Errorf("attemptToOrphan[%d]: expected %v, got %v", i, e, a)
 					}
 				}
 				if ctx.attemptToOrphan.Len() > len(s.pendingAttemptToOrphan) {
 					for i, a := range ctx.attemptToOrphan.pendingList[len(s.pendingAttemptToOrphan):] {
-						ctx.t.Errorf("attemptToOrphan[%d]: unexpected node: %v", len(s.pendingAttemptToOrphan)+i, a.(*node).identity)
+						ctx.t.Errorf("attemptToOrphan[%d]: unexpected node: %v", len(s.pendingAttemptToOrphan)+i, a.identity)
 					}
 				}
 			}
@@ -2782,46 +2782,46 @@ func assertState(s state) step {
 // allows introspection of the items in the queue,
 // and treats AddAfter and AddRateLimited the same as Add
 // so they are always synchronous.
-type trackingWorkqueue struct {
-	limiter     workqueue.RateLimitingInterface
-	pendingList []interface{}
-	pendingMap  map[interface{}]struct{}
+type trackingWorkqueue[T comparable] struct {
+	limiter     workqueue.TypedRateLimitingInterface[T]
+	pendingList []T
+	pendingMap  map[T]struct{}
 }
 
-var _ = workqueue.RateLimitingInterface(&trackingWorkqueue{})
+var _ = workqueue.TypedRateLimitingInterface[string](&trackingWorkqueue[string]{})
 
-func newTrackingWorkqueue() *trackingWorkqueue {
-	return &trackingWorkqueue{
-		limiter:    workqueue.NewRateLimitingQueue(&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Inf, 100)}),
-		pendingMap: map[interface{}]struct{}{},
+func newTrackingWorkqueue[T comparable]() *trackingWorkqueue[T] {
+	return &trackingWorkqueue[T]{
+		limiter:    workqueue.NewTypedRateLimitingQueue[T](&workqueue.TypedBucketRateLimiter[T]{Limiter: rate.NewLimiter(rate.Inf, 100)}),
+		pendingMap: map[T]struct{}{},
 	}
 }
 
-func (t *trackingWorkqueue) Add(item interface{}) {
+func (t *trackingWorkqueue[T]) Add(item T) {
 	t.queue(item)
 	t.limiter.Add(item)
 }
-func (t *trackingWorkqueue) AddAfter(item interface{}, duration time.Duration) {
+func (t *trackingWorkqueue[T]) AddAfter(item T, duration time.Duration) {
 	t.Add(item)
 }
-func (t *trackingWorkqueue) AddRateLimited(item interface{}) {
+func (t *trackingWorkqueue[T]) AddRateLimited(item T) {
 	t.Add(item)
 }
-func (t *trackingWorkqueue) Get() (interface{}, bool) {
+func (t *trackingWorkqueue[T]) Get() (T, bool) {
 	item, shutdown := t.limiter.Get()
 	t.dequeue(item)
 	return item, shutdown
 }
-func (t *trackingWorkqueue) Done(item interface{}) {
+func (t *trackingWorkqueue[T]) Done(item T) {
 	t.limiter.Done(item)
 }
-func (t *trackingWorkqueue) Forget(item interface{}) {
+func (t *trackingWorkqueue[T]) Forget(item T) {
 	t.limiter.Forget(item)
 }
-func (t *trackingWorkqueue) NumRequeues(item interface{}) int {
+func (t *trackingWorkqueue[T]) NumRequeues(item T) int {
 	return 0
 }
-func (t *trackingWorkqueue) Len() int {
+func (t *trackingWorkqueue[T]) Len() int {
 	if e, a := len(t.pendingList), len(t.pendingMap); e != a {
 		panic(fmt.Errorf("pendingList != pendingMap: %d / %d", e, a))
 	}
@@ -2830,17 +2830,17 @@ func (t *trackingWorkqueue) Len() int {
 	}
 	return len(t.pendingList)
 }
-func (t *trackingWorkqueue) ShutDown() {
+func (t *trackingWorkqueue[T]) ShutDown() {
 	t.limiter.ShutDown()
 }
-func (t *trackingWorkqueue) ShutDownWithDrain() {
+func (t *trackingWorkqueue[T]) ShutDownWithDrain() {
 	t.limiter.ShutDownWithDrain()
 }
-func (t *trackingWorkqueue) ShuttingDown() bool {
+func (t *trackingWorkqueue[T]) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
 }
 
-func (t *trackingWorkqueue) queue(item interface{}) {
+func (t *trackingWorkqueue[T]) queue(item T) {
 	if _, queued := t.pendingMap[item]; queued {
 		// fmt.Printf("already queued: %#v\n", item)
 		return
@@ -2848,13 +2848,13 @@ func (t *trackingWorkqueue) queue(item interface{}) {
 	t.pendingMap[item] = struct{}{}
 	t.pendingList = append(t.pendingList, item)
 }
-func (t *trackingWorkqueue) dequeue(item interface{}) {
+func (t *trackingWorkqueue[T]) dequeue(item T) {
 	if _, queued := t.pendingMap[item]; !queued {
 		// fmt.Printf("not queued: %#v\n", item)
 		return
 	}
 	delete(t.pendingMap, item)
-	newPendingList := []interface{}{}
+	newPendingList := []T{}
 	for _, p := range t.pendingList {
 		if p == item {
 			continue

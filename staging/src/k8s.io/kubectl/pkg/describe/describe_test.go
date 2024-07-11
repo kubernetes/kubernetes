@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/lithammer/dedent"
+	"github.com/stretchr/testify/assert"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -34,7 +37,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -49,7 +51,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -65,7 +66,7 @@ func TestDescribePod(t *testing.T) {
 	gracePeriod := int64(1234)
 	condition1 := corev1.PodConditionType("condition1")
 	condition2 := corev1.PodConditionType("condition2")
-	fake := fake.NewSimpleClientset(&corev1.Pod{
+	runningPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:                       "bar",
 			Namespace:                  "foo",
@@ -83,6 +84,7 @@ func TestDescribePod(t *testing.T) {
 			},
 		},
 		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
 			Conditions: []corev1.PodCondition{
 				{
 					Type:   condition1,
@@ -90,18 +92,46 @@ func TestDescribePod(t *testing.T) {
 				},
 			},
 		},
-	})
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := PodDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "Status:") {
-		t.Errorf("unexpected out: %s", out)
+	tests := []struct {
+		name       string
+		namespace  string
+		phase      corev1.PodPhase
+		wantOutput []string
+	}{
+		{
+			name: "foo", namespace: "bar", phase: "Running",
+			wantOutput: []string{"bar", "Status:", "Terminating (lasts 10y)", "Termination Grace Period", "1234s"},
+		},
+		{
+			name: "pod1", namespace: "ns1", phase: "Pending",
+			wantOutput: []string{"pod1", "ns1", "Terminating (lasts 10y)", "Termination Grace Period", "1234s"},
+		},
+		{
+			name: "pod2", namespace: "ns2", phase: "Succeeded",
+			wantOutput: []string{"pod2", "ns2", "Succeeded"},
+		},
+		{
+			name: "pod3", namespace: "ns3", phase: "Failed",
+			wantOutput: []string{"pod3", "ns3", "Failed"},
+		},
 	}
-	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
-		t.Errorf("unexpected out: %s", out)
+
+	for i, test := range tests {
+		pod := runningPod.DeepCopy()
+		pod.Name, pod.Namespace, pod.Status.Phase = test.name, test.namespace, test.phase
+		fake := fake.NewSimpleClientset(pod)
+		c := &describeClient{T: t, Namespace: pod.Namespace, Interface: fake}
+		d := PodDescriber{c}
+		out, err := d.Describe(pod.Namespace, pod.Name, DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("case %d: unexpected error: %v", i, err)
+		}
+		for _, wantStr := range test.wantOutput {
+			if !strings.Contains(out, wantStr) {
+				t.Errorf("case %d didn't contain want(%s): unexpected out:\n%s", i, wantStr, out)
+			}
+		}
 	}
 }
 
@@ -652,9 +682,10 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 func TestDescribeService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
 	testCases := []struct {
-		name    string
-		service *corev1.Service
-		expect  []string
+		name           string
+		service        *corev1.Service
+		endpointSlices []*discoveryv1.EndpointSlice
+		expected       string
 	}{
 		{
 			name: "test1",
@@ -676,24 +707,63 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyCluster),
 					HealthCheckNodePort:   32222,
 				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP:     "5.6.7.8",
+								IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
+							},
+						},
+					},
+				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "9527/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-abcde",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+					{Addresses: []string{"10.244.0.2"}},
+					{Addresses: []string{"10.244.0.3"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				Desired LoadBalancer IP:  5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8 (VIP)
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               9527/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				Internal Traffic Policy:  Cluster
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test2",
@@ -715,24 +785,82 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					InternalTrafficPolicy: ptr.To(corev1.ServiceInternalTrafficPolicyLocal),
 					HealthCheckNodePort:   32222,
 				},
+				Status: corev1.ServiceStatus{
+					LoadBalancer: corev1.LoadBalancerStatus{
+						Ingress: []corev1.LoadBalancerIngress{
+							{
+								IP: "5.6.7.8",
+							},
+						},
+					},
+				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
+			endpointSlices: []*discoveryv1.EndpointSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-12345",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.1"}},
+						{Addresses: []string{"10.244.0.2"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "bar-54321",
+						Namespace: "foo",
+						Labels: map[string]string{
+							"kubernetes.io/service-name": "bar",
+						},
+					},
+					Endpoints: []discoveryv1.Endpoint{
+						{Addresses: []string{"10.244.0.3"}},
+						{Addresses: []string{"10.244.0.4"}},
+						{Addresses: []string{"10.244.0.5"}},
+					},
+					Ports: []discoveryv1.EndpointPort{{
+						Name:     ptr.To("port-tcp"),
+						Port:     ptr.To[int32](9527),
+						Protocol: ptr.To(corev1.ProtocolUDP),
+					}},
+				},
 			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				Desired LoadBalancer IP:  5.6.7.8
+				LoadBalancer Ingress:     5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527,10.244.0.2:9527,10.244.0.3:9527 + 2 more...
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				Internal Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test-ServiceIPFamily",
@@ -754,25 +882,48 @@ func TestDescribeService(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"IP Families", "IPv4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			endpointSlices: []*discoveryv1.EndpointSlice{{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar-123ab",
+					Namespace: "foo",
+					Labels: map[string]string{
+						"kubernetes.io/service-name": "bar",
+					},
+				},
+				Endpoints: []discoveryv1.Endpoint{
+					{Addresses: []string{"10.244.0.1"}},
+				},
+				Ports: []discoveryv1.EndpointPort{{
+					Name:     ptr.To("port-tcp"),
+					Port:     ptr.To[int32](9527),
+					Protocol: ptr.To(corev1.ProtocolTCP),
+				}},
+			}},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				Desired LoadBalancer IP:  5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                10.244.0.1:9527
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 		{
 			name: "test-ServiceIPFamilyPolicy+ClusterIPs",
@@ -796,43 +947,49 @@ func TestDescribeService(t *testing.T) {
 					IPFamilyPolicy:        &singleStack,
 					ClusterIPs:            []string{"1.2.3.4"},
 					LoadBalancerIP:        "5.6.7.8",
-					SessionAffinity:       "None",
-					ExternalTrafficPolicy: "Local",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
 					HealthCheckNodePort:   32222,
 				},
 			},
-			expect: []string{
-				"Name", "bar",
-				"Namespace", "foo",
-				"Selector", "blah=heh",
-				"Type", "LoadBalancer",
-				"IP", "1.2.3.4",
-				"IP Families", "IPv4",
-				"IP Family Policy", "SingleStack",
-				"IPs", "1.2.3.4",
-				"Port", "port-tcp", "8080/TCP",
-				"TargetPort", "targetPort/TCP",
-				"NodePort", "port-tcp", "31111/TCP",
-				"Session Affinity", "None",
-				"External Traffic Policy", "Local",
-				"HealthCheck NodePort", "32222",
-			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Family Policy:         SingleStack
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      1.2.3.4
+				Desired LoadBalancer IP:  5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                <none>
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
 		},
 	}
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			fake := fake.NewSimpleClientset(testCase.service)
-			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := []runtime.Object{tc.service}
+			for i := range tc.endpointSlices {
+				objects = append(objects, tc.endpointSlices[i])
+			}
+			fakeClient := fake.NewSimpleClientset(objects...)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fakeClient}
 			d := ServiceDescriber{c}
 			out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			for _, expected := range testCase.expect {
-				if !strings.Contains(out, expected) {
-					t.Errorf("expected to find %q in output: %q", expected, out)
-				}
-			}
+
+			assert.Equal(t, tc.expected, out)
 		})
 	}
 }
@@ -1269,7 +1426,7 @@ func TestDefaultDescribers(t *testing.T) {
 
 	out, err = DefaultObjectDescriber.DescribeObject(&corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec:       corev1.ReplicationControllerSpec{Replicas: utilpointer.Int32(1)},
+		Spec:       corev1.ReplicationControllerSpec{Replicas: ptr.To[int32](1)},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1288,7 +1445,7 @@ func TestDefaultDescribers(t *testing.T) {
 
 	out, err = DefaultObjectDescriber.DescribeObject(&appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-		Spec:       appsv1.StatefulSetSpec{Replicas: utilpointer.Int32(1)},
+		Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To[int32](1)},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -2158,7 +2315,7 @@ func TestDescribeDeployment(t *testing.T) {
 						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
 					},
 					Spec: appsv1.DeploymentSpec{
-						Replicas: utilpointer.Int32Ptr(1),
+						Replicas: ptr.To[int32](1),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2203,13 +2360,13 @@ func TestDescribeDeployment(t *testing.T) {
 						Labels:    labels,
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								Controller: utilpointer.BoolPtr(true),
+								Controller: ptr.To(true),
 								UID:        "00000000-0000-0000-0000-000000000001",
 							},
 						},
 					},
 					Spec: appsv1.ReplicaSetSpec{
-						Replicas: utilpointer.Int32Ptr(1),
+						Replicas: ptr.To[int32](1),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2281,7 +2438,7 @@ func TestDescribeDeployment(t *testing.T) {
 						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
 					},
 					Spec: appsv1.DeploymentSpec{
-						Replicas: utilpointer.Int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2333,13 +2490,13 @@ func TestDescribeDeployment(t *testing.T) {
 						UID:       "00000000-0000-0000-0000-000000000001",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								Controller: utilpointer.BoolPtr(true),
+								Controller: ptr.To(true),
 								UID:        "00000000-0000-0000-0000-000000000001",
 							},
 						},
 					},
 					Spec: appsv1.ReplicaSetSpec{
-						Replicas: utilpointer.Int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2390,13 +2547,13 @@ func TestDescribeDeployment(t *testing.T) {
 						UID:       "00000000-0000-0000-0000-000000000002",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								Controller: utilpointer.BoolPtr(true),
+								Controller: ptr.To(true),
 								UID:        "00000000-0000-0000-0000-000000000001",
 							},
 						},
 					},
 					Spec: appsv1.ReplicaSetSpec{
-						Replicas: utilpointer.Int32Ptr(1),
+						Replicas: ptr.To[int32](1),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2541,7 +2698,7 @@ func TestDescribeDeployment(t *testing.T) {
 						CreationTimestamp: metav1.NewTime(time.Date(2021, time.Month(1), 1, 0, 0, 0, 0, time.UTC)),
 					},
 					Spec: appsv1.DeploymentSpec{
-						Replicas: utilpointer.Int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2593,13 +2750,13 @@ func TestDescribeDeployment(t *testing.T) {
 						UID:       "00000000-0000-0000-0000-000000000001",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								Controller: utilpointer.BoolPtr(true),
+								Controller: ptr.To(true),
 								UID:        "00000000-0000-0000-0000-000000000001",
 							},
 						},
 					},
 					Spec: appsv1.ReplicaSetSpec{
-						Replicas: utilpointer.Int32Ptr(0),
+						Replicas: ptr.To[int32](0),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2650,13 +2807,13 @@ func TestDescribeDeployment(t *testing.T) {
 						UID:       "00000000-0000-0000-0000-000000000002",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								Controller: utilpointer.BoolPtr(true),
+								Controller: ptr.To(true),
 								UID:        "00000000-0000-0000-0000-000000000001",
 							},
 						},
 					},
 					Spec: appsv1.ReplicaSetSpec{
-						Replicas: utilpointer.Int32Ptr(2),
+						Replicas: ptr.To[int32](2),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: labels,
 						},
@@ -2912,8 +3069,8 @@ func TestDescribeJob(t *testing.T) {
 				},
 				Spec: batchv1.JobSpec{
 					Suspend:                 ptr.To(true),
-					TTLSecondsAfterFinished: ptr.To(int32(123)),
-					BackoffLimit:            ptr.To(int32(1)),
+					TTLSecondsAfterFinished: ptr.To[int32](123),
+					BackoffLimit:            ptr.To[int32](1),
 				},
 			},
 			wantElements: []string{
@@ -3033,7 +3190,7 @@ func TestDescribeIngress(t *testing.T) {
 
 	backendResource := networkingv1.IngressBackend{
 		Resource: &corev1.TypedLocalObjectReference{
-			APIGroup: utilpointer.StringPtr("example.com"),
+			APIGroup: ptr.To("example.com"),
 			Kind:     "foo",
 			Name:     "bar",
 		},
@@ -3062,7 +3219,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3078,7 +3235,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3191,12 +3348,12 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3276,7 +3433,7 @@ Rules:
   Host         Path  Backends
   ----         ----  --------
   foo.bar.com  
-               /foo   default-backend:80 (<error: endpoints "default-backend" not found>)
+               /foo   default-backend:80 (<error: services "default-backend" not found>)
 Annotations:   <none>
 Events:        <none>` + "\n",
 		},
@@ -3296,11 +3453,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    test
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
@@ -3344,11 +3501,11 @@ Labels:           <none>
 Namespace:        foo
 Address:          
 Ingress Class:    <none>
-Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Default backend:  default-backend:80 (<error: services "default-backend" not found>)
 Rules:
   Host        Path  Backends
   ----        ----  --------
-  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+  *           *     default-backend:80 (<error: services "default-backend" not found>)
 Annotations:  <none>
 Events:       <none>
 `,
@@ -3527,7 +3684,7 @@ Events:       <none>
 }
 
 func TestDescribeCSINode(t *testing.T) {
-	limit := utilpointer.Int32Ptr(int32(2))
+	limit := ptr.To[int32](2)
 	f := fake.NewSimpleClientset(&storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: storagev1.CSINodeSpec{
@@ -4433,7 +4590,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 					},
 					Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
 						ScaleUp: &autoscalingv2.HPAScalingRules{
-							StabilizationWindowSeconds: utilpointer.Int32Ptr(30),
+							StabilizationWindowSeconds: ptr.To[int32](30),
 							SelectPolicy:               &maxSelectPolicy,
 							Policies: []autoscalingv2.HPAScalingPolicy{
 								{Type: autoscalingv2.PodsScalingPolicy, Value: 10, PeriodSeconds: 10},
@@ -4468,7 +4625,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 					},
 					Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
 						ScaleDown: &autoscalingv2.HPAScalingRules{
-							StabilizationWindowSeconds: utilpointer.Int32Ptr(30),
+							StabilizationWindowSeconds: ptr.To[int32](30),
 							Policies: []autoscalingv2.HPAScalingPolicy{
 								{Type: autoscalingv2.PodsScalingPolicy, Value: 10, PeriodSeconds: 10},
 								{Type: autoscalingv2.PercentScalingPolicy, Value: 10, PeriodSeconds: 10},
@@ -4644,7 +4801,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: utilpointer.Int32Ptr(1),
+					Replicas: ptr.To[int32](1),
 					Selector: &metav1.LabelSelector{},
 				},
 			}, events),
@@ -4710,7 +4867,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: appsv1.ReplicaSetSpec{
-					Replicas: utilpointer.Int32Ptr(1),
+					Replicas: ptr.To[int32](1),
 				},
 			}, events),
 		},
@@ -4721,7 +4878,7 @@ func TestDescribeEvents(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(1),
+					Replicas: ptr.To[int32](1),
 				},
 			}, events),
 		},
@@ -4983,7 +5140,7 @@ Parameters:
 				Spec: networkingv1beta1.IngressClassSpec{
 					Controller: "example.com/controller",
 					Parameters: &networkingv1beta1.IngressClassParametersReference{
-						APIGroup: utilpointer.StringPtr("v1"),
+						APIGroup: ptr.To("v1"),
 						Kind:     "ConfigMap",
 						Name:     "example-parameters",
 					},
@@ -4999,7 +5156,7 @@ Parameters:
 				Spec: networkingv1.IngressClassSpec{
 					Controller: "example.com/controller",
 					Parameters: &networkingv1.IngressClassParametersReference{
-						APIGroup: utilpointer.StringPtr("v1"),
+						APIGroup: ptr.To("v1"),
 						Kind:     "ConfigMap",
 						Name:     "example-parameters",
 					},
@@ -6081,7 +6238,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 				Endpoints: []discoveryv1beta1.Endpoint{
 					{
 						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
 						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
 						Topology: map[string]string{
 							"topology.kubernetes.io/zone":   "us-central1-a",
@@ -6089,7 +6246,7 @@ func TestDescribeEndpointSlice(t *testing.T) {
 						},
 					}, {
 						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1beta1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+						Conditions: discoveryv1beta1.EndpointConditions{Ready: ptr.To(true)},
 						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
 						Topology: map[string]string{
 							"topology.kubernetes.io/zone":   "us-central1-b",
@@ -6141,15 +6298,15 @@ Events:         <none>` + "\n",
 				Endpoints: []discoveryv1.Endpoint{
 					{
 						Addresses:  []string{"1.2.3.4", "1.2.3.5"},
-						Conditions: discoveryv1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
 						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
-						Zone:       utilpointer.StringPtr("us-central1-a"),
-						NodeName:   utilpointer.StringPtr("node-1"),
+						Zone:       ptr.To("us-central1-a"),
+						NodeName:   ptr.To("node-1"),
 					}, {
 						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
-						Conditions: discoveryv1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+						Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
 						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
-						NodeName:   utilpointer.StringPtr("node-2"),
+						NodeName:   ptr.To("node-2"),
 					},
 				},
 				Ports: []discoveryv1.EndpointPort{
@@ -6210,12 +6367,12 @@ func TestDescribeServiceCIDR(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"ServiceCIDR v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16", "fd00:1:1::/64"},
 				},
 			}),
@@ -6226,12 +6383,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16, fd00:1:1::/64
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv4": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv4": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"10.1.0.0/16"},
 				},
 			}),
@@ -6242,12 +6399,12 @@ Annotations:  <none>
 CIDRs:        10.1.0.0/16
 Events:       <none>` + "\n",
 		},
-		"ServiceCIDR v1alpha1 IPv6": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+		"ServiceCIDR v1beta1 IPv6": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.ServiceCIDR{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.ServiceCIDRSpec{
+				Spec: networkingv1beta1.ServiceCIDRSpec{
 					CIDRs: []string{"fd00:1:1::/64"},
 				},
 			}),
@@ -6281,13 +6438,13 @@ func TestDescribeIPAddress(t *testing.T) {
 		input  *fake.Clientset
 		output string
 	}{
-		"IPAddress v1alpha1": {
-			input: fake.NewSimpleClientset(&networkingv1alpha1.IPAddress{
+		"IPAddress v1beta1": {
+			input: fake.NewSimpleClientset(&networkingv1beta1.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo.123",
 				},
-				Spec: networkingv1alpha1.IPAddressSpec{
-					ParentRef: &networkingv1alpha1.ParentReference{
+				Spec: networkingv1beta1.IPAddressSpec{
+					ParentRef: &networkingv1beta1.ParentReference{
 						Group:     "mygroup",
 						Resource:  "myresource",
 						Namespace: "mynamespace",
@@ -6352,7 +6509,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "barpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: utilpointer.BoolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: ptr.To(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",
@@ -6389,7 +6546,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "buzpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: utilpointer.BoolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: ptr.To(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",

@@ -393,7 +393,7 @@ func ReuseTokenSource(t *Token, src TokenSource) TokenSource {
 	}
 }
 
-// ReuseTokenSource returns a TokenSource that acts in the same manner as the
+// ReuseTokenSourceWithExpiry returns a TokenSource that acts in the same manner as the
 // TokenSource returned by ReuseTokenSource, except the expiry buffer is
 // configurable. The expiration time of a token is calculated as
 // t.Expiry.Add(-earlyExpiry).

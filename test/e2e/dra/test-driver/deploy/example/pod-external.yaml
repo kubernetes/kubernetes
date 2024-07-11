@@ -36,5 +36,4 @@ spec:
     command: ["sh", "-c", "set && mount && ls -la /dev/"]
   resourceClaims:
   - name: resource
-    source:
-      resourceClaimName: external-claim
+    resourceClaimName: external-claim

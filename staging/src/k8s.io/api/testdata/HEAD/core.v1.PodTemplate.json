@@ -1399,6 +1399,7 @@
         "supplementalGroups": [
           4
         ],
+        "supplementalGroupsPolicy": "supplementalGroupsPolicyValue",
         "fsGroup": 5,
         "sysctls": [
           {
@@ -1739,10 +1740,8 @@
       "resourceClaims": [
         {
           "name": "nameValue",
-          "source": {
-            "resourceClaimName": "resourceClaimNameValue",
-            "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
-          }
+          "resourceClaimName": "resourceClaimNameValue",
+          "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
         }
       ]
     }

@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -77,7 +78,7 @@ func BuildAuthn(client authenticationclient.AuthenticationV1Interface, authn kub
 	}
 
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:                          authn.Anonymous.Enabled,
+		Anonymous:                          &apiserver.AnonymousAuthConfig{Enabled: authn.Anonymous.Enabled},
 		CacheTTL:                           authn.Webhook.CacheTTL.Duration,
 		ClientCertificateCAContentProvider: dynamicCAContentFromFile,
 	}

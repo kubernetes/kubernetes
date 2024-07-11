@@ -25,10 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
@@ -321,13 +323,35 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
 		// Due to immutable fields `spec.volumes`, pod update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		// A new Node may make a pod schedulable.
+		// We intentionally don't set QueueingHint since all Node/Add events could make Pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}},
 		// Pods may fail to schedule because the PVC it uses has not yet been created.
 		// This PVC is required to exist to check its access modes.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}},
 	}
+}
+
+// isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
+// It checks whether the deleted pod will conflict with volumes of other pods on the same node
+// TODO If we observe good throughput, we will add a check for conflicts between the deleted Pod and the readWriteOncePodPVC of the current Pod.
+func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+	}
+
+	if deletedPod.Namespace != pod.Namespace {
+		return framework.QueueSkip, nil
+	}
+
+	nodeInfo := framework.NewNodeInfo(deletedPod)
+	if !satisfyVolumeConflicts(pod, nodeInfo) {
+		return framework.Queue, nil
+	}
+
+	return framework.QueueSkip, nil
 }
 
 // New initializes a new plugin and returns it.

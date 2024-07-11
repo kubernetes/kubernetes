@@ -126,20 +126,24 @@ message AzureDiskVolumeSource {
 
   // cachingMode is the Host Caching mode: None, Read Only, Read Write.
   // +optional
+  // +default=ref(AzureDataDiskCachingReadWrite)
   optional string cachingMode = 3;
 
   // fsType is Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
   // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
   // +optional
+  // +default="ext4"
   optional string fsType = 4;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
   // +optional
+  // +default=false
   optional bool readOnly = 5;
 
   // kind expected values are Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+  // +default=ref(AzureSharedBlobDisk)
   optional string kind = 6;
 }
 
@@ -420,30 +424,6 @@ message CinderVolumeSource {
   // to OpenStack.
   // +optional
   optional LocalObjectReference secretRef = 4;
-}
-
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-message ClaimSource {
-  // ResourceClaimName is the name of a ResourceClaim object in the same
-  // namespace as this pod.
-  optional string resourceClaimName = 1;
-
-  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
-  // object in the same namespace as this pod.
-  //
-  // The template will be used to create a new ResourceClaim, which will
-  // be bound to this pod. When this pod is deleted, the ResourceClaim
-  // will also be deleted. The pod name and resource name, along with a
-  // generated component, will be used to form a unique name for the
-  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
-  //
-  // This field is immutable and no changes will be made to the
-  // corresponding ResourceClaim by the control plane after creating the
-  // ResourceClaim.
-  optional string resourceClaimTemplateName = 2;
 }
 
 // ClientIPConfig represents the configurations of Client IP based session affinity.
@@ -1109,6 +1089,19 @@ message ContainerStatus {
   // +listMapKey=mountPath
   // +featureGate=RecursiveReadOnlyMounts
   repeated VolumeMountStatus volumeMounts = 12;
+
+  // User represents user identity information initially attached to the first process of the container
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional ContainerUser user = 13;
+}
+
+// ContainerUser represents user identity information
+message ContainerUser {
+  // Linux holds user identity information initially attached to the first process of the containers in Linux.
+  // Note that the actual running identity can be changed if the process has enough privilege to do so.
+  // +optional
+  optional LinuxContainerUser linux = 1;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1986,6 +1979,7 @@ message HTTPHeader {
 // pod's hosts file.
 message HostAlias {
   // IP address of the host file entry.
+  // +required
   optional string ip = 1;
 
   // Hostnames for the above IP address.
@@ -2031,6 +2025,7 @@ message ISCSIPersistentVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2088,6 +2083,7 @@ message ISCSIVolumeSource {
   // iscsiInterface is the interface Name that uses an iSCSI transport.
   // Defaults to 'default' (tcp).
   // +optional
+  // +default="default"
   optional string iscsiInterface = 4;
 
   // fsType is the filesystem type of the volume that you want to mount.
@@ -2254,6 +2250,20 @@ message LimitRangeSpec {
   repeated LimitRangeItem limits = 1;
 }
 
+// LinuxContainerUser represents user identity information in Linux containers
+message LinuxContainerUser {
+  // UID is the primary uid initially attached to the first process in the container
+  optional int64 uid = 1;
+
+  // GID is the primary gid initially attached to the first process in the container
+  optional int64 gid = 2;
+
+  // SupplementalGroups are the supplemental groups initially attached to the first process in the container
+  // +optional
+  // +listType=atomic
+  repeated int64 supplementalGroups = 3;
+}
+
 // List holds a list of objects, which may not be known by the server.
 message List {
   // Standard list metadata.
@@ -2308,9 +2318,15 @@ message LoadBalancerStatus {
 // +structType=atomic
 message LocalObjectReference {
   // Name of the referent.
-  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // This field is effectively required, but due to backwards compatibility is
+  // allowed to be empty. Instances of this type with an empty value here are
+  // almost certainly wrong.
   // TODO: Add other useful fields. apiVersion, kind, uid?
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
   // +optional
+  // +default=""
+  // +kubebuilder:default=""
+  // TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
   optional string name = 1;
 }
 
@@ -2706,7 +2722,7 @@ message NodeSpec {
 // NodeStatus is information about the current status of a node.
 message NodeStatus {
   // Capacity represents the total resources of a node.
-  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
+  // More info: https://kubernetes.io/docs/reference/node/node-status/#capacity
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
@@ -2809,7 +2825,7 @@ message NodeSystemInfo {
   // Kubelet Version reported by the node.
   optional string kubeletVersion = 7;
 
-  // KubeProxy Version reported by the node.
+  // Deprecated: KubeProxy Version reported by the node.
   optional string kubeProxyVersion = 8;
 
   // The Operating System reported by the node
@@ -3508,7 +3524,8 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
   // Also, matchLabelKeys cannot be set when labelSelector isn't set.
-  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+  //
   // +listType=atomic
   // +optional
   repeated string matchLabelKeys = 5;
@@ -3521,7 +3538,8 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
   // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-  // This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.
+  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+  //
   // +listType=atomic
   // +optional
   repeated string mismatchLabelKeys = 6;
@@ -3791,7 +3809,10 @@ message PodReadinessGate {
   optional string conditionType = 1;
 }
 
-// PodResourceClaim references exactly one ResourceClaim through a ClaimSource.
+// PodResourceClaim references exactly one ResourceClaim, either directly
+// or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim
+// for the pod.
+//
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
 message PodResourceClaim {
@@ -3799,8 +3820,29 @@ message PodResourceClaim {
   // This must be a DNS_LABEL.
   optional string name = 1;
 
-  // Source describes where to find the ResourceClaim.
-  optional ClaimSource source = 2;
+  // ResourceClaimName is the name of a ResourceClaim object in the same
+  // namespace as this pod.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimName = 3;
+
+  // ResourceClaimTemplateName is the name of a ResourceClaimTemplate
+  // object in the same namespace as this pod.
+  //
+  // The template will be used to create a new ResourceClaim, which will
+  // be bound to this pod. When this pod is deleted, the ResourceClaim
+  // will also be deleted. The pod name and resource name, along with a
+  // generated component, will be used to form a unique name for the
+  // ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
+  //
+  // This field is immutable and no changes will be made to the
+  // corresponding ResourceClaim by the control plane after creating the
+  // ResourceClaim.
+  //
+  // Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+  // be set.
+  optional string resourceClaimTemplateName = 4;
 }
 
 // PodResourceClaimStatus is stored in the PodStatus for each PodResourceClaim
@@ -3875,16 +3917,28 @@ message PodSecurityContext {
   // +optional
   optional bool runAsNonRoot = 3;
 
-  // A list of groups applied to the first process run in each container, in addition
-  // to the container's primary GID, the fsGroup (if specified), and group memberships
-  // defined in the container image for the uid of the container process. If unspecified,
-  // no additional groups are added to any container. Note that group memberships
-  // defined in the container image for the uid of the container process are still effective,
-  // even if they are not included in this list.
+  // A list of groups applied to the first process run in each container, in
+  // addition to the container's primary GID and fsGroup (if specified).  If
+  // the SupplementalGroupsPolicy feature is enabled, the
+  // supplementalGroupsPolicy field determines whether these are in addition
+  // to or instead of any group memberships defined in the container image.
+  // If unspecified, no additional groups are added, though group memberships
+  // defined in the container image may still be used, depending on the
+  // supplementalGroupsPolicy field.
   // Note that this field cannot be set when spec.os.name is windows.
   // +optional
   // +listType=atomic
   repeated int64 supplementalGroups = 4;
+
+  // Defines how supplemental groups of the first container processes are calculated.
+  // Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+  // (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+  // and the container runtime must implement support for this feature.
+  // Note that this field cannot be set when spec.os.name is windows.
+  // TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional string supplementalGroupsPolicy = 12;
 
   // A special supplemental group that applies to all containers in a pod.
   // Some volume types allow the Kubelet to change the ownership of that volume
@@ -4225,6 +4279,7 @@ message PodSpec {
   // - spec.securityContext.runAsUser
   // - spec.securityContext.runAsGroup
   // - spec.securityContext.supplementalGroups
+  // - spec.securityContext.supplementalGroupsPolicy
   // - spec.containers[*].securityContext.appArmorProfile
   // - spec.containers[*].securityContext.seLinuxOptions
   // - spec.containers[*].securityContext.seccompProfile
@@ -4680,18 +4735,21 @@ message RBDPersistentVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -4732,18 +4790,21 @@ message RBDVolumeSource {
   // Default is rbd.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="rbd"
   optional string pool = 4;
 
   // user is the rados user name.
   // Default is admin.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="admin"
   optional string user = 5;
 
   // keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
   // More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it
   // +optional
+  // +default="/etc/ceph/keyring"
   optional string keyring = 6;
 
   // secretRef is name of the authentication secret for RBDUser. If provided
@@ -5053,6 +5114,7 @@ message ScaleIOPersistentVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5064,6 +5126,7 @@ message ScaleIOPersistentVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs"
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly defaults to false (read/write). ReadOnly here will force
@@ -5099,6 +5162,7 @@ message ScaleIOVolumeSource {
   // storageMode indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // Default is ThinProvisioned.
   // +optional
+  // +default="ThinProvisioned"
   optional string storageMode = 7;
 
   // volumeName is the name of a volume already created in the ScaleIO system
@@ -5110,6 +5174,7 @@ message ScaleIOVolumeSource {
   // Ex. "ext4", "xfs", "ntfs".
   // Default is "xfs".
   // +optional
+  // +default="xfs"
   optional string fsType = 9;
 
   // readOnly Defaults to false (read/write). ReadOnly here will force
@@ -5840,6 +5905,8 @@ message ServiceSpec {
   // not set, the implementation will apply its default routing strategy. If set
   // to "PreferClose", implementations should prioritize endpoints that are
   // topologically close (e.g., same zone).
+  // This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+  // +featureGate=ServiceTrafficDistribution
   // +optional
   optional string trafficDistribution = 23;
 }

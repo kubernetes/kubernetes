@@ -48,10 +48,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	remote "k8s.io/cri-client/pkg"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -617,22 +617,27 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		imageID = status.ImageId
 	}
 
+	var cStatusUser *kubecontainer.ContainerUser
+	if utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) {
+		cStatusUser = toKubeContainerUser(status.User)
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
 			ID:   status.Id,
 		},
-		Name:                 labeledInfo.ContainerName,
-		Image:                status.Image.Image,
-		ImageID:              imageID,
-		ImageRef:             status.ImageRef,
-		ImageRuntimeHandler:  status.Image.RuntimeHandler,
-		Hash:                 annotatedInfo.Hash,
-		HashWithoutResources: annotatedInfo.HashWithoutResources,
-		RestartCount:         annotatedInfo.RestartCount,
-		State:                toKubeContainerState(status.State),
-		CreatedAt:            time.Unix(0, status.CreatedAt),
-		Resources:            cStatusResources,
+		Name:                labeledInfo.ContainerName,
+		Image:               status.Image.Image,
+		ImageID:             imageID,
+		ImageRef:            status.ImageRef,
+		ImageRuntimeHandler: status.Image.RuntimeHandler,
+		Hash:                annotatedInfo.Hash,
+		RestartCount:        annotatedInfo.RestartCount,
+		State:               toKubeContainerState(status.State),
+		CreatedAt:           time.Unix(0, status.CreatedAt),
+		Resources:           cStatusResources,
+		User:                cStatusUser,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
@@ -841,7 +846,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	// only the last execution of each init container should be preserved, and only preserve it if it is in the
 	// list of init containers to keep.
-	initContainerNames := sets.NewString()
+	initContainerNames := sets.New[string]()
 	for _, container := range pod.Spec.InitContainers {
 		initContainerNames.Insert(container.Name)
 	}
@@ -875,7 +880,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
 func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
-	initContainerNames := sets.NewString()
+	initContainerNames := sets.New[string]()
 	for _, container := range pod.Spec.InitContainers {
 		initContainerNames.Insert(container.Name)
 	}

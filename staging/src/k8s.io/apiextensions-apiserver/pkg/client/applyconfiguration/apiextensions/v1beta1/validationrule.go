@@ -22,7 +22,7 @@ import (
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
-// ValidationRuleApplyConfiguration represents an declarative configuration of the ValidationRule type for use
+// ValidationRuleApplyConfiguration represents a declarative configuration of the ValidationRule type for use
 // with apply.
 type ValidationRuleApplyConfiguration struct {
 	Rule              *string                        `json:"rule,omitempty"`
@@ -33,7 +33,7 @@ type ValidationRuleApplyConfiguration struct {
 	OptionalOldSelf   *bool                          `json:"optionalOldSelf,omitempty"`
 }
 
-// ValidationRuleApplyConfiguration constructs an declarative configuration of the ValidationRule type for use with
+// ValidationRuleApplyConfiguration constructs a declarative configuration of the ValidationRule type for use with
 // apply.
 func ValidationRule() *ValidationRuleApplyConfiguration {
 	return &ValidationRuleApplyConfiguration{}

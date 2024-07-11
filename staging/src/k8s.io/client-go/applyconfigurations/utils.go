@@ -68,6 +68,7 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	storagemigrationv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
@@ -98,6 +99,7 @@ import (
 	applyconfigurationsflowcontrolv1beta2 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta2"
 	flowcontrolv1beta3 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta3"
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
+	internal "k8s.io/client-go/applyconfigurations/internal"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
 	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
@@ -118,6 +120,7 @@ import (
 	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	applyconfigurationsstoragemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
+	testing "k8s.io/client-go/testing"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -641,8 +644,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
 		return &applyconfigurationscorev1.CinderVolumeSourceApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("ClaimSource"):
-		return &applyconfigurationscorev1.ClaimSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClientIPConfig"):
 		return &applyconfigurationscorev1.ClientIPConfigApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClusterTrustBundleProjection"):
@@ -681,6 +682,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ContainerStateWaitingApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ContainerStatus"):
 		return &applyconfigurationscorev1.ContainerStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ContainerUser"):
+		return &applyconfigurationscorev1.ContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.CSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CSIVolumeSource"):
@@ -767,6 +770,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.LimitRangeItemApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LimitRangeSpec"):
 		return &applyconfigurationscorev1.LimitRangeSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("LinuxContainerUser"):
+		return &applyconfigurationscorev1.LinuxContainerUserApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerIngress"):
 		return &applyconfigurationscorev1.LoadBalancerIngressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("LoadBalancerStatus"):
@@ -1431,6 +1436,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1beta1.IngressStatusApplyConfiguration{}
 	case networkingv1beta1.SchemeGroupVersion.WithKind("IngressTLS"):
 		return &applyconfigurationsnetworkingv1beta1.IngressTLSApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IPAddress"):
+		return &applyconfigurationsnetworkingv1beta1.IPAddressApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("IPAddressSpec"):
+		return &applyconfigurationsnetworkingv1beta1.IPAddressSpecApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("ParentReference"):
+		return &applyconfigurationsnetworkingv1beta1.ParentReferenceApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("ServiceCIDR"):
+		return &applyconfigurationsnetworkingv1beta1.ServiceCIDRApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("ServiceCIDRSpec"):
+		return &applyconfigurationsnetworkingv1beta1.ServiceCIDRSpecApplyConfiguration{}
+	case networkingv1beta1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
+		return &applyconfigurationsnetworkingv1beta1.ServiceCIDRStatusApplyConfiguration{}
 
 		// Group=node.k8s.io, Version=v1
 	case nodev1.SchemeGroupVersion.WithKind("Overhead"):
@@ -1710,4 +1727,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 
 	}
 	return nil
+}
+
+func NewTypeConverter(scheme *runtime.Scheme) *testing.TypeConverter {
+	return &testing.TypeConverter{Scheme: scheme, TypeResolver: internal.Parser()}
 }

@@ -35,8 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -53,7 +52,7 @@ import (
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
 func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
-	externalCfg := &v1beta4.UpgradeConfiguration{}
+	externalCfg := &kubeadmapiv1.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
 	if err != nil {
@@ -106,6 +105,13 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
 
+	// Set the ImagePullPolicy and ImagePullSerial from the UpgradeApplyConfiguration to the InitConfiguration.
+	// These are used by preflight.RunPullImagesCheck() when running 'apply'.
+	if upgradeApply {
+		initCfg.NodeRegistration.ImagePullPolicy = upgradeCfg.Apply.ImagePullPolicy
+		initCfg.NodeRegistration.ImagePullSerial = upgradeCfg.Apply.ImagePullSerial
+	}
+
 	newK8sVersion := upgradeCfg.Plan.KubernetesVersion
 	if upgradeApply {
 		newK8sVersion = upgradeCfg.Apply.KubernetesVersion
@@ -135,14 +141,6 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
-	}
-
-	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
-	if flags.featureGatesString != "" {
-		initCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
-		if err != nil {
-			return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
-		}
 	}
 
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm

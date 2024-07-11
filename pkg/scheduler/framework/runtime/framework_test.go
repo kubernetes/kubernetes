@@ -1531,7 +1531,6 @@ func TestPreFilterPlugins(t *testing.T) {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
 		state := framework.NewCycleState()
-
 		f.RunPreFilterPlugins(ctx, state, nil)
 		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
 		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
@@ -1721,7 +1720,7 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			result, status := f.RunPreFilterPlugins(ctx, state, nil)
+			result, status, _ := f.RunPreFilterPlugins(ctx, state, nil)
 			if d := cmp.Diff(result, tt.wantPreFilterResult); d != "" {
 				t.Errorf("wrong status. got: %v, want: %v, diff: %s", result, tt.wantPreFilterResult, d)
 			}
@@ -2808,7 +2807,9 @@ func TestPermitPlugins(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: configPlugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("fail to create framework: %s", err)
 			}
@@ -2990,7 +2991,10 @@ func TestRecordingMetrics(t *testing.T) {
 				SchedulerName:            testProfileName,
 				Plugins:                  plugins,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, withMetricsRecorder(recorder))
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				withMetricsRecorder(recorder),
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				cancel()
 				t.Fatalf("Failed to create framework for testing: %v", err)
@@ -3160,7 +3164,9 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -3216,7 +3222,9 @@ func TestWaitOnPermit(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: plugins}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile)
+			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
+				WithWaitingPods(NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}

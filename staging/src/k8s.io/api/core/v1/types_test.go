@@ -58,3 +58,12 @@ func TestEphemeralContainer(t *testing.T) {
 		}
 	}
 }
+
+func TestNoBindingDeprecation(t *testing.T) {
+	var binding any = new(Binding)
+	if _, ok := binding.(interface {
+		APILifecycleDeprecated(major, minor int)
+	}); ok {
+		t.Fatal("The Binding type must not marked as deprecated, it is still used for the binding sub-resource which is not deprecated.")
+	}
+}

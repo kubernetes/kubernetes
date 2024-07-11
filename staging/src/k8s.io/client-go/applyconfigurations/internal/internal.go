@@ -4454,6 +4454,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: cachingMode
       type:
         scalar: string
+      default: ReadWrite
     - name: diskName
       type:
         scalar: string
@@ -4465,12 +4466,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: ext4
     - name: kind
       type:
         scalar: string
+      default: Shared
     - name: readOnly
       type:
         scalar: boolean
+      default: false
 - name: io.k8s.api.core.v1.AzureFilePersistentVolumeSource
   map:
     fields:
@@ -4655,15 +4659,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-- name: io.k8s.api.core.v1.ClaimSource
-  map:
-    fields:
-    - name: resourceClaimName
-      type:
-        scalar: string
-    - name: resourceClaimTemplateName
-      type:
-        scalar: string
 - name: io.k8s.api.core.v1.ClientIPConfig
   map:
     fields:
@@ -4759,6 +4754,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4772,6 +4768,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4809,6 +4806,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -4827,6 +4825,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -5080,6 +5079,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: user
+      type:
+        namedType: io.k8s.api.core.v1.ContainerUser
     - name: volumeMounts
       type:
         list:
@@ -5088,6 +5090,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - mountPath
+- name: io.k8s.api.core.v1.ContainerUser
+  map:
+    fields:
+    - name: linux
+      type:
+        namedType: io.k8s.api.core.v1.LinuxContainerUser
 - name: io.k8s.api.core.v1.DaemonEndpoint
   map:
     fields:
@@ -5650,6 +5658,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.HostIP
   map:
     fields:
@@ -5688,6 +5697,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: iscsiInterface
       type:
         scalar: string
+      default: default
     - name: lun
       type:
         scalar: numeric
@@ -5730,6 +5740,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: iscsiInterface
       type:
         scalar: string
+      default: default
     - name: lun
       type:
         scalar: numeric
@@ -5846,6 +5857,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.LimitRangeItem
           elementRelationship: atomic
+- name: io.k8s.api.core.v1.LinuxContainerUser
+  map:
+    fields:
+    - name: gid
+      type:
+        scalar: numeric
+      default: 0
+    - name: supplementalGroups
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: atomic
+    - name: uid
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.core.v1.LoadBalancerIngress
   map:
     fields:
@@ -5879,6 +5907,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     elementRelationship: atomic
 - name: io.k8s.api.core.v1.LocalVolumeSource
   map:
@@ -6762,10 +6791,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    - name: source
+    - name: resourceClaimName
       type:
-        namedType: io.k8s.api.core.v1.ClaimSource
-      default: {}
+        scalar: string
+    - name: resourceClaimTemplateName
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.PodResourceClaimStatus
   map:
     fields:
@@ -6816,6 +6847,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: numeric
           elementRelationship: atomic
+    - name: supplementalGroupsPolicy
+      type:
+        scalar: string
     - name: sysctls
       type:
         list:
@@ -7227,6 +7261,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: keyring
       type:
         scalar: string
+      default: /etc/ceph/keyring
     - name: monitors
       type:
         list:
@@ -7236,6 +7271,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+      default: rbd
     - name: readOnly
       type:
         scalar: boolean
@@ -7245,6 +7281,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+      default: admin
 - name: io.k8s.api.core.v1.RBDVolumeSource
   map:
     fields:
@@ -7258,6 +7295,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: keyring
       type:
         scalar: string
+      default: /etc/ceph/keyring
     - name: monitors
       type:
         list:
@@ -7267,6 +7305,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: pool
       type:
         scalar: string
+      default: rbd
     - name: readOnly
       type:
         scalar: boolean
@@ -7276,6 +7315,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         scalar: string
+      default: admin
 - name: io.k8s.api.core.v1.ReplicationController
   map:
     fields:
@@ -7476,6 +7516,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: xfs
     - name: gateway
       type:
         scalar: string
@@ -7495,6 +7536,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageMode
       type:
         scalar: string
+      default: ThinProvisioned
     - name: storagePool
       type:
         scalar: string
@@ -7511,6 +7553,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsType
       type:
         scalar: string
+      default: xfs
     - name: gateway
       type:
         scalar: string
@@ -7530,6 +7573,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: storageMode
       type:
         scalar: string
+      default: ThinProvisioned
     - name: storagePool
       type:
         scalar: string
@@ -7617,6 +7661,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -7630,6 +7675,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -7646,6 +7692,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: optional
       type:
         scalar: boolean
@@ -11031,6 +11078,29 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.networking.v1beta1.HTTPIngressPath
           elementRelationship: atomic
+- name: io.k8s.api.networking.v1beta1.IPAddress
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.networking.v1beta1.IPAddressSpec
+      default: {}
+- name: io.k8s.api.networking.v1beta1.IPAddressSpec
+  map:
+    fields:
+    - name: parentRef
+      type:
+        namedType: io.k8s.api.networking.v1beta1.ParentReference
 - name: io.k8s.api.networking.v1beta1.Ingress
   map:
     fields:
@@ -11197,6 +11267,62 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: secretName
       type:
         scalar: string
+- name: io.k8s.api.networking.v1beta1.ParentReference
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+    - name: namespace
+      type:
+        scalar: string
+    - name: resource
+      type:
+        scalar: string
+- name: io.k8s.api.networking.v1beta1.ServiceCIDR
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.networking.v1beta1.ServiceCIDRSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.networking.v1beta1.ServiceCIDRStatus
+      default: {}
+- name: io.k8s.api.networking.v1beta1.ServiceCIDRSpec
+  map:
+    fields:
+    - name: cidrs
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1beta1.ServiceCIDRStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: io.k8s.api.node.v1.Overhead
   map:
     fields:

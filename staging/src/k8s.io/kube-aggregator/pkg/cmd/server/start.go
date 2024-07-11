@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -55,11 +57,14 @@ type AggregatorOptions struct {
 
 // NewCommandStartAggregator provides a CLI handler for 'start master' command
 // with a default AggregatorOptions.
-func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct{}) *cobra.Command {
+func NewCommandStartAggregator(ctx context.Context, defaults *AggregatorOptions) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
 		Short: "Launch a API aggregator and proxy server",
 		Long:  "Launch a API aggregator and proxy server",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return utilversion.DefaultComponentGlobalsRegistry.Set()
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -67,12 +72,13 @@ func NewCommandStartAggregator(defaults *AggregatorOptions, stopCh <-chan struct
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(stopCh); err != nil {
+			if err := o.RunAggregator(c.Context()); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	cmd.SetContext(ctx)
 
 	o.AddFlags(cmd.Flags())
 	return cmd
@@ -115,11 +121,11 @@ func (o AggregatorOptions) Validate(args []string) error {
 
 // Complete fills in missing Options.
 func (o *AggregatorOptions) Complete() error {
-	return nil
+	return o.ServerRunOptions.Complete()
 }
 
 // RunAggregator runs the API Aggregator.
-func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
+func (o AggregatorOptions) RunAggregator(ctx context.Context) error {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -171,5 +177,5 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	return prepared.Run(stopCh)
+	return prepared.Run(ctx)
 }

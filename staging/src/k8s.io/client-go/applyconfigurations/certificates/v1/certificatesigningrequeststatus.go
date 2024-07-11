@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// CertificateSigningRequestStatusApplyConfiguration represents an declarative configuration of the CertificateSigningRequestStatus type for use
+// CertificateSigningRequestStatusApplyConfiguration represents a declarative configuration of the CertificateSigningRequestStatus type for use
 // with apply.
 type CertificateSigningRequestStatusApplyConfiguration struct {
 	Conditions  []CertificateSigningRequestConditionApplyConfiguration `json:"conditions,omitempty"`
 	Certificate []byte                                                 `json:"certificate,omitempty"`
 }
 
-// CertificateSigningRequestStatusApplyConfiguration constructs an declarative configuration of the CertificateSigningRequestStatus type for use with
+// CertificateSigningRequestStatusApplyConfiguration constructs a declarative configuration of the CertificateSigningRequestStatus type for use with
 // apply.
 func CertificateSigningRequestStatus() *CertificateSigningRequestStatusApplyConfiguration {
 	return &CertificateSigningRequestStatusApplyConfiguration{}

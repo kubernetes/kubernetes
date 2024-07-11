@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 /*
 Package attribute provide several helper functions for some commonly used
@@ -25,33 +14,33 @@ import (
 // BoolSliceValue converts a bool slice into an array with same elements as slice.
 func BoolSliceValue(v []bool) interface{} {
 	var zero bool
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero)))
-	copy(cp.Elem().Slice(0, len(v)).Interface().([]bool), v)
-	return cp.Elem().Interface()
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
 }
 
 // Int64SliceValue converts an int64 slice into an array with same elements as slice.
 func Int64SliceValue(v []int64) interface{} {
 	var zero int64
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero)))
-	copy(cp.Elem().Slice(0, len(v)).Interface().([]int64), v)
-	return cp.Elem().Interface()
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
 }
 
 // Float64SliceValue converts a float64 slice into an array with same elements as slice.
 func Float64SliceValue(v []float64) interface{} {
 	var zero float64
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero)))
-	copy(cp.Elem().Slice(0, len(v)).Interface().([]float64), v)
-	return cp.Elem().Interface()
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
 }
 
 // StringSliceValue converts a string slice into an array with same elements as slice.
 func StringSliceValue(v []string) interface{} {
 	var zero string
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero)))
-	copy(cp.Elem().Slice(0, len(v)).Interface().([]string), v)
-	return cp.Elem().Interface()
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeOf(zero))).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
 }
 
 // AsBoolSlice converts a bool array into a slice into with same elements as array.

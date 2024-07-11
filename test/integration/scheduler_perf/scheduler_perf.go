@@ -19,6 +19,7 @@ package benchmark
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -53,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -90,22 +93,64 @@ const (
 	configFile               = "config/performance-config.yaml"
 	extensionPointsLabelName = "extension_point"
 	resultLabelName          = "result"
+	pluginLabelName          = "plugin"
 )
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: map[string]*labelValues{
+		Metrics: map[string][]*labelValues{
 			"scheduler_framework_extension_point_duration_seconds": {
-				label:  extensionPointsLabelName,
-				values: []string{"Filter", "Score"},
+				{
+					label:  extensionPointsLabelName,
+					values: metrics.ExtentionPoints,
+				},
 			},
 			"scheduler_scheduling_attempt_duration_seconds": {
-				label:  resultLabelName,
-				values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+				{
+					label:  resultLabelName,
+					values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+				},
 			},
-			"scheduler_pod_scheduling_duration_seconds":     nil,
-			"scheduler_pod_scheduling_sli_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_plugin_execution_duration_seconds": {
+				{
+					label:  pluginLabelName,
+					values: PluginNames,
+				},
+				{
+					label:  extensionPointsLabelName,
+					values: metrics.ExtentionPoints,
+				},
+			},
 		},
+	}
+
+	// PluginNames is the names of the plugins that scheduler_perf collects metrics for.
+	// We export this variable because people outside k/k may want to put their custom plugins.
+	PluginNames = []string{
+		names.PrioritySort,
+		names.DefaultBinder,
+		names.DefaultPreemption,
+		names.DynamicResources,
+		names.ImageLocality,
+		names.InterPodAffinity,
+		names.NodeAffinity,
+		names.NodeName,
+		names.NodePorts,
+		names.NodeResourcesBalancedAllocation,
+		names.NodeResourcesFit,
+		names.NodeUnschedulable,
+		names.NodeVolumeLimits,
+		names.AzureDiskLimits,
+		names.CinderLimits,
+		names.EBSLimits,
+		names.GCEPDLimits,
+		names.PodTopologySpread,
+		names.SchedulingGates,
+		names.TaintToleration,
+		names.VolumeBinding,
+		names.VolumeRestrictions,
+		names.VolumeZone,
 	}
 )
 
@@ -421,6 +466,9 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Number of pods to be deleted per second after they were scheduled. If set to 0, pods are not deleted.
+	// Optional
+	DeletePodsPerSecond int
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -435,6 +483,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 		// complexity is not worth it, especially given that we don't have any
 		// use-cases right now.
 		return fmt.Errorf("collectMetrics and skipWaitToCompletion cannot be true at the same time")
+	}
+	if cpo.DeletePodsPerSecond < 0 {
+		return fmt.Errorf("invalid DeletePodsPerSecond=%d; should be non-negative", cpo.DeletePodsPerSecond)
 	}
 	return nil
 }
@@ -668,7 +719,9 @@ func withCleanup(tCtx ktesting.TContext, enabled bool) ktesting.TContext {
 var perfSchedulingLabelFilter = flag.String("perf-scheduling-label-filter", "performance", "comma-separated list of labels which a testcase must have (no prefix or +) or must not have (-), used by BenchmarkPerfScheduling")
 
 // RunBenchmarkPerfScheduling runs the scheduler performance tests.
-// Optionally, you can pass your own scheduler plugin via outOfTreePluginRegistry.
+//
+// You can pass your own scheduler plugins via outOfTreePluginRegistry.
+// Also, you may want to put your plugins in PluginNames variable in this package.
 func RunBenchmarkPerfScheduling(b *testing.B, outOfTreePluginRegistry frameworkruntime.Registry) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
@@ -985,6 +1038,34 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				mu.Unlock()
 			}
 
+			if concreteOp.DeletePodsPerSecond > 0 {
+				pods, err := podInformer.Lister().Pods(namespace).List(labels.Everything())
+				if err != nil {
+					tCtx.Fatalf("op %d: error in listing scheduled pods in the namespace: %v", opIndex, err)
+				}
+
+				ticker := time.NewTicker(time.Second / time.Duration(concreteOp.DeletePodsPerSecond))
+				defer ticker.Stop()
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					for i := 0; i < len(pods); i++ {
+						select {
+						case <-ticker.C:
+							if err := tCtx.Client().CoreV1().Pods(namespace).Delete(tCtx, pods[i].Name, metav1.DeleteOptions{}); err != nil {
+								if errors.Is(err, context.Canceled) {
+									return
+								}
+								tCtx.Errorf("op %d: unable to delete pod %v: %v", opIndex, pods[i].Name, err)
+							}
+						case <-tCtx.Done():
+							return
+						}
+					}
+				}()
+			}
+
 			if !concreteOp.SkipWaitToCompletion {
 				// SkipWaitToCompletion=false indicates this step has waited for the Pods to be scheduled.
 				// So we reset the metrics in global registry; otherwise metrics gathered in this step
@@ -1029,7 +1110,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 				churnFns = append(churnFns, func(name string) string {
 					if name != "" {
-						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil {
+						if err := dynRes.Delete(tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
 							tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
 						}
 						return ""
@@ -1387,16 +1468,12 @@ func validateTestCases(testCases []*testCase) error {
 }
 
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
-	basePod := makeBasePod()
+	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		var err error
-		basePod, err = getPodSpecFromFile(cpo.PodTemplatePath)
-		if err != nil {
-			return nil, err
-		}
+		podTemplate = podTemplateFromFile(*cpo.PodTemplatePath)
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
-		return testutils.NewCustomCreatePodStrategy(basePod), nil
+		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
 	}
 
 	pvTemplate, err := getPersistentVolumeSpecFromFile(cpo.PersistentVolumeTemplatePath)
@@ -1407,7 +1484,7 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	if err != nil {
 		return nil, err
 	}
-	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), basePod), nil
+	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
 func getNodeSpecFromFile(path *string) (*v1.Node, error) {
@@ -1418,9 +1495,11 @@ func getNodeSpecFromFile(path *string) (*v1.Node, error) {
 	return nodeSpec, nil
 }
 
-func getPodSpecFromFile(path *string) (*v1.Pod, error) {
+type podTemplateFromFile string
+
+func (f podTemplateFromFile) GetPodTemplate(index, count int) (*v1.Pod, error) {
 	podSpec := &v1.Pod{}
-	if err := getSpecFromFile(path, podSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
 	return podSpec, nil

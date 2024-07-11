@@ -145,11 +145,15 @@ func (c *Controller) Stop() {
 // Run periodically updates the kubernetes service
 func (c *Controller) Run(ch <-chan struct{}) {
 	// wait until process is ready
-	wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+	ctx := wait.ContextForChannel(ch)
+	err := wait.PollUntilContextCancel(ctx, 100*time.Millisecond, true, func(context.Context) (bool, error) {
 		var code int
 		c.client.CoreV1().RESTClient().Get().AbsPath("/readyz").Do(context.TODO()).StatusCode(&code)
 		return code == http.StatusOK, nil
-	}, ch)
+	})
+	if err != nil {
+		return
+	}
 
 	wait.NonSlidingUntil(func() {
 		// Service definition is not reconciled after first

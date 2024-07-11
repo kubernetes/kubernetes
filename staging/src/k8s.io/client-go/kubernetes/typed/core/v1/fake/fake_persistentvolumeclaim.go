@@ -46,7 +46,7 @@ var persistentvolumeclaimsKind = v1.SchemeGroupVersion.WithKind("PersistentVolum
 func (c *FakePersistentVolumeClaims) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolumeClaim, err error) {
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(persistentvolumeclaimsResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(persistentvolumeclaimsResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakePersistentVolumeClaims) Get(ctx context.Context, name string, optio
 func (c *FakePersistentVolumeClaims) List(ctx context.Context, opts metav1.ListOptions) (result *v1.PersistentVolumeClaimList, err error) {
 	emptyResult := &v1.PersistentVolumeClaimList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(persistentvolumeclaimsResource, persistentvolumeclaimsKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakePersistentVolumeClaims) List(ctx context.Context, opts metav1.ListO
 // Watch returns a watch.Interface that watches the requested persistentVolumeClaims.
 func (c *FakePersistentVolumeClaims) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(persistentvolumeclaimsResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(persistentvolumeclaimsResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakePersistentVolumeClaims) Watch(ctx context.Context, opts metav1.List
 func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.CreateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakePersistentVolumeClaims) Create(ctx context.Context, persistentVolum
 func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(persistentvolumeclaimsResource, c.ns, persistentVolumeClaim, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -113,7 +113,7 @@ func (c *FakePersistentVolumeClaims) Update(ctx context.Context, persistentVolum
 func (c *FakePersistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVolumeClaim *v1.PersistentVolumeClaim, opts metav1.UpdateOptions) (result *v1.PersistentVolumeClaim, err error) {
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim), emptyResult)
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(persistentvolumeclaimsResource, "status", c.ns, persistentVolumeClaim, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -131,7 +131,7 @@ func (c *FakePersistentVolumeClaims) Delete(ctx context.Context, name string, op
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakePersistentVolumeClaims) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(persistentvolumeclaimsResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(persistentvolumeclaimsResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.PersistentVolumeClaimList{})
 	return err
@@ -141,7 +141,7 @@ func (c *FakePersistentVolumeClaims) DeleteCollection(ctx context.Context, opts 
 func (c *FakePersistentVolumeClaims) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolumeClaim, err error) {
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(persistentvolumeclaimsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -164,7 +164,7 @@ func (c *FakePersistentVolumeClaims) Apply(ctx context.Context, persistentVolume
 	}
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -188,7 +188,7 @@ func (c *FakePersistentVolumeClaims) ApplyStatus(ctx context.Context, persistent
 	}
 	emptyResult := &v1.PersistentVolumeClaim{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(persistentvolumeclaimsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

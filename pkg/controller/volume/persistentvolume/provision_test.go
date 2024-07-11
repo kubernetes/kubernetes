@@ -18,12 +18,12 @@ package persistentvolume
 
 import (
 	"errors"
+	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
-	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -598,13 +598,16 @@ func TestProvisionSync(t *testing.T) {
 //
 // Some limit of calls in enforced to prevent endless loops.
 func TestProvisionMultiSync(t *testing.T) {
+	// Default enable the HonorPVReclaimPolicy feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
+
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
 		{
 			// Provision a volume with binding
 			name:            "12-1 - successful provision",
 			initialVolumes:  novolumes,
-			expectedVolumes: newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
+			expectedVolumes: volumesWithFinalizers(newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classGold, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
 			initialClaims:   newClaimArray("claim12-1", "uid12-1", "1Gi", "", v1.ClaimPending, &classGold),
 			expectedClaims:  newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", v1.ClaimBound, &classGold, volume.AnnBoundByController, volume.AnnBindCompleted, volume.AnnStorageProvisioner, volume.AnnBetaStorageProvisioner),
 			expectedEvents:  noevents,

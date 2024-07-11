@@ -72,6 +72,17 @@ const (
 	//           - a Pod that is deleted
 	//           - a Pod that was assumed, but gets un-assumed due to some errors in the binding cycle.
 	//           - an existing Pod that was unscheduled but gets scheduled to a Node.
+	//
+	// Note that the Pod event type includes the events for the unscheduled Pod itself.
+	// i.e., when unscheduled Pods are updated, the scheduling queue checks with Pod/Update QueueingHint(s) whether the update may make the pods schedulable,
+	// and requeues them to activeQ/backoffQ when at least one QueueingHint(s) return Queue.
+	// Plugins **have to** implement a QueueingHint for Pod/Update event
+	// if the rejection from them could be resolved by updating unscheduled Pods themselves.
+	// Example: Pods that require excessive resources may be rejected by the noderesources plugin,
+	// if this unscheduled pod is updated to require fewer resources,
+	// the previous rejection from noderesources plugin can be resolved.
+	// this plugin would implement QueueingHint for Pod/Update event
+	// that returns Queue when such label changes are made in unscheduled Pods.
 	Pod GVK = "Pod"
 	// A note about NodeAdd event and UpdateNodeTaint event:
 	// NodeAdd QueueingHint isn't always called because of the internal feature called preCheck.
@@ -208,7 +219,7 @@ type QueuedPodInfo struct {
 	// latency for a pod.
 	InitialAttemptTimestamp *time.Time
 	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status.
-	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
+	// It's registered only when the Pod is rejected in PreFilter, Filter, Reserve, PreBind or Permit (WaitOnPermit).
 	UnschedulablePlugins sets.Set[string]
 	// PendingPlugins records the plugin names that the Pod failed with Pending status.
 	PendingPlugins sets.Set[string]
@@ -325,9 +336,11 @@ const ExtenderName = "Extender"
 
 // Diagnosis records the details to diagnose a scheduling failure.
 type Diagnosis struct {
-	// NodeToStatusMap records the status of each node
+	// NodeToStatusMap records the status of each retriable node (status Unschedulable)
 	// if they're rejected in PreFilter (via PreFilterResult) or Filter plugins.
 	// Nodes that pass PreFilter/Filter plugins are not included in this map.
+	// While this map may contain UnschedulableAndUnresolvable statuses, the absence of
+	// a node should be interpreted as UnschedulableAndUnresolvable.
 	NodeToStatusMap NodeToStatusMap
 	// UnschedulablePlugins are plugins that returns Unschedulable or UnschedulableAndUnresolvable.
 	UnschedulablePlugins sets.Set[string]
@@ -577,6 +590,21 @@ type NodeInfo struct {
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
 }
+
+// NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
+// when nodes is a []*NodeInfo.
+var _ klog.KMetadata = &NodeInfo{}
+
+func (n *NodeInfo) GetName() string {
+	if n == nil {
+		return "<nil>"
+	}
+	if n.node == nil {
+		return "<no node>"
+	}
+	return n.node.Name
+}
+func (n *NodeInfo) GetNamespace() string { return "" }
 
 // nextGeneration: Let's make sure history never forgets the name...
 // Increments the generation number monotonically ensuring that generation numbers never collide.

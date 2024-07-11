@@ -27,6 +27,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/client-go/transport"
 	"k8s.io/component-base/tracing/api/v1"
@@ -47,7 +48,7 @@ func (n *noopTracerProvider) Shutdown(context.Context) error {
 }
 
 func NewNoopTracerProvider() TracerProvider {
-	return &noopTracerProvider{TracerProvider: oteltrace.NewNoopTracerProvider()}
+	return &noopTracerProvider{TracerProvider: noopoteltrace.NewTracerProvider()}
 }
 
 // NewProvider creates a TracerProvider in a component, and enforces recommended tracing behavior

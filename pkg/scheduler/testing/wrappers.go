@@ -882,6 +882,20 @@ func (p *PersistentVolumeWrapper) HostPathVolumeSource(src *v1.HostPathVolumeSou
 	return p
 }
 
+// NodeAffinityIn creates a HARD node affinity (with the operator In)
+// and injects into the pv.
+func (p *PersistentVolumeWrapper) NodeAffinityIn(key string, vals []string) *PersistentVolumeWrapper {
+	if p.Spec.NodeAffinity == nil {
+		p.Spec.NodeAffinity = &v1.VolumeNodeAffinity{}
+	}
+	if p.Spec.NodeAffinity.Required == nil {
+		p.Spec.NodeAffinity.Required = &v1.NodeSelector{}
+	}
+	nodeSelector := MakeNodeSelector().In(key, vals).Obj()
+	p.Spec.NodeAffinity.Required.NodeSelectorTerms = append(p.Spec.NodeAffinity.Required.NodeSelectorTerms, nodeSelector.NodeSelectorTerms...)
+	return p
+}
+
 // ResourceClaimWrapper wraps a ResourceClaim inside.
 type ResourceClaimWrapper struct{ resourcev1alpha2.ResourceClaim }
 
@@ -1140,6 +1154,11 @@ func MakeClaimParameters() *ClaimParametersWrapper {
 	return &ClaimParametersWrapper{}
 }
 
+// FromClaimParameters creates a ResourceClaimParameters wrapper from an existing object.
+func FromClaimParameters(other *resourcev1alpha2.ResourceClaimParameters) *ClaimParametersWrapper {
+	return &ClaimParametersWrapper{*other.DeepCopy()}
+}
+
 func (wrapper *ClaimParametersWrapper) Obj() *resourcev1alpha2.ResourceClaimParameters {
 	return &wrapper.ResourceClaimParameters
 }
@@ -1193,6 +1212,11 @@ type ClassParametersWrapper struct {
 
 func MakeClassParameters() *ClassParametersWrapper {
 	return &ClassParametersWrapper{}
+}
+
+// FromClassParameters creates a ResourceClassParameters wrapper from an existing object.
+func FromClassParameters(other *resourcev1alpha2.ResourceClassParameters) *ClassParametersWrapper {
+	return &ClassParametersWrapper{*other.DeepCopy()}
 }
 
 func (wrapper *ClassParametersWrapper) Obj() *resourcev1alpha2.ResourceClassParameters {

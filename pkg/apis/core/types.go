@@ -2741,6 +2741,32 @@ type ContainerStatus struct {
 	// +optional
 	// +featureGate=RecursiveReadOnlyMounts
 	VolumeMounts []VolumeMountStatus
+	// User represents user identity information initially attached to the first process of the container
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	User *ContainerUser
+}
+
+// ContainerUser represents user identity information
+type ContainerUser struct {
+	// Linux holds user identity information initially attached to the first process of the containers in Linux.
+	// Note that the actual running identity can be changed if the process has enough privilege to do so.
+	// +optional
+	Linux *LinuxContainerUser
+
+	// Windows holds user identity information of the first process of the containers in Windows
+	// This is just reserved for future use.
+	// Windows *WindowsContainerUser
+}
+
+// LinuxContainerUser represents user identity information in Linux containers
+type LinuxContainerUser struct {
+	// UID is the primary uid initially attached to the first process in the container
+	UID int64
+	// GID is the primary gid initially attached to the first process in the container
+	GID int64
+	// SupplementalGroups are the supplemental groups initially attached to the first process in the container
+	SupplementalGroups []int64
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -3083,19 +3109,27 @@ type PodAffinityTerm struct {
 	NamespaceSelector *metav1.LabelSelector
 	// MatchLabelKeys is a set of pod label keys to select which pods will
 	// be taken into consideration. The keys are used to lookup values from the
-	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)`
+	// incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)`
 	// to select the group of existing pods which pods will be taken into consideration
 	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
 	// pod labels will be ignored. The default value is empty.
+	// The same key is forbidden to exist in both matchLabelKeys and labelSelector.
+	// Also, matchLabelKeys cannot be set when labelSelector isn't set.
+	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+	//
 	// +listType=atomic
 	// +optional
 	MatchLabelKeys []string
 	// MismatchLabelKeys is a set of pod label keys to select which pods will
 	// be taken into consideration. The keys are used to lookup values from the
-	// incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)`
+	// incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)`
 	// to select the group of existing pods which pods will be taken into consideration
 	// for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming
 	// pod labels will be ignored. The default value is empty.
+	// The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
+	// Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
+	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
+	//
 	// +listType=atomic
 	// +optional
 	MismatchLabelKeys []string
@@ -3397,6 +3431,7 @@ type PodSpec struct {
 	// - spec.securityContext.runAsUser
 	// - spec.securityContext.runAsGroup
 	// - spec.securityContext.supplementalGroups
+	// - spec.securityContext.supplementalGroupsPolicy
 	// - spec.containers[*].securityContext.appArmorProfile
 	// - spec.containers[*].securityContext.seLinuxOptions
 	// - spec.containers[*].securityContext.seccompProfile
@@ -3441,17 +3476,11 @@ type PodResourceClaim struct {
 	// This must be a DNS_LABEL.
 	Name string
 
-	// Source describes where to find the ResourceClaim.
-	Source ClaimSource
-}
-
-// ClaimSource describes a reference to a ResourceClaim.
-//
-// Exactly one of these fields should be set.  Consumers of this type must
-// treat an empty object as if it has an unknown value.
-type ClaimSource struct {
 	// ResourceClaimName is the name of a ResourceClaim object in the same
 	// namespace as this pod.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimName *string
 
 	// ResourceClaimTemplateName is the name of a ResourceClaimTemplate
@@ -3466,6 +3495,9 @@ type ClaimSource struct {
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
+	//
+	// Exactly one of ResourceClaimName and ResourceClaimTemplateName must
+	// be set.
 	ResourceClaimTemplateName *string
 }
 
@@ -3539,6 +3571,22 @@ const (
 	// should always be changed whenever volume is mounted inside a Pod. This the default
 	// behavior.
 	FSGroupChangeAlways PodFSGroupChangePolicy = "Always"
+)
+
+// SupplementalGroupsPolicy defines how supplemental groups
+// of the first container processes are calculated.
+type SupplementalGroupsPolicy string
+
+const (
+	// SupplementalGroupsPolicyMerge means that the container's provided
+	// SupplementalGroups and FsGroup (specified in SecurityContext) will be
+	// merged with the primary user's groups as defined in the container image
+	// (in /etc/group).
+	SupplementalGroupsPolicyMerge SupplementalGroupsPolicy = "Merge"
+	// SupplementalGroupsPolicyStrict means that the container's provided
+	// SupplementalGroups and FsGroup (specified in SecurityContext) will be
+	// used instead of any groups defined in the container image.
+	SupplementalGroupsPolicyStrict SupplementalGroupsPolicy = "Strict"
 )
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -3623,15 +3671,26 @@ type PodSecurityContext struct {
 	// for that container.
 	// +optional
 	RunAsNonRoot *bool
-	// A list of groups applied to the first process run in each container, in addition
-	// to the container's primary GID, the fsGroup (if specified), and group memberships
-	// defined in the container image for the uid of the container process. If unspecified,
-	// no additional groups are added to any container. Note that group memberships
-	// defined in the container image for the uid of the container process are still effective,
-	// even if they are not included in this list.
+	// A list of groups applied to the first process run in each container, in
+	// addition to the container's primary GID and fsGroup (if specified).  If
+	// the SupplementalGroupsPolicy feature is enabled, the
+	// supplementalGroupsPolicy field determines whether these are in addition
+	// to or instead of any group memberships defined in the container image.
+	// If unspecified, no additional groups are added, though group memberships
+	// defined in the container image may still be used, depending on the
+	// supplementalGroupsPolicy field.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SupplementalGroups []int64
+	// Defines how supplemental groups of the first container processes are calculated.
+	// Valid values are "Merge" and "Strict". If not specified, "Merge" is used.
+	// (Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled
+	// and the container runtime must implement support for this feature.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// TODO: update the default value to "Merge" when spec.os.name is not windows in v1.34
+	// +featureGate=SupplementalGroupsPolicy
+	// +optional
+	SupplementalGroupsPolicy *SupplementalGroupsPolicy
 	// A special supplemental group that applies to all containers in a pod.
 	// Some volume types allow the Kubelet to change the ownership of that volume
 	// to be owned by the pod:

@@ -22,7 +22,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// DriverRequestsApplyConfiguration represents an declarative configuration of the DriverRequests type for use
+// DriverRequestsApplyConfiguration represents a declarative configuration of the DriverRequests type for use
 // with apply.
 type DriverRequestsApplyConfiguration struct {
 	DriverName       *string                             `json:"driverName,omitempty"`
@@ -30,7 +30,7 @@ type DriverRequestsApplyConfiguration struct {
 	Requests         []ResourceRequestApplyConfiguration `json:"requests,omitempty"`
 }
 
-// DriverRequestsApplyConfiguration constructs an declarative configuration of the DriverRequests type for use with
+// DriverRequestsApplyConfiguration constructs a declarative configuration of the DriverRequests type for use with
 // apply.
 func DriverRequests() *DriverRequestsApplyConfiguration {
 	return &DriverRequestsApplyConfiguration{}

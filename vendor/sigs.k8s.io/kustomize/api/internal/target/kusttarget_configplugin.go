@@ -275,13 +275,25 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 		if len(kt.kustomization.Labels) == 0 && len(kt.kustomization.CommonLabels) == 0 {
 			return
 		}
+
+		type labelStruct struct {
+			Labels     map[string]string
+			FieldSpecs []types.FieldSpec
+		}
+
 		for _, label := range kt.kustomization.Labels {
-			var c struct {
-				Labels     map[string]string
-				FieldSpecs []types.FieldSpec
-			}
+			var c labelStruct
+
 			c.Labels = label.Pairs
 			fss := types.FsSlice(label.FieldSpecs)
+
+			// merge labels specified in the label section of transformer configs
+			// these apply to selectors and templates
+			fss, err := fss.MergeAll(tc.Labels)
+			if err != nil {
+				return nil, fmt.Errorf("failed to merge labels: %w", err)
+			}
+
 			// merge the custom fieldSpecs with the default
 			if label.IncludeSelectors {
 				fss, err = fss.MergeAll(tc.CommonLabels)
@@ -297,7 +309,7 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 				fss, err = fss.MergeOne(types.FieldSpec{Path: "metadata/labels", CreateIfNotPresent: true})
 			}
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to merge labels: %w", err)
 			}
 			c.FieldSpecs = fss
 			p := f()
@@ -307,10 +319,9 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 			}
 			result = append(result, p)
 		}
-		var c struct {
-			Labels     map[string]string
-			FieldSpecs []types.FieldSpec
-		}
+
+		var c labelStruct
+
 		c.Labels = kt.kustomization.CommonLabels
 		c.FieldSpecs = tc.CommonLabels
 		p := f()

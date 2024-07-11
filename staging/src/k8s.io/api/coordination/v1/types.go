@@ -22,6 +22,7 @@ import (
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.14
 
 // Lease defines a lease concept.
 type Lease struct {
@@ -60,6 +61,7 @@ type LeaseSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // LeaseList is a list of Lease objects.
 type LeaseList struct {

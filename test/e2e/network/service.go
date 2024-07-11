@@ -54,7 +54,7 @@ import (
 
 	cloudprovider "k8s.io/cloud-provider"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -430,8 +430,8 @@ func verifyServeHostnameServiceDown(ctx context.Context, c clientset.Interface, 
 }
 
 // testNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
-func testNotReachableHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
+func testNotReachableHTTP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, "/", nil)
 		if result.Code == 0 {
 			return true, nil
@@ -439,7 +439,7 @@ func testNotReachableHTTP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
@@ -474,7 +474,7 @@ const (
 	// Any time we add new errors, we should audit all callers of this.
 )
 
-// pokeUDP tries to connect to a host on a port and send the given request. Callers
+// PokeUDP tries to connect to a host on a port and send the given request. Callers
 // can specify additional success parameters, if desired.
 //
 // The result status will be characterized as precisely as possible, given the
@@ -484,7 +484,7 @@ const (
 //
 // The result response will be populated if the UDP transaction was completed, even
 // if the other test params make this a failure).
-func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
+func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
 	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
 	url := fmt.Sprintf("udp://%s", hostPort)
 
@@ -519,8 +519,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -549,8 +549,8 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 	n, err := con.Read(buf)
 	if err != nil {
 		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
+		var neterr net.Error
+		if errors.As(err, &neterr) && neterr.Timeout() {
 			ret.Status = UDPTimeout
 		} else if strings.Contains(err.Error(), "connection refused") {
 			ret.Status = UDPRefused
@@ -575,9 +575,9 @@ func pokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPo
 }
 
 // testReachableUDP tests that the given host serves UDP on the given port.
-func testReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{
+func testReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
 			Timeout:  3 * time.Second,
 			Response: "hello",
 		})
@@ -587,43 +587,29 @@ func testReachableUDP(host string, port int, timeout time.Duration) {
 		return false, nil // caller can retry
 	}
 
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
 	}
 }
 
 // testNotReachableUDP tests that the given host doesn't serve UDP on the given port.
-func testNotReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
+func testNotReachableUDP(ctx context.Context, host string, port int, timeout time.Duration) {
+	pollfn := func(ctx context.Context) (bool, error) {
+		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
 		if result.Status != UDPSuccess && result.Status != UDPError {
 			return true, nil
 		}
 		return false, nil // caller can retry
 	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, pollfn); err != nil {
 		framework.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
 	}
 }
 
-// testRejectedUDP tests that the given host rejects a UDP request on the given port.
-func testRejectedUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := pokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status == UDPRefused {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
-	}
-}
-
 // TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
-func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
+func TestHTTPHealthCheckNodePort(ctx context.Context, host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	condition := func() (bool, error) {
+	condition := func(ctx context.Context) (bool, error) {
 		success, _ := testHTTPHealthCheckNodePort(host, port, request)
 		if success && expectSucceed ||
 			!success && !expectSucceed {
@@ -635,7 +621,7 @@ func TestHTTPHealthCheckNodePort(host string, port int, request string, timeout 
 		return false, nil
 	}
 
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
+	if err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, condition); err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
 	}
 	return nil
@@ -654,7 +640,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		framework.Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if err != nil {
 		framework.Logf("Got error reading response from %s: %v", url, err)
 		return false, err
@@ -672,7 +658,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 
 func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e2enetwork.NetworkingTestConfig, host string, port int, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
-	pollFn := func() (bool, error) {
+	pollFn := func(ctx context.Context) (bool, error) {
 		statusCode, err := config.GetHTTPCodeFromTestContainer(ctx,
 			"/healthz",
 			host,
@@ -689,7 +675,7 @@ func testHTTPHealthCheckNodePortFromTestContainer(ctx context.Context, config *e
 		}
 		return count >= threshold, nil
 	}
-	err := wait.PollImmediate(time.Second, timeout, pollFn)
+	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, pollFn)
 	if err != nil {
 		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v:%v/healthz, got %d", threshold, expectSucceed, host, port, count)
 	}
@@ -1953,7 +1939,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(gracePeriod)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To(gracePeriod)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2072,7 +2058,7 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(gracePeriod)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To(gracePeriod)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2706,6 +2692,78 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 	})
 
+	ginkgo.It("should support externalTrafficPolicy=Local for type=NodePort", func(ctx context.Context) {
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+
+		namespace := f.Namespace.Name
+		serviceName := "external-local-nodeport"
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+
+		ginkgo.By("creating the service")
+		svc, err := jig.CreateOnlyLocalNodePortService(ctx, false)
+		framework.ExpectNoError(err, "creating the service")
+		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+		nodePortStr := fmt.Sprintf("%d", tcpNodePort)
+		framework.Logf("NodePort is %s", nodePortStr)
+
+		ginkgo.By("creating a HostNetwork exec pod")
+		execPod := launchHostExecPod(ctx, cs, namespace, "hostexec")
+		execPod, err = cs.CoreV1().Pods(namespace).Get(ctx, execPod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "getting podIP of execPod")
+		framework.Logf("execPod IP is %q", execPod.Status.PodIP)
+
+		ginkgo.By("creating an endpoint for the service on a different node from the execPod")
+		_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
+			rc.Spec.Template.Spec.Affinity = &v1.Affinity{
+				// We need to ensure the endpoint is on a different node
+				// from the exec pod, to ensure that the source IP of the
+				// traffic is the node's "public" IP. For
+				// node-to-pod-on-same-node traffic, it might end up using
+				// the "docker0" IP or something like that.
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchFields: []v1.NodeSelectorRequirement{{
+								Key:      "metadata.name",
+								Operator: "NotIn",
+								Values:   []string{execPod.Spec.NodeName},
+							}},
+						}},
+					},
+				},
+			}
+		})
+		framework.ExpectNoError(err, "creating the endpoint pod")
+
+		// Extract the single endpoint node IP from a map of endpoint node IPs
+		var endpointNodeIP string
+		endpointsNodeMap, err := getEndpointNodesWithInternalIP(ctx, jig)
+		framework.ExpectNoError(err, "fetching endpoint node IPs")
+		for node, nodeIP := range endpointsNodeMap {
+			framework.Logf("endpoint is on node %s (%s)", node, nodeIP)
+			endpointNodeIP = nodeIP
+			break
+		}
+
+		ginkgo.By("connecting from the execpod to the NodePort on the endpoint's node")
+		cmd := fmt.Sprintf("curl -g -q -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(endpointNodeIP, nodePortStr))
+		var clientIP string
+		err = wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
+			clientIPPort, err := e2eoutput.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			if err != nil {
+				framework.Logf("error connecting: %v", err)
+				return false, nil
+			}
+			clientIP, _, err = net.SplitHostPort(clientIPPort)
+			framework.ExpectNoError(err, "parsing clientip output")
+			return true, nil
+		})
+		framework.ExpectNoError(err, "connecting to nodeport service")
+		if clientIP != execPod.Status.PodIP {
+			framework.Failf("Source IP %s is not the client IP", clientIP)
+		}
+	})
+
 	ginkgo.It("should fail health check node port if there are only terminating endpoints", func(ctx context.Context) {
 		// windows kube-proxy does not support this feature yet
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -2736,7 +2794,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2777,7 +2835,7 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		// validate that the health check node port from kube-proxy returns 503 when there are no ready endpoints
-		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(ctx, time.Second, time.Minute, true, func(ctx context.Context) (bool, error) {
 			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
@@ -2828,7 +2886,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2903,7 +2961,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -2980,7 +3038,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -3056,7 +3114,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("Creating 1 webserver pod to be part of the TCP service")
 		webserverPod0 := e2epod.NewAgnhostPod(ns, "echo-hostname-0", nil, nil, nil, "netexec", "--http-port", strconv.Itoa(servicePort), "--delay-shutdown", "100")
 		webserverPod0.Labels = jig.Labels
-		webserverPod0.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(100)
+		webserverPod0.Spec.TerminationGracePeriodSeconds = ptr.To[int64](100)
 		e2epod.SetNodeSelection(&webserverPod0.Spec, e2epod.NodeSelection{Name: node0.Name})
 
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
@@ -3361,7 +3419,7 @@ var _ = common.SIGDescribe("Services", func() {
 					Port:       int32(80),
 					TargetPort: intstr.FromInt32(80),
 				}},
-				LoadBalancerClass: utilpointer.String("example.com/internal-vip"),
+				LoadBalancerClass: ptr.To("example.com/internal-vip"),
 			},
 		}
 		_, err = cs.CoreV1().Services(ns).Create(ctx, &testService, metav1.CreateOptions{})
@@ -3461,7 +3519,7 @@ var _ = common.SIGDescribe("Services", func() {
 					svc.ObjectMeta.Namespace == ns &&
 					svc.Annotations["patchedstatus"] == "true"
 				if !found {
-					framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
+					framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
 					return false, nil
 				}
 				for _, cond := range svc.Status.Conditions {
@@ -3470,11 +3528,10 @@ var _ = common.SIGDescribe("Services", func() {
 						cond.Message == "Set from e2e test" {
 						framework.Logf("Found Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
 						return found, nil
-					} else {
-						framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.LoadBalancer)
-						return false, nil
 					}
 				}
+				framework.Logf("Observed Service %v in namespace %v with annotations: %v & Conditions: %v", svc.ObjectMeta.Name, svc.ObjectMeta.Namespace, svc.Annotations, svc.Status.Conditions)
+				return false, nil
 			}
 			framework.Logf("Observed event: %+v", event.Object)
 			return false, nil
@@ -4134,9 +4191,9 @@ func launchHostExecPod(ctx context.Context, client clientset.Interface, ns, name
 }
 
 // checkReachabilityFromPod checks reachability from the specified pod.
-func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
+func checkReachabilityFromPod(ctx context.Context, expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
 	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		_, err := e2eoutput.RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
 			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
@@ -4150,12 +4207,6 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-}
-
-// enableAndDisableInternalLB returns two functions for enabling and disabling the internal load balancer
-// setting for the supported cloud providers (currently GCE/GKE and Azure) and empty functions for others.
-func enableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(svc *v1.Service)) {
-	return framework.TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
 func validatePorts(ep, expectedEndpoints portsByPodUID) error {

@@ -18,7 +18,6 @@ package dynamicresources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -32,7 +31,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,14 +38,16 @@ import (
 	resourcev1alpha2apply "k8s.io/client-go/applyconfigurations/resource/v1alpha2"
 	"k8s.io/client-go/kubernetes"
 	resourcev1alpha2listers "k8s.io/client-go/listers/resource/v1alpha2"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/utils/ptr"
 )
 
@@ -56,6 +56,10 @@ const (
 	Name = names.DynamicResources
 
 	stateKey framework.StateKey = Name
+
+	// generatedFromIndex is the lookup name for the index function
+	// which indexes by other resource which generated the parameters object.
+	generatedFromIndex = "generated-from-index"
 )
 
 // The state is initialized in PreFilter phase. Because we save the pointer in
@@ -272,13 +276,19 @@ type dynamicResources struct {
 	enabled                    bool
 	fh                         framework.Handle
 	clientset                  kubernetes.Interface
-	claimLister                resourcev1alpha2listers.ResourceClaimLister
 	classLister                resourcev1alpha2listers.ResourceClassLister
 	podSchedulingContextLister resourcev1alpha2listers.PodSchedulingContextLister
 	claimParametersLister      resourcev1alpha2listers.ResourceClaimParametersLister
 	classParametersLister      resourcev1alpha2listers.ResourceClassParametersLister
 	resourceSliceLister        resourcev1alpha2listers.ResourceSliceLister
 	claimNameLookup            *resourceclaim.Lookup
+
+	// claimParametersIndexer has the common claimParametersGeneratedFrom indexer installed to
+	// limit iteration over claimParameters to those of interest.
+	claimParametersIndexer cache.Indexer
+	// classParametersIndexer has the common classParametersGeneratedFrom indexer installed to
+	// limit iteration over classParameters to those of interest.
+	classParametersIndexer cache.Indexer
 
 	// claimAssumeCache enables temporarily storing a newer claim object
 	// while the scheduler has allocated it and the corresponding object
@@ -302,7 +312,7 @@ type dynamicResources struct {
 	// When implementing cluster autoscaler support, this assume cache or
 	// something like it (see https://github.com/kubernetes/kubernetes/pull/112202)
 	// might have to be managed by the cluster autoscaler.
-	claimAssumeCache volumebinding.AssumeCache
+	claimAssumeCache *assumecache.AssumeCache
 
 	// inFlightAllocations is map from claim UUIDs to claim objects for those claims
 	// for which allocation was triggered during a scheduling cycle and the
@@ -343,22 +353,63 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return &dynamicResources{}, nil
 	}
 
-	logger := klog.FromContext(ctx)
 	pl := &dynamicResources{
 		enabled:                    true,
 		fh:                         fh,
 		clientset:                  fh.ClientSet(),
-		claimLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Lister(),
 		classLister:                fh.SharedInformerFactory().Resource().V1alpha2().ResourceClasses().Lister(),
 		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha2().PodSchedulingContexts().Lister(),
 		claimParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Lister(),
+		claimParametersIndexer:     fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaimParameters().Informer().GetIndexer(),
 		classParametersLister:      fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Lister(),
+		classParametersIndexer:     fh.SharedInformerFactory().Resource().V1alpha2().ResourceClassParameters().Informer().GetIndexer(),
 		resourceSliceLister:        fh.SharedInformerFactory().Resource().V1alpha2().ResourceSlices().Lister(),
 		claimNameLookup:            resourceclaim.NewNameLookup(fh.ClientSet()),
-		claimAssumeCache:           volumebinding.NewAssumeCache(logger, fh.SharedInformerFactory().Resource().V1alpha2().ResourceClaims().Informer(), "claim", "", nil),
+		claimAssumeCache:           fh.ResourceClaimCache(),
+	}
+
+	if err := pl.claimParametersIndexer.AddIndexers(cache.Indexers{generatedFromIndex: claimParametersGeneratedFromIndexFunc}); err != nil {
+		return nil, fmt.Errorf("add claim parameters cache indexer: %w", err)
+	}
+	if err := pl.classParametersIndexer.AddIndexers(cache.Indexers{generatedFromIndex: classParametersGeneratedFromIndexFunc}); err != nil {
+		return nil, fmt.Errorf("add class parameters cache indexer: %w", err)
 	}
 
 	return pl, nil
+}
+
+func claimParametersReferenceKeyFunc(namespace string, ref *resourcev1alpha2.ResourceClaimParametersReference) string {
+	return ref.APIGroup + "/" + ref.Kind + "/" + namespace + "/" + ref.Name
+}
+
+// claimParametersGeneratedFromIndexFunc is an index function that returns other resource keys
+// (= apiGroup/kind/namespace/name) for ResourceClaimParametersReference in a given claim parameters.
+func claimParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
+	parameters, ok := obj.(*resourcev1alpha2.ResourceClaimParameters)
+	if !ok {
+		return nil, nil
+	}
+	if parameters.GeneratedFrom == nil {
+		return nil, nil
+	}
+	return []string{claimParametersReferenceKeyFunc(parameters.Namespace, parameters.GeneratedFrom)}, nil
+}
+
+func classParametersReferenceKeyFunc(ref *resourcev1alpha2.ResourceClassParametersReference) string {
+	return ref.APIGroup + "/" + ref.Kind + "/" + ref.Namespace + "/" + ref.Name
+}
+
+// classParametersGeneratedFromIndexFunc is an index function that returns other resource keys
+// (= apiGroup/kind/namespace/name) for ResourceClassParametersReference in a given class parameters.
+func classParametersGeneratedFromIndexFunc(obj interface{}) ([]string, error) {
+	parameters, ok := obj.(*resourcev1alpha2.ResourceClassParameters)
+	if !ok {
+		return nil, nil
+	}
+	if parameters.GeneratedFrom == nil {
+		return nil, nil
+	}
+	return []string{classParametersReferenceKeyFunc(parameters.GeneratedFrom)}, nil
 }
 
 var _ framework.PreEnqueuePlugin = &dynamicResources{}
@@ -597,21 +648,6 @@ func (pl *dynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/123697):
 		// check that the pending claims depend on structured parameters (depends on refactoring foreachPodResourceClaim, see other TODO).
-		//
-		// There is a small race here:
-		// - The dynamicresources plugin allocates claim A and updates the assume cache.
-		// - A second pod gets marked as unschedulable based on that assume cache.
-		// - Before the informer cache here catches up, the pod runs, terminates and
-		//   the claim gets deallocated without ever sending the claim status with
-		//   allocation to the scheduler.
-		// - The comparison below is for a *very* old claim with no allocation and the
-		//   new claim where the allocation is already removed again, so no
-		//   RemovedClaimAllocation event gets emitted.
-		//
-		// This is extremely unlikely and thus a fix is not needed for alpha in Kubernetes 1.30.
-		// TODO (https://github.com/kubernetes/kubernetes/issues/123698): The solution is to somehow integrate the assume cache
-		// into the event mechanism. This can be tackled together with adding autoscaler
-		// support, which also needs to do something with the assume cache.
 		logger.V(6).Info("claim with structured parameters got deallocated", "pod", klog.KObj(pod), "claim", klog.KObj(modifiedClaim))
 		return framework.Queue, nil
 	}
@@ -731,7 +767,7 @@ func (pl *dynamicResources) isSchedulableAfterPodSchedulingContextChange(logger 
 	// before moving DRA to beta.
 	if podScheduling.Spec.SelectedNode != "" {
 		for _, claimStatus := range podScheduling.Status.ResourceClaims {
-			if sliceContains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
+			if slices.Contains(claimStatus.UnsuitableNodes, podScheduling.Spec.SelectedNode) {
 				logger.V(5).Info("PodSchedulingContext has unsuitable selected node, schedule immediately", "pod", klog.KObj(pod), "selectedNode", podScheduling.Spec.SelectedNode, "podResourceName", claimStatus.Name)
 				return framework.Queue, nil
 			}
@@ -769,15 +805,6 @@ func podSchedulingHasClaimInfo(podScheduling *resourcev1alpha2.PodSchedulingCont
 	return false
 }
 
-func sliceContains(hay []string, needle string) bool {
-	for _, item := range hay {
-		if item == needle {
-			return true
-		}
-	}
-	return false
-}
-
 // podResourceClaims returns the ResourceClaims for all pod.Spec.PodResourceClaims.
 func (pl *dynamicResources) podResourceClaims(pod *v1.Pod) ([]*resourcev1alpha2.ResourceClaim, error) {
 	claims := make([]*resourcev1alpha2.ResourceClaim, 0, len(pod.Spec.ResourceClaims))
@@ -807,9 +834,14 @@ func (pl *dynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 		if claimName == nil {
 			continue
 		}
-		claim, err := pl.claimLister.ResourceClaims(pod.Namespace).Get(*claimName)
+		obj, err := pl.claimAssumeCache.Get(pod.Namespace + "/" + *claimName)
 		if err != nil {
 			return err
+		}
+
+		claim, ok := obj.(*resourcev1alpha2.ResourceClaim)
+		if !ok {
+			return fmt.Errorf("unexpected object type %T for assumed object %s/%s", obj, pod.Namespace, *claimName)
 		}
 
 		if claim.DeletionTimestamp != nil {
@@ -996,23 +1028,29 @@ func (pl *dynamicResources) lookupClassParameters(logger klog.Logger, class *res
 		return parameters, nil
 	}
 
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
-	allParameters, err := pl.classParametersLister.ResourceClassParameters(class.Namespace).List(labels.Everything())
+	objs, err := pl.classParametersIndexer.ByIndex(generatedFromIndex, classParametersReferenceKeyFunc(class.ParametersRef))
 	if err != nil {
 		return nil, statusError(logger, fmt.Errorf("listing class parameters failed: %v", err))
 	}
-	for _, parameters := range allParameters {
-		if parameters.GeneratedFrom == nil {
-			continue
+	switch len(objs) {
+	case 0:
+		return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.ParametersRef.Namespace, class.ParametersRef.Name)))
+	case 1:
+		parameters, ok := objs[0].(*resourcev1alpha2.ResourceClassParameters)
+		if !ok {
+			return nil, statusError(logger, fmt.Errorf("unexpected object in class parameters index: %T", objs[0]))
 		}
-		if parameters.GeneratedFrom.APIGroup == class.ParametersRef.APIGroup &&
-			parameters.GeneratedFrom.Kind == class.ParametersRef.Kind &&
-			parameters.GeneratedFrom.Name == class.ParametersRef.Name &&
-			parameters.GeneratedFrom.Namespace == class.ParametersRef.Namespace {
-			return parameters, nil
-		}
+		return parameters, nil
+	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClassParameters), objs[j].(*resourcev1alpha2.ResourceClassParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
+		return nil, statusError(logger, fmt.Errorf("multiple generated class parameters for %s.%s %s found: %s", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
-	return nil, statusUnschedulable(logger, fmt.Sprintf("generated class parameters for %s.%s %s not found", class.ParametersRef.Kind, class.ParametersRef.APIGroup, klog.KRef(class.Namespace, class.ParametersRef.Name)))
 }
 
 func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *resourcev1alpha2.ResourceClass, claim *resourcev1alpha2.ResourceClaim) (*resourcev1alpha2.ResourceClaimParameters, *framework.Status) {
@@ -1054,22 +1092,29 @@ func (pl *dynamicResources) lookupClaimParameters(logger klog.Logger, class *res
 		return parameters, nil
 	}
 
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123731): use an indexer
-	allParameters, err := pl.claimParametersLister.ResourceClaimParameters(claim.Namespace).List(labels.Everything())
+	objs, err := pl.claimParametersIndexer.ByIndex(generatedFromIndex, claimParametersReferenceKeyFunc(claim.Namespace, claim.Spec.ParametersRef))
 	if err != nil {
 		return nil, statusError(logger, fmt.Errorf("listing claim parameters failed: %v", err))
 	}
-	for _, parameters := range allParameters {
-		if parameters.GeneratedFrom == nil {
-			continue
+	switch len(objs) {
+	case 0:
+		return nil, statusUnschedulable(logger, fmt.Sprintf("generated claim parameters for %s.%s %s not found", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
+	case 1:
+		parameters, ok := objs[0].(*resourcev1alpha2.ResourceClaimParameters)
+		if !ok {
+			return nil, statusError(logger, fmt.Errorf("unexpected object in claim parameters index: %T", objs[0]))
 		}
-		if parameters.GeneratedFrom.APIGroup == claim.Spec.ParametersRef.APIGroup &&
-			parameters.GeneratedFrom.Kind == claim.Spec.ParametersRef.Kind &&
-			parameters.GeneratedFrom.Name == claim.Spec.ParametersRef.Name {
-			return parameters, nil
-		}
+		return parameters, nil
+	default:
+		sort.Slice(objs, func(i, j int) bool {
+			obj1, obj2 := objs[i].(*resourcev1alpha2.ResourceClaimParameters), objs[j].(*resourcev1alpha2.ResourceClaimParameters)
+			if obj1 == nil || obj2 == nil {
+				return false
+			}
+			return obj1.Name < obj2.Name
+		})
+		return nil, statusError(logger, fmt.Errorf("multiple generated claim parameters for %s.%s %s found: %s", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name), klog.KObjSlice(objs)))
 	}
-	return nil, statusUnschedulable(logger, fmt.Sprintf("generated claim parameters for %s.%s %s not found", claim.Spec.ParametersRef.Kind, claim.Spec.ParametersRef.APIGroup, klog.KRef(claim.Namespace, claim.Spec.ParametersRef.Name)))
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -1330,20 +1375,11 @@ func haveAllPotentialNodes(schedulingCtx *resourcev1alpha2.PodSchedulingContext,
 		return false
 	}
 	for _, node := range nodes {
-		if !haveNode(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
+		if !slices.Contains(schedulingCtx.Spec.PotentialNodes, node.Node().Name) {
 			return false
 		}
 	}
 	return true
-}
-
-func haveNode(nodeNames []string, nodeName string) bool {
-	for _, n := range nodeNames {
-		if n == nodeName {
-			return true
-		}
-	}
-	return false
 }
 
 // Reserve reserves claims for the pod.
@@ -1402,7 +1438,7 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// scheduler will pick it forever even when it cannot satisfy
 		// the claim.
 		if state.podSchedulingState.schedulingCtx == nil ||
-			!containsNode(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
+			!slices.Contains(state.podSchedulingState.schedulingCtx.Spec.PotentialNodes, nodeName) {
 			potentialNodes := []string{nodeName}
 			state.podSchedulingState.potentialNodes = &potentialNodes
 			logger.V(5).Info("asking for information about single potential node", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
@@ -1424,7 +1460,9 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 		// The allocation would be enough. The full object is useful for
 		// debugging and testing, so let's make it realistic.
 		claim = claim.DeepCopy()
-		claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+		if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
+			claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+		}
 		claim.Status.DriverName = driverName
 		claim.Status.Allocation = allocation
 		pl.inFlightAllocations.Store(claim.UID, claim)
@@ -1476,15 +1514,6 @@ func (pl *dynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 	// irreversible, so it better should come last. On the other hand,
 	// triggering both in parallel might be faster.
 	return statusPending(logger, "waiting for resource driver to provide information", "pod", klog.KObj(pod))
-}
-
-func containsNode(hay []string, needle string) bool {
-	for _, node := range hay {
-		if node == needle {
-			return true
-		}
-	}
-	return false
 }
 
 // Unreserve clears the ReservedFor field for all claims.
@@ -1592,72 +1621,88 @@ func (pl *dynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 // and reservation are recorded. This finishes the work started in Reserve.
 func (pl *dynamicResources) bindClaim(ctx context.Context, state *stateData, index int, pod *v1.Pod, nodeName string) (patchedClaim *resourcev1alpha2.ResourceClaim, finalErr error) {
 	logger := klog.FromContext(ctx)
-	claim := state.claims[index]
-	allocationPatch := ""
-
+	claim := state.claims[index].DeepCopy()
 	allocation := state.informationsForClaim[index].allocation
-	logger.V(5).Info("preparing claim status patch", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
+	defer func() {
+		if allocation != nil {
+			// The scheduler was handling allocation. Now that has
+			// completed, either successfully or with a failure.
+			if finalErr == nil {
+				// This can fail, but only for reasons that are okay (concurrent delete or update).
+				// Shouldn't happen in this case.
+				if err := pl.claimAssumeCache.Assume(claim); err != nil {
+					logger.V(5).Info("Claim not stored in assume cache", "err", finalErr)
+				}
+			}
+			pl.inFlightAllocations.Delete(claim.UID)
+		}
+	}()
 
-	// Do we need to store an allocation result from Reserve?
-	if allocation != nil {
-		buffer, err := json.Marshal(allocation)
+	logger.V(5).Info("preparing claim status update", "claim", klog.KObj(state.claims[index]), "allocation", klog.Format(allocation))
+
+	// We may run into a ResourceVersion conflict because there may be some
+	// benign concurrent changes. In that case we get the latest claim and
+	// try again.
+	refreshClaim := false
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if refreshClaim {
+			updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			if err != nil {
+				return fmt.Errorf("get updated claim %s after conflict: %w", klog.KObj(claim), err)
+			}
+			logger.V(5).Info("retrying update after conflict", "claim", klog.KObj(claim))
+			claim = updatedClaim
+		} else {
+			// All future retries must get a new claim first.
+			refreshClaim = true
+		}
+
+		if claim.DeletionTimestamp != nil {
+			return fmt.Errorf("claim %s got deleted in the meantime", klog.KObj(claim))
+		}
+
+		// Do we need to store an allocation result from Reserve?
+		if allocation != nil {
+			if claim.Status.Allocation != nil {
+				return fmt.Errorf("claim %s got allocated elsewhere in the meantime", klog.KObj(claim))
+			}
+
+			// The finalizer needs to be added in a normal update.
+			// If we were interrupted in the past, it might already be set and we simply continue.
+			if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
+				claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
+				updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("add finalizer to claim %s: %w", klog.KObj(claim), err)
+				}
+				claim = updatedClaim
+			}
+
+			claim.Status.DriverName = state.informationsForClaim[index].allocationDriverName
+			claim.Status.Allocation = allocation
+		}
+
+		// We can simply try to add the pod here without checking
+		// preconditions. The apiserver will tell us with a
+		// non-conflict error if this isn't possible.
+		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourcev1alpha2.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
+		updatedClaim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("marshaling AllocationResult failed: %v", err)
-		}
-		allocationPatch = fmt.Sprintf(`"driverName": %q, "allocation": %s, `, state.informationsForClaim[index].allocationDriverName, string(buffer))
-
-		// The finalizer needs to be added in a normal update. Using a simple update is fine
-		// because we don't expect concurrent modifications while the claim is not allocated
-		// yet. If there are any, we want to fail.
-		//
-		// If we were interrupted in the past, it might already be set and we simply continue.
-		if !slices.Contains(claim.Finalizers, resourcev1alpha2.Finalizer) {
-			claim := state.claims[index].DeepCopy()
-			claim.Finalizers = append(claim.Finalizers, resourcev1alpha2.Finalizer)
-			if _, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{}); err != nil {
-				return nil, fmt.Errorf("add finalizer: %v", err)
+			if allocation != nil {
+				return fmt.Errorf("add allocation and reservation to claim %s: %w", klog.KObj(claim), err)
 			}
+			return fmt.Errorf("add reservation to claim %s: %w", klog.KObj(claim), err)
 		}
+		claim = updatedClaim
+		return nil
+	})
+
+	if retryErr != nil {
+		return nil, retryErr
 	}
 
-	// The claim might be stale, for example because the claim can get shared and some
-	// other goroutine has updated it in the meantime. We therefore cannot use
-	// SSA here to add the pod because then we would have to send the entire slice
-	// or use different field manager strings for each entry.
-	//
-	// With a strategic-merge-patch, we can simply send one new entry. The apiserver
-	// validation will catch if two goroutines try to do that at the same time and
-	// the claim cannot be shared.
-	//
-	// Note that this also works when the allocation result gets added twice because
-	// two pods both started using a shared claim: the first pod to get here adds the
-	// allocation result. The second pod then only adds itself to reservedFor.
-	patch := fmt.Sprintf(`{"metadata": {"uid": %q}, "status": {%s "reservedFor": [ {"resource": "pods", "name": %q, "uid": %q} ] }}`,
-		claim.UID,
-		allocationPatch,
-		pod.Name,
-		pod.UID,
-	)
-	if loggerV := logger.V(6); loggerV.Enabled() {
-		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim), "patch", patch)
-	} else {
-		logger.V(5).Info("reserve", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim))
-	}
-	claim, err := pl.clientset.ResourceV1alpha2().ResourceClaims(claim.Namespace).Patch(ctx, claim.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}, "status")
-	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim), "err", err)
-	if allocationPatch != "" {
-		// The scheduler was handling allocation. Now that has
-		// completed, either successfully or with a failure.
-		if err == nil {
-			// This can fail, but only for reasons that are okay (concurrent delete or update).
-			// Shouldn't happen in this case.
-			if err := pl.claimAssumeCache.Assume(claim); err != nil {
-				logger.V(5).Info("Claim not stored in assume cache", "err", err)
-			}
-		}
-		pl.inFlightAllocations.Delete(claim.UID)
-	}
-	return claim, err
+	logger.V(5).Info("reserved", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.Format(claim))
+	return claim, nil
 }
 
 // PostBind is called after a pod is successfully bound to a node. Now we are

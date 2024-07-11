@@ -28,7 +28,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// CSIStorageCapacityApplyConfiguration represents an declarative configuration of the CSIStorageCapacity type for use
+// CSIStorageCapacityApplyConfiguration represents a declarative configuration of the CSIStorageCapacity type for use
 // with apply.
 type CSIStorageCapacityApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -39,7 +39,7 @@ type CSIStorageCapacityApplyConfiguration struct {
 	MaximumVolumeSize                *resource.Quantity                  `json:"maximumVolumeSize,omitempty"`
 }
 
-// CSIStorageCapacity constructs an declarative configuration of the CSIStorageCapacity type for use with
+// CSIStorageCapacity constructs a declarative configuration of the CSIStorageCapacity type for use with
 // apply.
 func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfiguration {
 	b := &CSIStorageCapacityApplyConfiguration{}
@@ -274,4 +274,10 @@ func (b *CSIStorageCapacityApplyConfiguration) WithCapacity(value resource.Quant
 func (b *CSIStorageCapacityApplyConfiguration) WithMaximumVolumeSize(value resource.Quantity) *CSIStorageCapacityApplyConfiguration {
 	b.MaximumVolumeSize = &value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *CSIStorageCapacityApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

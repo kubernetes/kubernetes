@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesFilterApplyConfiguration represents an declarative configuration of the NamedResourcesFilter type for use
+// NamedResourcesFilterApplyConfiguration represents a declarative configuration of the NamedResourcesFilter type for use
 // with apply.
 type NamedResourcesFilterApplyConfiguration struct {
 	Selector *string `json:"selector,omitempty"`
 }
 
-// NamedResourcesFilterApplyConfiguration constructs an declarative configuration of the NamedResourcesFilter type for use with
+// NamedResourcesFilterApplyConfiguration constructs a declarative configuration of the NamedResourcesFilter type for use with
 // apply.
 func NamedResourcesFilter() *NamedResourcesFilterApplyConfiguration {
 	return &NamedResourcesFilterApplyConfiguration{}

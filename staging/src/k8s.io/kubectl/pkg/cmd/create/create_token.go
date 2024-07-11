@@ -19,7 +19,6 @@ package create
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -39,7 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // TokenOptions is the data required to perform a token request operation.
@@ -103,10 +102,9 @@ func boundObjectKindToAPIVersions() map[string]string {
 	kinds := map[string]string{
 		"Pod":    "v1",
 		"Secret": "v1",
+		"Node":   "v1",
 	}
-	if os.Getenv("KUBECTL_NODE_BOUND_TOKENS") == "true" {
-		kinds["Node"] = "v1"
-	}
+
 	return kinds
 }
 
@@ -247,7 +245,7 @@ func (o *TokenOptions) Run() error {
 		},
 	}
 	if o.Duration > 0 {
-		request.Spec.ExpirationSeconds = pointer.Int64(int64(o.Duration / time.Second))
+		request.Spec.ExpirationSeconds = ptr.To(int64(o.Duration / time.Second))
 	}
 	if len(o.BoundObjectKind) > 0 {
 		request.Spec.BoundObjectRef = &authenticationv1.BoundObjectReference{

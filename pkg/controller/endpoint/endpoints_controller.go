@@ -76,8 +76,13 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
 
 	e := &Controller{
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		client: client,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "endpoint",
+			},
+		),
 		workerLoopPeriod: time.Second,
 	}
 
@@ -105,6 +110,7 @@ func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInf
 	e.endpointsLister = endpointsInformer.Lister()
 	e.endpointsSynced = endpointsInformer.Informer().HasSynced
 
+	e.staleEndpointsTracker = newStaleEndpointsTracker()
 	e.triggerTimeTracker = endpointsliceutil.NewTriggerTimeTracker()
 	e.eventBroadcaster = broadcaster
 	e.eventRecorder = recorder
@@ -140,13 +146,15 @@ type Controller struct {
 	// endpointsSynced returns true if the endpoints shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	endpointsSynced cache.InformerSynced
+	// staleEndpointsTracker can help determine if a cached Endpoints is out of date.
+	staleEndpointsTracker *staleEndpointsTracker
 
 	// Services that need to be updated. A channel is inappropriate here,
 	// because it allows services with lots of pods to be serviced much
 	// more often than services with few pods; it also would cause a
 	// service that's inserted multiple times to be processed more than
 	// necessary.
-	queue workqueue.RateLimitingInterface
+	queue workqueue.TypedRateLimitingInterface[string]
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
@@ -324,19 +332,19 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer e.queue.Done(eKey)
 
 	logger := klog.FromContext(ctx)
-	err := e.syncService(ctx, eKey.(string))
+	err := e.syncService(ctx, eKey)
 	e.handleErr(logger, err, eKey)
 
 	return true
 }
 
-func (e *Controller) handleErr(logger klog.Logger, err error, key interface{}) {
+func (e *Controller) handleErr(logger klog.Logger, err error, key string) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
 	}
 
-	ns, name, keyErr := cache.SplitMetaNamespaceKey(key.(string))
+	ns, name, keyErr := cache.SplitMetaNamespaceKey(key)
 	if keyErr != nil {
 		logger.Error(err, "Failed to split meta namespace cache key", "key", key)
 	}
@@ -379,6 +387,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 			return err
 		}
 		e.triggerTimeTracker.DeleteService(namespace, name)
+		e.staleEndpointsTracker.Delete(namespace, name)
 		return nil
 	}
 
@@ -468,6 +477,8 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 				Labels: service.Labels,
 			},
 		}
+	} else if e.staleEndpointsTracker.IsStale(currentEndpoints) {
+		return fmt.Errorf("endpoints informer cache is out of date, resource version %s already processed for endpoints %s", currentEndpoints.ResourceVersion, key)
 	}
 
 	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
@@ -549,6 +560,12 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		}
 
 		return err
+	}
+	// If the current endpoints is updated we track the old resource version, so
+	// if we obtain this resource version again from the lister we know is outdated
+	// and we need to retry later to wait for the informer cache to be up-to-date.
+	if !createEndpoints {
+		e.staleEndpointsTracker.Stale(currentEndpoints)
 	}
 	return nil
 }

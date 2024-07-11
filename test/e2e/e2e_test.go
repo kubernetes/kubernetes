@@ -62,7 +62,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
 	_ "k8s.io/kubernetes/test/e2e/storage"
-	_ "k8s.io/kubernetes/test/e2e/storage/csi_mock"
+	_ "k8s.io/kubernetes/test/e2e/storage/csimock"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
 	_ "k8s.io/kubernetes/test/e2e/windows"
 

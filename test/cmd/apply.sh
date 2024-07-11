@@ -96,6 +96,34 @@ run_kubectl_apply_tests() {
   # cleanup
   kubectl delete pods selector-test-pod
 
+  # Create a deployment
+  kubectl apply -f hack/testdata/null-propagation/deployment-null.yml "${kube_flags[@]:?}"
+  # resources.limits.cpu should be nil.
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].resources.requests.cpu}" ''
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].resources.requests.memory}" '64Mi'
+  # The default value of the terminationMessagePolicy field is `File`, so the result will not be changed.
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].terminationMessagePolicy}" 'File'
+
+  # kubectl apply on create should do what kubectl apply on update will accomplish.
+  kubectl apply -f hack/testdata/null-propagation/deployment-null.yml "${kube_flags[@]}"
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].resources.requests.cpu}" ''
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].resources.requests.memory}" '64Mi'
+  kube::test::get_object_jsonpath_assert "deployment/my-dep-null" "{.spec.template.spec.containers[0].terminationMessagePolicy}" 'File'
+
+  # hard.limits.cpu should be nil.
+  kubectl apply -f hack/testdata/null-propagation/resourcesquota-null.yml "${kube_flags[@]}"
+  kube::test::get_object_jsonpath_assert  "resourcequota/my-rq" "{.spec.hard['limits\.cpu']}" ''
+  kube::test::get_object_jsonpath_assert  "resourcequota/my-rq" "{.spec.hard['limits\.memory']}" ''
+
+  # kubectl apply on create should do what kubectl apply on update will accomplish.
+  kubectl apply -f hack/testdata/null-propagation/resourcesquota-null.yml "${kube_flags[@]}"
+  kube::test::get_object_jsonpath_assert "resourcequota/my-rq" "{.spec.hard['limits\.cpu']}" ''
+  kube::test::get_object_jsonpath_assert  "resourcequota/my-rq" "{.spec.hard['limits\.memory']}" ''
+
+  # cleanup
+  kubectl delete deployment my-dep-null
+  kubectl delete resourcequota my-rq
+
   ## kubectl apply --dry-run=server
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''

@@ -21,10 +21,12 @@
 
 usage () {
   cat <<EOF >&2
-Usage: $0 [-r <revision>] [directory]"
-   -r <revision>: only report issues in code added since that revision. Default is
-      the common base of origin/master and HEAD.
-   [package]: check directory instead of everything
+Usage: $0 [-r <revision>] [directory ...]"
+   -t <revision>: Report changes in code up to and including this revision.
+                  Default is the current working tree instead of a revision.
+   -r <revision>: Report change in code added since this revision. Default is
+                  the common base of origin/master and HEAD.
+   [directory]:   Check one or more specific directory instead of everything.
 EOF
   exit 1
 }
@@ -37,11 +39,20 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 base=
-while getopts "r:" o; do
+target=
+while getopts "r:t:" o; do
     case "${o}" in
         r)
             base="${OPTARG}"
             if [ ! "$base" ]; then
+                echo "ERROR: -${o} needs a non-empty parameter" >&2
+                echo >&2
+                usage
+            fi
+            ;;
+       t)
+            target="${OPTARG}"
+            if [ ! "$target" ]; then
                 echo "ERROR: -${o} needs a non-empty parameter" >&2
                 echo >&2
                 usage
@@ -58,36 +69,51 @@ shift $((OPTIND - 1))
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
     # This lists all entries in the go.work file as absolute directory paths.
-    kube::util::read-array targets < <(
-        go list -f '{{.Dir}}' -m | while read -r d; do
-            # We need relative paths because we will invoke apidiff in
-            # different work trees.
-            d="$(realpath -s --relative-to="$(pwd)" "${d}")"
-            if [ "${d}" != "." ]; then
-                # sub-directories have to have a leading dot.
-                d="./${d}"
-            fi
-            echo "${d}"
-        done
-    )
+    kube::util::read-array targets < <(go list -f '{{.Dir}}' -m)
 fi
 
-# Default if -r was not given.
-if [ -z "${base}" ]; then
-    if ! base="$(git merge-base origin/master HEAD)"; then
-        echo >&2 "Could not determine default base revision. -r must be used explicitly."
-        exit 1
+# Sanitize paths:
+# - We need relative paths because we will invoke apidiff in
+#   different work trees.
+# - Must start with a dot.
+for (( i=0; i<${#targets[@]}; i++ )); do
+    d="${targets[i]}"
+    d=$(realpath -s --relative-to="$(pwd)" "${d}")
+    if [ "${d}" != "." ]; then
+        # sub-directories have to have a leading dot.
+        d="./${d}"
     fi
-fi
+    targets[i]="${d}"
+done
 
 # Must be a something that git can resolve to a commit.
 # "git rev-parse --verify" checks that and prints a detailed
 # error.
-base="$(git rev-parse --verify "$base")"
+if [ -n "${target}" ]; then
+    target="$(git rev-parse --verify "${target}")"
+fi
+
+# Determine defaults.
+if [ -z "${base}" ]; then
+    if ! base="$(git merge-base origin/master "${target:-HEAD}")"; then
+        echo >&2 "Could not determine default base revision. -r must be used explicitly."
+        exit 1
+    fi
+fi
+base="$(git rev-parse --verify "${base}")"
 
 # Give some information about what's happening. Failures from "git describe" are ignored
 # silently, that's optional information.
-echo "Checking for API changes since ${base}$(if descr=$(git describe --tags "${base}" 2>/dev/null); then echo " = ${descr}"; fi)."
+describe () {
+    local rev="$1"
+    local descr
+    echo -n "$rev"
+    if descr=$(git describe --tags "${rev}" 2>/dev/null); then
+        echo -n " (= ${descr})"
+    fi
+    echo
+}
+echo "Checking $(if [ -n "${target}" ]; then describe "${target}"; else echo "current working tree"; fi) for API changes since $(describe "${base}")."
 
 kube::golang::setup_env
 kube::util::ensure-temp-dir
@@ -118,21 +144,31 @@ run () {
     done
 }
 
-# First the current code.
-run "${KUBE_TEMP}/after"
+# runWorktree checks out a specific revision, then invokes run there.
+runWorktree () {
+    local out="$1"
+    local worktree="$2"
+    local rev="$3"
 
-WORKTREE="${KUBE_TEMP}/worktree"
+    # Create a copy of the repo with the specific revision checked out.
+    git worktree add -f -d "${worktree}" "${rev}"
+    # Clean up the copy on exit.
+    kube::util::trap_add "git worktree remove -f ${worktree}" EXIT
 
-# Create a copy of the repo with the base checked out.
-git worktree add -f -d "${WORKTREE}" "${base}"
-# Clean up the copy on exit.
-kube::util::trap_add "git worktree remove -f ${WORKTREE}" EXIT
+    # Ready for apidiff.
+    (
+        cd "${worktree}"
+        run "${out}"
+    )
+}
 
-# Base ready for apidiff.
-(
-    cd "${WORKTREE}"
-    run "${KUBE_TEMP}/before"
-)
+# Dump old and new api state.
+if [ -z "${target}" ]; then
+    run "${KUBE_TEMP}/after"
+else
+    runWorktree "${KUBE_TEMP}/after" "${KUBE_TEMP}/target" "${target}"
+fi
+runWorktree "${KUBE_TEMP}/before" "${KUBE_TEMP}/base" "${base}"
 
 # Now produce a report. All changes get reported because exporting some API
 # unnecessarily might also be good to know, but the final exit code will only

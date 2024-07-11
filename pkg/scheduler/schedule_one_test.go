@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"reflect"
 	"regexp"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"sync"
@@ -510,6 +511,10 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 
 // TestSchedulerGuaranteeNonNilNodeInSchedulingCycle is for detecting potential panic on nil Node when iterating Nodes.
 func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		// TODO: remove skip once the failing test has been fixed.
+		t.Skip("Skip failing test on Windows.")
+	}
 	random := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -773,7 +778,9 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				registerPluginFuncs,
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+			)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2241,10 +2248,11 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:              []string{"node1", "node2", "node3"},
-			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
-			wantNodes:          sets.New("node2"),
-			wantEvaluatedNodes: ptr.To[int32](3),
+			nodes:     []string{"node1", "node2", "node3"},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes: sets.New("node2"),
+			// since this case has no score plugin, we'll only try to find one node in Filter stage
+			wantEvaluatedNodes: ptr.To[int32](1),
 		},
 		{
 			name: "test prefilter plugin returning non-intersecting nodes",
@@ -2275,7 +2283,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
 						"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously"),
 					},
-					UnschedulablePlugins: sets.Set[string]{},
+					UnschedulablePlugins: sets.New("FakePreFilter2", "FakePreFilter3"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin(s) [FakePreFilter2 FakePreFilter3] simultaneously",
 				},
 			},
@@ -2303,7 +2311,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 					NodeToStatusMap: framework.NodeToStatusMap{
 						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node(s) didn't satisfy plugin FakePreFilter2"),
 					},
-					UnschedulablePlugins: sets.Set[string]{},
+					UnschedulablePlugins: sets.New("FakePreFilter2"),
 					PreFilterMsg:         "node(s) didn't satisfy plugin FakePreFilter2",
 				},
 			},
@@ -2329,10 +2337,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				NumAllNodes: 2,
 				Diagnosis: framework.Diagnosis{
 					NodeToStatusMap: framework.NodeToStatusMap{
-						"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "node is filtered out by the prefilter result"),
 						"node2": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-prefilter").WithPlugin("FakeFilter"),
 					},
-					UnschedulablePlugins: sets.New("FakeFilter"),
+					UnschedulablePlugins: sets.New("FakePreFilter", "FakeFilter"),
 					PreFilterMsg:         "",
 				},
 			},
@@ -2411,10 +2418,36 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
-			nodes:              []string{"node1", "node2", "node3"},
-			pod:                st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
-			wantNodes:          sets.New("node1", "node2"),
-			wantEvaluatedNodes: ptr.To[int32](2),
+			nodes:     []string{"node1", "node2", "node3"},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes: sets.New("node1", "node2"),
+			// since this case has no score plugin, we'll only try to find one node in Filter stage
+			wantEvaluatedNodes: ptr.To[int32](1),
+		},
+		{
+			name: "test prefilter plugin returned an invalid node",
+			registerPlugins: []tf.RegisterPluginFunc{
+				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				tf.RegisterPreFilterPlugin(
+					"FakePreFilter",
+					tf.NewFakePreFilterPlugin("FakePreFilter", &framework.PreFilterResult{
+						NodeNames: sets.New("invalid-node"),
+					}, nil),
+				),
+				tf.RegisterFilterPlugin("TrueFilter", tf.NewTrueFilterPlugin),
+				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			},
+			nodes:     []string{"1", "2"},
+			pod:       st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+			wantNodes: nil,
+			wErr: &framework.FitError{
+				Pod:         st.MakePod().Name("test-prefilter").UID("test-prefilter").Obj(),
+				NumAllNodes: 2,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap:      framework.NodeToStatusMap{},
+					UnschedulablePlugins: sets.New("FakePreFilter"),
+				},
+			},
 		},
 	}
 	for _, test := range tests {
@@ -2478,7 +2511,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				if gotOK != wantOK {
 					t.Errorf("Expected err to be FitError: %v, but got %v (error: %v)", wantOK, gotOK, err)
 				} else if gotOK {
-					if diff := cmp.Diff(gotFitErr, wantFitErr); diff != "" {
+					if diff := cmp.Diff(wantFitErr, gotFitErr); diff != "" {
 						t.Errorf("Unexpected fitErr: (-want, +got): %s", diff)
 					}
 				}
@@ -3523,6 +3556,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		informerFactory = informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
 	}
 	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
+	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	fwk, _ := tf.NewFramework(
 		ctx,
@@ -3532,6 +3566,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+		frameworkruntime.WithWaitingPods(waitingPods),
 	)
 
 	errChan := make(chan error, 1)

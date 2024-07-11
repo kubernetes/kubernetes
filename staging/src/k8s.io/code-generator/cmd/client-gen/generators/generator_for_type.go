@@ -148,30 +148,38 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		extendedMethods = append(extendedMethods, extendedMethod)
 	}
 	m := map[string]interface{}{
-		"type":                 t,
-		"inputType":            t,
-		"resultType":           t,
-		"package":              pkg,
-		"Package":              namer.IC(pkg),
-		"namespaced":           !tags.NonNamespaced,
-		"Group":                namer.IC(g.group),
-		"subresource":          false,
-		"subresourcePath":      "",
-		"GroupGoName":          g.groupGoName,
-		"Version":              namer.IC(g.version),
-		"CreateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
-		"DeleteOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
-		"GetOptions":           c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
-		"ListOptions":          c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
-		"PatchOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
-		"ApplyOptions":         c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
-		"UpdateOptions":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
-		"PatchType":            c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
-		"ApplyPatchType":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
-		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
-		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
-		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"type":                             t,
+		"inputType":                        t,
+		"resultType":                       t,
+		"package":                          pkg,
+		"Package":                          namer.IC(pkg),
+		"namespaced":                       !tags.NonNamespaced,
+		"Group":                            namer.IC(g.group),
+		"subresource":                      false,
+		"subresourcePath":                  "",
+		"GroupGoName":                      g.groupGoName,
+		"Version":                          namer.IC(g.version),
+		"CreateOptions":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "CreateOptions"}),
+		"DeleteOptions":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}),
+		"GetOptions":                       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "GetOptions"}),
+		"ListOptions":                      c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ListOptions"}),
+		"PatchOptions":                     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "PatchOptions"}),
+		"ApplyOptions":                     c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ApplyOptions"}),
+		"UpdateOptions":                    c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "UpdateOptions"}),
+		"PatchType":                        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "PatchType"}),
+		"ApplyPatchType":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
+		"watchInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
+		"RESTClientInterface":              c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
+		"schemeParameterCodec":             c.Universe.Variable(types.Name{Package: path.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"jsonMarshal":                      c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"resourceVersionMatchNotOlderThan": c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ResourceVersionMatchNotOlderThan"}),
+		"CheckListFromCacheDataConsistencyIfRequested":      c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckListFromCacheDataConsistencyIfRequested"}),
+		"CheckWatchListFromCacheDataConsistencyIfRequested": c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/consistencydetector", Name: "CheckWatchListFromCacheDataConsistencyIfRequested"}),
+		"PrepareWatchListOptionsFromListOptions":            c.Universe.Function(types.Name{Package: "k8s.io/client-go/util/watchlist", Name: "PrepareWatchListOptionsFromListOptions"}),
+		"Client":                                            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "Client"}),
+		"ClientWithList":                                    c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithList"}),
+		"ClientWithApply":                                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithApply"}),
+		"ClientWithListAndApply":                            c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "ClientWithListAndApply"}),
 	}
 
 	if generateApply {
@@ -206,52 +214,30 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 	}
 	sw.Do(interfaceTemplate4, m)
 
+	structNamespaced := namespaced
 	if tags.NonNamespaced {
-		sw.Do(structNonNamespaced, m)
-		sw.Do(newStructNonNamespaced, m)
-	} else {
-		sw.Do(structNamespaced, m)
-		sw.Do(newStructNamespaced, m)
+		structNamespaced = nonNamespaced
 	}
 
 	if tags.NoVerbs {
+		sw.Do(structType[noList|noApply], m)
+		sw.Do(newStruct[structNamespaced|noList|noApply], m)
+
 		return sw.Error()
 	}
 
-	if tags.HasVerb("get") {
-		sw.Do(getTemplate, m)
-	}
+	listableOrAppliable := noList | noApply
+
 	if tags.HasVerb("list") {
-		sw.Do(listTemplate, m)
-	}
-	if tags.HasVerb("watch") {
-		sw.Do(watchTemplate, m)
+		listableOrAppliable |= withList
 	}
 
-	if tags.HasVerb("create") {
-		sw.Do(createTemplate, m)
-	}
-	if tags.HasVerb("update") {
-		sw.Do(updateTemplate, m)
-	}
-	if tags.HasVerb("updateStatus") {
-		sw.Do(updateStatusTemplate, m)
-	}
-	if tags.HasVerb("delete") {
-		sw.Do(deleteTemplate, m)
-	}
-	if tags.HasVerb("deleteCollection") {
-		sw.Do(deleteCollectionTemplate, m)
-	}
-	if tags.HasVerb("patch") {
-		sw.Do(patchTemplate, m)
-	}
 	if tags.HasVerb("apply") && generateApply {
-		sw.Do(applyTemplate, m)
+		listableOrAppliable |= withApply
 	}
-	if tags.HasVerb("applyStatus") && generateApply {
-		sw.Do(applyStatusTemplate, m)
-	}
+
+	sw.Do(structType[listableOrAppliable], m)
+	sw.Do(newStruct[structNamespaced|listableOrAppliable], m)
 
 	// generate expansion methods
 	for _, e := range tags.Extensions {
@@ -298,6 +284,8 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listSubresourceTemplate), m)
 			} else {
 				sw.Do(adjustTemplate(e.VerbName, e.VerbType, listTemplate), m)
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, privateListTemplate), m)
+				sw.Do(adjustTemplate(e.VerbName, e.VerbType, watchListTemplate), m)
 			}
 		}
 
@@ -377,9 +365,10 @@ func buildSubresourceDefaultVerbTemplates(generateApply bool) map[string]string 
 
 func buildDefaultVerbTemplates(generateApply bool) map[string]string {
 	m := map[string]string{
-		"create":           `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
-		"update":           `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
-		"updateStatus":     `UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
+		"create": `Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (*$.resultType|raw$, error)`,
+		"update": `Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (*$.resultType|raw$, error)`,
+		"updateStatus": `// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+UpdateStatus(ctx context.Context, $.inputType|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (*$.type|raw$, error)`,
 		"delete":           `Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error`,
 		"deleteCollection": `DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error`,
 		"get":              `Get(ctx context.Context, name string, opts $.GetOptions|raw$) (*$.resultType|raw$, error)`,
@@ -389,7 +378,8 @@ func buildDefaultVerbTemplates(generateApply bool) map[string]string {
 	}
 	if generateApply {
 		m["apply"] = `Apply(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
-		m["applyStatus"] = `ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
+		m["applyStatus"] = `// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error)`
 	}
 	return m
 }
@@ -421,51 +411,204 @@ var interfaceTemplate4 = `
 }
 `
 
-// template for the struct that implements the type's interface
-var structNamespaced = `
-// $.type|privatePlural$ implements $.type|public$Interface
-type $.type|privatePlural$ struct {
-	client $.RESTClientInterface|raw$
-	ns     string
-}
-`
+// struct and constructor variants
+const (
+	// The following values are bits in a bitmask.
+	// The values which can be set indicate namespace support, list support, and apply support;
+	// to make the declarations easier to read (like a truth table), corresponding zero-values
+	// are also declared.
+	namespaced    = 0
+	noList        = 0
+	noApply       = 0
+	nonNamespaced = 1 << iota
+	withList
+	withApply
+)
 
-// template for the struct that implements the type's interface
-var structNonNamespaced = `
-// $.type|privatePlural$ implements $.type|public$Interface
-type $.type|privatePlural$ struct {
-	client $.RESTClientInterface|raw$
-}
-`
+// The following string slices are similar to maps, but with combinable keys used as indices.
+// Each entry defines whether it supports lists and/or apply, and if namespacedness matters,
+// namespaces; each bit is then toggled:
+// * noList, noApply: index 0;
+// * withList, noApply: index 2;
+// * noList, withApply: index 4;
+// * withList, withApply: index 6.
+// When namespacedness matters, the namespaced variants are the same as the above, and
+// the non-namespaced variants are offset by 1.
+// Go enforces index unicity in these kinds of declarations.
 
-var newStructNamespaced = `
-// new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
-	return &$.type|privatePlural${
-		client: c.RESTClient(),
-		ns:     namespace,
+// struct declarations
+// Namespacedness does not matter
+var structType = []string{
+	noList | noApply: `
+	// $.type|privatePlural$ implements $.type|public$Interface
+	type $.type|privatePlural$ struct {
+		*$.Client|raw$[*$.resultType|raw$]
 	}
-}
-`
-
-var newStructNonNamespaced = `
-// new$.type|publicPlural$ returns a $.type|publicPlural$
-func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
-	return &$.type|privatePlural${
-		client: c.RESTClient(),
+	`,
+	withList | noApply: `
+	// $.type|privatePlural$ implements $.type|public$Interface
+	type $.type|privatePlural$ struct {
+		*$.ClientWithList|raw$[*$.resultType|raw$, *$.resultType|raw$List]
 	}
+	`,
+	noList | withApply: `
+	// $.type|privatePlural$ implements $.type|public$Interface
+	type $.type|privatePlural$ struct {
+		*$.ClientWithApply|raw$[*$.resultType|raw$, *$.inputApplyConfig|raw$]
+	}
+	`,
+	withList | withApply: `
+	// $.type|privatePlural$ implements $.type|public$Interface
+	type $.type|privatePlural$ struct {
+		*$.ClientWithListAndApply|raw$[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$]
+	}
+	`,
 }
-`
+
+// Constructors for the struct, in all variants
+// Namespacedness matters
+var newStruct = []string{
+	namespaced | noList | noApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClient[*$.resultType|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				namespace,
+				func() *$.resultType|raw$ { return &$.resultType|raw${} }),
+		}
+	}
+	`,
+	namespaced | noList | withApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithApply[*$.resultType|raw$, *$.inputApplyConfig|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				namespace,
+				func() *$.resultType|raw$ { return &$.resultType|raw${} }),
+		}
+	}
+	`,
+	namespaced | withList | noApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithList[*$.resultType|raw$, *$.resultType|raw$List](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				namespace,
+				func() *$.resultType|raw$ { return &$.resultType|raw${} },
+				func() *$.resultType|raw$List { return &$.resultType|raw$List{} }),
+		}
+	}
+	`,
+	namespaced | withList | withApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client, namespace string) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithListAndApply[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				namespace,
+				func() *$.resultType|raw$ { return &$.resultType|raw${} },
+				func() *$.resultType|raw$List { return &$.resultType|raw$List{} }),
+		}
+	}
+	`,
+	nonNamespaced | noList | noApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClient[*$.resultType|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				"",
+				func() *$.resultType|raw$ { return &$.resultType|raw${} }),
+		}
+	}
+	`,
+	nonNamespaced | noList | withApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithApply[*$.resultType|raw$, *$.inputApplyConfig|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				"",
+				func() *$.resultType|raw$ { return &$.resultType|raw${} }),
+		}
+	}
+	`,
+	nonNamespaced | withList | noApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithList[*$.resultType|raw$, *$.resultType|raw$List](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				"",
+				func() *$.resultType|raw$ { return &$.resultType|raw${} },
+				func() *$.resultType|raw$List { return &$.resultType|raw$List{} }),
+		}
+	}
+	`,
+	nonNamespaced | withList | withApply: `
+	// new$.type|publicPlural$ returns a $.type|publicPlural$
+	func new$.type|publicPlural$(c *$.GroupGoName$$.Version$Client) *$.type|privatePlural$ {
+		return &$.type|privatePlural${
+			gentype.NewClientWithListAndApply[*$.resultType|raw$, *$.resultType|raw$List, *$.inputApplyConfig|raw$](
+				"$.type|resource$",
+				c.RESTClient(),
+				$.schemeParameterCodec|raw$,
+				"",
+				func() *$.resultType|raw$ { return &$.resultType|raw${} },
+				func() *$.resultType|raw$List { return &$.resultType|raw$List{} }),
+		}
+	}
+	`,
+}
+
 var listTemplate = `
 // List takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
-func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw$) (*$.resultType|raw$List, error) {
+    if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr  := $.PrepareWatchListOptionsFromListOptions|raw$(opts); watchListOptionsErr  != nil {
+        klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr )
+    } else if hasWatchListOptionsPrepared {
+        result, err := c.watchList(ctx, watchListOptions)
+        if err == nil {
+            $.CheckWatchListFromCacheDataConsistencyIfRequested|raw$(ctx, "watchlist request for $.type|resource$", c.list, opts, result)
+            return result, nil
+        }
+        klog.Warningf("The watchlist request for $.type|resource$ ended with an error, falling back to the standard LIST semantics, err = %v", err)
+    }
+    result, err := c.list(ctx, opts)
+    if err == nil {
+        $.CheckListFromCacheDataConsistencyIfRequested|raw$(ctx, "list request for $.type|resource$", c.list, opts, result)
+    }
+    return result, err
+}
+`
+
+var privateListTemplate = `
+// list takes label and field selectors, and returns the list of $.resultType|publicPlural$ that match those selectors.
+func (c *$.type|privatePlural$) list(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil{
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	result = &$.resultType|raw$List{}
-	err = c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
@@ -483,8 +626,8 @@ func (c *$.type|privatePlural$) List(ctx context.Context, $.type|private$Name st
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	result = &$.resultType|raw$List{}
-	err = c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -500,8 +643,8 @@ var getTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.resultType|private$ object, and an error if there is any.
 func (c *$.type|privatePlural$) Get(ctx context.Context, name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(name).
 		VersionedParams(&options, $.schemeParameterCodec|raw$).
@@ -515,8 +658,8 @@ var getSubresourceTemplate = `
 // Get takes name of the $.type|private$, and returns the corresponding $.resultType|raw$ object, and an error if there is any.
 func (c *$.type|privatePlural$) Get(ctx context.Context, $.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -530,28 +673,10 @@ func (c *$.type|privatePlural$) Get(ctx context.Context, $.type|private$Name str
 var deleteTemplate = `
 // Delete takes name of the $.type|private$ and deletes it. Returns an error if one occurs.
 func (c *$.type|privatePlural$) Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error {
-	return c.client.Delete().
-		$if .namespaced$Namespace(c.ns).$end$
+	return c.GetClient().Delete().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-`
-
-var deleteCollectionTemplate = `
-// DeleteCollection deletes a collection of objects.
-func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, opts $.DeleteOptions|raw$, listOpts $.ListOptions|raw$) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil{
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|resource$").
-		VersionedParams(&listOpts, $.schemeParameterCodec|raw$).
-		Timeout(timeout).
 		Body(&opts).
 		Do(ctx).
 		Error()
@@ -562,8 +687,8 @@ var createSubresourceTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Post().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Post().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -579,8 +704,8 @@ var createTemplate = `
 // Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Post().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Post().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
@@ -594,8 +719,8 @@ var updateSubresourceTemplate = `
 // Update takes the top resource name and the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Update(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Put().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Put().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -611,30 +736,12 @@ var updateTemplate = `
 // Update takes the representation of a $.inputType|private$ and updates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Update(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.UpdateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Put().
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Put().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.inputType|private$.Name).
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
-		Do(ctx).
-		Into(result)
-	return
-}
-`
-
-var updateStatusTemplate = `
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *$.type|privatePlural$) UpdateStatus(ctx context.Context, $.type|private$ *$.type|raw$, opts $.UpdateOptions|raw$) (result *$.type|raw$, err error) {
-	result = &$.type|raw${}
-	err = c.client.Put().
-		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|resource$").
-		Name($.type|private$.Name).
-		SubResource("status").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Body($.type|private$).
 		Do(ctx).
 		Into(result)
 	return
@@ -649,12 +756,30 @@ func (c *$.type|privatePlural$) Watch(ctx context.Context, opts $.ListOptions|ra
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
 	}
 	opts.Watch = true
-	return c.client.Get().
+	return c.GetClient().Get().
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
+		VersionedParams(&opts, $.schemeParameterCodec|raw$).
+		Timeout(timeout).
+		Watch(ctx)
+}
+`
+
+var watchListTemplate = `
+// watchList establishes a watch stream with the server and returns the list of $.resultType|publicPlural$
+func (c *$.type|privatePlural$) watchList(ctx context.Context, opts $.ListOptions|raw$) (result *$.resultType|raw$List, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil{
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
+    result = &$.resultType|raw$List{}
+	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
-		Watch(ctx)
+		WatchList(ctx).
+        Into(result)
+    return
 }
 `
 
@@ -662,8 +787,8 @@ var patchTemplate = `
 // Patch applies the patch and returns the patched $.resultType|private$.
 func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.PatchType|raw$, data []byte, opts $.PatchOptions|raw$, subresources ...string) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
-	err = c.client.Patch(pt).
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Patch(pt).
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(name).
 		SubResource(subresources...).
@@ -691,42 +816,10 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ 
 		return nil, fmt.Errorf("$.inputType|private$.Name must be provided to Apply")
 	}
 	result = &$.resultType|raw${}
-	err = c.client.Patch($.ApplyPatchType|raw$).
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Patch($.ApplyPatchType|raw$).
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name(*name).
-		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
-}
-`
-
-var applyStatusTemplate = `
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *$.type|privatePlural$) ApplyStatus(ctx context.Context, $.inputType|private$ *$.inputApplyConfig|raw$, opts $.ApplyOptions|raw$) (result *$.resultType|raw$, err error) {
-	if $.inputType|private$ == nil {
-		return nil, fmt.Errorf("$.inputType|private$ provided to Apply must not be nil")
-	}
-	patchOpts := opts.ToPatchOptions()
-	data, err := $.jsonMarshal|raw$($.inputType|private$)
-	if err != nil {
-		return nil, err
-	}
-
-	name := $.inputType|private$.Name
-	if name == nil {
-		return nil, fmt.Errorf("$.inputType|private$.Name must be provided to Apply")
-	}
-
-	result = &$.resultType|raw${}
-	err = c.client.Patch($.ApplyPatchType|raw$).
-		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|resource$").
-		Name(*name).
-		SubResource("status").
 		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
 		Body(data).
 		Do(ctx).
@@ -749,8 +842,8 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.type|private$Name s
 	}
 
 	result = &$.resultType|raw${}
-	err = c.client.Patch($.ApplyPatchType|raw$).
-		$if .namespaced$Namespace(c.ns).$end$
+	err = c.GetClient().Patch($.ApplyPatchType|raw$).
+		$if .namespaced$Namespace(c.GetNamespace()).$end$
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").

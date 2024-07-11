@@ -19,9 +19,6 @@ package nodeipam
 import (
 	"context"
 	"fmt"
-	"net"
-	"time"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -33,23 +30,11 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-)
-
-const (
-	// ipamResyncInterval is the amount of time between when the cloud and node
-	// CIDR range assignments are synchronized.
-	ipamResyncInterval = 30 * time.Second
-	// ipamMaxBackoff is the maximum backoff for retrying synchronization of a
-	// given in the error state.
-	ipamMaxBackoff = 10 * time.Second
-	// ipamInitialRetry is the initial retry interval for retrying synchronization of a
-	// given in the error state.
-	ipamInitialBackoff = 250 * time.Millisecond
+	"net"
 )
 
 // ipamController is an interface abstracting an interface for
-// legacy mode. It is needed to ensure correct building for
-// both provider-specific and providerless environments.
+// legacy mode.
 type ipamController interface {
 	Run(ctx context.Context)
 }

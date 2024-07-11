@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1
 
-// PriorityLevelConfigurationReferenceApplyConfiguration represents an declarative configuration of the PriorityLevelConfigurationReference type for use
+// PriorityLevelConfigurationReferenceApplyConfiguration represents a declarative configuration of the PriorityLevelConfigurationReference type for use
 // with apply.
 type PriorityLevelConfigurationReferenceApplyConfiguration struct {
 	Name *string `json:"name,omitempty"`
 }
 
-// PriorityLevelConfigurationReferenceApplyConfiguration constructs an declarative configuration of the PriorityLevelConfigurationReference type for use with
+// PriorityLevelConfigurationReferenceApplyConfiguration constructs a declarative configuration of the PriorityLevelConfigurationReference type for use with
 // apply.
 func PriorityLevelConfigurationReference() *PriorityLevelConfigurationReferenceApplyConfiguration {
 	return &PriorityLevelConfigurationReferenceApplyConfiguration{}

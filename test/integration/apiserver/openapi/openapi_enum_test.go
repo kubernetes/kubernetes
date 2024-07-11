@@ -77,8 +77,8 @@ func TestEnablingOpenAPIEnumTypes(t *testing.T) {
 
 			_, kubeConfig, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 				ModifyServerConfig: func(config *controlplane.Config) {
-					config.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-					config.GenericConfig.OpenAPIConfig.GetDefinitions = getDefinitionsFn
+					config.ControlPlane.Generic.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+					config.ControlPlane.Generic.OpenAPIConfig.GetDefinitions = getDefinitionsFn
 				},
 			})
 			defer tearDownFn()

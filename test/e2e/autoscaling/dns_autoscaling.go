@@ -120,7 +120,8 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
 	// TODO(upodroid) This test will be removed in 1.33 when kubeup is removed
-	f.It(f.WithSerial(), f.WithSlow(), f.WithLabel("KubeUp"), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
+	// TODO: make it cloud provider agnostic or move it to cloud-provider-gcp repository
+	f.It(f.WithSerial(), f.WithSlow(), f.WithLabel("KubeUp"), f.WithLabel("sig-cloud-provider-gcp"), "kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func(ctx context.Context) {
 		numNodes, err := e2enode.TotalRegistered(ctx, c)
 		framework.ExpectNoError(err)
 

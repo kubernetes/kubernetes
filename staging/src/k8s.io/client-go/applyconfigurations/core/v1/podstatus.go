@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PodStatusApplyConfiguration represents an declarative configuration of the PodStatus type for use
+// PodStatusApplyConfiguration represents a declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
 	Phase                      *v1.PodPhase                               `json:"phase,omitempty"`
@@ -44,7 +44,7 @@ type PodStatusApplyConfiguration struct {
 	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
 }
 
-// PodStatusApplyConfiguration constructs an declarative configuration of the PodStatus type for use with
+// PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
 // apply.
 func PodStatus() *PodStatusApplyConfiguration {
 	return &PodStatusApplyConfiguration{}

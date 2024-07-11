@@ -1178,7 +1178,8 @@ const (
 	PERF_SAMPLE_BRANCH_TYPE_SAVE_SHIFT    = 0x10
 	PERF_SAMPLE_BRANCH_HW_INDEX_SHIFT     = 0x11
 	PERF_SAMPLE_BRANCH_PRIV_SAVE_SHIFT    = 0x12
-	PERF_SAMPLE_BRANCH_MAX_SHIFT          = 0x13
+	PERF_SAMPLE_BRANCH_COUNTERS           = 0x80000
+	PERF_SAMPLE_BRANCH_MAX_SHIFT          = 0x14
 	PERF_SAMPLE_BRANCH_USER               = 0x1
 	PERF_SAMPLE_BRANCH_KERNEL             = 0x2
 	PERF_SAMPLE_BRANCH_HV                 = 0x4
@@ -1198,7 +1199,7 @@ const (
 	PERF_SAMPLE_BRANCH_TYPE_SAVE          = 0x10000
 	PERF_SAMPLE_BRANCH_HW_INDEX           = 0x20000
 	PERF_SAMPLE_BRANCH_PRIV_SAVE          = 0x40000
-	PERF_SAMPLE_BRANCH_MAX                = 0x80000
+	PERF_SAMPLE_BRANCH_MAX                = 0x100000
 	PERF_BR_UNKNOWN                       = 0x0
 	PERF_BR_COND                          = 0x1
 	PERF_BR_UNCOND                        = 0x2
@@ -2481,6 +2482,15 @@ type XDPMmapOffsets struct {
 	Cr XDPRingOffset
 }
 
+type XDPUmemReg struct {
+	Addr            uint64
+	Len             uint64
+	Chunk_size      uint32
+	Headroom        uint32
+	Flags           uint32
+	Tx_metadata_len uint32
+}
+
 type XDPStatistics struct {
 	Rx_dropped               uint64
 	Rx_invalid_descs         uint64
@@ -2935,7 +2945,7 @@ const (
 	BPF_TCP_LISTEN                             = 0xa
 	BPF_TCP_CLOSING                            = 0xb
 	BPF_TCP_NEW_SYN_RECV                       = 0xc
-	BPF_TCP_MAX_STATES                         = 0xd
+	BPF_TCP_MAX_STATES                         = 0xe
 	TCP_BPF_IW                                 = 0x3e9
 	TCP_BPF_SNDCWND_CLAMP                      = 0x3ea
 	TCP_BPF_DELACK_MAX                         = 0x3eb
@@ -3211,7 +3221,7 @@ const (
 	DEVLINK_CMD_LINECARD_NEW                           = 0x50
 	DEVLINK_CMD_LINECARD_DEL                           = 0x51
 	DEVLINK_CMD_SELFTESTS_GET                          = 0x52
-	DEVLINK_CMD_MAX                                    = 0x53
+	DEVLINK_CMD_MAX                                    = 0x54
 	DEVLINK_PORT_TYPE_NOTSET                           = 0x0
 	DEVLINK_PORT_TYPE_AUTO                             = 0x1
 	DEVLINK_PORT_TYPE_ETH                              = 0x2
@@ -4595,7 +4605,7 @@ const (
 	NL80211_ATTR_MAC_HINT                                   = 0xc8
 	NL80211_ATTR_MAC_MASK                                   = 0xd7
 	NL80211_ATTR_MAX_AP_ASSOC_STA                           = 0xca
-	NL80211_ATTR_MAX                                        = 0x146
+	NL80211_ATTR_MAX                                        = 0x14a
 	NL80211_ATTR_MAX_CRIT_PROT_DURATION                     = 0xb4
 	NL80211_ATTR_MAX_CSA_COUNTERS                           = 0xce
 	NL80211_ATTR_MAX_MATCH_SETS                             = 0x85
@@ -4861,7 +4871,7 @@ const (
 	NL80211_BSS_FREQUENCY_OFFSET                            = 0x14
 	NL80211_BSS_INFORMATION_ELEMENTS                        = 0x6
 	NL80211_BSS_LAST_SEEN_BOOTTIME                          = 0xf
-	NL80211_BSS_MAX                                         = 0x16
+	NL80211_BSS_MAX                                         = 0x18
 	NL80211_BSS_MLD_ADDR                                    = 0x16
 	NL80211_BSS_MLO_LINK_ID                                 = 0x15
 	NL80211_BSS_PAD                                         = 0x10
@@ -4965,7 +4975,7 @@ const (
 	NL80211_CMD_LEAVE_IBSS                                  = 0x2c
 	NL80211_CMD_LEAVE_MESH                                  = 0x45
 	NL80211_CMD_LEAVE_OCB                                   = 0x6d
-	NL80211_CMD_MAX                                         = 0x9a
+	NL80211_CMD_MAX                                         = 0x9b
 	NL80211_CMD_MICHAEL_MIC_FAILURE                         = 0x29
 	NL80211_CMD_MODIFY_LINK_STA                             = 0x97
 	NL80211_CMD_NAN_MATCH                                   = 0x78
@@ -5199,7 +5209,7 @@ const (
 	NL80211_FREQUENCY_ATTR_GO_CONCURRENT                    = 0xf
 	NL80211_FREQUENCY_ATTR_INDOOR_ONLY                      = 0xe
 	NL80211_FREQUENCY_ATTR_IR_CONCURRENT                    = 0xf
-	NL80211_FREQUENCY_ATTR_MAX                              = 0x1c
+	NL80211_FREQUENCY_ATTR_MAX                              = 0x20
 	NL80211_FREQUENCY_ATTR_MAX_TX_POWER                     = 0x6
 	NL80211_FREQUENCY_ATTR_NO_10MHZ                         = 0x11
 	NL80211_FREQUENCY_ATTR_NO_160MHZ                        = 0xc
@@ -5693,7 +5703,7 @@ const (
 	NL80211_STA_FLAG_ASSOCIATED                             = 0x7
 	NL80211_STA_FLAG_AUTHENTICATED                          = 0x5
 	NL80211_STA_FLAG_AUTHORIZED                             = 0x1
-	NL80211_STA_FLAG_MAX                                    = 0x7
+	NL80211_STA_FLAG_MAX                                    = 0x8
 	NL80211_STA_FLAG_MAX_OLD_API                            = 0x6
 	NL80211_STA_FLAG_MFP                                    = 0x4
 	NL80211_STA_FLAG_SHORT_PREAMBLE                         = 0x2
@@ -5990,4 +6000,35 @@ type Cachestat_t struct {
 type CachestatRange struct {
 	Off uint64
 	Len uint64
+}
+
+const (
+	SK_MEMINFO_RMEM_ALLOC          = 0x0
+	SK_MEMINFO_RCVBUF              = 0x1
+	SK_MEMINFO_WMEM_ALLOC          = 0x2
+	SK_MEMINFO_SNDBUF              = 0x3
+	SK_MEMINFO_FWD_ALLOC           = 0x4
+	SK_MEMINFO_WMEM_QUEUED         = 0x5
+	SK_MEMINFO_OPTMEM              = 0x6
+	SK_MEMINFO_BACKLOG             = 0x7
+	SK_MEMINFO_DROPS               = 0x8
+	SK_MEMINFO_VARS                = 0x9
+	SKNLGRP_NONE                   = 0x0
+	SKNLGRP_INET_TCP_DESTROY       = 0x1
+	SKNLGRP_INET_UDP_DESTROY       = 0x2
+	SKNLGRP_INET6_TCP_DESTROY      = 0x3
+	SKNLGRP_INET6_UDP_DESTROY      = 0x4
+	SK_DIAG_BPF_STORAGE_REQ_NONE   = 0x0
+	SK_DIAG_BPF_STORAGE_REQ_MAP_FD = 0x1
+	SK_DIAG_BPF_STORAGE_REP_NONE   = 0x0
+	SK_DIAG_BPF_STORAGE            = 0x1
+	SK_DIAG_BPF_STORAGE_NONE       = 0x0
+	SK_DIAG_BPF_STORAGE_PAD        = 0x1
+	SK_DIAG_BPF_STORAGE_MAP_ID     = 0x2
+	SK_DIAG_BPF_STORAGE_MAP_VALUE  = 0x3
+)
+
+type SockDiagReq struct {
+	Family   uint8
+	Protocol uint8
 }

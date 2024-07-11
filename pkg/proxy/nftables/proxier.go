@@ -29,6 +29,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -40,9 +41,9 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
-	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
@@ -50,8 +51,8 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -106,12 +107,11 @@ const (
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
 	ctx context.Context,
-	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetectors [2]proxyutiliptables.LocalTrafficDetector,
+	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
@@ -120,16 +120,18 @@ func NewDualStackProxier(
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, sysctl,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[0], hostname,
-		nodeIPs[v1.IPv4Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol],
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, sysctl,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit, localDetectors[1], hostname,
-		nodeIPs[v1.IPv6Protocol], recorder, healthzServer, nodePortAddresses, initOnly)
+	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol],
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -170,7 +172,7 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	conntrack      conntrack.Interface
-	localDetector  proxyutiliptables.LocalTrafficDetector
+	localDetector  proxyutil.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
 	recorder       events.EventRecorder
@@ -202,12 +204,11 @@ var _ proxy.Provider = &Proxier{}
 // call fails.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
-	sysctl utilsysctl.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	localDetector proxyutiliptables.LocalTrafficDetector,
+	localDetector proxyutil.LocalTrafficDetector,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
@@ -216,6 +217,11 @@ func NewProxier(ctx context.Context,
 	initOnly bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
+
+	nft, err := getNFTablesInterface(ipFamily)
+	if err != nil {
+		return nil, err
+	}
 
 	if initOnly {
 		logger.Info("System initialized and --init-only specified")
@@ -230,17 +236,6 @@ func NewProxier(ctx context.Context,
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
-
-	var nftablesFamily knftables.Family
-	if ipFamily == v1.IPv4Protocol {
-		nftablesFamily = knftables.IPv4Family
-	} else {
-		nftablesFamily = knftables.IPv6Family
-	}
-	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
-	if err != nil {
-		return nil, err
-	}
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
@@ -270,6 +265,52 @@ func NewProxier(ctx context.Context,
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 
 	return proxier, nil
+}
+
+// Create a knftables.Interface and check if we can use the nftables proxy mode on this host.
+func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
+	var nftablesFamily knftables.Family
+	if ipFamily == v1.IPv4Protocol {
+		nftablesFamily = knftables.IPv4Family
+	} else {
+		nftablesFamily = knftables.IPv6Family
+	}
+
+	// We require (or rather, knftables.New does) that the nft binary be version 1.0.1
+	// or later, because versions before that would always attempt to parse the entire
+	// nft ruleset at startup, even if you were only operating on a single table.
+	// That's bad, because in some cases, new versions of nft have added new rule
+	// types in ways that triggered bugs in older versions of nft, causing them to
+	// crash. Thus, if kube-proxy used nft < 1.0.1, it could potentially get locked
+	// out of its rules because of something some other component had done in a
+	// completely different table.
+	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	if err != nil {
+		return nil, err
+	}
+
+	// Likewise, we want to ensure that the host filesystem has nft >= 1.0.1, so that
+	// it's not possible that *our* rules break *the system's* nft. (In particular, we
+	// know that if kube-proxy uses nft >= 1.0.3 and the system has nft <= 0.9.8, that
+	// the system nft will become completely unusable.) Unfortunately, we can't easily
+	// figure out the version of nft installed on the host filesystem, so instead, we
+	// check the kernel version, under the assumption that the distro will have an nft
+	// binary that supports the same features as its kernel does, and so kernel 5.13
+	// or later implies nft 1.0.1 or later. https://issues.k8s.io/122743
+	//
+	// However, we allow the user to bypass this check by setting
+	// `KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK` to anything non-empty.
+	if os.Getenv("KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK") != "" {
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			return nil, fmt.Errorf("could not check kernel version: %w", err)
+		}
+		if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.NFTablesKubeProxyKernelVersion)) {
+			return nil, fmt.Errorf("kube-proxy in nftables mode requires kernel %s or later", utilkernel.NFTablesKubeProxyKernelVersion)
+		}
+	}
+
+	return nft, nil
 }
 
 // internal struct for string service information
@@ -1033,7 +1074,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// the chains still exist, they'll just get added back
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
-				// FIXME: metric
+				metrics.NFTablesCleanupFailuresTotal.Inc()
 			}
 		}
 	}
@@ -1614,13 +1655,18 @@ func (proxier *Proxier) syncProxyRules() {
 		"numEndpoints", totalEndpoints,
 	)
 
-	// FIXME
-	// klog.V(9).InfoS("Running nftables transaction", "transaction", tx.Bytes())
+	if klogV9 := klog.V(9); klogV9.Enabled() {
+		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+	}
 
 	err = proxier.nftables.Run(context.TODO(), tx)
 	if err != nil {
 		proxier.logger.Error(err, "nftables sync failed")
-		metrics.IptablesRestoreFailuresTotal.Inc()
+		metrics.NFTablesSyncFailuresTotal.Inc()
+
+		// staleChains is now incorrect since we didn't actually flush the
+		// chains in it. We can recompute it next time.
+		clear(proxier.staleChains)
 		return
 	}
 	success = true

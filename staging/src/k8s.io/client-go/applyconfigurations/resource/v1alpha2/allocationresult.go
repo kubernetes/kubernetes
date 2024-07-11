@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
-// AllocationResultApplyConfiguration represents an declarative configuration of the AllocationResult type for use
+// AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
 	ResourceHandles  []ResourceHandleApplyConfiguration `json:"resourceHandles,omitempty"`
@@ -30,7 +30,7 @@ type AllocationResultApplyConfiguration struct {
 	Shareable        *bool                              `json:"shareable,omitempty"`
 }
 
-// AllocationResultApplyConfiguration constructs an declarative configuration of the AllocationResult type for use with
+// AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
 // apply.
 func AllocationResult() *AllocationResultApplyConfiguration {
 	return &AllocationResultApplyConfiguration{}

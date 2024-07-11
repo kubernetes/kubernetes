@@ -127,7 +127,7 @@ func (s *ProcSMapsRollup) parseLine(line string) error {
 	}
 
 	v := strings.TrimSpace(kv[1])
-	v = strings.TrimRight(v, " kB")
+	v = strings.TrimSuffix(v, " kB")
 
 	vKBytes, err := strconv.ParseUint(v, 10, 64)
 	if err != nil {

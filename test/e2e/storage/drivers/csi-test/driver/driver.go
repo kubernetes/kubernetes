@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//go:generate mockgen -package=driver -destination=driver.mock.go -build_flags=-mod=readonly github.com/container-storage-interface/spec/lib/go/csi IdentityServer,ControllerServer,NodeServer
+//go:generate mockery
 
 package driver
 

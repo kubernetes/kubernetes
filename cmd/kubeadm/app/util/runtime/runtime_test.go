@@ -17,331 +17,335 @@ limitations under the License.
 package runtime
 
 import (
+	"errors"
 	"net"
 	"os"
-	"reflect"
 	"runtime"
 	"testing"
 
-	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
+	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
+var errTest = errors.New("test")
+
 func TestNewContainerRuntime(t *testing.T) {
-	execLookPathOK := &fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-	execLookPathErr := &fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return "", errors.Errorf("%s not found", cmd) },
-	}
-	cases := []struct {
-		name    string
-		execer  *fakeexec.FakeExec
-		isError bool
+	for _, tc := range []struct {
+		name        string
+		prepare     func(*fakeImpl)
+		shouldError bool
 	}{
-		{"valid: crictl present", execLookPathOK, false},
-		{"invalid: no crictl", execLookPathErr, true},
-	}
-
-	for _, tc := range cases {
+		{
+			name:        "valid",
+			shouldError: false,
+		},
+		{
+			name: "invalid: new runtime service fails",
+			prepare: func(mock *fakeImpl) {
+				mock.NewRemoteRuntimeServiceReturns(nil, errTest)
+			},
+			shouldError: true,
+		},
+		{
+			name: "invalid: new image service fails",
+			prepare: func(mock *fakeImpl) {
+				mock.NewRemoteImageServiceReturns(nil, errTest)
+			},
+			shouldError: true,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewContainerRuntime(tc.execer, "unix:///some/socket.sock")
-			if err != nil {
-				if !tc.isError {
-					t.Fatalf("unexpected NewContainerRuntime error. error: %v", err)
-				}
-				return // expected error occurs, impossible to test runtime further
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
-			if tc.isError && err == nil {
-				t.Fatal("unexpected NewContainerRuntime success")
-			}
-		})
-	}
-}
+			containerRuntime.SetImpl(mock)
 
-func genFakeActions(fcmd *fakeexec.FakeCmd, num int) []fakeexec.FakeCommandAction {
-	var actions []fakeexec.FakeCommandAction
-	for i := 0; i < num; i++ {
-		actions = append(actions, func(cmd string, args ...string) exec.Cmd {
-			return fakeexec.InitFakeCmd(fcmd, cmd, args...)
+			err := containerRuntime.Connect()
+
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
-	return actions
 }
 
 func TestIsRunning(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-
-	criExecer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name      string
-		criSocket string
-		execer    *fakeexec.FakeExec
-		isError   bool
+	for _, tc := range []struct {
+		name        string
+		prepare     func(*fakeImpl)
+		shouldError bool
 	}{
-		{"valid: CRI-O is running", "unix:///var/run/crio/crio.sock", criExecer, false},
-		{"invalid: CRI-O is not running", "unix:///var/run/crio/crio.sock", criExecer, true},
-	}
-
-	for _, tc := range cases {
+		{
+			name:        "valid",
+			shouldError: false,
+		},
+		{
+			name: "invalid: runtime status fails",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(nil, errTest)
+			},
+			shouldError: true,
+		},
+		{
+			name: "invalid: runtime condition status not 'true'",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
+					Conditions: []*v1.RuntimeCondition{
+						{
+							Type:   v1.RuntimeReady,
+							Status: false,
+						},
+					},
+				},
+				}, nil)
+			},
+			shouldError: true,
+		},
+		{
+			name: "valid: runtime condition type does not match",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Status: &v1.RuntimeStatus{
+					Conditions: []*v1.RuntimeCondition{
+						{
+							Type:   v1.NetworkReady,
+							Status: false,
+						},
+					},
+				},
+				}, nil)
+			},
+			shouldError: false,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(tc.execer, tc.criSocket)
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
-			isRunning := runtime.IsRunning()
-			if tc.isError && isRunning == nil {
-				t.Error("unexpected IsRunning() success")
-			}
-			if !tc.isError && isRunning != nil {
-				t.Error("unexpected IsRunning() error")
-			}
+			containerRuntime.SetImpl(mock)
+
+			err := containerRuntime.IsRunning()
+
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
 }
 
 func TestListKubeContainers(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return []byte("k8s_p1\nk8s_p2"), nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("k8s_p1\nk8s_p2"), nil, nil },
-		},
-	}
-	execer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name      string
-		criSocket string
-		isError   bool
+	for _, tc := range []struct {
+		name        string
+		expected    []string
+		prepare     func(*fakeImpl)
+		shouldError bool
 	}{
-		{"valid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", false},
-		{"invalid: list containers using CRI socket url", "unix:///var/run/crio/crio.sock", true},
-	}
-
-	for _, tc := range cases {
+		{
+			name: "valid",
+			prepare: func(mock *fakeImpl) {
+				mock.ListPodSandboxReturns([]*v1.PodSandbox{
+					{Id: "first"},
+					{Id: "second"},
+				}, nil)
+			},
+			expected:    []string{"first", "second"},
+			shouldError: false,
+		},
+		{
+			name: "invalid: list pod sandbox fails",
+			prepare: func(mock *fakeImpl) {
+				mock.ListPodSandboxReturns(nil, errTest)
+			},
+			shouldError: true,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(execer, tc.criSocket)
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
 
-			containers, err := runtime.ListKubeContainers()
-			if tc.isError {
-				if err == nil {
-					t.Errorf("unexpected ListKubeContainers success")
-				}
-				return
-			} else if err != nil {
-				t.Errorf("unexpected ListKubeContainers error: %v", err)
-			}
+			containers, err := containerRuntime.ListKubeContainers()
 
-			if !reflect.DeepEqual(containers, []string{"k8s_p1", "k8s_p2"}) {
-				t.Errorf("unexpected ListKubeContainers output: %v", containers)
-			}
+			assert.Equal(t, tc.shouldError, err != nil)
+			assert.Equal(t, tc.expected, containers)
 		})
 	}
 }
 
 func TestSandboxImage(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9"), nil, nil },
-			func() ([]byte, []byte, error) { return []byte("registry.k8s.io/pause:3.9\n"), nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-
-	execer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name     string
-		expected string
-		isError  bool
+	for _, tc := range []struct {
+		name, expected string
+		prepare        func(*fakeImpl)
+		shouldError    bool
 	}{
-		{"valid: read sandbox image normally", "registry.k8s.io/pause:3.9", false},
-		{"valid: read sandbox image with leading/trailing white spaces", "registry.k8s.io/pause:3.9", false},
-		{"invalid: read empty sandbox image", "", true},
-		{"invalid: failed to read sandbox image", "", true},
-	}
-
-	for _, tc := range cases {
+		{
+			name: "valid",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{
+					"config": `{"sandboxImage": "pause"}`,
+				}}, nil)
+			},
+			expected:    "pause",
+			shouldError: false,
+		},
+		{
+			name: "invalid: runtime status fails",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(nil, errTest)
+			},
+			shouldError: true,
+		},
+		{
+			name: "invalid: no config JSON",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{
+					"config": "wrong",
+				}}, nil)
+			},
+			shouldError: true,
+		},
+		{
+			name: "invalid: no config",
+			prepare: func(mock *fakeImpl) {
+				mock.StatusReturns(&v1.StatusResponse{Info: map[string]string{}}, nil)
+			},
+			shouldError: true,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(execer, "unix:///some/socket.sock")
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v", err)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
 
-			sandboxImage, err := runtime.SandboxImage()
-			if tc.isError {
-				if err == nil {
-					t.Errorf("unexpected SandboxImage success")
-				}
-				return
-			} else if err != nil {
-				t.Errorf("unexpected SandboxImage error: %v", err)
-			}
+			image, err := containerRuntime.SandboxImage()
 
-			if sandboxImage != tc.expected {
-				t.Errorf("expected sandbox image %v, but got %v", tc.expected, sandboxImage)
-			}
+			assert.Equal(t, tc.shouldError, err != nil)
+			assert.Equal(t, tc.expected, image)
 		})
 	}
 }
 
 func TestRemoveContainers(t *testing.T) {
-	fakeOK := func() ([]byte, []byte, error) { return nil, nil, nil }
-	fakeErr := func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} }
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 1
-			fakeOK, fakeOK, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeErr, fakeOK, fakeOK, // Test case 2
-			fakeErr, fakeErr, fakeErr, fakeErr, fakeErr, fakeOK, fakeOK, fakeOK, fakeOK, // Test case 3
-		},
-	}
-	execer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name       string
-		criSocket  string
-		containers []string
-		isError    bool
+	for _, tc := range []struct {
+		name        string
+		containers  []string
+		prepare     func(*fakeImpl)
+		shouldError bool
 	}{
-		{"valid: remove containers using CRI", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, false}, // Test case 1
-		{"invalid: CRI rmp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},            // Test case 2
-		{"invalid: CRI stopp failure", "unix:///var/run/crio/crio.sock", []string{"k8s_p1", "k8s_p2", "k8s_p3"}, true},          // Test case 3
-	}
-
-	for _, tc := range cases {
+		{
+			name: "valid",
+		},
+		{
+			name:        "valid: two containers",
+			containers:  []string{"1", "2"},
+			shouldError: false,
+		},
+		{
+			name:       "invalid: remove pod sandbox fails",
+			containers: []string{"1"},
+			prepare: func(mock *fakeImpl) {
+				mock.RemovePodSandboxReturns(errTest)
+			},
+			shouldError: true,
+		},
+		{
+			name:       "invalid: stop pod sandbox fails",
+			containers: []string{"1"},
+			prepare: func(mock *fakeImpl) {
+				mock.StopPodSandboxReturns(errTest)
+			},
+			shouldError: true,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(execer, tc.criSocket)
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
 
-			err = runtime.RemoveContainers(tc.containers)
-			if !tc.isError && err != nil {
-				t.Errorf("unexpected RemoveContainers errors: %v, criSocket: %s, containers: %v", err, tc.criSocket, tc.containers)
-			}
-			if tc.isError && err == nil {
-				t.Errorf("unexpected RemoveContainers success, criSocket: %s, containers: %v", tc.criSocket, tc.containers)
-			}
+			err := containerRuntime.RemoveContainers(tc.containers)
+
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
 }
 
 func TestPullImage(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			// If the pull fails, it will be retried 5 times (see PullImageRetry in constants/constants.go)
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return []byte("error"), nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-	execer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.CombinedOutputScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name      string
-		criSocket string
-		image     string
-		isError   bool
+	for _, tc := range []struct {
+		name        string
+		prepare     func(*fakeImpl)
+		shouldError bool
 	}{
-		{"valid: pull image using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
-		{"invalid: CRI pull error", "unix:///var/run/crio/crio.sock", "image2", true},
-	}
-
-	for _, tc := range cases {
+		{
+			name: "valid",
+		},
+		{
+			name: "invalid: pull image fails",
+			prepare: func(mock *fakeImpl) {
+				mock.PullImageReturns("", errTest)
+			},
+			shouldError: true,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(execer, tc.criSocket)
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
 
-			err = runtime.PullImage(tc.image)
-			if !tc.isError && err != nil {
-				t.Errorf("unexpected PullImage error: %v, criSocket: %s, image: %s", err, tc.criSocket, tc.image)
-			}
-			if tc.isError && err == nil {
-				t.Errorf("unexpected PullImage success, criSocket: %s, image: %s", tc.criSocket, tc.image)
-			}
+			err := containerRuntime.PullImage("")
+
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
 }
 
 func TestImageExists(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		RunScript: []fakeexec.FakeAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-		},
-	}
-	execer := &fakeexec.FakeExec{
-		CommandScript: genFakeActions(&fcmd, len(fcmd.RunScript)),
-		LookPathFunc:  func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
-	}
-
-	cases := []struct {
-		name      string
-		criSocket string
-		image     string
-		result    bool
+	for _, tc := range []struct {
+		name     string
+		expected bool
+		prepare  func(*fakeImpl)
 	}{
-		{"valid: test if image exists using CRI", "unix:///var/run/crio/crio.sock", "image1", false},
-		{"invalid: CRI inspect failure", "unix:///var/run/crio/crio.sock", "image2", true},
-	}
-
-	for _, tc := range cases {
+		{
+			name: "valid",
+			prepare: func(mock *fakeImpl) {
+				mock.ImageStatusReturns(&v1.ImageStatusResponse{
+					Image: &v1.Image{},
+				}, nil)
+			},
+			expected: true,
+		},
+		{
+			name: "invalid: image status fails",
+			prepare: func(mock *fakeImpl) {
+				mock.ImageStatusReturns(nil, errTest)
+			},
+			expected: false,
+		},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runtime, err := NewContainerRuntime(execer, tc.criSocket)
-			if err != nil {
-				t.Fatalf("unexpected NewContainerRuntime error: %v, criSocket: %s", err, tc.criSocket)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
 
-			result, err := runtime.ImageExists(tc.image)
-			if !tc.result != result {
-				t.Errorf("unexpected ImageExists result: %t, criSocket: %s, image: %s, expected result: %t", err, tc.criSocket, tc.image, tc.result)
-			}
+			exists := containerRuntime.ImageExists("")
+
+			assert.Equal(t, tc.expected, exists)
 		})
 	}
 }
@@ -462,77 +466,39 @@ func TestDetectCRISocketImpl(t *testing.T) {
 	}
 }
 
-func TestPullImagesInParallelImpl(t *testing.T) {
-	testError := errors.New("error")
-
-	tests := []struct {
-		name            string
-		images          []string
-		ifNotPresent    bool
-		imageExistsFunc func(string) (bool, error)
-		pullImageFunc   func(string) error
-		expectedErrors  int
+func TestPullImagesInParallel(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		ifNotPresent bool
+		prepare      func(*fakeImpl)
+		shouldError  bool
 	}{
 		{
-			name:         "all images exist, no errors",
-			images:       []string{"foo", "bar", "baz"},
-			ifNotPresent: true,
-			imageExistsFunc: func(string) (bool, error) {
-				return true, nil
-			},
-			pullImageFunc:  nil,
-			expectedErrors: 0,
+			name: "valid",
 		},
 		{
-			name:         "cannot check if one image exists due to error",
-			images:       []string{"foo", "bar", "baz"},
+			name:         "valid: ifNotPresent is true",
 			ifNotPresent: true,
-			imageExistsFunc: func(image string) (bool, error) {
-				if image == "baz" {
-					return false, testError
-				}
-				return true, nil
-			},
-			pullImageFunc:  nil,
-			expectedErrors: 1,
 		},
 		{
-			name:         "cannot pull two images",
-			images:       []string{"foo", "bar", "baz"},
-			ifNotPresent: true,
-			imageExistsFunc: func(string) (bool, error) {
-				return false, nil
+			name: "invalid: pull fails",
+			prepare: func(mock *fakeImpl) {
+				mock.PullImageReturns("", errTest)
 			},
-			pullImageFunc: func(image string) error {
-				if image == "foo" {
-					return nil
-				}
-				return testError
-			},
-			expectedErrors: 2,
+			shouldError: true,
 		},
-		{
-			name:         "pull all images",
-			images:       []string{"foo", "bar", "baz"},
-			ifNotPresent: true,
-			imageExistsFunc: func(string) (bool, error) {
-				return false, nil
-			},
-			pullImageFunc: func(string) error {
-				return nil
-			},
-			expectedErrors: 0,
-		},
-	}
-
-	for _, tc := range tests {
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := pullImagesInParallelImpl(tc.images, tc.ifNotPresent,
-				tc.imageExistsFunc, tc.pullImageFunc)
-			if len(actual) != tc.expectedErrors {
-				t.Fatalf("expected non-nil errors: %v, got: %v, full list of errors: %v",
-					tc.expectedErrors, len(actual), actual)
+			containerRuntime := NewContainerRuntime("")
+			mock := &fakeImpl{}
+			if tc.prepare != nil {
+				tc.prepare(mock)
 			}
+			containerRuntime.SetImpl(mock)
+
+			err := containerRuntime.PullImagesInParallel([]string{"first", "second"}, tc.ifNotPresent)
+
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
 }

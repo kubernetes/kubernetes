@@ -38,7 +38,7 @@ var (
 	DeviceManager = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DeviceManager"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	DevicePluginProbe = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePluginProbe"))
+	DevicePlugin = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePlugin"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	DownwardAPIHugePages = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
@@ -83,9 +83,6 @@ var (
 	OOMScoreAdj = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PodDisruptionConditions = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodDisruptionConditions"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 
 	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)
@@ -96,6 +93,10 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RuntimeHandler = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
+
+	// Added to test Swap Feature
+	// This label should be used when testing KEP-2400 (Node Swap Support)
+	Swap = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeSwap"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))

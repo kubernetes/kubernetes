@@ -44,6 +44,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
@@ -213,6 +214,11 @@ func TestE2eNode(t *testing.T) {
 			klog.Errorf("Failed creating report directory: %v", err)
 		}
 	}
+
+	// annotate created pods with source code location to make it easier to find tests
+	// which do insufficient cleanup and pollute the node state with lingering pods
+	e2epod.GlobalOwnerTracking = true
+
 	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
 	ginkgo.RunSpecs(t, "E2eNode Suite", suiteConfig, reporterConfig)
 }

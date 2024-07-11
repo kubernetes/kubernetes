@@ -38,7 +38,7 @@ import (
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -684,7 +685,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "CIDRs", Type: "string", Description: networkingv1alpha1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
+		{Name: "CIDRs", Type: "string", Description: networkingv1beta1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
@@ -693,7 +694,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	ipAddressColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "ParentRef", Type: "string", Description: networkingv1alpha1.IPAddressSpec{}.SwaggerDoc()["parentRef"]},
+		{Name: "ParentRef", Type: "string", Description: networkingv1beta1.IPAddressSpec{}.SwaggerDoc()["parentRef"]},
 	}
 
 	_ = h.TableHandler(ipAddressColumnDefinitions, printIPAddress)
@@ -865,7 +866,8 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 	lastRestartDate := metav1.NewTime(time.Time{})
 	lastRestartableInitContainerRestartDate := metav1.NewTime(time.Time{})
 
-	reason := string(pod.Status.Phase)
+	podPhase := pod.Status.Phase
+	reason := string(podPhase)
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
 	}
@@ -988,7 +990,7 @@ func printPod(pod *api.Pod, options printers.GenerateOptions) ([]metav1.TableRow
 
 	if pod.DeletionTimestamp != nil && pod.Status.Reason == node.NodeUnreachablePodReason {
 		reason = "Unknown"
-	} else if pod.DeletionTimestamp != nil {
+	} else if pod.DeletionTimestamp != nil && !podutil.IsPodPhaseTerminal(apiv1.PodPhase(podPhase)) {
 		reason = "Terminating"
 	}
 
@@ -3207,6 +3209,9 @@ func (list SortableResourceNames) Less(i, j int) bool {
 }
 
 func isRestartableInitContainer(initContainer *api.Container) bool {
+	if initContainer == nil {
+		return false
+	}
 	if initContainer.RestartPolicy == nil {
 		return false
 	}

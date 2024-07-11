@@ -45,7 +45,7 @@ var validatingwebhookconfigurationsKind = v1.SchemeGroupVersion.WithKind("Valida
 func (c *FakeValidatingWebhookConfigurations) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
 	emptyResult := &v1.ValidatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(validatingwebhookconfigurationsResource, name), emptyResult)
+		Invokes(testing.NewRootGetActionWithOptions(validatingwebhookconfigurationsResource, name, options), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -56,7 +56,7 @@ func (c *FakeValidatingWebhookConfigurations) Get(ctx context.Context, name stri
 func (c *FakeValidatingWebhookConfigurations) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ValidatingWebhookConfigurationList, err error) {
 	emptyResult := &v1.ValidatingWebhookConfigurationList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(validatingwebhookconfigurationsResource, validatingwebhookconfigurationsKind, opts), emptyResult)
+		Invokes(testing.NewRootListActionWithOptions(validatingwebhookconfigurationsResource, validatingwebhookconfigurationsKind, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -77,14 +77,14 @@ func (c *FakeValidatingWebhookConfigurations) List(ctx context.Context, opts met
 // Watch returns a watch.Interface that watches the requested validatingWebhookConfigurations.
 func (c *FakeValidatingWebhookConfigurations) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(validatingwebhookconfigurationsResource, opts))
+		InvokesWatch(testing.NewRootWatchActionWithOptions(validatingwebhookconfigurationsResource, opts))
 }
 
 // Create takes the representation of a validatingWebhookConfiguration and creates it.  Returns the server's representation of the validatingWebhookConfiguration, and an error, if there is any.
 func (c *FakeValidatingWebhookConfigurations) Create(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts metav1.CreateOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
 	emptyResult := &v1.ValidatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(validatingwebhookconfigurationsResource, validatingWebhookConfiguration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -95,7 +95,7 @@ func (c *FakeValidatingWebhookConfigurations) Create(ctx context.Context, valida
 func (c *FakeValidatingWebhookConfigurations) Update(ctx context.Context, validatingWebhookConfiguration *v1.ValidatingWebhookConfiguration, opts metav1.UpdateOptions) (result *v1.ValidatingWebhookConfiguration, err error) {
 	emptyResult := &v1.ValidatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(validatingwebhookconfigurationsResource, validatingWebhookConfiguration), emptyResult)
+		Invokes(testing.NewRootUpdateActionWithOptions(validatingwebhookconfigurationsResource, validatingWebhookConfiguration, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -111,7 +111,7 @@ func (c *FakeValidatingWebhookConfigurations) Delete(ctx context.Context, name s
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeValidatingWebhookConfigurations) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(validatingwebhookconfigurationsResource, listOpts)
+	action := testing.NewRootDeleteCollectionActionWithOptions(validatingwebhookconfigurationsResource, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1.ValidatingWebhookConfigurationList{})
 	return err
@@ -121,7 +121,7 @@ func (c *FakeValidatingWebhookConfigurations) DeleteCollection(ctx context.Conte
 func (c *FakeValidatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ValidatingWebhookConfiguration, err error) {
 	emptyResult := &v1.ValidatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingwebhookconfigurationsResource, name, pt, data, opts, subresources...), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}
@@ -143,7 +143,7 @@ func (c *FakeValidatingWebhookConfigurations) Apply(ctx context.Context, validat
 	}
 	emptyResult := &v1.ValidatingWebhookConfiguration{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(validatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewRootPatchSubresourceActionWithOptions(validatingwebhookconfigurationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

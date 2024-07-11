@@ -52,7 +52,7 @@ func WaitForJobPodsSucceeded(ctx context.Context, c clientset.Interface, ns, job
 
 // waitForJobPodsInPhase wait for all pods for the Job named JobName in namespace ns to be in a given phase.
 func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobName string, expectedCount int32, phase v1.PodPhase) error {
-	return wait.PollWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		pods, err := GetJobPods(ctx, c, ns, jobName)
 		if err != nil {
 			return false, err
@@ -69,7 +69,7 @@ func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobNa
 
 // WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
 func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName string, completions int32) error {
-	return wait.PollWithContext(ctx, framework.Poll, JobTimeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -145,7 +145,7 @@ func isJobFinished(j *batchv1.Job) bool {
 
 // WaitForJobGone uses c to wait for up to timeout for the Job named jobName in namespace ns to be removed.
 func WaitForJobGone(ctx context.Context, c clientset.Interface, ns, jobName string, timeout time.Duration) error {
-	return wait.PollWithContext(ctx, framework.Poll, timeout, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		_, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil

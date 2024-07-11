@@ -25,7 +25,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -39,7 +39,7 @@ var (
 	saKeyLongDesc = fmt.Sprintf(cmdutil.LongDesc(`
 		Generate the private key for signing service account tokens along with its public key, and save them into
 		%s and %s files.
-		
+
 		If both files already exist, kubeadm skips the generation step and existing files will be used.
 		`), kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName)
 
@@ -95,7 +95,7 @@ func newCertSubPhases() []workflow.Phase {
 		Short:        "Generate a private key for signing service account tokens along with its public key",
 		Long:         saKeyLongDesc,
 		Run:          runCertsSa,
-		InheritFlags: []string{options.CertificatesDir},
+		InheritFlags: getCertPhaseFlags("sa"),
 	}
 
 	subPhases = append(subPhases, saPhase)

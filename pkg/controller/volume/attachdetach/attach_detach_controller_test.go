@@ -58,7 +58,6 @@ func createADC(t testing.TB, tCtx ktesting.TContext, fakeKubeClient *fake.Client
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		plugins,
 		nil, /* prober */
 		false,
@@ -272,7 +271,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		informerFactory.Storage().V1().CSINodes(),
 		informerFactory.Storage().V1().CSIDrivers(),
 		informerFactory.Storage().V1().VolumeAttachments(),
-		nil, /* cloud */
 		plugins,
 		prober,
 		false,

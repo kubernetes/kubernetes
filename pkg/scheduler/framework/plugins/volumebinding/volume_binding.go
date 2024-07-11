@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -114,13 +116,39 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEventWithHint {
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}},
 		// We rely on CSI node to translate in-tree PV to CSI.
-		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}},
+		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
+		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeChange},
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
 		{Event: framework.ClusterEvent{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update}},
 		{Event: framework.ClusterEvent{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update}},
 	}
 	return events
+}
+
+func (pl *VolumeBinding) isSchedulableAfterCSINodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	if oldObj == nil {
+		logger.V(5).Info("CSINode creation could make the pod schedulable")
+		return framework.Queue, nil
+	}
+	oldCSINode, modifiedCSINode, err := util.As[*storagev1.CSINode](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, err
+	}
+
+	logger = klog.LoggerWithValues(
+		logger,
+		"Pod", klog.KObj(pod),
+		"CSINode", klog.KObj(modifiedCSINode),
+	)
+
+	if oldCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] != modifiedCSINode.ObjectMeta.Annotations[v1.MigratedPluginsAnnotationKey] {
+		logger.V(5).Info("CSINode's migrated plugins annotation is updated and that may make the pod schedulable")
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("CISNode was created or updated but it doesn't make this pod schedulable")
+	return framework.QueueSkip, nil
 }
 
 // podHasPVCs returns 2 values:

@@ -39,7 +39,7 @@ var tokenreviewsKind = v1beta1.SchemeGroupVersion.WithKind("TokenReview")
 func (c *FakeTokenReviews) Create(ctx context.Context, tokenReview *v1beta1.TokenReview, opts v1.CreateOptions) (result *v1beta1.TokenReview, err error) {
 	emptyResult := &v1beta1.TokenReview{}
 	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(tokenreviewsResource, tokenReview), emptyResult)
+		Invokes(testing.NewRootCreateActionWithOptions(tokenreviewsResource, tokenReview, opts), emptyResult)
 	if obj == nil {
 		return emptyResult, err
 	}

@@ -657,7 +657,7 @@ func TestHashContainer(t *testing.T) {
 				"echo abc",
 			},
 			containerPort: int32(8001),
-			expectedHash:  uint64(0x3c42280f),
+			expectedHash:  uint64(0x8e45cbd0),
 		},
 	}
 
@@ -680,21 +680,21 @@ func TestShouldRecordEvent(t *testing.T) {
 	}
 
 	_, actual := innerEventRecorder.shouldRecordEvent(nil)
-	assert.Equal(t, false, actual)
+	assert.False(t, actual)
 
 	var obj = &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
 
 	_, actual = innerEventRecorder.shouldRecordEvent(obj)
-	assert.Equal(t, true, actual)
+	assert.True(t, actual)
 
 	obj = &v1.ObjectReference{Namespace: "system", Name: "infra", FieldPath: "implicitly required container "}
 
 	_, actual = innerEventRecorder.shouldRecordEvent(obj)
-	assert.Equal(t, false, actual)
+	assert.False(t, actual)
 
 	var nilObj *v1.ObjectReference = nil
 	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
-	assert.Equal(t, false, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
+	assert.False(t, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
 }
 
 func TestHasWindowsHostProcessContainer(t *testing.T) {
@@ -938,7 +938,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x5f62cb4c,
+			0x11a6d6d6,
 		},
 		{
 			"Burstable pod with memory policy restart required",
@@ -951,7 +951,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0xcdab9e00,
+			0x11a6d6d6,
 		},
 		{
 			"Guaranteed pod with CPU policy restart required",
@@ -964,7 +964,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x5f62cb4c,
+			0x11a6d6d6,
 		},
 		{
 			"Guaranteed pod with memory policy restart required",
@@ -977,13 +977,13 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0xcdab9e00,
+			0x11a6d6d6,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			containerCopy := tc.container.DeepCopy()
-			hash := HashContainerWithoutResources(tc.container)
+			hash := HashContainer(tc.container)
 			assert.Equal(t, tc.expectedHash, hash, "[%s]", tc.name)
 			assert.Equal(t, containerCopy, tc.container, "[%s]", tc.name)
 		})

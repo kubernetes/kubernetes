@@ -18,57 +18,107 @@ package apiserver
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"time"
 
-	oteltrace "go.opentelemetry.io/otel/trace"
+	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericfeatures "k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/reconcilers"
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/server/filters"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
+	"k8s.io/client-go/dynamic"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/transport"
-	"k8s.io/component-base/version"
-	"k8s.io/klog/v2"
+	"k8s.io/client-go/util/keyutil"
+	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controlplane"
-	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
+	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
+	"k8s.io/kubernetes/pkg/controlplane/apiserver/options"
+	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// BuildGenericConfig takes the master server options and produces the genericapiserver.Config associated with it
+// Config defines configuration for the master
+type Config struct {
+	Generic *genericapiserver.Config
+	Extra
+}
+
+type Extra struct {
+	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
+
+	APIResourceConfigSource serverstorage.APIResourceConfigSource
+	StorageFactory          serverstorage.StorageFactory
+	EventTTL                time.Duration
+
+	EnableLogsSupport bool
+	ProxyTransport    *http.Transport
+
+	// PeerProxy, if not nil, sets proxy transport between kube-apiserver peers for requests
+	// that can not be served locally
+	PeerProxy utilpeerproxy.Interface
+	// PeerEndpointReconcileInterval defines how often the endpoint leases are reconciled in etcd.
+	PeerEndpointReconcileInterval time.Duration
+	// PeerEndpointLeaseReconciler updates the peer endpoint leases
+	PeerEndpointLeaseReconciler peerreconcilers.PeerEndpointLeaseReconciler
+	// PeerAdvertiseAddress is the IP for this kube-apiserver which is used by peer apiservers to route a request
+	// to this apiserver. This happens in cases where the peer is not able to serve the request due to
+	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
+	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
+
+	ServiceAccountIssuer        serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration time.Duration
+	ExtendExpiration            bool
+
+	// ServiceAccountIssuerDiscovery
+	ServiceAccountIssuerURL        string
+	ServiceAccountJWKSURI          string
+	ServiceAccountPublicKeysGetter serviceaccount.PublicKeysGetter
+
+	SystemNamespaces []string
+
+	VersionedInformers clientgoinformers.SharedInformerFactory
+}
+
+// BuildGenericConfig takes the generic controlplane apiserver options and produces
+// the genericapiserver.Config associated with it. The genericapiserver.Config is
+// often shared between multiple delegated apiservers.
 func BuildGenericConfig(
-	s controlplaneapiserver.CompletedOptions,
+	s options.CompletedOptions,
 	schemes []*runtime.Scheme,
+	resourceConfig *serverstorage.ResourceConfig,
 	getOpenAPIDefinitions func(ref openapicommon.ReferenceCallback) map[string]openapicommon.OpenAPIDefinition,
 ) (
 	genericConfig *genericapiserver.Config,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	storageFactory *serverstorage.DefaultStorageFactory,
-
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
-	genericConfig.MergedResourceConfig = controlplane.DefaultAPIResourceConfigSource()
+	genericConfig.MergedResourceConfig = resourceConfig
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
 		return
@@ -90,15 +140,21 @@ func BuildGenericConfig(
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
-		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
+		lastErr = fmt.Errorf("failed to create real external clientset: %w", err)
 		return
 	}
-	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil && accessor.GetManagedFields() != nil {
+			accessor.SetManagedFields(nil)
+		}
+		return obj, nil
+	}
+	versionedInformers = clientgoinformers.NewSharedInformerFactoryWithOptions(clientgoExternalClient, 10*time.Minute, clientgoinformers.WithTransform(trim))
 
 	if lastErr = s.Features.ApplyTo(genericConfig, clientgoExternalClient, versionedInformers); lastErr != nil {
 		return
 	}
-	if lastErr = s.APIEnablement.ApplyTo(genericConfig, controlplane.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
+	if lastErr = s.APIEnablement.ApplyTo(genericConfig, resourceConfig, legacyscheme.Scheme); lastErr != nil {
 		return
 	}
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
@@ -122,20 +178,19 @@ func BuildGenericConfig(
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
-	kubeVersion := version.Get()
-	genericConfig.Version = &kubeVersion
-
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = oteltrace.NewNoopTracerProvider()
+		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
 	}
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageFactoryConfig.CurrentVersion = genericConfig.EffectiveVersion
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
+	storageFactoryConfig.DefaultResourceEncoding.SetEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactory, lastErr = storageFactoryConfig.Complete(s.Etcd).New()
 	if lastErr != nil {
 		return
@@ -163,7 +218,7 @@ func BuildGenericConfig(
 		versionedInformers,
 	)
 	if err != nil {
-		lastErr = fmt.Errorf("invalid authorization config: %v", err)
+		lastErr = fmt.Errorf("invalid authorization config: %w", err)
 		return
 	}
 	if s.Authorization != nil && !enablesRBAC {
@@ -183,7 +238,7 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s controlplaneapiserver.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
 	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	if err != nil {
 		return nil, nil, false, err
@@ -213,49 +268,136 @@ func BuildAuthorizer(ctx context.Context, s controlplaneapiserver.CompletedOptio
 	return authorizer, ruleResolver, enablesRBAC, err
 }
 
-// CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
-// The peer endpoint leases are used to find network locations of apiservers for peer proxy
-func CreatePeerEndpointLeaseReconciler(c genericapiserver.Config, storageFactory serverstorage.StorageFactory) (reconcilers.PeerEndpointLeaseReconciler, error) {
-	ttl := controlplane.DefaultEndpointReconcilerTTL
-	config, err := storageFactory.NewConfig(api.Resource("apiServerPeerIPInfo"))
-	if err != nil {
-		return nil, fmt.Errorf("error creating storage factory config: %w", err)
+// CreateConfig takes the generic controlplane apiserver options and
+// creates a config for the generic Kube APIs out of it.
+func CreateConfig(
+	opts options.CompletedOptions,
+	genericConfig *genericapiserver.Config,
+	versionedInformers clientgoinformers.SharedInformerFactory,
+	storageFactory *serverstorage.DefaultStorageFactory,
+	serviceResolver aggregatorapiserver.ServiceResolver,
+	additionalInitializers []admission.PluginInitializer,
+) (
+	*Config,
+	[]admission.PluginInitializer,
+	error,
+) {
+	proxyTransport := CreateProxyTransport()
+
+	opts.Metrics.Apply()
+	serviceaccount.RegisterMetrics()
+
+	config := &Config{
+		Generic: genericConfig,
+		Extra: Extra{
+			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
+			StorageFactory:          storageFactory,
+			EventTTL:                opts.EventTTL,
+			EnableLogsSupport:       opts.EnableLogsHandler,
+			ProxyTransport:          proxyTransport,
+			SystemNamespaces:        opts.SystemNamespaces,
+
+			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
+			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
+
+			VersionedInformers: versionedInformers,
+		},
 	}
-	reconciler, err := reconcilers.NewPeerEndpointLeaseReconciler(config, "/peerserverleases/", ttl)
-	return reconciler, err
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		var err error
+		config.PeerEndpointLeaseReconciler, err = CreatePeerEndpointLeaseReconciler(*genericConfig, storageFactory)
+		if err != nil {
+			return nil, nil, err
+		}
+		// build peer proxy config only if peer ca file exists
+		if opts.PeerCAFile != "" {
+			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
+				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	clientCAProvider, err := opts.Authentication.ClientCert.GetClientCAContentProvider()
+	if err != nil {
+		return nil, nil, err
+	}
+	config.ClusterAuthenticationInfo.ClientCA = clientCAProvider
+
+	requestHeaderConfig, err := opts.Authentication.RequestHeader.ToAuthenticationRequestHeaderConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	if requestHeaderConfig != nil {
+		config.ClusterAuthenticationInfo.RequestHeaderCA = requestHeaderConfig.CAContentProvider
+		config.ClusterAuthenticationInfo.RequestHeaderAllowedNames = requestHeaderConfig.AllowedClientNames
+		config.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
+		config.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
+		config.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
+	}
+
+	// setup admission
+	genericAdmissionConfig := controlplaneadmission.Config{
+		ExternalInformers:    versionedInformers,
+		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+	}
+	genericInitializers, err := genericAdmissionConfig.New(proxyTransport, genericConfig.EgressSelector, serviceResolver, genericConfig.TracerProvider)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
+	}
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create real client-go external client: %w", err)
+	}
+	dynamicExternalClient, err := dynamic.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create real dynamic external client: %w", err)
+	}
+	err = opts.Admission.ApplyTo(
+		genericConfig,
+		versionedInformers,
+		clientgoExternalClient,
+		dynamicExternalClient,
+		utilfeature.DefaultFeatureGate,
+		append(genericInitializers, additionalInitializers...)...,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to apply admission: %w", err)
+	}
+
+	if len(opts.Authentication.ServiceAccounts.KeyFiles) > 0 {
+		// Load and set the public keys.
+		var pubKeys []interface{}
+		for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
+			keys, err := keyutil.PublicKeysFromFile(f)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse key file %q: %w", f, err)
+			}
+			pubKeys = append(pubKeys, keys...)
+		}
+		keysGetter, err := serviceaccount.StaticPublicKeysGetter(pubKeys)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to set up public service account keys: %w", err)
+		}
+		config.ServiceAccountPublicKeysGetter = keysGetter
+	}
+	config.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
+	config.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
+
+	return config, genericInitializers, nil
 }
 
-func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, svm storageversion.Manager,
-	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
-	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
-	if proxyClientCertFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
-	}
-	if proxyClientKeyFile == "" {
-		return nil, fmt.Errorf("error building peer proxy handler, proxy-key-file not specified")
-	}
-	// create proxy client config
-	clientConfig := &transport.Config{
-		TLS: transport.TLSConfig{
-			Insecure:   false,
-			CertFile:   proxyClientCertFile,
-			KeyFile:    proxyClientKeyFile,
-			CAFile:     peerCAFile,
-			ServerName: "kubernetes.default.svc",
-		}}
-
-	// build proxy transport
-	proxyRoundTripper, transportBuildingError := transport.New(clientConfig)
-	if transportBuildingError != nil {
-		klog.Error(transportBuildingError.Error())
-		return nil, transportBuildingError
-	}
-	return utilpeerproxy.NewPeerProxyHandler(
-		versionedInformer,
-		svm,
-		proxyRoundTripper,
-		apiServerID,
-		reconciler,
-		serializer,
-	), nil
+// CreateProxyTransport creates the dialer infrastructure to connect to the nodes.
+func CreateProxyTransport() *http.Transport {
+	var proxyDialerFn utilnet.DialFunc
+	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
+	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
+		DialContext:     proxyDialerFn,
+		TLSClientConfig: proxyTLSClientConfig,
+	})
+	return proxyTransport
 }

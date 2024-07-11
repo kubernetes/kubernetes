@@ -183,6 +183,15 @@ func (hcnObj HcnMock) CreateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalanc
 	return loadBalancer, nil
 }
 
+func (hcnObj HcnMock) UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer, hnsLbID string) (*hcn.HostComputeLoadBalancer, error) {
+	if _, ok := loadbalancerMap[hnsLbID]; !ok {
+		return nil, fmt.Errorf("LoadBalancer id %s Not Present", loadBalancer.Id)
+	}
+	loadBalancer.Id = hnsLbID
+	loadbalancerMap[hnsLbID] = loadBalancer
+	return loadBalancer, nil
+}
+
 func (hcnObj HcnMock) DeleteLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) error {
 	if _, ok := loadbalancerMap[loadBalancer.Id]; !ok {
 		return hcn.LoadBalancerNotFoundError{LoadBalancerId: loadBalancer.Id}

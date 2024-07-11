@@ -26,7 +26,6 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
-	gomock "go.uber.org/mock/gomock"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,19 +54,16 @@ func TestSummaryProvider(t *testing.T) {
 
 	assert := assert.New(t)
 
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	mockStatsProvider := statstest.NewMockProvider(mockCtrl)
-	mockStatsProvider.EXPECT().GetNode().Return(node, nil).AnyTimes()
-	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).AnyTimes()
-	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).AnyTimes()
-	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).AnyTimes()
-	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).AnyTimes()
+	mockStatsProvider := statstest.NewMockProvider(t)
+	mockStatsProvider.EXPECT().GetNode().Return(node, nil).Maybe()
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig).Maybe()
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot).Maybe()
+	mockStatsProvider.EXPECT().ListPodStats(ctx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil).Maybe()
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil).Maybe()
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil).Maybe()
+	mockStatsProvider.EXPECT().RlimitStats().Return(nil, nil).Maybe()
+	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).Maybe()
 
 	kubeletCreationTime := metav1.Now()
 	systemBootTime := metav1.Now()

@@ -46,7 +46,7 @@ var rolesKind = v1beta1.SchemeGroupVersion.WithKind("Role")
 func (c *FakeRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Role, err error) {
 	emptyResult := &v1beta1.Role{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(rolesResource, c.ns, name), emptyResult)
+		Invokes(testing.NewGetActionWithOptions(rolesResource, c.ns, name, options), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -58,7 +58,7 @@ func (c *FakeRoles) Get(ctx context.Context, name string, options v1.GetOptions)
 func (c *FakeRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.RoleList, err error) {
 	emptyResult := &v1beta1.RoleList{}
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolesResource, rolesKind, c.ns, opts), emptyResult)
+		Invokes(testing.NewListActionWithOptions(rolesResource, rolesKind, c.ns, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -80,7 +80,7 @@ func (c *FakeRoles) List(ctx context.Context, opts v1.ListOptions) (result *v1be
 // Watch returns a watch.Interface that watches the requested roles.
 func (c *FakeRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(rolesResource, c.ns, opts))
+		InvokesWatch(testing.NewWatchActionWithOptions(rolesResource, c.ns, opts))
 
 }
 
@@ -88,7 +88,7 @@ func (c *FakeRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 func (c *FakeRoles) Create(ctx context.Context, role *v1beta1.Role, opts v1.CreateOptions) (result *v1beta1.Role, err error) {
 	emptyResult := &v1beta1.Role{}
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), emptyResult)
+		Invokes(testing.NewCreateActionWithOptions(rolesResource, c.ns, role, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -100,7 +100,7 @@ func (c *FakeRoles) Create(ctx context.Context, role *v1beta1.Role, opts v1.Crea
 func (c *FakeRoles) Update(ctx context.Context, role *v1beta1.Role, opts v1.UpdateOptions) (result *v1beta1.Role, err error) {
 	emptyResult := &v1beta1.Role{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), emptyResult)
+		Invokes(testing.NewUpdateActionWithOptions(rolesResource, c.ns, role, opts), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -118,7 +118,7 @@ func (c *FakeRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptio
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOpts)
+	action := testing.NewDeleteCollectionActionWithOptions(rolesResource, c.ns, opts, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1beta1.RoleList{})
 	return err
@@ -128,7 +128,7 @@ func (c *FakeRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *FakeRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Role, err error) {
 	emptyResult := &v1beta1.Role{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, name, pt, data, subresources...), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolesResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
@@ -151,7 +151,7 @@ func (c *FakeRoles) Apply(ctx context.Context, role *rbacv1beta1.RoleApplyConfig
 	}
 	emptyResult := &v1beta1.Role{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(rolesResource, c.ns, *name, types.ApplyPatchType, data), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(rolesResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

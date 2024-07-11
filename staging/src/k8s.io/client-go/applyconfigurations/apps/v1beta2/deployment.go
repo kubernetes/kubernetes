@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// DeploymentApplyConfiguration represents an declarative configuration of the Deployment type for use
+// DeploymentApplyConfiguration represents a declarative configuration of the Deployment type for use
 // with apply.
 type DeploymentApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -36,7 +36,7 @@ type DeploymentApplyConfiguration struct {
 	Status                           *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 
-// Deployment constructs an declarative configuration of the Deployment type for use with
+// Deployment constructs a declarative configuration of the Deployment type for use with
 // apply.
 func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 	b := &DeploymentApplyConfiguration{}
@@ -255,4 +255,10 @@ func (b *DeploymentApplyConfiguration) WithSpec(value *DeploymentSpecApplyConfig
 func (b *DeploymentApplyConfiguration) WithStatus(value *DeploymentStatusApplyConfiguration) *DeploymentApplyConfiguration {
 	b.Status = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *DeploymentApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

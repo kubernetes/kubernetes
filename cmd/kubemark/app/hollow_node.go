@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 
@@ -41,13 +41,13 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	remote "k8s.io/cri-client/pkg"
+	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	kubemarkproxy "k8s.io/kubernetes/pkg/proxy/kubemark"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -63,6 +63,8 @@ type hollowNodeConfig struct {
 	NodeName                string
 	ServerPort              int
 	ContentType             string
+	QPS                     float32
+	Burst                   int
 	NodeLabels              map[string]string
 	RegisterWithTaints      []v1.Taint
 	MaxPods                 int
@@ -94,6 +96,9 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
 	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
+	fs.Float32Var(&c.QPS, "kube-api-qps", 10, "QPS indicates the maximum QPS to the apiserver.")
+	fs.IntVar(&c.Burst, "kube-api-burst", 20, "Burst indicates maximum burst for throttle to the apiserver.")
+
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
 	fs.Var(utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
@@ -120,8 +125,8 @@ func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, err
 		return nil, fmt.Errorf("error while creating kubeconfig: %v", err)
 	}
 	config.ContentType = c.ContentType
-	config.QPS = 10
-	config.Burst = 20
+	config.QPS = c.QPS
+	config.Burst = c.Burst
 	return config, nil
 }
 
@@ -242,14 +247,15 @@ func run(ctx context.Context, config *hollowNodeConfig) error {
 			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
-		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+		logger := klog.Background()
+		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second, noop.NewTracerProvider(), &logger)
 		if err != nil {
 			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
-			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, oteltrace.NewNoopTracerProvider())
+			imageService, err = remote.NewRemoteImageService(c.ImageServiceEndpoint, 15*time.Second, noop.NewTracerProvider(), &logger)
 			if err != nil {
 				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}

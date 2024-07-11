@@ -34,30 +34,16 @@ func GetLines(file *token.File) []int {
 		lines []int
 		_     []struct{}
 	}
-	type tokenFile118 struct {
-		_ *token.FileSet // deleted in go1.19
-		tokenFile119
-	}
 
-	type uP = unsafe.Pointer
-	switch unsafe.Sizeof(*file) {
-	case unsafe.Sizeof(tokenFile118{}):
-		var ptr *tokenFile118
-		*(*uP)(uP(&ptr)) = uP(file)
-		ptr.mu.Lock()
-		defer ptr.mu.Unlock()
-		return ptr.lines
-
-	case unsafe.Sizeof(tokenFile119{}):
-		var ptr *tokenFile119
-		*(*uP)(uP(&ptr)) = uP(file)
-		ptr.mu.Lock()
-		defer ptr.mu.Unlock()
-		return ptr.lines
-
-	default:
+	if unsafe.Sizeof(*file) != unsafe.Sizeof(tokenFile119{}) {
 		panic("unexpected token.File size")
 	}
+	var ptr *tokenFile119
+	type uP = unsafe.Pointer
+	*(*uP)(uP(&ptr)) = uP(file)
+	ptr.mu.Lock()
+	defer ptr.mu.Unlock()
+	return ptr.lines
 }
 
 // AddExistingFiles adds the specified files to the FileSet if they

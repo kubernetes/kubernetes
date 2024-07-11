@@ -22,14 +22,14 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// VendorParametersApplyConfiguration represents an declarative configuration of the VendorParameters type for use
+// VendorParametersApplyConfiguration represents a declarative configuration of the VendorParameters type for use
 // with apply.
 type VendorParametersApplyConfiguration struct {
 	DriverName *string               `json:"driverName,omitempty"`
 	Parameters *runtime.RawExtension `json:"parameters,omitempty"`
 }
 
-// VendorParametersApplyConfiguration constructs an declarative configuration of the VendorParameters type for use with
+// VendorParametersApplyConfiguration constructs a declarative configuration of the VendorParameters type for use with
 // apply.
 func VendorParameters() *VendorParametersApplyConfiguration {
 	return &VendorParametersApplyConfiguration{}

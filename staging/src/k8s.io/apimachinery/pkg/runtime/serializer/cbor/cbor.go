@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
@@ -97,16 +99,35 @@ func (s *serializer) Identifier() runtime.Identifier {
 	return "cbor"
 }
 
+// Encode writes a CBOR representation of the given object.
+//
+// Because the CBOR data item written by a call to Encode is always enclosed in the "self-described
+// CBOR" tag, its encoded form always has the prefix 0xd9d9f7. This prefix is suitable for use as a
+// "magic number" for distinguishing encoded CBOR from other protocols.
+//
+// The default serialization behavior for any given object replicates the behavior of the JSON
+// serializer as far as it is necessary to allow the CBOR serializer to be used as a drop-in
+// replacement for the JSON serializer, with limited exceptions. For example, the distinction
+// between integers and floating-point numbers is preserved in CBOR due to its distinct
+// representations for each type.
+//
+// Objects implementing runtime.Unstructured will have their unstructured content encoded rather
+// than following the default behavior for their dynamic type.
 func (s *serializer) Encode(obj runtime.Object, w io.Writer) error {
+	return s.encode(modes.Encode, obj, w)
+}
+
+func (s *serializer) encode(mode modes.EncMode, obj runtime.Object, w io.Writer) error {
 	if _, err := w.Write(selfDescribedCBOR); err != nil {
 		return err
 	}
 
-	e := modes.Encode.NewEncoder(w)
+	var v interface{} = obj
 	if u, ok := obj.(runtime.Unstructured); ok {
-		return e.Encode(u.UnstructuredContent())
+		v = u.UnstructuredContent()
 	}
-	return e.Encode(obj)
+
+	return mode.MarshalTo(v, w)
 }
 
 // gvkWithDefaults returns group kind and version defaulting from provided default
@@ -137,16 +158,83 @@ func diagnose(data []byte) string {
 	return diag
 }
 
+// unmarshal unmarshals CBOR data from the provided byte slice into a Go object. If the decoder is
+// configured to report strict errors, the first error return value may be a non-nil strict decoding
+// error. If the last error return value is non-nil, then the unmarshal failed entirely and the
+// state of the destination object should not be relied on.
 func (s *serializer) unmarshal(data []byte, into interface{}) (strict, lax error) {
 	if u, ok := into.(runtime.Unstructured); ok {
 		var content map[string]interface{}
 		defer func() {
-			// TODO: The UnstructuredList implementation of SetUnstructuredContent is
-			// not identical to what unstructuredJSONScheme does: (1) it retains the
-			// "items" key in its Object field, and (2) it does not infer a singular
-			// Kind from the list's Kind and populate omitted apiVersion/kind for all
-			// entries in Items.
-			u.SetUnstructuredContent(content)
+			switch u := u.(type) {
+			case *unstructured.UnstructuredList:
+				// UnstructuredList's implementation of SetUnstructuredContent
+				// produces different objects than those produced by a decode using
+				// UnstructuredJSONScheme:
+				//
+				//   1. SetUnstructuredContent retains the "items" key in the list's
+				//      Object field. It is omitted from Object when decoding with
+				//      UnstructuredJSONScheme.
+				//   2. SetUnstructuredContent does not populate "apiVersion" and
+				//      "kind" on each entry of its Items
+				//      field. UnstructuredJSONScheme does, inferring the singular
+				//      Kind from the list Kind.
+				//   3. SetUnstructuredContent ignores entries of "items" that are
+				//      not JSON objects or are objects without
+				//      "kind". UnstructuredJSONScheme returns an error in either
+				//      case.
+				//
+				// UnstructuredJSONScheme's behavior is replicated here.
+				var items []interface{}
+				if uncast, present := content["items"]; present {
+					var cast bool
+					items, cast = uncast.([]interface{})
+					if !cast {
+						strict, lax = nil, fmt.Errorf("items field of UnstructuredList must be encoded as an array or null if present")
+						return
+					}
+				}
+				apiVersion, _ := content["apiVersion"].(string)
+				kind, _ := content["kind"].(string)
+				kind = strings.TrimSuffix(kind, "List")
+				var unstructureds []unstructured.Unstructured
+				if len(items) > 0 {
+					unstructureds = make([]unstructured.Unstructured, len(items))
+				}
+				for i := range items {
+					object, cast := items[i].(map[string]interface{})
+					if !cast {
+						strict, lax = nil, fmt.Errorf("elements of the items field of UnstructuredList must be encoded as a map")
+						return
+					}
+
+					// As in UnstructuredJSONScheme, only set the heuristic
+					// singular GVK when both "apiVersion" and "kind" are either
+					// missing, non-string, or empty.
+					object["apiVersion"], _ = object["apiVersion"].(string)
+					object["kind"], _ = object["kind"].(string)
+					if object["apiVersion"] == "" && object["kind"] == "" {
+						object["apiVersion"] = apiVersion
+						object["kind"] = kind
+					}
+
+					if object["kind"] == "" {
+						strict, lax = nil, runtime.NewMissingKindErr(diagnose(data))
+						return
+					}
+					if object["apiVersion"] == "" {
+						strict, lax = nil, runtime.NewMissingVersionErr(diagnose(data))
+						return
+					}
+
+					unstructureds[i].Object = object
+				}
+				delete(content, "items")
+				u.Object = content
+				u.Items = unstructureds
+			default:
+				u.SetUnstructuredContent(content)
+			}
 		}()
 		into = &content
 	}
@@ -229,6 +317,12 @@ func (s *serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runt
 	if err != nil {
 		return nil, actual, err
 	}
+
+	// TODO: Make possible to disable this behavior.
+	if err := transcodeRawTypes(obj); err != nil {
+		return nil, actual, err
+	}
+
 	return obj, actual, strict
 }
 

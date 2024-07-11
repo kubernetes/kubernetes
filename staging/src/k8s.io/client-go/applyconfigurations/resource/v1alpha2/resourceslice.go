@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
-// ResourceSliceApplyConfiguration represents an declarative configuration of the ResourceSlice type for use
+// ResourceSliceApplyConfiguration represents a declarative configuration of the ResourceSlice type for use
 // with apply.
 type ResourceSliceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
@@ -37,7 +37,7 @@ type ResourceSliceApplyConfiguration struct {
 	ResourceModelApplyConfiguration  `json:",inline"`
 }
 
-// ResourceSlice constructs an declarative configuration of the ResourceSlice type for use with
+// ResourceSlice constructs a declarative configuration of the ResourceSlice type for use with
 // apply.
 func ResourceSlice(name string) *ResourceSliceApplyConfiguration {
 	b := &ResourceSliceApplyConfiguration{}
@@ -262,4 +262,10 @@ func (b *ResourceSliceApplyConfiguration) WithDriverName(value string) *Resource
 func (b *ResourceSliceApplyConfiguration) WithNamedResources(value *NamedResourcesResourcesApplyConfiguration) *ResourceSliceApplyConfiguration {
 	b.NamedResources = value
 	return b
+}
+
+// GetName retrieves the value of the Name field in the declarative configuration.
+func (b *ResourceSliceApplyConfiguration) GetName() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.Name
 }

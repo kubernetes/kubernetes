@@ -98,11 +98,10 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	if err != nil {
 		tCtx.Fatalf("start apiserver: %v", err)
 	}
+	// Cleanup will be in reverse order: first the clients by canceling the
+	// child context (happens automatically), then the server.
 	tCtx.Cleanup(server.TearDownFn)
-
-	// Cleanup will be in reverse order: first the clients get cancelled,
-	// then the apiserver is torn down via the automatic cancelation of
-	// tCtx.
+	tCtx = ktesting.WithCancel(tCtx)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -247,7 +246,7 @@ type labelValues struct {
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
 // NOTE: The mapping here means only one filter is supported, either value in the list of `values` is able to be collected.
 type metricsCollectorConfig struct {
-	Metrics map[string]*labelValues
+	Metrics map[string][]*labelValues
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -270,17 +269,15 @@ func (*metricsCollector) run(tCtx ktesting.TContext) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for metric, labelVals := range pc.Metrics {
+	for metric, labelValsSlice := range pc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
-		if labelVals == nil {
+		if labelValsSlice == nil {
 			dataItem := collectHistogramVec(metric, pc.labels, nil)
 			if dataItem != nil {
 				dataItems = append(dataItems, *dataItem)
 			}
 		} else {
-			// fetch the metric from metricFamily which match each of the lvMap.
-			for _, value := range labelVals.values {
-				lvMap := map[string]string{labelVals.label: value}
+			for _, lvMap := range uniqueLVCombos(labelValsSlice) {
 				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
 				if dataItem != nil {
 					dataItems = append(dataItems, *dataItem)
@@ -289,6 +286,32 @@ func (pc *metricsCollector) collect() []DataItem {
 		}
 	}
 	return dataItems
+}
+
+// uniqueLVCombos lists up all possible label values combinations.
+// e.g., if there are 3 labelValues, each of which has 2 values,
+// the result would be {A: a1, B: b1, C: c1}, {A: a2, B: b1, C: c1}, {A: a1, B: b2, C: c1}, ... (2^3 = 8 combinations).
+func uniqueLVCombos(lvs []*labelValues) []map[string]string {
+	if len(lvs) == 0 {
+		return []map[string]string{{}}
+	}
+
+	remainingCombos := uniqueLVCombos(lvs[1:])
+
+	results := make([]map[string]string, 0)
+
+	current := lvs[0]
+	for _, value := range current.values {
+		for _, combo := range remainingCombos {
+			newCombo := make(map[string]string, len(combo)+1)
+			for k, v := range combo {
+				newCombo[k] = v
+			}
+			newCombo[current.label] = value
+			results = append(results, newCombo)
+		}
+	}
+	return results
 }
 
 func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
@@ -304,7 +327,6 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 	}
 
 	if vec.GetAggregatedSampleCount() == 0 {
-		klog.InfoS("It is expected that this metric wasn't recorded. The data for this metric won't be stored in a benchmark result file", "metric", metric, "labels", labels)
 		return nil
 	}
 
@@ -407,22 +429,21 @@ func (tc *throughputCollector) run(tCtx ktesting.TContext) {
 			// be scheduled immediately when the timer
 			// triggers. Instead we track the actual time stamps.
 			duration := now.Sub(lastSampleTime)
-			durationInSeconds := duration.Seconds()
-			throughput := float64(newScheduled) / durationInSeconds
 			expectedDuration := throughputSampleInterval * time.Duration(skipped+1)
 			errorMargin := (duration - expectedDuration).Seconds() / expectedDuration.Seconds() * 100
 			if tc.errorMargin > 0 && math.Abs(errorMargin) > tc.errorMargin {
 				// This might affect the result, report it.
-				tCtx.Errorf("ERROR: Expected throuput collector to sample at regular time intervals. The %d most recent intervals took %s instead of %s, a difference of %0.1f%%.", skipped+1, duration, expectedDuration, errorMargin)
+				klog.Infof("WARNING: Expected throughput collector to sample at regular time intervals. The %d most recent intervals took %s instead of %s, a difference of %0.1f%%.", skipped+1, duration, expectedDuration, errorMargin)
 			}
 
 			// To keep percentiles accurate, we have to record multiple samples with the same
 			// throughput value if we skipped some intervals.
+			throughput := float64(newScheduled) / duration.Seconds()
 			for i := 0; i <= skipped; i++ {
 				tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
 			}
 			lastScheduledCount = scheduled
-			klog.Infof("%d pods scheduled", lastScheduledCount)
+			klog.Infof("%d pods have been scheduled successfully", lastScheduledCount)
 			skipped = 0
 			lastSampleTime = now
 		}

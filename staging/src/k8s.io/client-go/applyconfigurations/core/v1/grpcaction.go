@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// GRPCActionApplyConfiguration represents an declarative configuration of the GRPCAction type for use
+// GRPCActionApplyConfiguration represents a declarative configuration of the GRPCAction type for use
 // with apply.
 type GRPCActionApplyConfiguration struct {
 	Port    *int32  `json:"port,omitempty"`
 	Service *string `json:"service,omitempty"`
 }
 
-// GRPCActionApplyConfiguration constructs an declarative configuration of the GRPCAction type for use with
+// GRPCActionApplyConfiguration constructs a declarative configuration of the GRPCAction type for use with
 // apply.
 func GRPCAction() *GRPCActionApplyConfiguration {
 	return &GRPCActionApplyConfiguration{}

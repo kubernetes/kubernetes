@@ -56,14 +56,14 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.4.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.5.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
-CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"754a71ed60a4bd08726c3af705a7d55ee3df03122b12e389fdba4bea35d7dd7e"}
-CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"de7a666fd6ad83a228086bd55756db62ef335a193d1b143d910b69f079e30598"}
-CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"8ceff026f4eccf33c261b4153af6911e10784ac169d08c1d86cf6887b9f4e99b"}
-CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"2f1f65ac33e961bcdc633e14c376656455824e22cc45d3ca7e31eb2750a7ebc4"}
+CNI_PLUGINS_AMD64_SHA256SUM=${CNI_PLUGINS_AMD64_SHA256SUM:-"57a18478422cb321370e30a5ee6ce026321289cd9c94353ca697dddd7714f1a5"}
+CNI_PLUGINS_ARM64_SHA256SUM=${CNI_PLUGINS_ARM64_SHA256SUM:-"ab38507efe50c34bc2242a25c5783c19fdfe0376c65a2a91d48174d4f39f1fc2"}
+CNI_PLUGINS_PPC64LE_SHA256SUM=${CNI_PLUGINS_PPC64LE_SHA256SUM:-"5eea6e7033a337fd98df00fa8a72a8ca8d2d2c69f6637555828515de94158cab"}
+CNI_PLUGINS_S390X_SHA256SUM=${CNI_PLUGINS_S390X_SHA256SUM:-"3d1b56d8b357ee593866cd9342a61fc797852da9ff75ae5ed7b5de125a30b253"}
 
 # enables testing eviction scenarios locally.
 EVICTION_HARD=${EVICTION_HARD:-"imagefs.available<15%,memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"}
@@ -242,7 +242,7 @@ EXTERNAL_HOSTNAME=${EXTERNAL_HOSTNAME:-localhost}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 KUBELET_RESOLV_CONF=${KUBELET_RESOLV_CONF:-"/etc/resolv.conf"}
 # By default only allow CORS for requests on localhost
-API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$}
+API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-//127.0.0.1(:[0-9]+)?$,//localhost(:[0-9]+)?$}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 # By default we use 0(close it) for it's insecure
 KUBELET_READ_ONLY_PORT=${KUBELET_READ_ONLY_PORT:-0}
@@ -1039,7 +1039,7 @@ function start_dns_addon {
         ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create dns addon
-        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f dns.yaml ; then
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f dns.yaml ; then
             echo "${DNS_ADDON} addon successfully deployed."
         else
 		echo "Something is wrong with your DNS input"
@@ -1058,7 +1058,7 @@ function start_nodelocaldns {
   ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
 
   # use kubectl to create nodelocaldns addon
-  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system apply -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."
   rm nodelocaldns.yaml
 }
@@ -1085,7 +1085,7 @@ function create_storage_class {
 
     if [ -e "${CLASS_FILE}" ]; then
         echo "Create default storage class for ${CLOUD_PROVIDER}"
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f "${CLASS_FILE}"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" apply -f "${CLASS_FILE}"
     else
         echo "No storage class available for ${CLOUD_PROVIDER}."
     fi

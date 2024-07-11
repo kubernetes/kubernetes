@@ -52,7 +52,7 @@ func (b *readDelayer) Read(p []byte) (n int, err error) {
 
 func TestClusterScopedOwners(t *testing.T) {
 	// Start the test server and wrap the client to delay PV watch responses
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	server.ClientConfig.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
 		return roundTripFunc(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get("watch") != "true" || !strings.Contains(req.URL.String(), "persistentvolumes") {

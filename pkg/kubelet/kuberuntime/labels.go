@@ -22,10 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubelet/pkg/types"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -35,7 +33,6 @@ const (
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
 	containerHashLabel                     = "io.kubernetes.container.hash"
-	containerHashWithoutResourcesLabel     = "io.kubernetes.container.hashWithoutResources"
 	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
 	containerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
@@ -65,7 +62,6 @@ type labeledContainerInfo struct {
 
 type annotatedContainerInfo struct {
 	Hash                      uint64
-	HashWithoutResources      uint64
 	RestartCount              int
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
@@ -117,9 +113,6 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	}
 
 	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		annotations[containerHashWithoutResourcesLabel] = strconv.FormatUint(kubecontainer.HashContainerWithoutResources(container), 16)
-	}
 	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
@@ -199,11 +192,6 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashLabel, "annotations", annotations)
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if containerInfo.HashWithoutResources, err = getUint64ValueFromLabel(annotations, containerHashWithoutResourcesLabel); err != nil {
-			klog.ErrorS(err, "Unable to get label value from annotations", "label", containerHashWithoutResourcesLabel, "annotations", annotations)
-		}
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label value from annotations", "label", containerRestartCountLabel, "annotations", annotations)

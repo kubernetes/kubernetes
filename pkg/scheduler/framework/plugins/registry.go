@@ -53,12 +53,13 @@ func NewInTreeRegistry() runtime.Registry {
 		EnablePodDisruptionConditions:                feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions),
 		EnableInPlacePodVerticalScaling:              feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		EnableSidecarContainers:                      feature.DefaultFeatureGate.Enabled(features.SidecarContainers),
+		EnableSchedulingQueueHint:                    feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints),
 	}
 
 	registry := runtime.Registry{
 		dynamicresources.Name:                runtime.FactoryAdapter(fts, dynamicresources.New),
 		imagelocality.Name:                   imagelocality.New,
-		tainttoleration.Name:                 tainttoleration.New,
+		tainttoleration.Name:                 runtime.FactoryAdapter(fts, tainttoleration.New),
 		nodename.Name:                        nodename.New,
 		nodeports.Name:                       nodeports.New,
 		nodeaffinity.Name:                    nodeaffinity.New,
@@ -78,7 +79,7 @@ func NewInTreeRegistry() runtime.Registry {
 		queuesort.Name:                       queuesort.New,
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),
-		schedulinggates.Name:                 schedulinggates.New,
+		schedulinggates.Name:                 runtime.FactoryAdapter(fts, schedulinggates.New),
 	}
 
 	return registry

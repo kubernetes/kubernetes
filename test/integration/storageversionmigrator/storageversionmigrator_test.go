@@ -181,7 +181,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	shutdownServer := svmTest.createConversionWebhook(ctx, t, certCtx)
 
 	// add v2 for serving only
-	svmTest.updateCRD(ctx, t, crd.Name, v2CRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v2CRDVersion, []string{"v1", "v2"}, "v1")
 
 	// create another CR
 	cr2 := svmTest.createCR(ctx, t, "cr2", "v2")
@@ -195,7 +195,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	}
 
 	// add v2 as storage version
-	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion, []string{"v1", "v2"}, "v2")
 
 	// create CR with v1
 	cr3 := svmTest.createCR(ctx, t, "cr3", "v1")
@@ -257,7 +257,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	}
 
 	// update CRD to v1 not serving and storage followed by webhook shutdown
-	svmTest.updateCRD(ctx, t, crd.Name, v1NotServingCRDVersion)
+	svmTest.updateCRD(ctx, t, crd.Name, v1NotServingCRDVersion, []string{"v2"}, "v2")
 	shutdownServer()
 
 	// assert RV and Generations of CRs

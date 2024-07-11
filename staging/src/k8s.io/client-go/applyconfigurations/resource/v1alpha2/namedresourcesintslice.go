@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// NamedResourcesIntSliceApplyConfiguration represents an declarative configuration of the NamedResourcesIntSlice type for use
+// NamedResourcesIntSliceApplyConfiguration represents a declarative configuration of the NamedResourcesIntSlice type for use
 // with apply.
 type NamedResourcesIntSliceApplyConfiguration struct {
 	Ints []int64 `json:"ints,omitempty"`
 }
 
-// NamedResourcesIntSliceApplyConfiguration constructs an declarative configuration of the NamedResourcesIntSlice type for use with
+// NamedResourcesIntSliceApplyConfiguration constructs a declarative configuration of the NamedResourcesIntSlice type for use with
 // apply.
 func NamedResourcesIntSlice() *NamedResourcesIntSliceApplyConfiguration {
 	return &NamedResourcesIntSliceApplyConfiguration{}

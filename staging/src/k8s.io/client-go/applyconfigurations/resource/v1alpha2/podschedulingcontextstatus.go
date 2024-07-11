@@ -18,13 +18,13 @@ limitations under the License.
 
 package v1alpha2
 
-// PodSchedulingContextStatusApplyConfiguration represents an declarative configuration of the PodSchedulingContextStatus type for use
+// PodSchedulingContextStatusApplyConfiguration represents a declarative configuration of the PodSchedulingContextStatus type for use
 // with apply.
 type PodSchedulingContextStatusApplyConfiguration struct {
 	ResourceClaims []ResourceClaimSchedulingStatusApplyConfiguration `json:"resourceClaims,omitempty"`
 }
 
-// PodSchedulingContextStatusApplyConfiguration constructs an declarative configuration of the PodSchedulingContextStatus type for use with
+// PodSchedulingContextStatusApplyConfiguration constructs a declarative configuration of the PodSchedulingContextStatus type for use with
 // apply.
 func PodSchedulingContextStatus() *PodSchedulingContextStatusApplyConfiguration {
 	return &PodSchedulingContextStatusApplyConfiguration{}

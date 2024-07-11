@@ -194,8 +194,8 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
 
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-		framework.ExpectError(err)
+		getPod := e2epod.Get(f.ClientSet, pod)
+		gomega.Consistently(ctx, getPod, f.Timeouts.PodStart, 2*time.Second).ShouldNot(e2epod.BeInPhase(v1.PodRunning))
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(ctx, c, pod))
@@ -245,7 +245,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		// Poll kubelet metrics waiting for the volume to be picked up
 		// by the volume stats collector
 		var kubeMetrics e2emetrics.KubeletMetrics
-		waitErr := wait.PollWithContext(ctx, 30*time.Second, 5*time.Minute, func(ctx context.Context) (bool, error) {
+		waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, 5*time.Minute, false, func(ctx context.Context) (bool, error) {
 			framework.Logf("Grabbing Kubelet metrics")
 			// Grab kubelet metrics from the node the pod was scheduled on
 			var err error

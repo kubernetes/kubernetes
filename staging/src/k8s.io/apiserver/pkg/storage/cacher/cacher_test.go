@@ -208,6 +208,11 @@ func TestGetListNonRecursiveWithConsistentListFromCache(t *testing.T) {
 	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client), cacher)
 }
 
+func TestGetListRecursivePrefix(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
+}
+
 func checkStorageCalls(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 	// No-op function for now, since cacher passes pagination calls to underlying storage.
 }
@@ -464,14 +469,25 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		// The tests assume that Get/GetList/Watch calls shouldn't fail.
+		// However, 429 error can now be returned if watchcache is under initialization.
+		// To avoid rewriting all tests, we wait for watchcache to initialize.
+		if err := cacher.Wait(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	return ctx, cacher, server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
 	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 
-	if err := cacher.ready.wait(context.TODO()); err != nil {
-		t.Fatalf("unexpected error waiting for the cache to be ready")
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
+		if err := cacher.ready.wait(context.TODO()); err != nil {
+			t.Fatalf("unexpected error waiting for the cache to be ready")
+		}
 	}
 	return &createWrapper{Cacher: cacher}, tearDown
 }

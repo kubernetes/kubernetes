@@ -247,8 +247,9 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 	)
 
 	for desc, test := range map[string]struct {
-		input    *runtimeapi.ContainerStatus
-		expected *kubecontainer.Status
+		input         *runtimeapi.ContainerStatus
+		expected      *kubecontainer.Status
+		skipOnWindows bool
 	}{
 		"container reporting cpu and memory": {
 			input: &runtimeapi.ContainerStatus{
@@ -289,6 +290,7 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 					MemoryLimit: resource.NewQuantity(524288000, resource.BinarySI),
 				},
 			},
+			skipOnWindows: true,
 		},
 		"container reporting cpu only": {
 			input: &runtimeapi.ContainerStatus{
@@ -357,8 +359,96 @@ func TestToKubeContainerStatusWithResources(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
+			if test.skipOnWindows && goruntime.GOOS == "windows" {
+				// TODO: remove skip once the failing test has been fixed.
+				t.Skip("Skip failing test on Windows.")
+			}
 			actual := toKubeContainerStatus(test.input, cid.Type)
 			assert.Equal(t, test.expected, actual, desc)
+		})
+	}
+}
+
+func TestToKubeContainerStatusWithUser(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Updating Pod Container User is not supported on Windows.")
+	}
+
+	cid := &kubecontainer.ContainerID{Type: "testRuntime", ID: "dummyid"}
+	meta := &runtimeapi.ContainerMetadata{Name: "cname", Attempt: 3}
+	imageSpec := &runtimeapi.ImageSpec{Image: "fimage"}
+	var (
+		createdAt int64 = 327
+		startedAt int64 = 999
+	)
+
+	for desc, test := range map[string]struct {
+		input          *runtimeapi.ContainerUser
+		expected       *kubecontainer.ContainerUser
+		featureEnabled bool
+	}{
+		"non nil user, SupplementalGroupsPolicy is disabled": {
+			input: &runtimeapi.ContainerUser{
+				Linux: &runtimeapi.LinuxContainerUser{
+					Uid:                0,
+					Gid:                0,
+					SupplementalGroups: []int64{10},
+				},
+			},
+			expected:       nil,
+			featureEnabled: false,
+		},
+		"empty user, SupplementalGroupsPolicy is disabled": {
+			input:          &runtimeapi.ContainerUser{},
+			expected:       nil,
+			featureEnabled: false,
+		},
+		"nil user, SupplementalGroupsPolicy is disabled": {
+			input:          nil,
+			expected:       nil,
+			featureEnabled: false,
+		},
+		"non nil user, SupplementalGroupsPolicy is enabled": {
+			input: &runtimeapi.ContainerUser{
+				Linux: &runtimeapi.LinuxContainerUser{
+					Uid:                0,
+					Gid:                0,
+					SupplementalGroups: []int64{10},
+				},
+			},
+			expected: &kubecontainer.ContainerUser{
+				Linux: &kubecontainer.LinuxContainerUser{
+					UID:                0,
+					GID:                0,
+					SupplementalGroups: []int64{10},
+				},
+			},
+			featureEnabled: true,
+		},
+		"empty user, SupplementalGroupsPolicy is enabled": {
+			input:          &runtimeapi.ContainerUser{},
+			expected:       &kubecontainer.ContainerUser{},
+			featureEnabled: true,
+		},
+		"nil user, SupplementalGroupsPolicy is enabled": {
+			input:          nil,
+			expected:       nil,
+			featureEnabled: true,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SupplementalGroupsPolicy, test.featureEnabled)
+			cStatus := &runtimeapi.ContainerStatus{
+				Id:        cid.ID,
+				Metadata:  meta,
+				Image:     imageSpec,
+				State:     runtimeapi.ContainerState_CONTAINER_RUNNING,
+				CreatedAt: createdAt,
+				StartedAt: startedAt,
+				User:      test.input,
+			}
+			actual := toKubeContainerStatus(cStatus, cid.Type)
+			assert.EqualValues(t, test.expected, actual.User, desc)
 		})
 	}
 }

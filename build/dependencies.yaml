@@ -11,14 +11,14 @@ dependencies:
   #
   # ref: https://github.com/kubernetes/kubernetes/pull/98845
   - name: "zeitgeist"
-    version: "v0.2.0"
+    version: "v0.5.3"
     refPaths:
     - path: hack/verify-external-dependencies-version.sh
       match: sigs.k8s.io/zeitgeist@v.*
 
   # CNI plugins
   - name: "cni"
-    version: 1.4.1
+    version: 1.5.0
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
@@ -64,7 +64,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.13
+    version: 3.5.14
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -80,14 +80,14 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.13
+    version: 3.5.14
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
     - path: cluster/images/etcd/migrate/options.go
 
   - name: "node-problem-detector"
-    version: 0.8.16
+    version: 0.8.19
     refPaths:
     - path: test/e2e_node/image_list.go
       match: const defaultImage
@@ -109,14 +109,14 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.21.8 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
+    version: 1.21.10 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.22.2
+    version: 1.22.5
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
@@ -138,13 +138,13 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.30.0-go1.22.2-bullseye.0
+    version: v1.31.0-go1.22.5-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
   # Base images
   - name: "registry.k8s.io/debian-base: dependents"
-    version: bookworm-v1.0.2
+    version: bookworm-v1.0.3
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
@@ -176,7 +176,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.5.3
+    version: v0.5.6
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -184,19 +184,19 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.3.1-go1.22.2-bookworm.0
+    version: v2.3.1-go1.22.5-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
 
   - name: "registry.k8s.io/pause"
-    version: 3.9
+    version: 3.10
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=
 
   - name: "registry.k8s.io/pause: dependents"
-    version: 3.9
+    version: 3.10
     refPaths:
     - path: cluster/gce/config-common.sh
       match: registry.k8s.io\/pause:\d+\.\d+
@@ -206,12 +206,6 @@ dependencies:
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: validTmpl\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: validTmplOut\s+=
-    - path: cmd/kubeadm/app/util/template_test.go
-      match: doNothing\s+=
     - path: cmd/kubelet/app/options/container_runtime.go
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
@@ -228,31 +222,29 @@ dependencies:
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/benchmark-controller.json
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-default.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-default.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-node-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-node-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-pod-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-pod-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-pod-anti-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-pod-anti-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-pod-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-anti-affinity.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-pod-anti-affinity.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-preferred-topology-spreading.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-preferred-topology-spreading.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-secret-volume.yaml
+    - path: test/integration/scheduler_perf/config/templates/pod-with-secret-volume.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/integration/scheduler_perf/config/pod-with-topology-spreading.yaml
-      match: registry.k8s.io\/pause:\d+\.\d+
-    - path: test/utils/runners.go
+    - path: test/integration/scheduler_perf/config/templates/pod-with-topology-spreading.yaml
       match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
   - name: "registry.k8s.io/build-image/setcap: dependents"
-    version: bookworm-v1.0.2
+    version: bookworm-v1.0.3
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=
@@ -268,7 +260,7 @@ dependencies:
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"
-    version: v20230623-56e06d7c18
+    version: v20240523-a15ad90fc9@sha256:bb04162508c2c61637eae700a0d8e8c8be8f2d4c831d2b75e59db2d4dd6cf75d
     refPaths:
     - path: build/pause/cloudbuild.yaml
       match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud

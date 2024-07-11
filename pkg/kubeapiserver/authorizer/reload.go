@@ -128,6 +128,9 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 			if err != nil {
 				return nil, nil, err
 			}
+			if configuredAuthorizer.Webhook.Timeout.Duration != 0 {
+				clientConfig.Timeout = configuredAuthorizer.Webhook.Timeout.Duration
+			}
 			var decisionOnError authorizer.Decision
 			switch configuredAuthorizer.Webhook.FailurePolicy {
 			case authzconfig.FailurePolicyNoOpinion:

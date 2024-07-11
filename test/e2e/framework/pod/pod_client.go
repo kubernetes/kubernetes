@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 
 	"github.com/onsi/ginkgo/v2"
+	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 	"github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -56,6 +57,19 @@ const (
 
 	// it is copied from k8s.io/kubernetes/pkg/kubelet/sysctl
 	forbiddenReason = "SysctlForbidden"
+
+	// which test created this pod?
+	AnnotationTestOwner = "owner.test"
+)
+
+// global flags so we can enable features per-suite instead of per-client.
+var (
+	// GlobalOwnerTracking controls if newly created PodClients should automatically annotate
+	// the pod with the owner test. The owner test is identified by "sourcecodepath:linenumber".
+	// Annotating the pods this way is useful to troubleshoot tests which do insufficient cleanup.
+	// Default is false to maximize backward compatibility.
+	// See also: WithOwnerTracking, AnnotationTestOwner
+	GlobalOwnerTracking bool
 )
 
 // ImagePrePullList is the images used in the current test suite. It should be initialized in test suite and
@@ -68,9 +82,10 @@ var ImagePrePullList sets.String
 // node e2e pod scheduling.
 func NewPodClient(f *framework.Framework) *PodClient {
 	return &PodClient{
-		f:            f,
-		PodInterface: f.ClientSet.CoreV1().Pods(f.Namespace.Name),
-		namespace:    f.Namespace.Name,
+		f:             f,
+		PodInterface:  f.ClientSet.CoreV1().Pods(f.Namespace.Name),
+		namespace:     f.Namespace.Name,
+		ownerTracking: GlobalOwnerTracking,
 	}
 }
 
@@ -79,9 +94,10 @@ func NewPodClient(f *framework.Framework) *PodClient {
 // node e2e pod scheduling.
 func PodClientNS(f *framework.Framework, namespace string) *PodClient {
 	return &PodClient{
-		f:            f,
-		PodInterface: f.ClientSet.CoreV1().Pods(namespace),
-		namespace:    namespace,
+		f:             f,
+		PodInterface:  f.ClientSet.CoreV1().Pods(namespace),
+		namespace:     namespace,
+		ownerTracking: GlobalOwnerTracking,
 	}
 }
 
@@ -89,19 +105,34 @@ func PodClientNS(f *framework.Framework, namespace string) *PodClient {
 type PodClient struct {
 	f *framework.Framework
 	v1core.PodInterface
-	namespace string
+	namespace     string
+	ownerTracking bool
+}
+
+// WithOwnerTracking controls automatic add of annotations recording the code location
+// which created a pod. This is helpful when troubleshooting e2e tests (like e2e_node)
+// which leak pods because insufficient cleanup.
+// Note we want a shallow clone to avoid mutating the receiver.
+// The default is the value of GlobalOwnerTracking *when the client was created*.
+func (c PodClient) WithOwnerTracking(value bool) *PodClient {
+	c.ownerTracking = value
+	return &c
 }
 
 // Create creates a new pod according to the framework specifications (don't wait for it to start).
 func (c *PodClient) Create(ctx context.Context, pod *v1.Pod) *v1.Pod {
+	ginkgo.GinkgoHelper()
 	c.mungeSpec(pod)
+	c.setOwnerAnnotation(pod)
 	p, err := c.PodInterface.Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Error creating Pod")
 	return p
+
 }
 
 // CreateSync creates a new pod according to the framework specifications, and wait for it to start and be running and ready.
 func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
+	ginkgo.GinkgoHelper()
 	p := c.Create(ctx, pod)
 	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(ctx, c.f.ClientSet, p.Name, c.namespace, framework.PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
@@ -112,6 +143,7 @@ func (c *PodClient) CreateSync(ctx context.Context, pod *v1.Pod) *v1.Pod {
 
 // CreateBatch create a batch of pods. All pods are created before waiting.
 func (c *PodClient) CreateBatch(ctx context.Context, pods []*v1.Pod) []*v1.Pod {
+	ginkgo.GinkgoHelper()
 	ps := make([]*v1.Pod, len(pods))
 	var wg sync.WaitGroup
 	for i, pod := range pods {
@@ -130,7 +162,7 @@ func (c *PodClient) CreateBatch(ctx context.Context, pods []*v1.Pod) []*v1.Pod {
 // there is any other apierrors. name is the pod name, updateFn is the function updating the
 // pod object.
 func (c *PodClient) Update(ctx context.Context, name string, updateFn func(pod *v1.Pod)) {
-	framework.ExpectNoError(wait.PollWithContext(ctx, time.Millisecond*500, time.Second*30, func(ctx context.Context) (bool, error) {
+	framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Millisecond*500, time.Second*30, false, func(ctx context.Context) (bool, error) {
 		pod, err := c.PodInterface.Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %w", name, err)
@@ -190,6 +222,19 @@ func (c *PodClient) DeleteSync(ctx context.Context, name string, options metav1.
 		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
 	framework.ExpectNoError(WaitForPodNotFoundInNamespace(ctx, c.f.ClientSet, name, c.namespace, timeout), "wait for pod %q to disappear", name)
+}
+
+// addTestOrigin adds annotations to help identifying tests which incorrectly leak pods because insufficient cleanup
+func (c *PodClient) setOwnerAnnotation(pod *v1.Pod) {
+	if !c.ownerTracking {
+		return
+	}
+	ginkgo.GinkgoHelper()
+	location := ginkgotypes.NewCodeLocation(0)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	pod.Annotations[AnnotationTestOwner] = fmt.Sprintf("%s:%d", location.FileName, location.LineNumber)
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
@@ -264,7 +309,7 @@ func (c *PodClient) WaitForFinish(ctx context.Context, name string, timeout time
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(ctx context.Context, pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.PollWithContext(ctx, framework.Poll, framework.PodStartTimeout, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %w", err)

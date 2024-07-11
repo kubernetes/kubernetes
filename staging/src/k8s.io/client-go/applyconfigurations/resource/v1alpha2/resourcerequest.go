@@ -22,14 +22,14 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// ResourceRequestApplyConfiguration represents an declarative configuration of the ResourceRequest type for use
+// ResourceRequestApplyConfiguration represents a declarative configuration of the ResourceRequest type for use
 // with apply.
 type ResourceRequestApplyConfiguration struct {
 	VendorParameters                       *runtime.RawExtension `json:"vendorParameters,omitempty"`
 	ResourceRequestModelApplyConfiguration `json:",inline"`
 }
 
-// ResourceRequestApplyConfiguration constructs an declarative configuration of the ResourceRequest type for use with
+// ResourceRequestApplyConfiguration constructs a declarative configuration of the ResourceRequest type for use with
 // apply.
 func ResourceRequest() *ResourceRequestApplyConfiguration {
 	return &ResourceRequestApplyConfiguration{}

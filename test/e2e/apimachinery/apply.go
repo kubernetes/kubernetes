@@ -39,9 +39,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-
-	// ensure libs have a chance to initialize
-	_ "github.com/stretchr/testify/assert"
 )
 
 var _ = SIGDescribe("ServerSideApply", func() {

@@ -40,11 +40,11 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
@@ -85,7 +85,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		podCIDR = "fd00:10::/64"
 		serviceCIDRs = "fd00:10:96::/112"
 	}
-	detectLocal, _ := proxyutiliptables.NewDetectLocalByCIDR(podCIDR)
+	detectLocal := proxyutil.NewDetectLocalByCIDR(podCIDR)
 	nodePortAddresses := []string{fmt.Sprintf("%s/32", testNodeIP), fmt.Sprintf("%s/128", testNodeIPv6)}
 
 	networkInterfacer := proxyutiltest.NewFakeNetwork()
@@ -141,7 +141,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 // rules are exactly as expected.
 func TestOverallNFTablesRules(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 
 	makeServiceMap(fp,
 		// create ClusterIP service
@@ -3905,7 +3905,7 @@ func TestInternalExternalMasquerade(t *testing.T) {
 			nft, fp := NewFakeProxier(v1.IPv4Protocol)
 			fp.masqueradeAll = tc.masqueradeAll
 			if !tc.localDetector {
-				fp.localDetector = proxyutiliptables.NewNoOpLocalDetector()
+				fp.localDetector = proxyutil.NewNoOpLocalDetector()
 			}
 			setupTest(fp)
 
@@ -4455,7 +4455,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		hostname string
 	}
 
-	metrics.RegisterMetrics()
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
 	testCases := []struct {
 		name                                                string
 		internalTrafficPolicy                               *v1.ServiceInternalTrafficPolicy
