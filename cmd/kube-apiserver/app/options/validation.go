@@ -142,14 +142,20 @@ func (s CompletedOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
 
-	// TODO: remove in 1.32
 	// emulationVersion is introduced in 1.31, so it is only allowed to be equal to the binary version at 1.31.
 	effectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor(s.GenericServerRunOptions.ComponentName)
 	binaryVersion := version.MajorMinor(effectiveVersion.BinaryVersion().Major(), effectiveVersion.BinaryVersion().Minor())
-	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) && !effectiveVersion.EmulationVersion().EqualTo(binaryVersion) {
+	emulationVersion := effectiveVersion.EmulationVersion()
+	// allow emulation version to be in the range from binary version - 1 minor to binary version
+	if binaryVersion.Minor() == 31 && !emulationVersion.EqualTo(binaryVersion) {
 		errs = append(errs, fmt.Errorf("emulation version needs to be equal to binary version(%s) in compatibility-version alpha, got %s",
-			binaryVersion.String(), effectiveVersion.EmulationVersion().String()))
+			binaryVersion.String(), emulationVersion.String()))
+	} else if binaryVersion.Minor() != 31 {
+		previousMinorVersion := version.MajorMinor(binaryVersion.Major(), binaryVersion.Minor()-1)
+		if emulationVersion.LessThan(previousMinorVersion) || emulationVersion.GreaterThan(binaryVersion) {
+			errs = append(errs, fmt.Errorf("emulation version needs to be in the range from %s to %s, got %s",
+				previousMinorVersion.String(), binaryVersion.String(), emulationVersion.String()))
+		}
 	}
-
 	return errs
 }
