@@ -336,6 +336,7 @@ const (
 	// kep: https://kep.k8s.io/3329
 	// alpha: v1.25
 	// beta: v1.26
+	// stable: v1.31
 	//
 	// Allow users to specify handling of pod failures based on container exit codes
 	// and pod conditions.
@@ -1061,7 +1062,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobManagedBy: {Default: false, PreRelease: featuregate.Alpha},
 
-	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.Beta},
+	JobPodFailurePolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	JobPodReplacementPolicy: {Default: true, PreRelease: featuregate.Beta},
 
