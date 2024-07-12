@@ -584,11 +584,11 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 			def := utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(generatedopenapi.GetOpenAPIDefinitions)(ref)
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
+			def[fmt.Sprintf("%s/%s.%s", packagePrefix(b.group), b.version, b.kind)] = common.OpenAPIDefinition{
 				Schema:       *b.schema,
 				Dependencies: []string{objectMetaType},
 			}
-			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.listKind)] = common.OpenAPIDefinition{
+			def[fmt.Sprintf("%s/%s.%s", packagePrefix(b.group), b.version, b.listKind)] = common.OpenAPIDefinition{
 				Schema: *b.listSchema,
 			}
 			return def
@@ -597,8 +597,6 @@ func (b *builder) getOpenAPIV3Config() *common.OpenAPIV3Config {
 }
 
 func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, schema *structuralschema.Structural, opts Options) *builder {
-	group := crd.Spec.Group
-	// HACK: support the case when we add core resources through CRDs (KCP scenario)
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -606,7 +604,7 @@ func newBuilder(crd *apiextensionsv1.CustomResourceDefinition, version string, s
 		listSchema: &spec.Schema{},
 		ws:         &restful.WebService{},
 
-		group:    group,
+		group:    crd.Spec.Group,
 		version:  version,
 		kind:     crd.Spec.Names.Kind,
 		listKind: crd.Spec.Names.ListKind,
