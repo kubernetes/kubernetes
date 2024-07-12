@@ -30,6 +30,8 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/mount-utils"
 )
 
@@ -224,8 +226,13 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	kubeletPid := os.Getpid()
 	mountSource := fmt.Sprintf("/proc/%d/fd/%v", kubeletPid, fd)
 
-	// Do the bind mount
+	info, err := hostutil.NewHostUtil().FindMountInfo(subpath.Path)
+	if err != nil {
+		klog.Warningf("Failed to parse mount info for %q: %v", subpath.Path, err)
+	}
+	// Do the bind mount<
 	options := []string{"bind"}
+	options = append(options, info.MountOptions...)
 	mountFlags := []string{"--no-canonicalize"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
 	if err = mounter.MountSensitiveWithoutSystemdWithMountFlags(mountSource, bindPathTarget, "" /*fstype*/, options, nil /* sensitiveOptions */, mountFlags); err != nil {
