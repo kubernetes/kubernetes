@@ -4666,6 +4666,19 @@ func TestPrintReplicationController(t *testing.T) {
 			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
 			expected: []metav1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", "test", "test_image", "a=b"}}},
 		},
+		{
+			// make sure Bookmark event will not lead a panic
+			rc: api.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						metav1.InitialEventsAnnotationKey: "true",
+					},
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
+			expected: []metav1.TableRow{{Cells: []interface{}{"", int64(0), int64(0), int64(0), "<unknown>", "", "", "<none>"}}},
+		},
 	}
 
 	for i, test := range tests {
