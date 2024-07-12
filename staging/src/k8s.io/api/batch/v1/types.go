@@ -174,7 +174,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// When specified, it should match one the container or initContainer
 	// names in the pod template.
 	// +optional
-	ContainerName *string `json:"containerName" protobuf:"bytes,1,opt,name=containerName"`
+	ContainerName *string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 
 	// Represents the relationship between the container exit code(s) and the
 	// specified values. Containers completed with success (exit code 0) are
@@ -234,14 +234,14 @@ type PodFailurePolicyRule struct {
 
 	// Represents the requirement on the container exit codes.
 	// +optional
-	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes" protobuf:"bytes,2,opt,name=onExitCodes"`
+	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes,omitempty" protobuf:"bytes,2,opt,name=onExitCodes"`
 
 	// Represents the requirement on the pod conditions. The requirement is represented
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
 	// +optional
-	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
+	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty" protobuf:"bytes,3,opt,name=onPodConditions"`
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
