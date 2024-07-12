@@ -161,7 +161,6 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 			},
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, true)
 	closeFn, restConfig, cs, ns := setup(t, "simple")
 	defer closeFn()
 
@@ -343,7 +342,6 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		},
 	}
 	testCases := map[string]struct {
-		enableJobPodFailurePolicy                bool
 		restartController                        bool
 		job                                      batchv1.Job
 		podStatus                                v1.PodStatus
@@ -353,13 +351,12 @@ func TestJobPodFailurePolicy(t *testing.T) {
 		wantJobFinishedMetric                    metricLabelsWithValue
 		wantPodFailuresHandledByPolicyRuleMetric *metricLabelsWithValue
 	}{
-		"pod status matching the configured FailJob rule on exit codes; job terminated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                0,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobFailed,
+		"pod status matching the configured FailJob rule on exit codes; job terminated": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
 				Value:  1,
@@ -369,38 +366,24 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"pod status matching the configured FailJob rule on exit codes; with controller restart; job terminated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			restartController:         true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                0,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobFailed,
+		"pod status matching the configured FailJob rule on exit codes; with controller restart; job terminated": {
+			restartController:    true,
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:           0,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobFailed,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "failed", "PodFailurePolicy"},
 				Value:  1,
 			},
 		},
-		"pod status matching the configured FailJob rule on exit codes; default handling when JobPodFailurePolicy disabled": {
-			enableJobPodFailurePolicy: false,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
-			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
-				Value:  1,
-			},
-		},
-		"pod status matching the configured Ignore rule on pod conditions; pod failure not counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnPodConditionsIgnoreRule,
-			wantActive:                1,
-			wantFailed:                0,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status matching the configured Ignore rule on pod conditions; pod failure not counted": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnPodConditionsIgnoreRule,
+			wantActive:           1,
+			wantFailed:           0,
+			wantJobConditionType: batchv1.JobComplete,
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
 				Labels: []string{"Ignore"},
 				Value:  1,
@@ -410,13 +393,12 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"pod status matching the configured Count rule on exit codes; pod failure counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusMatchingOnExitCodesCountRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status matching the configured Count rule on exit codes; pod failure counted": {
+			job:                  job,
+			podStatus:            podStatusMatchingOnExitCodesCountRule,
+			wantActive:           1,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "succeeded", ""},
 				Value:  1,
@@ -426,13 +408,12 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 		},
-		"pod status non-matching any configured rule; pod failure counted when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job:                       job,
-			podStatus:                 podStatusNotMatchingAnyRule,
-			wantActive:                1,
-			wantFailed:                1,
-			wantJobConditionType:      batchv1.JobComplete,
+		"pod status non-matching any configured rule; pod failure counted": {
+			job:                  job,
+			podStatus:            podStatusNotMatchingAnyRule,
+			wantActive:           1,
+			wantFailed:           1,
+			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
 				Labels: []string{"NonIndexed", "succeeded", ""},
 				Value:  1,
@@ -446,7 +427,6 @@ func TestJobPodFailurePolicy(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, test.enableJobPodFailurePolicy)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
 			defer closeFn()
@@ -1802,7 +1782,6 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "simple")
@@ -2913,7 +2892,6 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.jobSpec.PodFailurePolicy != nil)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "pod-replacement-policy")
 			t.Cleanup(closeFn)

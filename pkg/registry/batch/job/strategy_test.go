@@ -88,7 +88,6 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		enableJobPodReplacementPolicy bool
 		enableJobSuccessPolicy        bool
@@ -264,8 +263,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
-		"update job with a new field; updated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
+		"update job with a new field; updated": {
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -345,62 +343,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
-		"update job with a new field; not updated when JobPodFailurePolicy disabled": {
-			enableJobPodFailurePolicy: false,
-			job: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: nil,
-				},
-			},
-			updatedJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: updatedPodFailurePolicy,
-				},
-			},
-			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: nil,
-				},
-			},
-		},
-		"update pre-existing field; updated when JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
-			job: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: podFailurePolicy,
-				},
-			},
-			updatedJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: updatedPodFailurePolicy,
-				},
-			},
-			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(1),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: updatedPodFailurePolicy,
-				},
-			},
-		},
-		"update pre-existing field; updated when JobPodFailurePolicy disabled": {
-			enableJobPodFailurePolicy: false,
+		"update pre-existing field; updated": {
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -569,7 +512,6 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
@@ -613,7 +555,6 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		enableJobPodReplacementPolicy bool
 		enableJobManageBy             bool
@@ -727,8 +668,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with a new field; JobPodFailurePolicy enabled": {
-			enableJobPodFailurePolicy: true,
+		"create job with a new field": {
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -790,27 +730,6 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with a new field; JobPodFailurePolicy disabled": {
-			enableJobPodFailurePolicy: false,
-			job: batch.Job{
-				ObjectMeta: getValidObjectMeta(0),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					ManualSelector:   ptr.To(false),
-					Template:         validPodTemplateSpec,
-					PodFailurePolicy: podFailurePolicy,
-				},
-			},
-			wantJob: batch.Job{
-				ObjectMeta: getValidObjectMeta(1),
-				Spec: batch.JobSpec{
-					Selector:         validSelector,
-					ManualSelector:   ptr.To(false),
-					Template:         expectedPodTemplateSpec,
-					PodFailurePolicy: nil,
-				},
-			},
-		},
 		"job does not allow setting status on create": {
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
@@ -832,9 +751,8 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with pod failure policy using FailIndex action; JobPodFailurePolicy enabled, JobBackoffLimitPerIndex disabled": {
+		"create job with pod failure policy using FailIndex action; JobBackoffLimitPerIndex disabled": {
 			enableJobBackoffLimitPerIndex: false,
-			enableJobPodFailurePolicy:     true,
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -867,9 +785,8 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with multiple pod failure policy rules, some using FailIndex action; JobPodFailurePolicy enabled, JobBackoffLimitPerIndex disabled": {
+		"create job with multiple pod failure policy rules, some using FailIndex action; JobBackoffLimitPerIndex disabled": {
 			enableJobBackoffLimitPerIndex: false,
-			enableJobPodFailurePolicy:     true,
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
 				Spec: batch.JobSpec{
@@ -976,7 +893,6 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobManagedBy, tc.enableJobManageBy)
@@ -1027,7 +943,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	validPodTemplateSpecNever.Spec.RestartPolicy = api.RestartPolicyNever
 	now := metav1.Now()
 	cases := map[string]struct {
-		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		job                           *batch.Job
 		update                        func(*batch.Job)
@@ -1258,7 +1173,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 			},
 		},
 		"old job is using FailIndex JobBackoffLimitPerIndex is disabled, but FailIndex was already used": {
-			enableJobPodFailurePolicy:     true,
 			enableJobBackoffLimitPerIndex: false,
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1294,7 +1208,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			newJob := tc.job.DeepCopy()
 			tc.update(newJob)
@@ -1541,7 +1454,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 	validPodSpecNever := podtest.MakePodSpec(podtest.SetRestartPolicy(api.RestartPolicyNever))
 	validObjectMeta := getValidObjectMeta(0)
 	testcases := map[string]struct {
-		enableJobPodFailurePolicy     bool
 		enableJobBackoffLimitPerIndex bool
 		job                           *batch.Job
 		wantJob                       *batch.Job
@@ -1743,7 +1655,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantWarningCount: 1,
 		},
 		"FailIndex action; when JobBackoffLimitPerIndex is disabled - validation error": {
-			enableJobPodFailurePolicy:     true,
 			enableJobBackoffLimitPerIndex: false,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -1796,7 +1707,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantWarningCount: 1,
 		},
 		"FailIndex action; when JobBackoffLimitPerIndex is enabled, but not used - validation error": {
-			enableJobPodFailurePolicy:     true,
 			enableJobBackoffLimitPerIndex: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -1849,7 +1759,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 			wantWarningCount: 1,
 		},
 		"FailIndex action; when JobBackoffLimitPerIndex is enabled and used - no error": {
-			enableJobPodFailurePolicy:     true,
 			enableJobBackoffLimitPerIndex: true,
 			job: &batch.Job{
 				ObjectMeta: validObjectMeta,
@@ -1909,7 +1818,6 @@ func TestJobStrategy_Validate(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobPodFailurePolicy, tc.enableJobPodFailurePolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableJobBackoffLimitPerIndex)
 			errs := Strategy.Validate(ctx, tc.job)
 			if len(errs) != int(tc.wantWarningCount) {
