@@ -24,7 +24,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -94,7 +93,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	logger.V(4).Info("Update event for node", "node", klog.KObj(newNode))
 	nodeInfo := sched.Cache.UpdateNode(logger, oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
-	for _, evt := range nodeSchedulingPropertiesChange(newNode, oldNode) {
+	for _, evt := range queue.NodeSchedulingPropertiesChange(newNode, oldNode) {
 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, oldNode, newNode, preCheckForNode(nodeInfo))
 	}
 }
@@ -569,62 +568,6 @@ func addAllEventHandlers(
 	}
 	sched.registeredHandlers = handlers
 	return nil
-}
-
-func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framework.ClusterEvent {
-	var events []framework.ClusterEvent
-
-	if nodeSpecUnschedulableChanged(newNode, oldNode) {
-		events = append(events, queue.NodeSpecUnschedulableChange)
-	}
-	if nodeAllocatableChanged(newNode, oldNode) {
-		events = append(events, queue.NodeAllocatableChange)
-	}
-	if nodeLabelsChanged(newNode, oldNode) {
-		events = append(events, queue.NodeLabelChange)
-	}
-	if nodeTaintsChanged(newNode, oldNode) {
-		events = append(events, queue.NodeTaintChange)
-	}
-	if nodeConditionsChanged(newNode, oldNode) {
-		events = append(events, queue.NodeConditionChange)
-	}
-	if nodeAnnotationsChanged(newNode, oldNode) {
-		events = append(events, queue.NodeAnnotationChange)
-	}
-
-	return events
-}
-
-func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
-}
-
-func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
-}
-
-func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
-}
-
-func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
-		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
-		for i := range conditions {
-			conditionStatuses[conditions[i].Type] = conditions[i].Status
-		}
-		return conditionStatuses
-	}
-	return !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
-}
-
-func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
-}
-
-func nodeAnnotationsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations())
 }
 
 func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {

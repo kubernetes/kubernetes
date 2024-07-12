@@ -17,6 +17,8 @@ limitations under the License.
 package queue
 
 import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -89,3 +91,59 @@ var (
 	// UnschedulableTimeout is the event when a pod stays in unschedulable for longer than timeout.
 	UnschedulableTimeout = framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All, Label: "UnschedulableTimeout"}
 )
+
+func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framework.ClusterEvent {
+	var events []framework.ClusterEvent
+
+	if nodeSpecUnschedulableChanged(newNode, oldNode) {
+		events = append(events, NodeSpecUnschedulableChange)
+	}
+	if nodeAllocatableChanged(newNode, oldNode) {
+		events = append(events, NodeAllocatableChange)
+	}
+	if nodeLabelsChanged(newNode, oldNode) {
+		events = append(events, NodeLabelChange)
+	}
+	if nodeTaintsChanged(newNode, oldNode) {
+		events = append(events, NodeTaintChange)
+	}
+	if nodeConditionsChanged(newNode, oldNode) {
+		events = append(events, NodeConditionChange)
+	}
+	if nodeAnnotationsChanged(newNode, oldNode) {
+		events = append(events, NodeAnnotationChange)
+	}
+
+	return events
+}
+
+func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+}
+
+func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+}
+
+func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+}
+
+func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
+		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
+		for i := range conditions {
+			conditionStatuses[conditions[i].Type] = conditions[i].Status
+		}
+		return conditionStatuses
+	}
+	return !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+}
+
+func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
+}
+
+func nodeAnnotationsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+	return !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations())
+}
