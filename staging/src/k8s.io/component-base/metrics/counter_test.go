@@ -87,7 +87,7 @@ func TestCounter(t *testing.T) {
 			mfs, err := registry.Gather()
 			var buf bytes.Buffer
 			enc := expfmt.NewEncoder(&buf, "text/plain; version=0.0.4; charset=utf-8")
-			assert.Equalf(t, test.expectedMetricCount, len(mfs), "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
+			assert.Lenf(t, mfs, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 			for _, metric := range mfs {
 				err := enc.Encode(metric)
@@ -186,12 +186,12 @@ func TestCounterVec(t *testing.T) {
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Inc()
 			mfs, err := registry.Gather()
-			assert.Equalf(t, test.expectedMetricFamilyCount, len(mfs), "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
+			assert.Lenf(t, mfs, test.expectedMetricFamilyCount, "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
 			assert.Nil(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
-				assert.Equalf(t, 1, len(mf.GetMetric()), "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 1, "Got %v metrics, wanted 1 as the count", len(mf.GetMetric()))
 				assert.Equalf(t, test.expectedHelp, mf.GetHelp(), "Got %s as help message, want %s", mf.GetHelp(), test.expectedHelp)
 			}
 
@@ -203,7 +203,7 @@ func TestCounterVec(t *testing.T) {
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
-				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
 			}
 		})
 	}

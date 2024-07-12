@@ -2389,7 +2389,7 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 	assert.Empty(t, reconciler.volumesNeedUpdateFromNodeStatus)
 
 	attachedVolumes := asw.GetAttachedVolumes()
-	assert.Equalf(t, len(attachedVolumes), 2, "two volumes in ASW expected")
+	assert.Lenf(t, attachedVolumes, 2, "two volumes in ASW expected")
 	for _, vol := range attachedVolumes {
 		if vol.VolumeName == volumeName1 {
 			// devicePath + attachability must have been updated from node.status

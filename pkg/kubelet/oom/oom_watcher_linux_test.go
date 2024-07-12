@@ -66,7 +66,7 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	assert.NoError(t, oomWatcher.Start(node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
-	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
+	assert.Len(t, eventsRecorded, numExpectedOomEvents)
 }
 
 func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
@@ -125,7 +125,7 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 	assert.NoError(t, oomWatcher.Start(node))
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
-	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
+	assert.Len(t, eventsRecorded, numExpectedOomEvents)
 }
 
 // TestWatcherRecordsEventsForOomEventsWithAdditionalInfo verifies that our the
@@ -161,7 +161,7 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 
-	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
+	assert.Len(t, eventsRecorded, numExpectedOomEvents)
 	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
 	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("pid: %d", eventPid))
 	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("victim process: %s", processName))

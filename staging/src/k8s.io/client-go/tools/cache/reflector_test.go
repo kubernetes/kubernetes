@@ -194,7 +194,7 @@ func TestReflectorWatchStoppedAfter(t *testing.T) {
 
 	err := target.watch(nil, stopCh, nil)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(watchers))
+	require.Len(t, watchers, 1)
 	require.True(t, watchers[0].IsStopped())
 }
 

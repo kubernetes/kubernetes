@@ -243,7 +243,7 @@ func TestCRIListPodStats(t *testing.T) {
 	stats, err := provider.ListPodStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(4, len(stats))
+	assert.Len(stats, 4)
 
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
@@ -252,7 +252,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	p0 := podStatsMap[statsapi.PodReference{Name: "sandbox0-name", UID: "sandbox0-uid", Namespace: "sandbox0-ns"}]
 	assert.Equal(sandbox0.CreatedAt, p0.StartTime.UnixNano())
-	assert.Equal(2, len(p0.Containers))
+	assert.Len(p0.Containers, 2)
 
 	checkEphemeralStorageStats(assert, p0, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats0, containerStats1},
 		[]*volume.Metrics{containerLogStats0, containerLogStats1}, podLogStats0)
@@ -281,7 +281,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
-	assert.Equal(1, len(p1.Containers))
+	assert.Len(p1.Containers, 1)
 
 	checkEphemeralStorageStats(assert, p1, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats2},
 		[]*volume.Metrics{containerLogStats2}, podLogStats1)
@@ -298,7 +298,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
-	assert.Equal(1, len(p2.Containers))
+	assert.Len(p2.Containers, 1)
 
 	checkEphemeralStorageStats(assert, p2, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats4},
 		[]*volume.Metrics{containerLogStats4}, nil)
@@ -317,7 +317,7 @@ func TestCRIListPodStats(t *testing.T) {
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
-	assert.Equal(1, len(p3.Containers))
+	assert.Len(p3.Containers, 1)
 
 	c8 := p3.Containers[0]
 	assert.Equal(cName8, c8.Name)
@@ -468,14 +468,14 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 	stats, err := provider.ListPodStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(2, len(stats))
+	assert.Len(stats, 2)
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
 		podStatsMap[s.PodRef] = s
 	}
 	p0 := podStatsMap[prf0]
 	assert.Equal(sandbox0.CreatedAt, p0.StartTime.UnixNano())
-	assert.Equal(2, len(p0.Containers))
+	assert.Len(p0.Containers, 2)
 
 	checkEphemeralStorageStats(assert, p0, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats0, containerStats1},
 		[]*volume.Metrics{containerLogStats0, containerLogStats1}, podLogStats0)
@@ -504,7 +504,7 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 
 	p1 := podStatsMap[prf1]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
-	assert.Equal(1, len(p1.Containers))
+	assert.Len(p1.Containers, 1)
 
 	checkEphemeralStorageStats(assert, p1, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats2},
 		[]*volume.Metrics{containerLogStats2}, podLogStats1)
@@ -637,7 +637,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	stats, err := provider.ListPodCPUAndMemoryStats(ctx)
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(5, len(stats))
+	assert.Len(stats, 5)
 
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
@@ -646,7 +646,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	p0 := podStatsMap[statsapi.PodReference{Name: "sandbox0-name", UID: "sandbox0-uid", Namespace: "sandbox0-ns"}]
 	assert.Equal(sandbox0.CreatedAt, p0.StartTime.UnixNano())
-	assert.Equal(2, len(p0.Containers))
+	assert.Len(p0.Containers, 2)
 	assert.Nil(p0.EphemeralStorage)
 	assert.Nil(p0.VolumeStats)
 	assert.Nil(p0.Network)
@@ -674,7 +674,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
-	assert.Equal(1, len(p1.Containers))
+	assert.Len(p1.Containers, 1)
 	assert.Nil(p1.EphemeralStorage)
 	assert.Nil(p1.VolumeStats)
 	assert.Nil(p1.Network)
@@ -691,7 +691,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
-	assert.Equal(1, len(p2.Containers))
+	assert.Len(p2.Containers, 1)
 	assert.Nil(p2.EphemeralStorage)
 	assert.Nil(p2.VolumeStats)
 	assert.Nil(p2.Network)
@@ -708,7 +708,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
-	assert.Equal(1, len(p3.Containers))
+	assert.Len(p3.Containers, 1)
 
 	c8 := p3.Containers[0]
 	assert.Equal(cName8, c8.Name)
@@ -719,7 +719,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 	p6 := podStatsMap[statsapi.PodReference{Name: "sandbox6-name", UID: "sandbox6-uid", Namespace: "sandbox6-ns"}]
 	assert.Equal(sandbox6.CreatedAt, p6.StartTime.UnixNano())
-	assert.Equal(1, len(p6.Containers))
+	assert.Len(p6.Containers, 1)
 
 	c9 := p6.Containers[0]
 	assert.Equal(cName9, c9.Name)
