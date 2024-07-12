@@ -595,6 +595,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.UserNamespaces = (*config.UserNamespaces)(unsafe.Pointer(in.UserNamespaces))
+	if err := v1.Convert_Pointer_v1_Duration_To_v1_Duration(&in.PodHousekeepingPeriod, &out.PodHousekeepingPeriod, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -801,6 +804,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.UserNamespaces = (*configv1beta1.UserNamespaces)(unsafe.Pointer(in.UserNamespaces))
+	if err := v1.Convert_v1_Duration_To_Pointer_v1_Duration(&in.PodHousekeepingPeriod, &out.PodHousekeepingPeriod, s); err != nil {
+		return err
+	}
 	return nil
 }
 
