@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/endpointslice/util"
+	endpointsliceutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
@@ -221,6 +225,362 @@ func TestNewEndpointSlice(t *testing.T) {
 	}
 }
 
+func Test_hintsEnabled(t *testing.T) {
+	testCases := []struct {
+		name          string
+		annotations   map[string]string
+		expectEnabled bool
+	}{{
+		name:          "empty annotations",
+		expectEnabled: false,
+	}, {
+		name:          "different annotations",
+		annotations:   map[string]string{"topology-hints": "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "hints annotation == enabled",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "hints annotation == aUto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "hints annotation == auto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "hints annotation == Auto",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "hints annotation == disabled",
+		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == enabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == aUto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == Auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == enabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == aUto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == Auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
+		expectEnabled: false,
+	}, {
+		name:          "mode annotation == disabled, hints annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled", v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "mode annotation == auto, hints annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto", v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
+		expectEnabled: false,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualEnabled := hintsEnabled(tc.annotations)
+			if actualEnabled != tc.expectEnabled {
+				t.Errorf("Expected %t, got %t", tc.expectEnabled, actualEnabled)
+			}
+		})
+	}
+}
+
+func TestCompareEndpointPortAddressTypeSlices(t *testing.T) {
+	endpointA := &discovery.Endpoint{
+		Addresses:  []string{"172.16.1.1"},
+		Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		NodeName:   ptr.To("worker"),
+		TargetRef:  &corev1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod-a", UID: "d77ee8a4-96a8-41e4-b8ed-2880eae70cc7"},
+	}
+	endpointB := &discovery.Endpoint{
+		Addresses:  []string{"172.16.1.2"},
+		Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		NodeName:   ptr.To("worker"),
+		TargetRef:  &corev1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod-b", UID: "d77ee8a4-96a8-41e4-b8ed-2880eae70cc8"},
+	}
+	endpointC := &discovery.Endpoint{
+		Addresses:  []string{"172.16.1.3"},
+		Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+		NodeName:   ptr.To("worker"),
+		TargetRef:  &corev1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod-c", UID: "d77ee8a4-96a8-41e4-b8ed-2880eae70cc9"},
+	}
+
+	type args struct {
+		epat1 []*EndpointPortAddressType
+		epat2 []*EndpointPortAddressType
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{
+			name: "empty",
+			args: args{
+				epat1: []*EndpointPortAddressType{},
+				epat2: []*EndpointPortAddressType{},
+			},
+			want: true,
+		},
+		{
+			name: "different ports",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: util.EndpointSet{},
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+							{Name: ptr.To(""), Port: ptr.To(int32(8080))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: util.EndpointSet{},
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "different address type",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: util.EndpointSet{},
+						Ports:       []discovery.EndpointPort{},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: util.EndpointSet{},
+						Ports:       []discovery.EndpointPort{},
+						AddressType: discovery.AddressTypeIPv6,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "same endpoints",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA, endpointB)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointB, endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			name: "different endpoints",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA, endpointB)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA, endpointC)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "different endpoints (duplicated endpoint)",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA, endpointB)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA, endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "duplicated EndpointPortAddressType",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointB)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(8080))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "different length",
+			args: args{
+				epat1: []*EndpointPortAddressType{
+					{
+						EndpointSet: func() endpointsliceutil.EndpointSet {
+							es := endpointsliceutil.EndpointSet{}
+							es.Insert(endpointA)
+							return es
+						}(),
+						Ports: []discovery.EndpointPort{
+							{Name: ptr.To(""), Port: ptr.To(int32(80))},
+						},
+						AddressType: discovery.AddressTypeIPv4,
+					},
+				},
+				epat2: []*EndpointPortAddressType{},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CompareEndpointPortAddressTypeSlices(tt.args.epat1, tt.args.epat2); got != tt.want {
+				t.Errorf("CompareEndpointPortAddressTypeSlices() = %v, want %v", got, tt.want)
+			}
+			if got := CompareEndpointPortAddressTypeSlices(tt.args.epat2, tt.args.epat1); got != tt.want {
+				t.Errorf("CompareEndpointPortAddressTypeSlices() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // Test helpers
 
 func newPod(n int, namespace string, ready bool, nPorts int, terminating bool) *v1.Pod {
@@ -334,96 +694,5 @@ func newEmptyEndpointSlice(n int, namespace string, ports []discovery.EndpointPo
 		Ports:       ports,
 		AddressType: addressType,
 		Endpoints:   []discovery.Endpoint{},
-	}
-}
-
-func Test_hintsEnabled(t *testing.T) {
-	testCases := []struct {
-		name          string
-		annotations   map[string]string
-		expectEnabled bool
-	}{{
-		name:          "empty annotations",
-		expectEnabled: false,
-	}, {
-		name:          "different annotations",
-		annotations:   map[string]string{"topology-hints": "enabled"},
-		expectEnabled: false,
-	}, {
-		name:          "hints annotation == enabled",
-		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "enabled"},
-		expectEnabled: false,
-	}, {
-		name:          "hints annotation == aUto",
-		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "aUto"},
-		expectEnabled: false,
-	}, {
-		name:          "hints annotation == auto",
-		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
-		expectEnabled: true,
-	}, {
-		name:          "hints annotation == Auto",
-		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "Auto"},
-		expectEnabled: true,
-	}, {
-		name:          "hints annotation == disabled",
-		annotations:   map[string]string{v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == enabled",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == aUto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == auto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
-		expectEnabled: true,
-	}, {
-		name:          "mode annotation == Auto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
-		expectEnabled: true,
-	}, {
-		name:          "mode annotation == disabled",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == enabled",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "enabled"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == aUto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "aUto"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == auto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto"},
-		expectEnabled: true,
-	}, {
-		name:          "mode annotation == Auto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "Auto"},
-		expectEnabled: true,
-	}, {
-		name:          "mode annotation == disabled",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled"},
-		expectEnabled: false,
-	}, {
-		name:          "mode annotation == disabled, hints annotation == auto",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "disabled", v1.DeprecatedAnnotationTopologyAwareHints: "auto"},
-		expectEnabled: true,
-	}, {
-		name:          "mode annotation == auto, hints annotation == disabled",
-		annotations:   map[string]string{v1.AnnotationTopologyMode: "auto", v1.DeprecatedAnnotationTopologyAwareHints: "disabled"},
-		expectEnabled: false,
-	}}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			actualEnabled := hintsEnabled(tc.annotations)
-			if actualEnabled != tc.expectEnabled {
-				t.Errorf("Expected %t, got %t", tc.expectEnabled, actualEnabled)
-			}
-		})
 	}
 }

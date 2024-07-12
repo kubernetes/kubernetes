@@ -28,7 +28,10 @@ var endpointSliceMetricsMap sync.Map
 // EndpointSliceMetrics holds the metrics instruments for a particular subsystem.
 type EndpointSliceMetrics struct {
 	EndpointsAddedPerSync              *metrics.HistogramVec
+	EndpointsUpdatedPerSync            *metrics.HistogramVec // todo
 	EndpointsRemovedPerSync            *metrics.HistogramVec
+	AddressesSkippedPerSync            *metrics.HistogramVec // todo
+	EndpointsSyncDuration              *metrics.HistogramVec // todo
 	EndpointsDesired                   *metrics.GaugeVec
 	NumEndpointSlices                  *metrics.GaugeVec
 	DesiredEndpointSlices              *metrics.GaugeVec
@@ -54,6 +57,17 @@ func NewEndpointSliceMetrics(subsystem string) *EndpointSliceMetrics {
 		[]string{},
 	)
 
+	esm.EndpointsUpdatedPerSync = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "endpoints_updated_per_sync",
+			Help:           "Number of endpoints updated on each Endpoints sync",
+			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBuckets(2, 2, 15),
+		},
+		[]string{},
+	)
+
 	esm.EndpointsRemovedPerSync = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      subsystem,
@@ -61,6 +75,28 @@ func NewEndpointSliceMetrics(subsystem string) *EndpointSliceMetrics {
 			Help:           "Number of endpoints removed on each Service sync",
 			StabilityLevel: metrics.ALPHA,
 			Buckets:        metrics.ExponentialBuckets(2, 2, 15),
+		},
+		[]string{},
+	)
+
+	esm.AddressesSkippedPerSync = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "addresses_skipped_per_sync",
+			Help:           "Number of addresses skipped on each Endpoints sync due to being invalid or exceeding MaxEndpointsPerSubset",
+			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBuckets(2, 2, 15),
+		},
+		[]string{},
+	)
+
+	esm.EndpointsSyncDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      subsystem,
+			Name:           "endpoints_sync_duration",
+			Help:           "Duration of syncEndpoints() in seconds",
+			StabilityLevel: metrics.ALPHA,
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 		},
 		[]string{},
 	)
@@ -150,7 +186,10 @@ func NewEndpointSliceMetrics(subsystem string) *EndpointSliceMetrics {
 // Reset resets all metrics.
 func (esm *EndpointSliceMetrics) Reset() {
 	esm.EndpointsAddedPerSync.Reset()
+	esm.EndpointsUpdatedPerSync.Reset()
 	esm.EndpointsRemovedPerSync.Reset()
+	esm.AddressesSkippedPerSync.Reset()
+	esm.EndpointsSyncDuration.Reset()
 	esm.EndpointsDesired.Reset()
 	esm.NumEndpointSlices.Reset()
 	esm.DesiredEndpointSlices.Reset()
@@ -163,7 +202,10 @@ func (esm *EndpointSliceMetrics) Reset() {
 // registerMetrics registers EndpointSlice metrics.
 func (esm *EndpointSliceMetrics) registerMetrics() {
 	legacyregistry.MustRegister(esm.EndpointsAddedPerSync)
+	legacyregistry.MustRegister(esm.EndpointsUpdatedPerSync)
 	legacyregistry.MustRegister(esm.EndpointsRemovedPerSync)
+	legacyregistry.MustRegister(esm.AddressesSkippedPerSync)
+	legacyregistry.MustRegister(esm.EndpointsSyncDuration)
 	legacyregistry.MustRegister(esm.EndpointsDesired)
 	legacyregistry.MustRegister(esm.NumEndpointSlices)
 	legacyregistry.MustRegister(esm.DesiredEndpointSlices)

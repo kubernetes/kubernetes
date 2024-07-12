@@ -1084,7 +1084,7 @@ func TestDesiredEndpointSlicesFromServicePods(t *testing.T) {
 				t.Errorf("TestDesiredEndpointSlicesFromServicePods() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.wantDesiredEndpointSlices) {
+			if !CompareEndpointPortAddressTypeSlices(got, tt.wantDesiredEndpointSlices) {
 				t.Errorf("TestDesiredEndpointSlicesFromServicePods() got (desiredEndpointSlices) = %v, want %v", got, tt.wantDesiredEndpointSlices)
 			}
 			if !reflect.DeepEqual(got1, tt.wantSupportedAddressTypes) {

@@ -200,3 +200,46 @@ func newAddrTypePortMapKey(portMapKey endpointsliceutil.PortMapKey, addrType dis
 	pmk := fmt.Sprintf("%s-%s", addrType, portMapKey)
 	return endpointsliceutil.PortMapKey(pmk)
 }
+
+// CompareEndpointPortAddressTypeSlices checks if both EndpointPortAddressType slices are identical.
+func CompareEndpointPortAddressTypeSlices(epat1 []*EndpointPortAddressType, epat2 []*EndpointPortAddressType) bool {
+	if len(epat1) != len(epat2) {
+		return false
+	}
+
+	epat1Map := map[endpointsliceutil.PortMapKey]endpointsliceutil.EndpointSet{}
+	for _, epat := range epat1 {
+		epHash := newAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(epat.Ports), epat.AddressType)
+		epat1Map[epHash] = epat.EndpointSet
+	}
+
+	epat2Map := map[endpointsliceutil.PortMapKey]endpointsliceutil.EndpointSet{}
+	for _, epat := range epat2 {
+		epHash := newAddrTypePortMapKey(endpointsliceutil.NewPortMapKey(epat.Ports), epat.AddressType)
+		epat2Map[epHash] = epat.EndpointSet
+	}
+
+	// Checks duplicates
+	if len(epat1Map) != len(epat2Map) {
+		return false
+	}
+
+	for epHash, ep := range epat2Map {
+		epatFrom1, exists := epat1Map[epHash]
+		if !exists {
+			return false
+		}
+
+		if epatFrom1.Len() != ep.Len() {
+			return false
+		}
+
+		for _, endpoint := range ep.UnsortedList() {
+			if !epatFrom1.Has(endpoint) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
