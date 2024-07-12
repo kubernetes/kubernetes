@@ -339,8 +339,8 @@ type JobSpec struct {
 	// When the field is specified, it must be immutable and works only for the Indexed Jobs.
 	// Once the Job meets the SuccessPolicy, the lingering pods are terminated.
 	//
-	// This field  is alpha-level. To use this field, you must enable the
-	// `JobSuccessPolicy` feature gate (disabled by default).
+	// This field is beta-level. To use this field, you must enable the
+	// `JobSuccessPolicy` feature gate (enabled by default).
 	// +optional
 	SuccessPolicy *SuccessPolicy
 
