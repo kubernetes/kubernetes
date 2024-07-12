@@ -40,6 +40,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/openapi3"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/csaupgrade"
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -118,8 +119,9 @@ type ApplyOptions struct {
 	// way to set this field is to use "SetObjects()".
 	// Subsequent calls to "GetObjects()" after setting would
 	// not call the resource builder; only return the set objects.
-	objects       []*resource.Info
-	objectsCached bool
+	objects        []*resource.Info
+	objectsCached  bool
+	warningHandler rest.WarningHandler
 
 	// Stores visited objects/namespaces for later use
 	// calculating the set of objects to prune.
@@ -255,6 +257,12 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 		return nil, err
 	}
 
+	config, err := f.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+	warningHandler := config.WarningHandler
+
 	fieldManager := GetApplyFieldManagerFlag(cmd, serverSideApply)
 
 	// allow for a success message operation to be specified at print time
@@ -370,8 +378,9 @@ func (flags *ApplyFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, baseNa
 
 		IOStreams: flags.IOStreams,
 
-		objects:       []*resource.Info{},
-		objectsCached: false,
+		objects:        []*resource.Info{},
+		objectsCached:  false,
+		warningHandler: warningHandler,
 
 		VisitedUids:       sets.New[types.UID](),
 		VisitedNamespaces: sets.New[string](),
@@ -565,7 +574,8 @@ func (o *ApplyOptions) applyOneObject(info *resource.Info) error {
 	helper := resource.NewHelper(info.Client, info.Mapping).
 		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 		WithFieldManager(o.FieldManager).
-		WithFieldValidation(o.ValidationDirective)
+		WithFieldValidation(o.ValidationDirective).
+		WithWarningHandler(o.warningHandler)
 
 	if o.ServerSideApply {
 		// Send the full object to be applied on the server side.

@@ -23,6 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -58,6 +59,9 @@ type Helper struct {
 	// FieldValidation is the directive used to indicate how the server should perform
 	// field validation (Ignore, Warn, or Strict)
 	FieldValidation string
+
+	// WarningHandler is used to change the default WarningHandlder before sending requests
+	WarningHandler rest.WarningHandler
 }
 
 // NewHelper creates a Helper from a ResourceMapping
@@ -96,12 +100,19 @@ func (m *Helper) WithSubresource(subresource string) *Helper {
 	return m
 }
 
+// WithWarningHandler sets the custom warning handler
+func (m *Helper) WithWarningHandler(warningHandler rest.WarningHandler) *Helper {
+	m.WarningHandler = warningHandler
+	return m
+}
+
 func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
-		SubResource(m.Subresource)
+		SubResource(m.Subresource).
+		WarningHandler(m.WarningHandler)
 	return req.Do(context.TODO()).Get()
 }
 
@@ -109,7 +120,8 @@ func (m *Helper) List(namespace, apiVersion string, options *metav1.ListOptions)
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
-		VersionedParams(options, metav1.ParameterCodec)
+		VersionedParams(options, metav1.ParameterCodec).
+		WarningHandler(m.WarningHandler)
 	return req.Do(context.TODO()).Get()
 }
 
@@ -167,6 +179,7 @@ func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(options, metav1.ParameterCodec).
+		WarningHandler(m.WarningHandler).
 		Watch(context.TODO())
 }
 
@@ -179,6 +192,7 @@ func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Int
 			Watch:           true,
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
 		}, metav1.ParameterCodec).
+		WarningHandler(m.WarningHandler).
 		Watch(context.TODO())
 }
 
@@ -199,6 +213,7 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		Resource(m.Resource).
 		Name(name).
 		Body(options).
+		WarningHandler(m.WarningHandler).
 		Do(context.TODO()).
 		Get()
 }
@@ -243,6 +258,7 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Resource(resource).
 		VersionedParams(options, metav1.ParameterCodec).
 		Body(obj).
+		WarningHandler(m.WarningHandler).
 		Do(context.TODO()).
 		Get()
 }
@@ -265,6 +281,7 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 		Name(name).
 		SubResource(m.Subresource).
 		VersionedParams(options, metav1.ParameterCodec).
+		WarningHandler(m.WarningHandler).
 		Body(data).
 		Do(context.TODO()).
 		Get()
@@ -315,6 +332,7 @@ func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string,
 		Name(name).
 		SubResource(m.Subresource).
 		VersionedParams(options, metav1.ParameterCodec).
+		WarningHandler(m.WarningHandler).
 		Body(obj).
 		Do(context.TODO()).
 		Get()
