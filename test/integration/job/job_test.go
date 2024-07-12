@@ -389,7 +389,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 				Value:  1,
 			},
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 		},
@@ -400,7 +400,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			wantFailed:           1,
 			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
@@ -415,7 +415,7 @@ func TestJobPodFailurePolicy(t *testing.T) {
 			wantFailed:           1,
 			wantJobConditionType: batchv1.JobComplete,
 			wantJobFinishedMetric: metricLabelsWithValue{
-				Labels: []string{"NonIndexed", "succeeded", ""},
+				Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 				Value:  1,
 			},
 			wantPodFailuresHandledByPolicyRuleMetric: &metricLabelsWithValue{
@@ -2474,7 +2474,7 @@ func TestNonParallelJob(t *testing.T) {
 	})
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2562,7 +2562,7 @@ func TestParallelJob(t *testing.T) {
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateTerminatedPodsTrackingFinalizerMetric(ctx, t, 7)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2704,7 +2704,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, want)
 	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"NonIndexed", "succeeded", ""},
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
@@ -2800,7 +2800,7 @@ func TestIndexedJob(t *testing.T) {
 		Value:  4,
 	})
 	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
-		Labels: []string{"Indexed", "succeeded", ""},
+		Labels: []string{"Indexed", "succeeded", "CompletionsReached"},
 		Value:  1,
 	})
 	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
