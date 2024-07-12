@@ -38,7 +38,7 @@ func NewTestQueueWithObjects(
 	objs []runtime.Object,
 	opts ...Option,
 ) *PriorityQueue {
-	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
 	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
 }
 

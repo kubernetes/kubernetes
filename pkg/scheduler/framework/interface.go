@@ -707,7 +707,7 @@ type Handle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
-	// ResourceClaimInfos returns an assume cache of ResourceClaim objects
+	// ResourceClaimCache returns an assume cache of ResourceClaim objects
 	// which gets populated by the shared informer factory and the dynamic resources
 	// plugin.
 	ResourceClaimCache() *assumecache.AssumeCache
