@@ -268,7 +268,7 @@ func getOOMTargetContainerWithoutLimit(name string) v1.Container {
 			"sh",
 			"-c",
 			// use the dd tool to attempt to allocate huge block of memory which exceeds the node allocatable
-			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
+			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=1024G",
 		},
 		SecurityContext: &v1.SecurityContext{
 			SeccompProfile: &v1.SeccompProfile{
