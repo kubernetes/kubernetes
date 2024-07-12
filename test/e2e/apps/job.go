@@ -844,6 +844,10 @@ done`}
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
+		ginkgo.By("Awaiting for the job to have the interim failure condition")
+		err = e2ejob.WaitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailureTarget, batchv1.JobReasonBackoffLimitExceeded)
+		framework.ExpectNoError(err, "failed to ensure job has the interim failure condition: %s", f.Namespace.Name)
+
 		ginkgo.By("Ensuring job exceed backofflimit")
 		err = e2ejob.WaitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobFailed, batchv1.JobReasonBackoffLimitExceeded)
 		framework.ExpectNoError(err, "failed to ensure job exceed backofflimit in namespace: %s", f.Namespace.Name)
@@ -855,6 +859,13 @@ done`}
 		for _, pod := range pods.Items {
 			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodFailed))
 		}
+
+		ginkgo.By("Verifying the Job status fields to ensure correct final state")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
+		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
+		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	f.It("should run a job to completion with CPU requests", f.WithSerial(), func(ctx context.Context) {
