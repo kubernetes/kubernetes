@@ -543,6 +543,13 @@ type KubeletConfiguration struct {
 	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
+
+	// PodHousekeepingPeriod is the interval to specify the frequency for
+	// performing global pod cleanup tasks. Specifying a high value for this
+	// will result in low frequency for lower performance overhead but may
+	// result in high latency to remove orphaned resources and remove
+	// unwanted pods.
+	PodHousekeepingPeriod metav1.Duration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
