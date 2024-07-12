@@ -276,7 +276,7 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
 		//
 		// A note about UpdateNodeTaint event:
@@ -340,6 +340,23 @@ func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.Persiste
 	}
 	logger.V(5).Info("PVC is not referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 	return false
+}
+
+// isSchedulableAfterStorageClassAdded is invoked whenever a StorageClass is added.
+// It checks whether the addition of StorageClass has made a previously unschedulable pod schedulable.
+// Only a new StorageClass with WaitForFirstConsumer will cause a pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, addedStorageClass, err := util.As[*storage.StorageClass](nil, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
+	}
+	if (addedStorageClass.VolumeBindingMode == nil) || (*addedStorageClass.VolumeBindingMode != storage.VolumeBindingWaitForFirstConsumer) {
+		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
+		return framework.QueueSkip, nil
+	}
+
+	logger.V(5).Info("StorageClass with waitForFirstConsumer mode was created and it might make this pod schedulable", "pod", klog.KObj(pod), "StorageClass", klog.KObj(addedStorageClass))
+	return framework.Queue, nil
 }
 
 // New initializes a new plugin and returns it.
