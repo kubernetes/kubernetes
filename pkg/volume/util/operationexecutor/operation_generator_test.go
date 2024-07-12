@@ -94,7 +94,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 
 func TestOperationGenerator_GenerateExpandAndRecoverVolumeFunc(t *testing.T) {
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
-	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
+	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 	var tests = []struct {
 		name                 string
 		pvc                  *v1.PersistentVolumeClaim
@@ -194,7 +194,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 		return &x
 	}
 
-	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
+	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
 		name string
@@ -217,7 +217,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 			pvc:  getTestPVC("test-vol0", "2G", "1G", "", &nodeResizeFailed),
 			pv:   getTestPV("test-vol0", "2G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeInfeasible,
 			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("1G"),
 		},
@@ -234,7 +234,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 			pvc:                  getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
 			pv:                   getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
 			expectError:          true,
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeInfeasible,
 			resizeCallCount:      1,
 			expectedStatusSize:   resource.MustParse("1G"),
 		},
@@ -265,7 +265,7 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 			desiredSize: getSizeFunc("2G"),
 			actualSize:  getSizeFunc("1G"),
 
-			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeFailed,
+			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeInfeasible,
 			resizeCallCount:      0,
 			expectedStatusSize:   resource.MustParse("2G"),
 		},

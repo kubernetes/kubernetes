@@ -29,7 +29,7 @@ import (
 )
 
 func TestNodeExpander(t *testing.T) {
-	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeFailed
+	nodeResizeFailed := v1.PersistentVolumeClaimNodeResizeInfeasible
 
 	nodeResizePending := v1.PersistentVolumeClaimNodeResizePending
 	var tests = []struct {
