@@ -1,9 +1,12 @@
 /*
 Copyright 2024 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,152 +28,156 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestNodeAllocatableChanged(t *testing.T) {
+func TestNodeAllocatableChange(t *testing.T) {
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
 	for _, test := range []struct {
-		Name           string
-		Changed        bool
-		OldAllocatable v1.ResourceList
-		NewAllocatable v1.ResourceList
+		name string
+		// changed is true if it's expected that the function detects the change and returns event.
+		changed        bool
+		oldAllocatable v1.ResourceList
+		newAllocatable v1.ResourceList
 	}{
 		{
-			Name:           "no allocatable resources changed",
-			Changed:        false,
-			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
-			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+			name:           "no allocatable resources changed",
+			changed:        false,
+			oldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+			newAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
 		},
 		{
-			Name:           "new node has more allocatable resources",
-			Changed:        true,
-			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
-			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
+			name:           "new node has more allocatable resources",
+			changed:        true,
+			oldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
+			newAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
 		},
 	} {
-		t.Run(test.Name, func(t *testing.T) {
-			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.OldAllocatable}}
-			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.NewAllocatable}}
-			changed := nodeAllocatableChanged(newNode, oldNode)
-			if changed != test.Changed {
-				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.Changed, changed)
+		t.Run(test.name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.oldAllocatable}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.newAllocatable}}
+			changed := extractNodeAllocatableChange(newNode, oldNode) != nil
+			if changed != test.changed {
+				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.changed, changed)
 			}
 		})
 	}
 }
 
-func TestNodeLabelsChanged(t *testing.T) {
+func TestNodeLabelsChange(t *testing.T) {
 	for _, test := range []struct {
-		Name      string
-		Changed   bool
-		OldLabels map[string]string
-		NewLabels map[string]string
+		name string
+		// changed is true if it's expected that the function detects the change and returns event.
+		changed   bool
+		oldLabels map[string]string
+		newLabels map[string]string
 	}{
 		{
-			Name:      "no labels changed",
-			Changed:   false,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar"},
+			name:      "no labels changed",
+			changed:   false,
+			oldLabels: map[string]string{"foo": "bar"},
+			newLabels: map[string]string{"foo": "bar"},
 		},
 		// Labels changed.
 		{
-			Name:      "new node has more labels",
-			Changed:   true,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar", "test": "value"},
+			name:      "new object has more labels",
+			changed:   true,
+			oldLabels: map[string]string{"foo": "bar"},
+			newLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		t.Run(test.Name, func(t *testing.T) {
-			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
-			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
-			changed := nodeLabelsChanged(newNode, oldNode)
-			if changed != test.Changed {
-				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+		t.Run(test.name, func(t *testing.T) {
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.oldLabels}}
+			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.newLabels}}
+			changed := extractNodeLabelsChange(newNode, oldNode) != nil
+			if changed != test.changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.name, test.changed, changed)
 			}
 		})
 	}
 }
 
-func TestNodeTaintsChanged(t *testing.T) {
+func TestNodeTaintsChange(t *testing.T) {
 	for _, test := range []struct {
-		Name      string
-		Changed   bool
-		OldTaints []v1.Taint
-		NewTaints []v1.Taint
+		name string
+		// changed is true if it's expected that the function detects the change and returns event.
+		changed   bool
+		oldTaints []v1.Taint
+		newTaints []v1.Taint
 	}{
 		{
-			Name:      "no taint changed",
-			Changed:   false,
-			OldTaints: []v1.Taint{{Key: "key", Value: "value"}},
-			NewTaints: []v1.Taint{{Key: "key", Value: "value"}},
+			name:      "no taint changed",
+			changed:   false,
+			oldTaints: []v1.Taint{{Key: "key", Value: "value"}},
+			newTaints: []v1.Taint{{Key: "key", Value: "value"}},
 		},
 		{
-			Name:      "taint value changed",
-			Changed:   true,
-			OldTaints: []v1.Taint{{Key: "key", Value: "value1"}},
-			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
+			name:      "taint value changed",
+			changed:   true,
+			oldTaints: []v1.Taint{{Key: "key", Value: "value1"}},
+			newTaints: []v1.Taint{{Key: "key", Value: "value2"}},
 		},
 	} {
-		t.Run(test.Name, func(t *testing.T) {
-			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.OldTaints}}
-			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.NewTaints}}
-			changed := nodeTaintsChanged(newNode, oldNode)
-			if changed != test.Changed {
-				t.Errorf("Test case %q failed: should be %t, not %t", test.Name, test.Changed, changed)
+		t.Run(test.name, func(t *testing.T) {
+			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.oldTaints}}
+			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.newTaints}}
+			changed := extractNodeTaintsChange(newNode, oldNode) != nil
+			if changed != test.changed {
+				t.Errorf("Test case %q failed: should be %t, not %t", test.name, test.changed, changed)
 			}
 		})
 	}
 }
 
-func TestNodeConditionsChanged(t *testing.T) {
+func TestNodeConditionsChange(t *testing.T) {
 	nodeConditionType := reflect.TypeOf(v1.NodeCondition{})
 	if nodeConditionType.NumField() != 6 {
-		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
+		t.Errorf("NodeCondition type has changed. The nodeConditionsChange() function must be reevaluated.")
 	}
 
 	for _, test := range []struct {
-		Name          string
-		Changed       bool
-		OldConditions []v1.NodeCondition
-		NewConditions []v1.NodeCondition
+		name string
+		// changed is true if it's expected that the function detects the change and returns event.
+		changed       bool
+		oldConditions []v1.NodeCondition
+		newConditions []v1.NodeCondition
 	}{
 		{
-			Name:          "no condition changed",
-			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
+			name:          "no condition changed",
+			changed:       false,
+			oldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
+			newConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
 		},
 		{
-			Name:          "only LastHeartbeatTime changed",
-			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
+			name:          "only LastHeartbeatTime changed",
+			changed:       false,
+			oldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
+			newConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
 		},
 		{
-			Name:          "new node has more healthy conditions",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+			name:          "new node has more healthy conditions",
+			changed:       true,
+			oldConditions: []v1.NodeCondition{},
+			newConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 		{
-			Name:          "new node has less unhealthy conditions",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{},
+			name:          "new node has less unhealthy conditions",
+			changed:       true,
+			oldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
+			newConditions: []v1.NodeCondition{},
 		},
 		{
-			Name:          "condition status changed",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+			name:          "condition status changed",
+			changed:       true,
+			oldConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+			newConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 	} {
-		t.Run(test.Name, func(t *testing.T) {
-			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.OldConditions}}
-			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.NewConditions}}
-			changed := nodeConditionsChanged(newNode, oldNode)
-			if changed != test.Changed {
-				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+		t.Run(test.name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.oldConditions}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.newConditions}}
+			changed := extractNodeConditionsChange(newNode, oldNode) != nil
+			if changed != test.changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.name, test.changed, changed)
 			}
 		})
 	}

@@ -37,18 +37,15 @@ const (
 )
 
 var (
-	// AssignedPodAdd is the event when a pod is added that causes pods with matching affinity terms
-	// to be more schedulable.
+	// AssignedPodAdd is the event when an assigned pod is added.
 	AssignedPodAdd = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add, Label: "AssignedPodAdd"}
 	// NodeAdd is the event when a new node is added to the cluster.
 	NodeAdd = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add, Label: "NodeAdd"}
-	// AssignedPodUpdate is the event when a pod is updated that causes pods with matching affinity
-	// terms to be more schedulable.
+	// AssignedPodUpdate is the event when an assigned pod is updated.
 	AssignedPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "AssignedPodUpdate"}
 	// UnscheduledPodUpdate is the event when an unscheduled pod is updated.
 	UnscheduledPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "UnschedulablePodUpdate"}
-	// AssignedPodDelete is the event when a pod is deleted that causes pods with matching affinity
-	// terms to be more schedulable.
+	// AssignedPodDelete is the event when an assigned pod is deleted.
 	AssignedPodDelete = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete, Label: "AssignedPodDelete"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
 	NodeSpecUnschedulableChange = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint, Label: "NodeSpecUnschedulableChange"}
@@ -92,44 +89,49 @@ var (
 	UnschedulableTimeout = framework.ClusterEvent{Resource: framework.WildCard, ActionType: framework.All, Label: "UnschedulableTimeout"}
 )
 
-func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) []framework.ClusterEvent {
-	var events []framework.ClusterEvent
-
-	if nodeSpecUnschedulableChanged(newNode, oldNode) {
-		events = append(events, NodeSpecUnschedulableChange)
-	}
-	if nodeAllocatableChanged(newNode, oldNode) {
-		events = append(events, NodeAllocatableChange)
-	}
-	if nodeLabelsChanged(newNode, oldNode) {
-		events = append(events, NodeLabelChange)
-	}
-	if nodeTaintsChanged(newNode, oldNode) {
-		events = append(events, NodeTaintChange)
-	}
-	if nodeConditionsChanged(newNode, oldNode) {
-		events = append(events, NodeConditionChange)
-	}
-	if nodeAnnotationsChanged(newNode, oldNode) {
-		events = append(events, NodeAnnotationChange)
+// NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
+func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events []framework.ClusterEvent) {
+	nodeChangeExtracters := []nodeChangeExtractor{
+		extractNodeSpecUnschedulableChange,
+		extractNodeAllocatableChange,
+		extractNodeLabelsChange,
+		extractNodeTaintsChange,
+		extractNodeConditionsChange,
+		extractNodeAnnotationsChange,
 	}
 
-	return events
+	for _, fn := range nodeChangeExtracters {
+		if event := fn(newNode, oldNode); event != nil {
+			events = append(events, *event)
+		}
+	}
+	return
 }
 
-func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable)
+type nodeChangeExtractor func(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent
+
+func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+	if !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
+		return &NodeAllocatableChange
+	}
+	return nil
 }
 
-func nodeLabelsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels())
+func extractNodeLabelsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+	if !equality.Semantic.DeepEqual(oldNode.GetLabels(), newNode.GetLabels()) {
+		return &NodeLabelChange
+	}
+	return nil
 }
 
-func nodeTaintsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints)
+func extractNodeTaintsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+	if !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints) {
+		return &NodeTaintChange
+	}
+	return nil
 }
 
-func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
+func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
 	strip := func(conditions []v1.NodeCondition) map[v1.NodeConditionType]v1.ConditionStatus {
 		conditionStatuses := make(map[v1.NodeConditionType]v1.ConditionStatus, len(conditions))
 		for i := range conditions {
@@ -137,13 +139,22 @@ func nodeConditionsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 		}
 		return conditionStatuses
 	}
-	return !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions))
+	if !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions)) {
+		return &NodeConditionChange
+	}
+	return nil
 }
 
-func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
+func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+	if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable {
+		return &NodeSpecUnschedulableChange
+	}
+	return nil
 }
 
-func nodeAnnotationsChanged(newNode *v1.Node, oldNode *v1.Node) bool {
-	return !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations())
+func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
+	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
+		return &NodeAnnotationChange
+	}
+	return nil
 }
