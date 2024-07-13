@@ -511,10 +511,10 @@ func TestSuccessPolicy(t *testing.T) {
 	testCases := map[string]struct {
 		enableJobSuccessPolicy     bool
 		enableBackoffLimitPerIndex bool
-		job                        batchv1.Job
-		podTerminations            []podTerminationWithExpectations
-		wantConditionTypes         []batchv1.JobConditionType
-		wantJobFinishedNumMetric   []metricLabelsWithValue
+		job                      batchv1.Job
+		podTerminations          []podTerminationWithExpectations
+		wantConditionTypes       []batchv1.JobConditionType
+		wantJobFinishedNumMetric []metricLabelsWithValue
 	}{
 		"all indexes succeeded; JobSuccessPolicy is enabled": {
 			enableJobSuccessPolicy: true,
@@ -1185,6 +1185,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	testCases := map[string]struct {
 		enableJobManagedBy            bool
 		enableJobPodReplacementPolicy bool
+		enableJobSuccessPolicy        bool
 
 		job                batchv1.Job
 		action             func(context.Context, clientset.Interface, *batchv1.Job)
@@ -1393,6 +1394,92 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				},
 			},
 		},
+		"job scale down to meet completions; JobManagedBy and JobSuccessPolicy are enabled": {
+			enableJobManagedBy:     true,
+			enableJobSuccessPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+		},
+		"job scale down to meet completions; JobPodReplacementPolicy and JobSuccessPolicy are enabled": {
+			enableJobPodReplacementPolicy: true,
+			enableJobSuccessPolicy:        true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](2),
+					Completions:    ptr.To[int32](2),
+					CompletionMode: ptr.To(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			action: succeedOnePodAndScaleDown,
+			wantInterimStatus: &batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](1),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+			wantTerminalStatus: batchv1.JobStatus{
+				Succeeded:        1,
+				Ready:            ptr.To[int32](0),
+				Terminating:      ptr.To[int32](0),
+				CompletedIndexes: "0",
+				Conditions: []batchv1.JobCondition{
+					{
+						Type:   batchv1.JobSuccessCriteriaMet,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+					{
+						Type:   batchv1.JobComplete,
+						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
+					},
+				},
+			},
+		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
@@ -1400,6 +1487,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, test.enableJobSuccessPolicy)
 
 			closeFn, restConfig, clientSet, ns := setup(t, "delay-terminal-condition")
 			t.Cleanup(closeFn)

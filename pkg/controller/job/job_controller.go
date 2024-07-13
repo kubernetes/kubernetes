@@ -988,7 +988,12 @@ func (jm *Controller) newSuccessCondition() *batch.JobCondition {
 	if delayTerminalCondition() {
 		cType = batch.JobSuccessCriteriaMet
 	}
-	return newCondition(cType, v1.ConditionTrue, "", "", jm.clock.Now())
+	var reason, message string
+	if feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
+		reason = batch.JobReasonCompletionsReached
+		message = "Reached expected number of succeeded pods"
+	}
+	return newCondition(cType, v1.ConditionTrue, reason, message, jm.clock.Now())
 }
 
 func delayTerminalCondition() bool {
