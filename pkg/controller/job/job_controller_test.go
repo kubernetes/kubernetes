@@ -5132,8 +5132,10 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
-						Type:   batch.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batch.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonCompletionsReached,
+						Message: "Reached to completions",
 					},
 					{
 						Type:   batch.JobComplete,
@@ -7092,8 +7094,10 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobSuccessCriteriaMet,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobSuccessCriteriaMet,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached to completions",
 				},
 				{
 					Type:   batch.JobComplete,
@@ -7115,8 +7119,10 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobSuccessCriteriaMet,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobSuccessCriteriaMet,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached to completions",
 				},
 				{
 					Type:   batch.JobComplete,

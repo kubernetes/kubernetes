@@ -651,6 +651,12 @@ const (
 	// https://kep.k8s.io/3998
 	// This is currently an alpha field.
 	JobReasonSuccessPolicy string = "SuccessPolicy"
+	// JobReasonCompletionsReached reason indicates a SuccessCriteriaMet condition is added due to
+	// a number of succeeded Job pods met completions.
+	// - https://kep.k8s.io/3998
+	// - https://kep.k8s.io/4368
+	// This is currently a beta field.
+	JobReasonCompletionsReached string = "CompletionsReached"
 )
 
 // JobCondition describes current state of a job.

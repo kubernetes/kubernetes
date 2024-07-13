@@ -985,10 +985,16 @@ func (jm *Controller) newFailureCondition(reason, message string) *batch.JobCond
 
 func (jm *Controller) newSuccessCondition() *batch.JobCondition {
 	cType := batch.JobComplete
+	var reason, message string
 	if delayTerminalCondition() {
 		cType = batch.JobSuccessCriteriaMet
+
+		// To avoid the breaking the existing Completion condition, the CompletionsReached reason and message are set
+		// only when the condition type is SuccessCriteriaMet.
+		reason = batch.JobReasonCompletionsReached
+		message = "Reached to completions"
 	}
-	return newCondition(cType, v1.ConditionTrue, "", "", jm.clock.Now())
+	return newCondition(cType, v1.ConditionTrue, reason, message, jm.clock.Now())
 }
 
 func delayTerminalCondition() bool {
@@ -1205,9 +1211,16 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			needsFlush = true
 		}
 
+		// To avoid the breaking the existing Completion condition, the SuccessCriteriaMet reason and message are propagated
+		// only when the SuccessCriteriaMet condition reason is not CompletionsReached.
+		var reason, message string
+		if jobCtx.finishedCondition.Reason != batch.JobReasonCompletionsReached {
+			reason = jobCtx.finishedCondition.Reason
+			message = jobCtx.finishedCondition.Message
+		}
 		// Prepare the final Complete condition to update the job status with after the finalizers are removed.
 		// It is also used in the enactJobFinished function for reporting.
-		jobCtx.finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, jobCtx.finishedCondition.Reason, jobCtx.finishedCondition.Message, jm.clock.Now())
+		jobCtx.finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, reason, message, jm.clock.Now())
 	}
 	var err error
 	if jobCtx.job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, jobCtx, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush); err != nil {

@@ -1335,6 +1335,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					{
 						Type:   batchv1.JobSuccessCriteriaMet,
 						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
 					},
 				},
 			},
@@ -1347,6 +1348,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					{
 						Type:   batchv1.JobSuccessCriteriaMet,
 						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
 					},
 					{
 						Type:   batchv1.JobComplete,
@@ -1374,6 +1376,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					{
 						Type:   batchv1.JobSuccessCriteriaMet,
 						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
 					},
 				},
 			},
@@ -1385,6 +1388,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					{
 						Type:   batchv1.JobSuccessCriteriaMet,
 						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
 					},
 					{
 						Type:   batchv1.JobComplete,

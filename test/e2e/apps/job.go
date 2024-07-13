@@ -703,7 +703,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Awaiting for the job to have the interim success condition")
-		err = e2ejob.WaitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, "")
+		err = e2ejob.WaitForJobCondition(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobSuccessCriteriaMet, batchv1.JobReasonCompletionsReached)
 		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
