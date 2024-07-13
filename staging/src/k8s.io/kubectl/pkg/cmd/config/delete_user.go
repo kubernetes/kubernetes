@@ -85,7 +85,8 @@ func (o *DeleteUserOptions) Complete(cmd *cobra.Command, args []string) error {
 	o.config = config
 
 	if len(args) != 1 {
-		return cmdutil.UsageErrorf(cmd, "user to delete is required")
+		cmd.Help()
+		return nil
 	}
 	o.user = args[0]
 
