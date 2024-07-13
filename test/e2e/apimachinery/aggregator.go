@@ -131,6 +131,12 @@ func generateSampleAPIServerObjectNames(namespace string) sampleAPIServerObjectN
 	}
 }
 
+// SetUpSampleAPIServer sets up a sample-apiserver.
+//
+// Important:
+// Test cases that call this function should be marked as serial due to potential conflicts
+// with other test cases that also set up a sample-apiserver. For more information, see
+// https://github.com/kubernetes/kubernetes/issues/119582#issuecomment-2215054411.
 func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string, n sampleAPIServerObjectNames, apiServiceGroupName, apiServiceVersion string) {
 	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
