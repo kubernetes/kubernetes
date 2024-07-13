@@ -104,7 +104,7 @@ with the apiserver API to configure the proxy.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
-			if err := initForOS(opts.WindowsService); err != nil {
+			if err := initForOS(opts.config.Windows.RunAsService); err != nil {
 				return fmt.Errorf("failed os init: %w", err)
 			}
 

@@ -54,9 +54,6 @@ type Options struct {
 	CleanupAndExit bool
 	// InitAndExit, when true, makes the proxy server makes configurations that need privileged access, then exit.
 	InitAndExit bool
-	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
-	// Its corresponding flag only gets registered in Windows builds
-	WindowsService bool
 	// config is the proxy server's configuration object.
 	config *kubeproxyconfig.KubeProxyConfiguration
 	// watcher is used to watch on the update change of ConfigFile

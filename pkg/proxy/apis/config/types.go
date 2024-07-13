@@ -22,6 +22,13 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
+// KubeProxyWindowsConfiguration contains Windows platform related configuration details for the
+// Kubernetes proxy server that aren't specific to a particular backend
+type KubeProxyWindowsConfiguration struct {
+	// runAsService, if true, enables Windows service control manager API integration.
+	RunAsService bool
+}
+
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPTablesConfiguration struct {
@@ -164,6 +171,9 @@ type DetectLocalConfiguration struct {
 // Kubernetes proxy server.
 type KubeProxyConfiguration struct {
 	metav1.TypeMeta
+
+	// windows contains Windows-related configuration options.
+	Windows KubeProxyWindowsConfiguration
 
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
 	FeatureGates map[string]bool
