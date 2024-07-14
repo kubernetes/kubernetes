@@ -23,6 +23,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -88,10 +89,10 @@ func TestCounter(t *testing.T) {
 			var buf bytes.Buffer
 			enc := expfmt.NewEncoder(&buf, "text/plain; version=0.0.4; charset=utf-8")
 			assert.Lenf(t, mfs, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(mfs), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 			for _, metric := range mfs {
 				err := enc.Encode(metric)
-				assert.Nil(t, err, "Unexpected err %v in encoding the metric", err)
+				require.NoError(t, err, "Unexpected err %v in encoding the metric", err)
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
@@ -101,7 +102,7 @@ func TestCounter(t *testing.T) {
 				c.Inc()
 			}
 			mfs, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				mfMetric := mf.GetMetric()
@@ -187,7 +188,7 @@ func TestCounterVec(t *testing.T) {
 			c.WithLabelValues("1", "2").Inc()
 			mfs, err := registry.Gather()
 			assert.Lenf(t, mfs, test.expectedMetricFamilyCount, "Got %v metric families, Want: %v metric families", len(mfs), test.expectedMetricFamilyCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -199,7 +200,7 @@ func TestCounterVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Inc()
 			c.WithLabelValues("2", "3").Inc()
 			mfs, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			// this no-opts here when there are no metric families (i.e. when the metric is hidden)
 			for _, mf := range mfs {
@@ -257,7 +258,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Inc()
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -88,7 +89,7 @@ func TestSummary(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -101,7 +102,7 @@ func TestSummary(t *testing.T) {
 			c.Observe(1.5)
 			expected := 4
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				for _, m := range mf.GetMetric() {
@@ -177,7 +178,7 @@ func TestSummaryVec(t *testing.T) {
 			c.WithLabelValues("1", "2").Observe(1.0)
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -187,7 +188,7 @@ func TestSummaryVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Observe(1.0)
 			c.WithLabelValues("2", "3").Observe(1.0)
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				assert.Lenf(t, mf.GetMetric(), 3, "Got %v metrics, wanted 2 as the count", len(mf.GetMetric()))
@@ -247,7 +248,7 @@ func TestSummaryWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Observe(1.0)
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
