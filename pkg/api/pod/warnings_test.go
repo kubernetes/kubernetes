@@ -18,6 +18,7 @@ package pod
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -255,7 +256,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"Test\" (ConfigMap \"foo\"): overlapping path \"test\" with \"test\"",
+				`volume "Test" (ConfigMap "foo"): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -277,7 +278,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"Test\" (ConfigMap \"foo\"): overlapping path \"test/app\" with \"test\"",
+				`volume "Test" (ConfigMap "foo"): overlapping paths: "test/app" with "test"`,
 			},
 		},
 		{
@@ -299,7 +300,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"Test\" (ConfigMap \"foo\"): overlapping path \"test\" with \"test/app\"",
+				`volume "Test" (ConfigMap "foo"): overlapping paths: "test" with "test/app"`,
 			},
 		},
 		{
@@ -321,7 +322,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"Test\" (Secret \"foo\"): overlapping path \"test\" with \"test\"",
+				`volume "Test" (Secret "foo"): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -342,7 +343,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"Test\" (DownwardAPI): overlapping path \"test\" with \"test\"",
+				`volume "Test" (DownwardAPI): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -354,15 +355,19 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ConfigMap: &api.ConfigMapProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "Test"},
-										Items: []api.KeyToPath{
-											{Key: "foo", Path: "test"},
+									{
+										ConfigMap: &api.ConfigMapProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "Test"},
+											Items: []api.KeyToPath{
+												{Key: "foo", Path: "test"},
+											},
 										},
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -370,11 +375,11 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
-			name: "overlapping paths in projected volume volume - service account dir and config file",
+			name: "overlapping paths in projected volume volume: service account dir and config file",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
@@ -382,15 +387,19 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ConfigMap: &api.ConfigMapProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "Test"},
-										Items: []api.KeyToPath{
-											{Key: "foo", Path: "test"},
+									{
+										ConfigMap: &api.ConfigMapProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "Test"},
+											Items: []api.KeyToPath{
+												{Key: "foo", Path: "test"},
+											},
 										},
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test/file",
-									}},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test/file",
+										},
+									},
 								},
 							},
 						},
@@ -398,7 +407,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test/file\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test/file" with "test"`,
 			},
 		},
 		{
@@ -410,15 +419,19 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ConfigMap: &api.ConfigMapProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "Test"},
-										Items: []api.KeyToPath{
-											{Key: "foo", Path: "test/file"},
+									{
+										ConfigMap: &api.ConfigMapProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "Test"},
+											Items: []api.KeyToPath{
+												{Key: "foo", Path: "test/file"},
+											},
 										},
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -426,7 +439,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test/file\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test/file" with "test"`,
 			},
 		},
 		{
@@ -438,16 +451,19 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{Secret: &api.SecretProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "Test"},
-										Items: []api.KeyToPath{
-											{Key: "foo", Path: "test"},
+									{
+										Secret: &api.SecretProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "Test"},
+											Items: []api.KeyToPath{
+												{Key: "foo", Path: "test"},
+											},
 										},
 									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
 									},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
 								},
 							},
 						},
@@ -455,7 +471,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -467,14 +483,18 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{DownwardAPI: &api.DownwardAPIProjection{
-										Items: []api.DownwardAPIVolumeFile{
-											{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
+									{
+										DownwardAPI: &api.DownwardAPIProjection{
+											Items: []api.DownwardAPIVolumeFile{
+												{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
+											},
 										},
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -482,7 +502,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -494,12 +514,16 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-										Name: &testName, Path: "test",
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									{
+										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+											Name: &testName, Path: "test",
+										},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -507,7 +531,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -519,12 +543,16 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-										SignerName: &testName, Path: "test",
-									}},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									{
+										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+											SignerName: &testName, Path: "test",
+										},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -532,7 +560,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
 			},
 		},
 		{
@@ -544,15 +572,17 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{Secret: &api.SecretProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "TestSecret"},
-										Items: []api.KeyToPath{
-											{
-												Key:  "mykey",
-												Path: "test",
+									{
+										Secret: &api.SecretProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "TestSecret"},
+											Items: []api.KeyToPath{
+												{
+													Key:  "mykey",
+													Path: "test",
+												},
 											},
 										},
-									}},
+									},
 									{
 										ConfigMap: &api.ConfigMapProjection{
 											LocalObjectReference: api.LocalObjectReference{Name: "TestConfigMap"},
@@ -571,7 +601,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ConfigMap \"TestConfigMap\"): overlapping path \"test/test1\" with \"test\"",
+				`volume "foo" (Projected ConfigMap "TestConfigMap"): overlapping paths: "test/test1" with "test"`,
 			},
 		},
 		{
@@ -583,15 +613,17 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{Secret: &api.SecretProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "TestSecret"},
-										Items: []api.KeyToPath{
-											{
-												Key:  "mykey",
-												Path: "test",
+									{
+										Secret: &api.SecretProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "TestSecret"},
+											Items: []api.KeyToPath{
+												{
+													Key:  "mykey",
+													Path: "test",
+												},
 											},
 										},
-									}},
+									},
 									{
 										DownwardAPI: &api.DownwardAPIProjection{
 											Items: []api.DownwardAPIVolumeFile{
@@ -606,11 +638,11 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected DownwardAPI): overlapping path \"test/test2\" with \"test\"",
+				`volume "foo" (Projected DownwardAPI): overlapping paths: "test/test2" with "test"`,
 			},
 		},
 		{
-			name: "overlapping paths in projected volume - downward api and downward api",
+			name: "overlapping paths in projected volume - downward api and cluster thrust bundle api",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				Volumes: []api.Volume{
 					{
@@ -637,7 +669,7 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected ClusterTrustBundle \"Test\"): overlapping path \"test\" with \"test/test2\"",
+				`volume "foo" (Projected ClusterTrustBundle "Test"): overlapping paths: "test/test2" with "test"`,
 			},
 		},
 		{
@@ -649,24 +681,31 @@ func TestWarnings(t *testing.T) {
 						VolumeSource: api.VolumeSource{
 							Projected: &api.ProjectedVolumeSource{
 								Sources: []api.VolumeProjection{
-									{ClusterTrustBundle: &api.ClusterTrustBundleProjection{
-										SignerName: &testName, Path: "test/test",
-									}},
-									{DownwardAPI: &api.DownwardAPIProjection{
-										Items: []api.DownwardAPIVolumeFile{
-											{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
-										},
-									}},
-									{Secret: &api.SecretProjection{
-										LocalObjectReference: api.LocalObjectReference{Name: "Test"},
-										Items: []api.KeyToPath{
-											{Key: "foo", Path: "test"},
+									{
+										ClusterTrustBundle: &api.ClusterTrustBundleProjection{
+											SignerName: &testName, Path: "test/test",
 										},
 									},
+									{
+										DownwardAPI: &api.DownwardAPIProjection{
+											Items: []api.DownwardAPIVolumeFile{
+												{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
+											},
+										},
 									},
-									{ServiceAccountToken: &api.ServiceAccountTokenProjection{
-										Path: "test",
-									}},
+									{
+										Secret: &api.SecretProjection{
+											LocalObjectReference: api.LocalObjectReference{Name: "Test"},
+											Items: []api.KeyToPath{
+												{Key: "foo", Path: "test"},
+											},
+										},
+									},
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test",
+										},
+									},
 								},
 							},
 						},
@@ -674,11 +713,64 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				"volume \"foo\" (Projected DownwardAPI): overlapping path \"test\" with \"test/test\"",
-				"volume \"foo\" (Projected Secret \"Test\"): overlapping path \"test\" with \"test\"",
-				"volume \"foo\" (Projected Secret \"Test\"): overlapping path \"test\" with \"test/test\"",
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test/test\"",
-				"volume \"foo\" (Projected ServiceAccountToken): overlapping path \"test\" with \"test\"",
+				`volume "foo" (Projected DownwardAPI): overlapping paths: "test/test" with "test"`,
+				`volume "foo" (Projected Secret "Test"): overlapping paths: "test" with "test"`,
+				`volume "foo" (Projected Secret "Test"): overlapping paths: "test/test" with "test"`,
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test/test" with "test"`,
+				`volume "foo" (Projected ServiceAccountToken): overlapping paths: "test" with "test"`,
+			},
+		},
+		{
+			name: "overlapping paths in projected volume - multiple sources",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{
+										ServiceAccountToken: &api.ServiceAccountTokenProjection{
+											Path: "test/test2",
+										},
+									},
+									{
+										DownwardAPI: &api.DownwardAPIProjection{
+											Items: []api.DownwardAPIVolumeFile{
+												{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
+												{FieldRef: &api.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.name"}, Path: "test"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				`volume "foo" (Projected DownwardAPI): overlapping paths: "test" with "test"`,
+				`volume "foo" (Projected DownwardAPI): overlapping paths: "test/test2" with "test"`,
+			},
+		},
+		{
+			name: "empty sources in projected volume",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: "foo",
+						VolumeSource: api.VolumeSource{
+							Projected: &api.ProjectedVolumeSource{
+								Sources: []api.VolumeProjection{
+									{},
+								},
+							},
+						},
+					},
+				},
+			}},
+			expected: []string{
+				`volume "foo" (Projected) has no sources provided`,
 			},
 		},
 		{
@@ -1513,12 +1605,16 @@ func TestWarnings(t *testing.T) {
 			if tc.oldTemplate != nil {
 				oldTemplate = tc.oldTemplate
 			}
-			actual := sets.New[string](GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)...)
-			expected := sets.New[string](tc.expected...)
-			for _, missing := range sets.List[string](expected.Difference(actual)) {
+			actual := GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)
+			if len(actual) != len(tc.expected) {
+				t.Errorf("expected %d errors, got %d:\n%v", len(tc.expected), len(actual), strings.Join(actual, "\n"))
+			}
+			actualSet := sets.New(actual...)
+			expectedSet := sets.New(tc.expected...)
+			for _, missing := range sets.List(expectedSet.Difference(actualSet)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range sets.List[string](actual.Difference(expected)) {
+			for _, extra := range sets.List(actualSet.Difference(expectedSet)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -1531,12 +1627,16 @@ func TestWarnings(t *testing.T) {
 					Spec:       tc.template.Spec,
 				}
 			}
-			actual := sets.New[string](GetWarningsForPod(context.TODO(), pod, &api.Pod{})...)
-			expected := sets.New[string](tc.expected...)
-			for _, missing := range sets.List[string](expected.Difference(actual)) {
+			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
+			if len(actual) != len(tc.expected) {
+				t.Errorf("expected %d errors, got %d:\n%v", len(tc.expected), len(actual), strings.Join(actual, "\n"))
+			}
+			actualSet := sets.New(actual...)
+			expectedSet := sets.New(tc.expected...)
+			for _, missing := range sets.List(expectedSet.Difference(actualSet)) {
 				t.Errorf("missing: %s", missing)
 			}
-			for _, extra := range sets.List[string](actual.Difference(expected)) {
+			for _, extra := range sets.List(actualSet.Difference(expectedSet)) {
 				t.Errorf("extra: %s", extra)
 			}
 		})
@@ -1641,6 +1741,31 @@ func TestCheckForOverLap(t *testing.T) {
 			path:       "path/path1",
 			expected:   "path/path1",
 		},
+		"no match": {
+			checkPaths: []string{"path/path1"},
+			path:       "path2/path1",
+			expected:   "",
+		},
+		"empty checkPaths": {
+			checkPaths: []string{},
+			path:       "path2/path1",
+			expected:   "",
+		},
+		"empty string in checkPaths": {
+			checkPaths: []string{""},
+			path:       "path2/path1",
+			expected:   "",
+		},
+		"empty path": {
+			checkPaths: []string{"test"},
+			path:       "",
+			expected:   "",
+		},
+		"empty strings in checkPaths and path": {
+			checkPaths: []string{""},
+			path:       "",
+			expected:   "",
+		},
 		"between file and dir": {
 			checkPaths: []string{"path/path1"},
 			path:       "path",
@@ -1651,13 +1776,43 @@ func TestCheckForOverLap(t *testing.T) {
 			path:       "path/path1",
 			expected:   "path",
 		},
+		"multiple paths without overlap": {
+			checkPaths: []string{"path1/path", "path2/path", "path3/path"},
+			path:       "path4/path",
+			expected:   "",
+		},
+		"multiple paths with overlap": {
+			checkPaths: []string{"path1/path", "path2/path", "path3/path"},
+			path:       "path3/path3",
+			expected:   "path3/path",
+		},
+		"partial overlap": {
+			checkPaths: []string{"path1/path", "path2/path", "path3/path"},
+			path:       "path101/path3",
+			expected:   "",
+		},
+		"partial overlap in path": {
+			checkPaths: []string{"path101/path", "path2/path", "path3/path"},
+			path:       "path1/path3",
+			expected:   "",
+		},
+		"trailing slash in path": {
+			checkPaths: []string{"path1/path3"},
+			path:       "path1/path3/",
+			expected:   "path1/path3",
+		},
+		"trailing slash in checkPaths": {
+			checkPaths: []string{"path1/path3/"},
+			path:       "path1/path3",
+			expected:   "path1/path3/",
+		},
 	}
 
 	for name, tc := range testCase {
 		t.Run(name, func(t *testing.T) {
 			result := checkForOverlap(sets.New(tc.checkPaths...), tc.path)
-			if *result != tc.expected {
-				t.Errorf("expected %v, got %v", tc.expected, *result)
+			if result != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, result)
 			}
 		})
 	}

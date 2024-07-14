@@ -172,9 +172,8 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
-	overlappingPathInContainers := warningsForOverlappingVirtualPaths(podSpec.Volumes)
-	if len(overlappingPathInContainers) > 0 {
-		warnings = append(warnings, overlappingPathInContainers...)
+	if overlaps := warningsForOverlappingVirtualPaths(podSpec.Volumes); len(overlaps) > 0 {
+		warnings = append(warnings, overlaps...)
 	}
 
 	// duplicate hostAliases (#91670, #58477)
@@ -379,54 +378,50 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 //
 // In such cases we either get `is directory` or 'file exists' error message.
 func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
-	warnings := make([]string, 0)
+	var warnings []string
 
 	for _, v := range volumes {
 		if v.ConfigMap != nil && v.ConfigMap.Items != nil {
-			w := checkVolumeMappingForOverlap(extractPaths(v.ConfigMap.Items), fmt.Sprintf("volume %q (ConfigMap %q): overlapping path", v.Name, v.ConfigMap.Name))
-			if len(w) > 0 {
-				warnings = append(warnings, w...)
-			}
+			warnings = append(warnings, checkVolumeMappingForOverlap(extractPaths(v.ConfigMap.Items), fmt.Sprintf("volume %q (ConfigMap %q): overlapping paths", v.Name, v.ConfigMap.Name))...)
 		}
 
 		if v.Secret != nil && v.Secret.Items != nil {
-			w := checkVolumeMappingForOverlap(extractPaths(v.Secret.Items), fmt.Sprintf("volume %q (Secret %q): overlapping path", v.Name, v.Secret.SecretName))
-			if len(w) > 0 {
-				warnings = append(warnings, w...)
-			}
+			warnings = append(warnings, checkVolumeMappingForOverlap(extractPaths(v.Secret.Items), fmt.Sprintf("volume %q (Secret %q): overlapping paths", v.Name, v.Secret.SecretName))...)
 		}
 
 		if v.DownwardAPI != nil && v.DownwardAPI.Items != nil {
-			w := checkVolumeMappingForOverlap(extractPathsDownwardAPI(v.DownwardAPI.Items), fmt.Sprintf("volume %q (DownwardAPI): overlapping path", v.Name))
-			if len(w) > 0 {
-				warnings = append(warnings, w...)
-			}
+			warnings = append(warnings, checkVolumeMappingForOverlap(extractPathsDownwardAPI(v.DownwardAPI.Items), fmt.Sprintf("volume %q (DownwardAPI): overlapping paths", v.Name))...)
 		}
 
 		if v.Projected != nil {
-			var sourcePaths, allPaths []string
+			var sourcePaths []string
 			var errorMessage string
+			allPaths := sets.New[string]()
 
 			for _, source := range v.Projected.Sources {
+				if source == (api.VolumeProjection{}) {
+					warnings = append(warnings, fmt.Sprintf("volume %q (Projected) has no sources provided", v.Name))
+					continue
+				}
 				switch {
 				case source.ConfigMap != nil && source.ConfigMap.Items != nil:
 					sourcePaths = extractPaths(source.ConfigMap.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected ConfigMap %q): overlapping path", v.Name, source.ConfigMap.Name)
+					errorMessage = fmt.Sprintf("volume %q (Projected ConfigMap %q): overlapping paths", v.Name, source.ConfigMap.Name)
 				case source.Secret != nil && source.Secret.Items != nil:
 					sourcePaths = extractPaths(source.Secret.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected Secret %q): overlapping path", v.Name, source.Secret.Name)
+					errorMessage = fmt.Sprintf("volume %q (Projected Secret %q): overlapping paths", v.Name, source.Secret.Name)
 				case source.DownwardAPI != nil && source.DownwardAPI.Items != nil:
 					sourcePaths = extractPathsDownwardAPI(source.DownwardAPI.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected DownwardAPI): overlapping path", v.Name)
+					errorMessage = fmt.Sprintf("volume %q (Projected DownwardAPI): overlapping paths", v.Name)
 				case source.ServiceAccountToken != nil:
 					sourcePaths = []string{source.ServiceAccountToken.Path}
-					errorMessage = fmt.Sprintf("volume %q (Projected ServiceAccountToken): overlapping path", v.Name)
+					errorMessage = fmt.Sprintf("volume %q (Projected ServiceAccountToken): overlapping paths", v.Name)
 				case source.ClusterTrustBundle != nil:
 					sourcePaths = []string{source.ClusterTrustBundle.Path}
 					if source.ClusterTrustBundle.Name != nil {
-						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping path", v.Name, *source.ClusterTrustBundle.Name)
+						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping paths", v.Name, *source.ClusterTrustBundle.Name)
 					} else {
-						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping path", v.Name, *source.ClusterTrustBundle.SignerName)
+						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping paths", v.Name, *source.ClusterTrustBundle.SignerName)
 					}
 				}
 
@@ -434,16 +429,14 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 					continue
 				}
 
-				warningsInSource := checkVolumeMappingForOverlap(sourcePaths, errorMessage)
-				if len(warningsInSource) > 0 {
-					warnings = append(warnings, warningsInSource...)
-				}
+				warnings = append(warnings, checkVolumeMappingForOverlap(sourcePaths, errorMessage)...)
 
-				allPaths = append(allPaths, sourcePaths...)
-				warningsInAllPaths := checkVolumeMappingForOverlap(allPaths, errorMessage)
-				if len(warningsInAllPaths) > 0 {
-					warnings = append(warnings, warningsInAllPaths...)
-				}
+				// remove duplicates path and sort the new array, so we can get predetermined result
+				uniqueSourcePaths := sets.New[string](sourcePaths...).UnsortedList()
+				orderedSourcePaths := append(uniqueSourcePaths, allPaths.UnsortedList()...)
+				sort.Strings(orderedSourcePaths)
+				warnings = append(warnings, checkVolumeMappingForOverlap(orderedSourcePaths, errorMessage)...)
+				allPaths.Insert(uniqueSourcePaths...)
 			}
 		}
 
@@ -470,14 +463,14 @@ func extractPathsDownwardAPI(mapping []api.DownwardAPIVolumeFile) []string {
 }
 
 func checkVolumeMappingForOverlap(paths []string, warningMessage string) []string {
+	var warnings []string
 	pathSeparator := string(os.PathSeparator)
-	warnings := make([]string, 0)
 	uniquePaths := sets.New[string]()
 
 	for _, path := range paths {
 		normalizedPath := strings.TrimRight(path, pathSeparator)
-		if collision := checkForOverlap(uniquePaths, normalizedPath); collision != nil {
-			warnings = append(warnings, fmt.Sprintf("%s %q with %q", warningMessage, normalizedPath, *collision))
+		if collision := checkForOverlap(uniquePaths, normalizedPath); collision != "" {
+			warnings = append(warnings, fmt.Sprintf("%s: %q with %q", warningMessage, normalizedPath, collision))
 		}
 		uniquePaths.Insert(normalizedPath)
 	}
@@ -485,21 +478,21 @@ func checkVolumeMappingForOverlap(paths []string, warningMessage string) []strin
 	return warnings
 }
 
-func checkForOverlap(paths sets.Set[string], path string) *string {
+func checkForOverlap(paths sets.Set[string], path string) string {
 	pathSeparator := string(os.PathSeparator)
-	p := paths.UnsortedList()
-	sort.Strings(p)
 
-	for _, item := range p {
+	for item := range paths {
 		switch {
+		case item == "" || path == "":
+			return ""
 		case item == path:
-			return &item
+			return item
 		case strings.HasPrefix(item+pathSeparator, path):
-			return &item
+			return item
 		case strings.HasPrefix(path+pathSeparator, item):
-			return &item
+			return item
 		}
 	}
 
-	return nil
+	return ""
 }
