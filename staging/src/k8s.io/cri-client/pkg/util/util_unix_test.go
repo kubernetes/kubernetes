@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseEndpoint(t *testing.T) {
@@ -62,10 +63,10 @@ func TestParseEndpoint(t *testing.T) {
 		protocol, addr, err := parseEndpoint(test.endpoint)
 		assert.Equal(t, test.expectedProtocol, protocol)
 		if test.expectError {
-			assert.NotNil(t, err, "Expect error during parsing %q", test.endpoint)
+			require.Error(t, err, "Expect error during parsing %q", test.endpoint)
 			continue
 		}
-		assert.Nil(t, err, "Expect no error during parsing %q", test.endpoint)
+		require.NoError(t, err, "Expect no error during parsing %q", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
 
@@ -109,10 +110,10 @@ func TestGetAddressAndDialer(t *testing.T) {
 		// just test addr and err
 		addr, _, err := GetAddressAndDialer(test.endpoint)
 		if test.expectError {
-			assert.NotNil(t, err, "expected error during parsing %s", test.endpoint)
+			require.Error(t, err, "expected error during parsing %s", test.endpoint)
 			continue
 		}
-		assert.Nil(t, err, "expected no error during parsing %s", test.endpoint)
+		require.NoError(t, err, "expected no error during parsing %s", test.endpoint)
 		assert.Equal(t, test.expectedAddr, addr)
 	}
 }
