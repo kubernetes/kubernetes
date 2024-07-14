@@ -1525,6 +1525,6 @@ func TestTrimURLPath(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
+		assert.Equalf(t, test.expected, getURLRootPath(test.path), "path is: %s", test.path)
 	}
 }

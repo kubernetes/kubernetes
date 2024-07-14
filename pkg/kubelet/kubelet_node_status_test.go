@@ -2704,8 +2704,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 	}
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		assert.Error(t, err, fmt.Sprintf(
-			"Unable to obtain a list of the node's unicast interface addresses."))
+		assert.Errorf(t, err, "Unable to obtain a list of the node's unicast interface addresses.")
 	}
 	for _, addr := range addrs {
 		var ip net.IP
@@ -2728,9 +2727,9 @@ func TestValidateNodeIPParam(t *testing.T) {
 	for _, test := range tests {
 		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
 		if test.success {
-			assert.NoError(t, err, "test %s", test.testName)
+			assert.NoErrorf(t, err, "test %s", test.testName)
 		} else {
-			assert.Error(t, err, fmt.Sprintf("test %s", test.testName))
+			assert.Errorf(t, err, "test %s", test.testName)
 		}
 	}
 }

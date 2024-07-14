@@ -786,7 +786,7 @@ func TestFallbackResourcesUsage(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.NotEqual(t, 0, test.usageFunc(), fmt.Sprintf("%s: unexpected fallback value", test.usageFuncName))
+			assert.NotEqualf(t, 0, test.usageFunc(), "%s: unexpected fallback value", test.usageFuncName)
 		})
 	}
 }
