@@ -38,7 +38,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/client-go/tools/clientcmd/api/v1"
+	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
 // newWebhookHandler returns a handler which receives webhook events and decodes the
@@ -133,7 +133,7 @@ func TestWebhook(t *testing.T) {
 
 		// Ensure this doesn't return a serialization error.
 		event := &auditinternal.Event{}
-		require.NoError(t, backend.processEvents(event), fmt.Sprintf("failed to send events, apiVersion: %s", version))
-		require.True(t, gotEvents, fmt.Sprintf("no events received, apiVersion: %s", version))
+		require.NoErrorf(t, backend.processEvents(event), "failed to send events, apiVersion: %s", version)
+		require.Truef(t, gotEvents, "no events received, apiVersion: %s", version)
 	}
 }
