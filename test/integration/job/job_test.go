@@ -511,10 +511,10 @@ func TestSuccessPolicy(t *testing.T) {
 	testCases := map[string]struct {
 		enableJobSuccessPolicy     bool
 		enableBackoffLimitPerIndex bool
-		job                      batchv1.Job
-		podTerminations          []podTerminationWithExpectations
-		wantConditionTypes       []batchv1.JobConditionType
-		wantJobFinishedNumMetric []metricLabelsWithValue
+		job                        batchv1.Job
+		podTerminations            []podTerminationWithExpectations
+		wantConditionTypes         []batchv1.JobConditionType
+		wantJobFinishedNumMetric   []metricLabelsWithValue
 	}{
 		"all indexes succeeded; JobSuccessPolicy is enabled": {
 			enableJobSuccessPolicy: true,
@@ -547,7 +547,7 @@ func TestSuccessPolicy(t *testing.T) {
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
@@ -583,6 +583,37 @@ func TestSuccessPolicy(t *testing.T) {
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
 					Labels: []string{"Indexed", "succeeded", ""},
+					Value:  1,
+				},
+			},
+		},
+		"job without successPolicy; incremented the jobs_finished_total metric with CompletionsReached reason": {
+			enableJobSuccessPolicy: true,
+			job: batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Parallelism:    ptr.To[int32](1),
+					Completions:    ptr.To[int32](1),
+					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
+					Template:       podTemplateSpec,
+				},
+			},
+			podTerminations: []podTerminationWithExpectations{
+				{
+					index: 0,
+					status: v1.PodStatus{
+						Phase: v1.PodSucceeded,
+					},
+					wantActive:           0,
+					wantFailed:           0,
+					wantSucceeded:        1,
+					wantCompletedIndexes: "0",
+					wantTerminating:      ptr.To[int32](0),
+				},
+			},
+			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
+			wantJobFinishedNumMetric: []metricLabelsWithValue{
+				{
+					Labels: []string{"Indexed", "succeeded", "CompletionsReached"},
 					Value:  1,
 				},
 			},
@@ -629,7 +660,7 @@ func TestSuccessPolicy(t *testing.T) {
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
@@ -676,7 +707,7 @@ func TestSuccessPolicy(t *testing.T) {
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
 			wantJobFinishedNumMetric: []metricLabelsWithValue{
 				{
-					Labels: []string{"Indexed", "succeeded", ""},
+					Labels: []string{"Indexed", "succeeded", "SuccessPolicy"},
 					Value:  1,
 				},
 			},
