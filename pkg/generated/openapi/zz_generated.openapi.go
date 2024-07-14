@@ -62436,6 +62436,12 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"evictionMonitoringPeriod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EvictionMonitoringPeriod is the period for performing eviction monitoring. Default: 10s",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},

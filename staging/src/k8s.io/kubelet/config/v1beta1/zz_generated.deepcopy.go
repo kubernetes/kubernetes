@@ -485,6 +485,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.EvictionMonitoringPeriod != nil {
+		in, out := &in.EvictionMonitoringPeriod, &out.EvictionMonitoringPeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

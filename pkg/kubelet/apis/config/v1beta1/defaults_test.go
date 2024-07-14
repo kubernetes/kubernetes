@@ -129,6 +129,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -259,6 +260,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                    utilpointer.Bool(false),
 				LocalStorageCapacityIsolation:   utilpointer.Bool(false),
 				PodLogsDir:                      "",
+				EvictionMonitoringPeriod:        &metav1.Duration{Duration: 10 * time.Second},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(false),
@@ -360,6 +362,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(false),
 				LocalStorageCapacityIsolation: utilpointer.Bool(false),
 				PodLogsDir:                    DefaultPodLogsDir,
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -512,6 +515,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.Bool(true),
@@ -661,6 +665,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    "/custom/path",
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -753,6 +758,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -845,6 +851,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		{
@@ -937,6 +944,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				RegisterNode:                  utilpointer.Bool(true),
 				LocalStorageCapacityIsolation: utilpointer.Bool(true),
 				PodLogsDir:                    DefaultPodLogsDir,
+				EvictionMonitoringPeriod:      &metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 	}

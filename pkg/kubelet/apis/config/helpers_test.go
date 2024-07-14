@@ -300,5 +300,6 @@ var (
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
+		"EvictionMonitoringPeriod",
 	)
 )

@@ -851,6 +851,11 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
+
+	// EvictionMonitoringPeriod is the period for performing eviction monitoring.
+	// Default: 10s
+	// +optional
+	EvictionMonitoringPeriod *metav1.Duration `json:"evictionMonitoringPeriod,omitempty"`
 }
 
 type KubeletAuthorizationMode string

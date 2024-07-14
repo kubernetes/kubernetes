@@ -36,6 +36,7 @@ enforceNodeAllocatable:
 - pods
 eventBurst: 100
 eventRecordQPS: 50
+evictionMonitoringPeriod: 10s
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s

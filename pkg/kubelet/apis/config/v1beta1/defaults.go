@@ -283,4 +283,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.PodLogsDir == "" {
 		obj.PodLogsDir = DefaultPodLogsDir
 	}
+	if obj.EvictionMonitoringPeriod == nil {
+		obj.EvictionMonitoringPeriod = &metav1.Duration{Duration: 10 * time.Second}
+	}
 }
