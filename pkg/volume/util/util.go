@@ -209,7 +209,7 @@ func GetPath(mounter volume.Mounter) (string, error) {
 	return path, nil
 }
 
-// UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
+// UnmountViaEmptyDir delegates the tear down operation for secret, configmap and downwardapi
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volSpec volume.Spec, podUID utypes.UID) error {
 	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)

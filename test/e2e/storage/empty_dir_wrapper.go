@@ -19,11 +19,8 @@ package storage
 import (
 	"context"
 	"fmt"
-	"strconv"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -41,8 +38,7 @@ const (
 	// If you make them too low, you'll get flaky
 	// tests instead of failing ones if the race bug reappears.
 	// If you make volume counts or pod counts too high,
-	// the tests may fail because mounting configmap/git_repo
-	// volumes is not very fast and the tests may time out
+	// the tests may fail because the tests may time out
 	// waiting for pods to become Running.
 	// And of course the higher are the numbers, the
 	// slower are the tests.
@@ -193,86 +189,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 			testNoWrappedVolumeRace(ctx, f, volumes, volumeMounts, wrappedVolumeRaceConfigMapPodCount)
 		}
 	})
-
-	// Slow by design [~150 Seconds].
-	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
-	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.
-	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
-	f.It("should not cause race condition when used for git_repo", f.WithSerial(), f.WithSlow(), func(ctx context.Context) {
-		gitURL, gitRepo, cleanup := createGitServer(ctx, f)
-		defer cleanup()
-		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
-		for i := 0; i < wrappedVolumeRaceGitRepoIterationCount; i++ {
-			testNoWrappedVolumeRace(ctx, f, volumes, volumeMounts, wrappedVolumeRaceGitRepoPodCount)
-		}
-	})
 })
-
-func createGitServer(ctx context.Context, f *framework.Framework) (gitURL string, gitRepo string, cleanup func()) {
-	var err error
-	gitServerPodName := "git-server-" + string(uuid.NewUUID())
-	containerPort := int32(8000)
-
-	labels := map[string]string{"name": gitServerPodName}
-
-	gitServerPod := e2epod.NewAgnhostPod(f.Namespace.Name, gitServerPodName, nil, nil, []v1.ContainerPort{{ContainerPort: int32(containerPort)}}, "fake-gitserver")
-	gitServerPod.ObjectMeta.Labels = labels
-	e2epod.NewPodClient(f).CreateSync(ctx, gitServerPod)
-
-	// Portal IP and port
-	httpPort := 2345
-
-	gitServerSvc := &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "git-server-svc",
-		},
-		Spec: v1.ServiceSpec{
-			Selector: labels,
-			Ports: []v1.ServicePort{
-				{
-					Name:       "http-portal",
-					Port:       int32(httpPort),
-					TargetPort: intstr.FromInt32(containerPort),
-				},
-			},
-		},
-	}
-
-	if gitServerSvc, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(ctx, gitServerSvc, metav1.CreateOptions{}); err != nil {
-		framework.Failf("unable to create test git server service %s: %v", gitServerSvc.Name, err)
-	}
-
-	return "http://" + gitServerSvc.Spec.ClusterIP + ":" + strconv.Itoa(httpPort), "test", func() {
-		ginkgo.By("Cleaning up the git server pod")
-		if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(ctx, gitServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-			framework.Failf("unable to delete git server pod %v: %v", gitServerPod.Name, err)
-		}
-		ginkgo.By("Cleaning up the git server svc")
-		if err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(ctx, gitServerSvc.Name, metav1.DeleteOptions{}); err != nil {
-			framework.Failf("unable to delete git server svc %v: %v", gitServerSvc.Name, err)
-		}
-	}
-}
-
-func makeGitRepoVolumes(gitURL, gitRepo string) (volumes []v1.Volume, volumeMounts []v1.VolumeMount) {
-	for i := 0; i < wrappedVolumeRaceGitRepoVolumeCount; i++ {
-		volumeName := fmt.Sprintf("racey-git-repo-%d", i)
-		volumes = append(volumes, v1.Volume{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				GitRepo: &v1.GitRepoVolumeSource{
-					Repository: gitURL,
-					Directory:  gitRepo,
-				},
-			},
-		})
-		volumeMounts = append(volumeMounts, v1.VolumeMount{
-			Name:      volumeName,
-			MountPath: fmt.Sprintf("/etc/git-volume-%d", i),
-		})
-	}
-	return
-}
 
 func createConfigmapsForRace(ctx context.Context, f *framework.Framework) (configMapNames []string) {
 	ginkgo.By(fmt.Sprintf("Creating %d configmaps", wrappedVolumeRaceConfigMapVolumeCount))
