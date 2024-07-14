@@ -157,6 +157,20 @@ Possible values of the "reason" label are:
 Possible values of the "status" label are:
 "succeeded", "failed".`,
 		}, []string{"reason", "status"})
+
+	// JobSucceededTotal tracks the number of succeeded Jobs which have SuccessCriteriaMet condition.
+	// Possible label values:
+	//   reason: JobSuccessPolicy, Completions
+	JobSucceededTotal = metrics.NewCounterVec(&metrics.CounterOpts{
+		Subsystem: JobControllerSubsystem,
+		Name:      "job_succeeded_total",
+		Help: `The number of succeeded Jobs which have SuccessCriteriaMet condition.
+Possible values of the "reason" label are:
+"JobSuccessPolicy", which means a Job met the successPolicy,
+"Completions", which means a Job reached to the completions.`,
+		StabilityLevel: metrics.ALPHA,
+	},
+		[]string{"reason"})
 )
 
 const (
@@ -210,5 +224,6 @@ func Register() {
 		legacyregistry.MustRegister(JobFinishedIndexesTotal)
 		legacyregistry.MustRegister(JobPodsCreationTotal)
 		legacyregistry.MustRegister(JobByExternalControllerTotal)
+		legacyregistry.MustRegister(JobSucceededTotal)
 	})
 }

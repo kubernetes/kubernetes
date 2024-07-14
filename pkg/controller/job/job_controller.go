@@ -1204,11 +1204,12 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 			jobCtx.finishedCondition = newFailedConditionForFailureTarget(jobCtx.finishedCondition, jm.clock.Now())
 		}
 	}
+	needsIncrementSucceededMetric := false
 	if isSuccessCriteriaMetCondition(jobCtx.finishedCondition) {
 		// Append the interim SuccessCriteriaMet condition to update the job status with before finalizers are removed.
 		if hasSuccessCriteriaMetCondition(jobCtx.job) == nil {
 			jobCtx.job.Status.Conditions = append(jobCtx.job.Status.Conditions, *jobCtx.finishedCondition)
-			needsFlush = true
+			needsIncrementSucceededMetric = true
 		}
 
 		// To avoid the breaking the existing Completion condition, the SuccessCriteriaMet reason and message are propagated
@@ -1222,8 +1223,9 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		// It is also used in the enactJobFinished function for reporting.
 		jobCtx.finishedCondition = newCondition(batch.JobComplete, v1.ConditionTrue, reason, message, jm.clock.Now())
 	}
+	needsFlush = needsFlush || needsIncrementSucceededMetric
 	var err error
-	if jobCtx.job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, jobCtx, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush); err != nil {
+	if jobCtx.job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, jobCtx, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, podFailureCountByPolicyAction, needsFlush, needsIncrementSucceededMetric); err != nil {
 		return err
 	}
 	jobFinished := !reachedMaxUncountedPods && jm.enactJobFinished(logger, jobCtx)
@@ -1280,12 +1282,23 @@ func canRemoveFinalizer(logger klog.Logger, jobCtx *syncJobCtx, pod *v1.Pod, con
 //
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, jobCtx *syncJobCtx, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.Set[string], oldCounters *batch.JobStatus, podFailureCountByPolicyAction map[string]int, needsFlush bool) (*batch.Job, bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(
+	ctx context.Context,
+	jobCtx *syncJobCtx,
+	podsToRemoveFinalizer []*v1.Pod,
+	uidsWithFinalizer sets.Set[string],
+	oldCounters *batch.JobStatus,
+	podFailureCountByPolicyAction map[string]int,
+	needsFlush, needsIncrementSucceededMetric bool,
+) (*batch.Job, bool, error) {
 	logger := klog.FromContext(ctx)
 	var err error
 	if needsFlush {
 		if jobCtx.job, err = jm.updateStatusHandler(ctx, jobCtx.job); err != nil {
 			return jobCtx.job, needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
+		}
+		if needsIncrementSucceededMetric {
+			jm.recordJobSucceeded(jobCtx.job)
 		}
 
 		err = jm.podBackoffStore.updateBackoffRecord(jobCtx.newBackoffRecord)
@@ -1440,6 +1453,22 @@ func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobC
 		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed", finishedCond.Reason).Inc()
 	}
 	return true
+}
+
+func (jm *Controller) recordJobSucceeded(job *batch.Job) {
+	successCriteriaMet := hasSuccessCriteriaMetCondition(job)
+	if successCriteriaMet == nil {
+		return
+	}
+	var metricReason string
+	switch successCriteriaMet.Reason {
+	case batch.JobReasonSuccessPolicy:
+		metricReason = "JobSuccessPolicy"
+	case batch.JobReasonCompletionsReached:
+		metricReason = "Completions"
+	}
+	jm.recorder.Event(job, v1.EventTypeNormal, "SuccessCriteriaMet", "Job met success criteria")
+	metrics.JobSucceededTotal.WithLabelValues(metricReason).Inc()
 }
 
 func filterInUncountedUIDs(uncounted []types.UID, include sets.Set[string]) []types.UID {
