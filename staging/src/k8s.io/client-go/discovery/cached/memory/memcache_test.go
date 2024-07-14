@@ -431,38 +431,28 @@ func TestOpenAPIMemCache(t *testing.T) {
 		t.Run(contentType, func(t *testing.T) {
 			for k, v := range paths {
 				original, err := v.Schema(contentType)
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
 				pathsAgain, err := openapiClient.Paths()
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
 				schemaAgain, err := pathsAgain[k].Schema(contentType)
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
-				assert.True(t, reflect.ValueOf(paths).Pointer() == reflect.ValueOf(pathsAgain).Pointer())
-				assert.True(t, reflect.ValueOf(original).Pointer() == reflect.ValueOf(schemaAgain).Pointer())
+				assert.Equal(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				assert.Equal(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 
 				// Invalidate and try again. This time pointers should not be equal
 				client.Invalidate()
 
 				pathsAgain, err = client.OpenAPIV3().Paths()
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
 				schemaAgain, err = pathsAgain[k].Schema(contentType)
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
-				assert.True(t, reflect.ValueOf(paths).Pointer() != reflect.ValueOf(pathsAgain).Pointer())
-				assert.True(t, reflect.ValueOf(original).Pointer() != reflect.ValueOf(schemaAgain).Pointer())
+				assert.NotEqual(t, reflect.ValueOf(paths).Pointer(), reflect.ValueOf(pathsAgain).Pointer())
+				assert.NotEqual(t, reflect.ValueOf(original).Pointer(), reflect.ValueOf(schemaAgain).Pointer())
 				assert.Equal(t, original, schemaAgain)
 			}
 		})

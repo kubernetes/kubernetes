@@ -57,35 +57,35 @@ func TestCachedDiscoveryClient_Fresh(t *testing.T) {
 
 	cdc.ServerGroups()
 	assert.True(cdc.Fresh(), "should be fresh after groups call without cache")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroups()
 	assert.True(cdc.Fresh(), "should be fresh after another groups call")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should be fresh after resources call")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(1, c.resourceCalls)
 
 	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should be fresh after another resources call")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(1, c.resourceCalls)
 
 	cdc = newCachedDiscoveryClient(&c, d, 60*time.Second)
 	cdc.ServerGroups()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing groups cache")
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(1, c.groupCalls)
 
 	cdc.ServerGroupsAndResources()
 	assert.False(cdc.Fresh(), "should NOT be fresh after recreation with existing resources cache")
-	assert.Equal(c.resourceCalls, 1)
+	assert.Equal(1, c.resourceCalls)
 
 	cdc.Invalidate()
 	assert.True(cdc.Fresh(), "should be fresh after cache invalidation")
 
 	cdc.ServerGroupsAndResources()
 	assert.True(cdc.Fresh(), "should ignore existing resources cache after invalidation")
-	assert.Equal(c.resourceCalls, 2)
+	assert.Equal(2, c.resourceCalls)
 }
 
 func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
@@ -98,12 +98,12 @@ func TestNewCachedDiscoveryClient_TTL(t *testing.T) {
 	c := fakeDiscoveryClient{}
 	cdc := newCachedDiscoveryClient(&c, d, 1*time.Nanosecond)
 	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 1)
+	assert.Equal(1, c.groupCalls)
 
 	time.Sleep(1 * time.Second)
 
 	cdc.ServerGroups()
-	assert.Equal(c.groupCalls, 2)
+	assert.Equal(2, c.groupCalls)
 }
 
 func TestNewCachedDiscoveryClient_PathPerm(t *testing.T) {
@@ -193,14 +193,14 @@ func TestOpenAPIDiskCache(t *testing.T) {
 				i++
 
 				_, err = v.Schema(contentType)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				path := "/openapi/v3/" + strings.TrimPrefix(k, "/")
 				assert.Equal(t, 1, fakeServer.RequestCounters[path])
 
 				// Ensure schema call is served from memory
 				_, err = v.Schema(contentType)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, 1, fakeServer.RequestCounters[path])
 
 				client.Invalidate()
@@ -208,13 +208,11 @@ func TestOpenAPIDiskCache(t *testing.T) {
 				// Refetch the schema from a new openapi client to try to force a new
 				// http request
 				newPaths, err := client.OpenAPIV3().Paths()
-				if !assert.NoError(t, err) {
-					continue
-				}
+				require.NoError(t, err)
 
 				// Ensure schema call is still served from disk
 				_, err = newPaths[k].Schema(contentType)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, 1, fakeServer.RequestCounters[path])
 			}
 		})
@@ -368,7 +366,7 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 		require.NoError(t, err)
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.
@@ -659,7 +657,7 @@ func TestCachedDiscoveryClientAggregatedServerGroups(t *testing.T) {
 		require.NoError(t, err)
 		// Discovery groups cached in servergroups.json file.
 		numFound, err := numFilesFound(discoCache, "servergroups.json")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 1, numFound,
 			"%s: expected 1 discovery cache file servergroups.json found, got %d", test.name, numFound)
 		// Test expected groups returned by server groups.

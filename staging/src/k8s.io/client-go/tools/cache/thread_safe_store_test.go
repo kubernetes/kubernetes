@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
@@ -111,8 +111,6 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	store.Add("key1", "foo")
 	store.Add("key2", "bar")
 
-	assert := assert.New(t)
-
 	compare := func(key string, expected []string) error {
 		values := store.index.indices[testIndexer][key].List()
 		if cmp.Equal(values, expected) {
@@ -121,48 +119,48 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 		return fmt.Errorf("unexpected index for key %s, diff=%s", key, cmp.Diff(values, expected))
 	}
 
-	assert.NoError(compare("foo", []string{"key1"}))
-	assert.NoError(compare("bar", []string{"key2"}))
+	require.NoError(t, compare("foo", []string{"key1"}))
+	require.NoError(t, compare("bar", []string{"key2"}))
 
 	store.Update("key2", "foo,bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key2"}))
-	assert.NoError(compare("bar", []string{"key2"}))
+	require.NoError(t, compare("foo", []string{"key1", "key2"}))
+	require.NoError(t, compare("bar", []string{"key2"}))
 
 	store.Update("key1", "foo,bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key2"}))
-	assert.NoError(compare("bar", []string{"key1", "key2"}))
+	require.NoError(t, compare("foo", []string{"key1", "key2"}))
+	require.NoError(t, compare("bar", []string{"key1", "key2"}))
 
 	store.Add("key3", "foo,bar,baz")
 
-	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("bar", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	require.NoError(t, compare("foo", []string{"key1", "key2", "key3"}))
+	require.NoError(t, compare("bar", []string{"key1", "key2", "key3"}))
+	require.NoError(t, compare("baz", []string{"key3"}))
 
 	store.Update("key1", "foo")
 
-	assert.NoError(compare("foo", []string{"key1", "key2", "key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	require.NoError(t, compare("foo", []string{"key1", "key2", "key3"}))
+	require.NoError(t, compare("bar", []string{"key2", "key3"}))
+	require.NoError(t, compare("baz", []string{"key3"}))
 
 	store.Update("key2", "bar")
 
-	assert.NoError(compare("foo", []string{"key1", "key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	require.NoError(t, compare("foo", []string{"key1", "key3"}))
+	require.NoError(t, compare("bar", []string{"key2", "key3"}))
+	require.NoError(t, compare("baz", []string{"key3"}))
 
 	store.Delete("key1")
 
-	assert.NoError(compare("foo", []string{"key3"}))
-	assert.NoError(compare("bar", []string{"key2", "key3"}))
-	assert.NoError(compare("baz", []string{"key3"}))
+	require.NoError(t, compare("foo", []string{"key3"}))
+	require.NoError(t, compare("bar", []string{"key2", "key3"}))
+	require.NoError(t, compare("baz", []string{"key3"}))
 
 	store.Delete("key3")
 
-	assert.NoError(compare("foo", []string{}))
-	assert.NoError(compare("bar", []string{"key2"}))
-	assert.NoError(compare("baz", []string{}))
+	require.NoError(t, compare("foo", []string{}))
+	require.NoError(t, compare("bar", []string{"key2"}))
+	require.NoError(t, compare("baz", []string{}))
 }
 
 func BenchmarkIndexer(b *testing.B) {

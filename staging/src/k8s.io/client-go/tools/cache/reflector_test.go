@@ -571,7 +571,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 			t.Errorf("unexpected ListAndWatch error: %v", err)
 		}
 		if item.listErr == nil && item.watchErr == nil {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 }

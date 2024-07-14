@@ -26,6 +26,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -930,14 +931,14 @@ func TestLeaderElectionConfigValidation(t *testing.T) {
 	}
 
 	_, err := NewLeaderElector(lec)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Invalid lock identity
 	resourceLockConfig.Identity = ""
 	lock.LockConfig = resourceLockConfig
 	lec.Lock = lock
 	_, err = NewLeaderElector(lec)
-	assert.Error(t, err, fmt.Errorf("Lock identity is empty"))
+	require.EqualError(t, err, "Lock identity is empty")
 }
 
 func assertEqualEvents(t *testing.T, expected []string, actual <-chan string) {

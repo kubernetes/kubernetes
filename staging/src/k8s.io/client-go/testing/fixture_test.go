@@ -19,12 +19,14 @@ package testing
 import (
 	"fmt"
 	"math/rand"
-	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"strconv"
 	"sync"
 	"testing"
 
+	"sigs.k8s.io/structured-merge-diff/v4/typed"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -277,7 +279,7 @@ func TestPatchWithMissingObject(t *testing.T) {
 	handled, node, err := reaction(action)
 	assert.True(t, handled)
 	assert.Nil(t, node)
-	assert.EqualError(t, err, `nodes "node-1" not found`)
+	require.EqualError(t, err, `nodes "node-1" not found`)
 }
 
 func TestApplyCreate(t *testing.T) {
@@ -297,7 +299,7 @@ func TestApplyCreate(t *testing.T) {
 		t.Errorf("Failed to create a resource with apply: %v", err)
 	}
 	cm := configMap.(*v1.ConfigMap)
-	assert.Equal(t, cm.Data, map[string]string{"k": "v"})
+	assert.Equal(t, map[string]string{"k": "v"}, cm.Data)
 }
 
 func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
@@ -345,9 +347,8 @@ func TestApplyUpdateMultipleFieldManagers(t *testing.T) {
 		metav1.PatchOptions{FieldManager: "test-manager-2"})
 	handled, _, err = reaction(applyAction)
 	assert.True(t, handled)
-	if assert.Error(t, err) {
-		assert.Equal(t, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1", err.Error())
-	}
+	require.Error(t, err)
+	require.EqualError(t, err, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1")
 
 	// Apply with test-manager-2
 	// Expect data to be shared with initial create and test-manager-1
@@ -418,7 +419,7 @@ func TestGetWithExactMatch(t *testing.T) {
 	constructObject := func(s schema.GroupVersionResource, name, namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
 		obj := getArbitraryResource(s, name, namespace)
 		gvks, _, err := scheme.ObjectKinds(obj)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
 		return obj, gvr
 	}
@@ -429,33 +430,33 @@ func TestGetWithExactMatch(t *testing.T) {
 	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
 	node, gvr := constructObject(nodeResource, "node", "")
 
-	assert.Nil(t, o.Add(node))
+	require.NoError(t, o.Add(node))
 
 	// Exact match
 	_, err = o.Get(gvr, "", "node")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Unexpected namespace provided
 	_, err = o.Get(gvr, "ns", "node")
-	assert.Error(t, err)
+	require.Error(t, err)
 	errNotFound := errors.NewNotFound(gvr.GroupResource(), "node")
-	assert.EqualError(t, err, errNotFound.Error())
+	require.EqualError(t, err, errNotFound.Error())
 
 	// Object with non-empty namespace
 	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
 	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
 	pod, gvr := constructObject(podResource, "pod", "default")
-	assert.Nil(t, o.Add(pod))
+	require.NoError(t, o.Add(pod))
 
 	// Exact match
 	_, err = o.Get(gvr, "default", "pod")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Missing namespace
 	_, err = o.Get(gvr, "", "pod")
-	assert.Error(t, err)
+	require.Error(t, err)
 	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
-	assert.EqualError(t, err, errNotFound.Error())
+	require.EqualError(t, err, errNotFound.Error())
 }
 
 func Test_resourceCovers(t *testing.T) {

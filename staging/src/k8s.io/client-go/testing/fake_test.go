@@ -19,7 +19,7 @@ package testing
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -60,7 +60,7 @@ func TestOriginalObjectCaptured(t *testing.T) {
 
 	// execute the reaction chain
 	ret, err := f.Invokes(action, nil)
-	assert.NoError(t, err, "running Invokes failed")
+	require.NoError(t, err, "running Invokes failed")
 
 	// obtain a metadata accessor for the returned resource
 	accessor, err := meta.Accessor(ret)
@@ -137,7 +137,7 @@ func TestReactorChangesPersisted(t *testing.T) {
 
 	// execute the reaction chain
 	ret, err := f.Invokes(action, nil)
-	assert.NoError(t, err, "running Invokes failed")
+	require.NoError(t, err, "running Invokes failed")
 
 	// obtain a metadata accessor for the returned resource
 	accessor, err := meta.Accessor(ret)

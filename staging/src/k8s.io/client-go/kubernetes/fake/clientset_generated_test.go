@@ -18,8 +18,10 @@ package fake
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -88,9 +90,8 @@ func TestManagedFieldClientset(t *testing.T) {
 	_, err = client.CoreV1().ConfigMaps("default").Apply(context.Background(),
 		v1ac.ConfigMap(name, namespace).WithData(map[string]string{"k1": "xyz"}),
 		meta_v1.ApplyOptions{FieldManager: "test-manager-2"})
-	if assert.Error(t, err) {
-		assert.Equal(t, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1", err.Error())
-	}
+	require.Error(t, err)
+	require.EqualError(t, err, "Apply failed with 1 conflict: conflict with \"test-manager-1\": .data.k1")
 
 	// Apply with test-manager-2
 	// Expect data to be shared with initial create and test-manager-1

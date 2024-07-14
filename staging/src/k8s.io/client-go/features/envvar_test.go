@@ -148,7 +148,7 @@ func TestEnvVarFeatureGates(t *testing.T) {
 			}
 			for expectedFeature, expectedValue := range scenario.expectedFeaturesState {
 				actualValue := target.Enabled(expectedFeature)
-				require.Equal(t, actualValue, expectedValue, "expected feature=%v, to be=%v, not=%v", expectedFeature, expectedValue, actualValue)
+				require.Equal(t, expectedValue, actualValue, "expected feature=%v, to be=%v, not=%v", expectedFeature, expectedValue, actualValue)
 			}
 
 			enabledViaEnvVarInternalMap := target.enabledViaEnvVar.Load().(map[Feature]bool)

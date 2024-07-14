@@ -53,7 +53,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 		conn, err := upgrader.Upgrade(w, req, nil)
 		require.NoError(t, err)
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		assert.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
 		tunnelingConn := NewTunnelingConnection("server", conn)
 		spdyConn, err := spdy.NewServerConnection(tunnelingConn, justQueueStream(streamChan))
 		require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 		conn, err := upgrader.Upgrade(w, req, nil)
 		require.NoError(t, err)
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		assert.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
 		<-stopServerChan
 	}))
 	defer tunnelingServer.Close()
@@ -120,9 +120,9 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 	assert.Equal(t, "tcp", localAddr.Network(), "tunneling connection must be TCP")
 	assert.Equal(t, "tcp", remoteAddr.Network(), "tunneling connection must be TCP")
 	_, err = net.ResolveTCPAddr("tcp", localAddr.String())
-	assert.NoError(t, err, "tunneling connection local addr should parse")
+	require.NoError(t, err, "tunneling connection local addr should parse")
 	_, err = net.ResolveTCPAddr("tcp", remoteAddr.String())
-	assert.NoError(t, err, "tunneling connection remote addr should parse")
+	require.NoError(t, err, "tunneling connection remote addr should parse")
 }
 
 func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
@@ -136,7 +136,7 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 		conn, err := upgrader.Upgrade(w, req, nil)
 		require.NoError(t, err)
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		assert.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
 		<-stopServerChan
 	}))
 	defer tunnelingServer.Close()
@@ -148,17 +148,17 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 	defer tConn.Close() //nolint:errcheck
 	// Validate the read and write deadlines.
 	err = tConn.SetReadDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	require.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetWriteDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	require.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetDeadline(time.Time{})
-	assert.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
+	require.NoError(t, err, "setting zero deadline should always succeed; turns off deadline")
 	err = tConn.SetReadDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	require.NoError(t, err, "setting deadline 10 year from now succeeds")
 	err = tConn.SetWriteDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	require.NoError(t, err, "setting deadline 10 year from now succeeds")
 	err = tConn.SetDeadline(time.Now().AddDate(10, 0, 0))
-	assert.NoError(t, err, "setting deadline 10 year from now succeeds")
+	require.NoError(t, err, "setting deadline 10 year from now succeeds")
 }
 
 // dialForTunnelingConnection upgrades a request at the passed "url", creating

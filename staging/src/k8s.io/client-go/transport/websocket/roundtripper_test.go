@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +69,7 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 		// Bad handshake means websocket server will not completely initialize.
 		_, err := webSocketServerStreams(req, w)
 		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(), "websocket server finished before becoming ready"))
+		assert.ErrorContains(t, err, "websocket server finished before becoming ready")
 	}))
 	defer websocketServer.Close()
 
@@ -87,8 +86,8 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 	_, err = rt.RoundTrip(req)
 	// Ensure a "bad handshake" error is returned, since requested protocol is not supported.
 	require.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "websocket: bad handshake"))
-	assert.True(t, strings.Contains(err.Error(), "403 Forbidden"))
+	require.ErrorContains(t, err, "websocket: bad handshake")
+	require.ErrorContains(t, err, "403 Forbidden")
 	assert.True(t, httpstream.IsUpgradeFailure(err))
 }
 
