@@ -40,6 +40,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultFlags(t *testing.T) {
@@ -370,14 +371,14 @@ func TestCreateConfig(t *testing.T) {
 		"--webhook-secure-port=10300",
 	}
 	err = fs.Parse(args)
-	assert.Nil(t, err, "unexpected error: %s", err)
+	require.NoError(t, err, "unexpected error: %s", err)
 
 	fs.VisitAll(func(f *pflag.Flag) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
 
 	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
-	assert.Nil(t, err, "unexpected error: %s", err)
+	require.NoError(t, err, "unexpected error: %s", err)
 
 	expected := &appconfig.Config{
 		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
