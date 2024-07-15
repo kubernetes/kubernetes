@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/component-base/featuregate"
@@ -103,14 +104,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 			expectedSecrets = append(expectedSecrets, *secret)
 		}
 
-		var actualRequestsMadeByKubeClient []string
-		clientConfig := f.ClientConfig()
-		clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return roundTripFunc(func(req *http.Request) (*http.Response, error) {
-				actualRequestsMadeByKubeClient = append(actualRequestsMadeByKubeClient, req.URL.RawQuery)
-				return rt.RoundTrip(req)
-			})
-		})
+		rt, clientConfig := clientConfigWithRoundTripper(f)
 		wrappedKubeClient, err := kubernetes.NewForConfig(clientConfig)
 		framework.ExpectNoError(err)
 
@@ -120,26 +114,35 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 
 		ginkgo.By("Verifying if the secret list was properly streamed")
 		streamedSecrets := secretList.Items
-		sort.Sort(byName(expectedSecrets))
 		gomega.Expect(cmp.Equal(expectedSecrets, streamedSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestMadeByKubeClient := []string{
-			// corresponds to a streaming request made by the kube client to stream the secrets
-			"allowWatchBookmarks=true&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true",
-		}
-		if consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
-			// corresponds to a standard list request made by the consistency detector build in into the kube client
-			expectedRequestMadeByKubeClient = append(expectedRequestMadeByKubeClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", secretList.ResourceVersion))
-		}
-		gomega.Expect(actualRequestsMadeByKubeClient).To(gomega.Equal(expectedRequestMadeByKubeClient))
+		expectedRequestMadeByKubeClient := getExpectedRequestMadeByClientFor(secretList.ResourceVersion)
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByKubeClient))
 	})
 })
 
-type roundTripFunc func(req *http.Request) (*http.Response, error)
+type roundTripper struct {
+	actualRequests []string
+	delegate       http.RoundTripper
+}
 
-func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.actualRequests = append(r.actualRequests, req.URL.RawQuery)
+	return r.delegate.RoundTrip(req)
+}
+
+func (r *roundTripper) Wrap(delegate http.RoundTripper) http.RoundTripper {
+	r.delegate = delegate
+	return r
+}
+
+func clientConfigWithRoundTripper(f *framework.Framework) (*roundTripper, *rest.Config) {
+	clientConfig := f.ClientConfig()
+	rt := &roundTripper{}
+	clientConfig.Wrap(rt.Wrap)
+
+	return rt, clientConfig
 }
 
 func verifyStore(ctx context.Context, expectedSecrets []v1.Secret, store cache.Store) {
@@ -155,6 +158,18 @@ func verifyStore(ctx context.Context, expectedSecrets []v1.Secret, store cache.S
 		return cmp.Equal(expectedSecrets, streamedSecrets), nil
 	})
 	framework.ExpectNoError(err)
+}
+
+func getExpectedRequestMadeByClientFor(rv string) []string {
+	expectedRequestMadeByClient := []string{
+		// corresponds to a streaming request made by the client to stream the secrets
+		"allowWatchBookmarks=true&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true",
+	}
+	if consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
+		// corresponds to a standard list request made by the consistency detector build in into the client
+		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
+	}
+	return expectedRequestMadeByClient
 }
 
 type byName []v1.Secret
