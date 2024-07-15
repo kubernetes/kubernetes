@@ -5877,7 +5877,10 @@ type NodeRuntimeHandlerFeatures struct {
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool `json:"recursiveReadOnlyMounts,omitempty" protobuf:"varint,1,opt,name=recursiveReadOnlyMounts"`
-	// Reserved: UserNamespaces *bool (varint 2, for consistency with CRI API)
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	UserNamespaces *bool `json:"userNamespaces,omitempty" protobuf:"varint,2,opt,name=userNamespaces"`
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.
@@ -6029,6 +6032,7 @@ type NodeStatus struct {
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
 	// The available runtime handlers.
 	// +featureGate=RecursiveReadOnlyMounts
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	// +listType=atomic
 	RuntimeHandlers []NodeRuntimeHandler `json:"runtimeHandlers,omitempty" protobuf:"bytes,12,rep,name=runtimeHandlers"`

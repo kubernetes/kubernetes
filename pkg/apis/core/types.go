@@ -4898,7 +4898,10 @@ type NodeRuntimeHandlerFeatures struct {
 	// +featureGate=RecursiveReadOnlyMounts
 	// +optional
 	RecursiveReadOnlyMounts *bool
-	// Reserved: UserNamespaces *bool
+	// UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	UserNamespaces *bool
 }
 
 // NodeRuntimeHandler is a set of runtime handler information.
@@ -5024,6 +5027,7 @@ type NodeStatus struct {
 	Config *NodeConfigStatus
 	// The available runtime handlers.
 	// +featureGate=RecursiveReadOnlyMounts
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	RuntimeHandlers []NodeRuntimeHandler
 }
