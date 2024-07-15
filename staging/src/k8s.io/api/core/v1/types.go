@@ -6145,9 +6145,10 @@ type NodeAddressType string
 
 // These are built-in addresses type of node. A cloud provider may set a type not listed here.
 const (
-	// NodeHostName identifies a name of the node. Although every node can be assumed
-	// to have a NodeAddress of this type, its exact syntax and semantics are not
-	// defined, and are not consistent between different clusters.
+	// NodeHostName identifies the node name of the system. Although every node can be
+	// assumed to have a NodeAddress of this type, its exact syntax and semantics are
+	// not defined, and are not consistent between different clusters. It is recommended
+	// to use the system node name reported by kernel for this field.
 	NodeHostName NodeAddressType = "Hostname"
 
 	// NodeInternalIP identifies an IP address which is assigned to one of the node's
