@@ -216,7 +216,7 @@ func NewActualStateOfWorld(
 		attachedVolumes:                 make(map[v1.UniqueVolumeName]attachedVolume),
 		foundDuringReconstruction:       make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
 		volumePluginMgr:                 volumePluginMgr,
-		volumesWithFinalExpansionErrors: sets.New[string](),
+		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
 	}
 }
 
