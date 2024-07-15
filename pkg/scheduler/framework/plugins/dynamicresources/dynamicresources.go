@@ -146,6 +146,9 @@ func (p *podSchedulingState) isDirty() bool {
 // init checks whether there is already a PodSchedulingContext object.
 // Must not be called concurrently,
 func (p *podSchedulingState) init(ctx context.Context, pod *v1.Pod, podSchedulingContextLister resourcelisters.PodSchedulingContextLister) error {
+	if podSchedulingContextLister == nil {
+		return nil
+	}
 	schedulingCtx, err := podSchedulingContextLister.PodSchedulingContexts(pod.Namespace).Get(pod.Name)
 	switch {
 	case apierrors.IsNotFound(err):
@@ -267,11 +270,13 @@ func statusForClaim(schedulingCtx *resourceapi.PodSchedulingContext, podClaimNam
 
 // dynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type dynamicResources struct {
-	enabled                    bool
+	enabled                       bool
+	controlPlaneControllerEnabled bool
+
 	fh                         framework.Handle
 	clientset                  kubernetes.Interface
 	classLister                resourcelisters.DeviceClassLister
-	podSchedulingContextLister resourcelisters.PodSchedulingContextLister
+	podSchedulingContextLister resourcelisters.PodSchedulingContextLister // nil if and only if DRAControlPlaneController is disabled
 	sliceLister                resourcelisters.ResourceSliceLister
 
 	// claimAssumeCache enables temporarily storing a newer claim object
@@ -338,13 +343,17 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	}
 
 	pl := &dynamicResources{
-		enabled:                    true,
-		fh:                         fh,
-		clientset:                  fh.ClientSet(),
-		classLister:                fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
-		podSchedulingContextLister: fh.SharedInformerFactory().Resource().V1alpha3().PodSchedulingContexts().Lister(),
-		sliceLister:                fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
-		claimAssumeCache:           fh.ResourceClaimCache(),
+		enabled:                       true,
+		controlPlaneControllerEnabled: fts.EnableDRAControlPlaneController,
+
+		fh:               fh,
+		clientset:        fh.ClientSet(),
+		classLister:      fh.SharedInformerFactory().Resource().V1alpha3().DeviceClasses().Lister(),
+		sliceLister:      fh.SharedInformerFactory().Resource().V1alpha3().ResourceSlices().Lister(),
+		claimAssumeCache: fh.ResourceClaimCache(),
+	}
+	if pl.controlPlaneControllerEnabled {
+		pl.podSchedulingContextLister = fh.SharedInformerFactory().Resource().V1alpha3().PodSchedulingContexts().Lister()
 	}
 
 	return pl, nil
@@ -375,9 +384,6 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 	events := []framework.ClusterEventWithHint{
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
-		// When a driver has provided additional information, a pod waiting for that information
-		// may be schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodSchedulingContextChange},
 		// A resource might depend on node labels for topology filtering.
 		// A new or updated node may make pods schedulable.
 		//
@@ -393,6 +399,15 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.DeviceClass, ActionType: framework.Add | framework.Update}},
 	}
+
+	if pl.podSchedulingContextLister != nil {
+		events = append(events,
+			// When a driver has provided additional information, a pod waiting for that information
+			// may be schedulable.
+			framework.ClusterEventWithHint{Event: framework.ClusterEvent{Resource: framework.PodSchedulingContext, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodSchedulingContextChange},
+		)
+	}
+
 	return events, nil
 }
 
@@ -400,6 +415,10 @@ func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.Clu
 // scheduled. When this fails, one of the registered events can trigger another
 // attempt.
 func (pl *dynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status *framework.Status) {
+	if !pl.enabled {
+		return nil
+	}
+
 	if err := pl.foreachPodResourceClaim(pod, nil); err != nil {
 		return statusUnschedulable(klog.FromContext(ctx), err.Error())
 	}
@@ -679,6 +698,7 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 	}
 
 	// Fetch PodSchedulingContext, it's going to be needed when checking claims.
+	// Doesn't do anything when DRAControlPlaneController is disabled.
 	if err := s.podSchedulingState.init(ctx, pod, pl.podSchedulingContextLister); err != nil {
 		return nil, statusError(logger, err)
 	}
@@ -688,6 +708,16 @@ func (pl *dynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 
 	s.informationsForClaim = make([]informationForClaim, len(claims))
 	for index, claim := range claims {
+		if claim.Spec.Controller != "" &&
+			!pl.controlPlaneControllerEnabled {
+			// This keeps the pod as unschedulable until the
+			// scheduler gets restarted with "classic DRA" enabled
+			// or the claim gets replaced with one which doesn't
+			// need the feature. That is a cluster event that
+			// re-enqueues the pod.
+			return nil, statusUnschedulable(logger, "resourceclaim depends on disabled DRAControlPlaneController feature", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
+		}
+
 		if claim.Status.DeallocationRequested {
 			// This will get resolved by the resource driver.
 			return nil, statusUnschedulable(logger, "resourceclaim must be reallocated", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))

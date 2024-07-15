@@ -19,18 +19,42 @@ package deviceclass
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-var deviceClass = &resource.DeviceClass{
+var obj = &resource.DeviceClass{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: "valid-class",
+		Name:       "valid-class",
+		Generation: 1,
 	},
 }
 
-func TestClassStrategy(t *testing.T) {
+var objWithGatedFields = &resource.DeviceClass{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:       "valid-class",
+		Generation: 1,
+	},
+	Spec: resource.DeviceClassSpec{
+		SuitableNodes: &core.NodeSelector{
+			NodeSelectorTerms: []core.NodeSelectorTerm{{
+				MatchExpressions: []core.NodeSelectorRequirement{{
+					Key:      "foo",
+					Operator: core.NodeSelectorOpExists,
+				}},
+			}},
+		},
+	},
+}
+
+func TestStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("DeviceClass must not be namespace scoped")
 	}
@@ -39,42 +63,135 @@ func TestClassStrategy(t *testing.T) {
 	}
 }
 
-func TestClassStrategyCreate(t *testing.T) {
+func TestStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	deviceClass := deviceClass.DeepCopy()
 
-	Strategy.PrepareForCreate(ctx, deviceClass)
-	errs := Strategy.Validate(ctx, deviceClass)
-	if len(errs) != 0 {
-		t.Errorf("unexpected error validating for create %v", errs)
+	testcases := map[string]struct {
+		obj                    *resource.DeviceClass
+		controlPlaneController bool
+		expectValidationError  bool
+		expectObj              *resource.DeviceClass
+	}{
+		"simple": {
+			obj:       obj,
+			expectObj: obj,
+		},
+		"validation-error": {
+			obj: func() *resource.DeviceClass {
+				obj := obj.DeepCopy()
+				obj.Name = "%#@$%$"
+				return obj
+			}(),
+			expectValidationError: true,
+		},
+		"drop-fields": {
+			obj:                    objWithGatedFields,
+			controlPlaneController: false,
+			expectObj:              obj,
+		},
+		"keep-fields": {
+			obj:                    objWithGatedFields,
+			controlPlaneController: true,
+			expectObj:              objWithGatedFields,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tc.controlPlaneController)
+
+			obj := tc.obj.DeepCopy()
+			Strategy.PrepareForCreate(ctx, obj)
+			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
+				if !tc.expectValidationError {
+					t.Fatalf("unexpected validation errors: %q", errs)
+				}
+				return
+			} else if tc.expectValidationError {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := Strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			Strategy.Canonicalize(obj)
+			assert.Equal(t, tc.expectObj, obj)
+		})
 	}
 }
 
-func TestClassStrategyUpdate(t *testing.T) {
-	t.Run("no-changes-okay", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		deviceClass := deviceClass.DeepCopy()
-		newClass := deviceClass.DeepCopy()
-		newClass.ResourceVersion = "4"
+func TestStrategyUpdate(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
 
-		Strategy.PrepareForUpdate(ctx, newClass, deviceClass)
-		errs := Strategy.ValidateUpdate(ctx, newClass, deviceClass)
-		if len(errs) != 0 {
-			t.Errorf("unexpected validation errors: %v", errs)
-		}
-	})
+	testcases := map[string]struct {
+		oldObj                 *resource.DeviceClass
+		newObj                 *resource.DeviceClass
+		controlPlaneController bool
+		expectValidationError  bool
+		expectObj              *resource.DeviceClass
+	}{
+		"no-changes-okay": {
+			oldObj:    obj,
+			newObj:    obj,
+			expectObj: obj,
+		},
+		"name-change-not-allowed": {
+			oldObj: obj,
+			newObj: func() *resource.DeviceClass {
+				obj := obj.DeepCopy()
+				obj.Name += "-2"
+				return obj
+			}(),
+			expectValidationError: true,
+		},
+		"drop-fields": {
+			oldObj:                 obj,
+			newObj:                 objWithGatedFields,
+			controlPlaneController: false,
+			expectObj:              obj,
+		},
+		"keep-fields": {
+			oldObj:                 obj,
+			newObj:                 objWithGatedFields,
+			controlPlaneController: true,
+			expectObj: func() *resource.DeviceClass {
+				obj := objWithGatedFields.DeepCopy()
+				// Spec changes -> generation gets bumped.
+				obj.Generation++
+				return obj
+			}(),
+		},
+		"keep-existing-fields": {
+			oldObj:                 objWithGatedFields,
+			newObj:                 objWithGatedFields,
+			controlPlaneController: false,
+			expectObj:              objWithGatedFields,
+		},
+	}
 
-	t.Run("name-change-not-allowed", func(t *testing.T) {
-		ctx := genericapirequest.NewDefaultContext()
-		deviceClass := deviceClass.DeepCopy()
-		newClass := deviceClass.DeepCopy()
-		newClass.Name = "valid-class-2"
-		newClass.ResourceVersion = "4"
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, tc.controlPlaneController)
+			oldObj := tc.oldObj.DeepCopy()
+			newObj := tc.newObj.DeepCopy()
+			newObj.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClass, deviceClass)
-		errs := Strategy.ValidateUpdate(ctx, newClass, deviceClass)
-		if len(errs) == 0 {
-			t.Errorf("expected a validation error")
-		}
-	})
+			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+				if !tc.expectValidationError {
+					t.Fatalf("unexpected validation errors: %q", errs)
+				}
+				return
+			} else if tc.expectValidationError {
+				t.Fatal("expected validation error(s), got none")
+			}
+			if warnings := Strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+				t.Fatalf("unexpected warnings: %q", warnings)
+			}
+			Strategy.Canonicalize(newObj)
+
+			expectObj := tc.expectObj.DeepCopy()
+			expectObj.ResourceVersion = "4"
+			assert.Equal(t, expectObj, newObj)
+		})
+	}
 }

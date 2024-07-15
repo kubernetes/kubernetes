@@ -75,6 +75,10 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 		storage[resource] = resourceClaimTemplateStorage
 	}
 
+	// Registered also without the corresponding DRAControlPlaneController feature gate for the
+	// same reasons as registering the other types without a feature gate check: it might be
+	// useful to provide access to these resources while their feature is off to allow cleaning
+	// them up.
 	if resource := "podschedulingcontexts"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
 		podSchedulingStorage, podSchedulingStatusStorage, err := podschedulingcontextsstore.NewREST(restOptionsGetter)
 		if err != nil {

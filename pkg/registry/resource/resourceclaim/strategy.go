@@ -28,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -65,6 +67,8 @@ func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	claim := obj.(*resource.ResourceClaim)
 	// Status must not be set by user on create.
 	claim.Status = resource.ResourceClaimStatus{}
+
+	dropDisabledFields(claim, nil)
 }
 
 func (resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -87,6 +91,8 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Status = oldClaim.Status
+
+	dropDisabledFields(newClaim, oldClaim)
 }
 
 func (resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -127,6 +133,8 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Spec = oldClaim.Spec
 	metav1.ResetObjectMetaForStatus(&newClaim.ObjectMeta, &oldClaim.ObjectMeta)
+
+	dropDisabledFields(newClaim, oldClaim)
 }
 
 func (resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -162,4 +170,37 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	fields := generic.ObjectMetaFieldsSet(&claim.ObjectMeta, true)
 	return fields
+}
+
+// dropDisabledFields removes fields which are covered by the optional DRAControlPlaneController feature gate.
+func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) {
+		// No need to drop anything.
+		return
+	}
+
+	if oldClaim == nil {
+		// Always drop on create. There's no status yet, so nothing to do there.
+		newClaim.Spec.Controller = ""
+		return
+	}
+
+	// Drop on (status) update only if not already set.
+	if oldClaim.Spec.Controller == "" {
+		newClaim.Spec.Controller = ""
+	}
+	// If the claim is handled by a control plane controller, allow
+	// setting it also in the status. Stripping that field would be bad.
+	if oldClaim.Spec.Controller == "" &&
+		newClaim.Status.Allocation != nil &&
+		oldClaim.Status.Allocation == nil &&
+		(oldClaim.Status.Allocation == nil || oldClaim.Status.Allocation.Controller == "") {
+		newClaim.Status.Allocation.Controller = ""
+	}
+	// If there is an existing allocation which used a control plane controller, then
+	// allow requesting its deallocation.
+	if !oldClaim.Status.DeallocationRequested &&
+		(newClaim.Status.Allocation == nil || newClaim.Status.Allocation.Controller == "") {
+		newClaim.Status.DeallocationRequested = false
+	}
 }

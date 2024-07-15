@@ -973,8 +973,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	}
 
-	ginkgo.Context("with classic DRA", func() { tests(parameterModeClassicDRA) })
-	ginkgo.Context("with structured parameters", func() { tests(parameterModeStructured) })
+	framework.Context("with classic DRA", feature.DRAControlPlaneController, func() { tests(parameterModeClassicDRA) })
+	framework.Context("with structured parameters", func() { tests(parameterModeStructured) })
 
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
 	// executed with different parameters.
@@ -1100,7 +1100,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	// The following tests are all about behavior in combination with a
 	// control-plane DRA driver controller.
-	ginkgo.Context("cluster with DRA driver controller", func() {
+	framework.Context("cluster with classic DRA", feature.DRAControlPlaneController, func() {
 		nodes := NewNodes(f, 1, 4)
 
 		// kube-controller-manager can trigger delayed allocation for pods where the

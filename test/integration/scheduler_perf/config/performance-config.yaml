@@ -745,6 +745,7 @@
 # and dynamically created ResourceClaim instances for each pod.
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
+    DRAControlPlaneController: true
     DynamicResourceAllocation: true
     # SchedulerQueueingHints: true
   workloadTemplate:
@@ -812,6 +813,7 @@
 # scheduling via PodSchedulingContext.
 - name: SchedulingWithMultipleResourceClaims
   featureGates:
+    DRAControlPlaneController: true
     DynamicResourceAllocation: true
     # SchedulerQueueingHints: true
   workloadTemplate:
@@ -882,7 +884,7 @@
       measurePods: 1000
       maxClaimsPerNode: 20
 
-# SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
+# SchedulingWithResourceClaimTemplateStructured uses a ResourceClaimTemplate
 # and dynamically creates ResourceClaim instances for each pod.
 # The driver uses structured parameters.
 - name: SchedulingWithResourceClaimTemplateStructured

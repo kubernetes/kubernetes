@@ -235,7 +235,17 @@ const (
 	// alpha: v1.26
 	//
 	// Enables support for resources with custom parameters and a lifecycle
-	// that is independent of a Pod.
+	// that is independent of a Pod. Resource allocation is done by a DRA driver's
+	// "control plane controller" in cooperation with the scheduler.
+	DRAControlPlaneController featuregate.Feature = "DRAControlPlaneController"
+
+	// owner: @pohly
+	// kep: http://kep.k8s.io/4381
+	// alpha: v1.29
+	//
+	// Enables support for resources with custom parameters and a lifecycle
+	// that is independent of a Pod. Resource allocation is done by the scheduler
+	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
 	// owner: @harche
@@ -1060,6 +1070,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DisableNodeKubeProxyVersion: {Default: true, PreRelease: featuregate.Beta},
 
 	DevicePluginCDIDevices: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
+
+	DRAControlPlaneController: {Default: false, PreRelease: featuregate.Alpha},
 
 	DynamicResourceAllocation: {Default: false, PreRelease: featuregate.Alpha},
 

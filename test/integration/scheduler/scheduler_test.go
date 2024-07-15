@@ -658,6 +658,7 @@ func TestNodeEvents(t *testing.T) {
 //     no standard API for those).
 func TestPodSchedulingContextSSA(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAControlPlaneController, true)
 
 	testCtx := testutils.InitTestAPIServer(t, "podschedulingcontext-ssa", nil)
 	testCtx.DisableEventSink = true
