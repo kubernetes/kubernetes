@@ -231,8 +231,8 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 		},
 		{
 			name:                 "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, reize_op=failing",
-			pvc:                  getTestPVC(volumetesting.AlwaysFailNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
-			pv:                   getTestPV(volumetesting.AlwaysFailNodeExpansion, "2G"),
+			pvc:                  getTestPVC(volumetesting.InfeasibleNodeExpansion, "2G", "1G", "2G", &nodeResizePending),
+			pv:                   getTestPV(volumetesting.InfeasibleNodeExpansion, "2G"),
 			expectError:          true,
 			expectedResizeStatus: v1.PersistentVolumeClaimNodeResizeInfeasible,
 			resizeCallCount:      1,
@@ -302,9 +302,10 @@ func TestOperationGenerator_nodeExpandVolume(t *testing.T) {
 				NewSize:    *desiredSize,
 				OldSize:    *actualSize,
 			}
+			asow := newFakeActualStateOfWorld()
 
 			ogInstance, _ := og.(*operationGenerator)
-			_, err := ogInstance.nodeExpandVolume(vmt, nil, pluginResizeOpts)
+			_, err := ogInstance.nodeExpandVolume(vmt, asow, pluginResizeOpts)
 
 			if !test.expectError && err != nil {
 				t.Errorf("For test %s, expected no error got: %v", test.name, err)
