@@ -29,10 +29,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -119,6 +121,35 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		ginkgo.By("Verifying if expected requests were sent to the server")
 		expectedRequestMadeByKubeClient := getExpectedRequestMadeByClientFor(secretList.ResourceVersion)
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByKubeClient))
+	})
+	ginkgo.It("should be requested by dynamic client's List method when WatchListClient is enabled", func(ctx context.Context) {
+		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
+
+		ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))
+		var expectedSecrets []unstructured.Unstructured
+		for i := 1; i <= 5; i++ {
+			unstructuredSecret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newSecret(fmt.Sprintf("secret-%d", i)))
+			framework.ExpectNoError(err)
+			secret, err := f.DynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).Create(ctx, &unstructured.Unstructured{Object: unstructuredSecret}, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			expectedSecrets = append(expectedSecrets, *secret)
+		}
+
+		rt, clientConfig := clientConfigWithRoundTripper(f)
+		wrappedDynamicClient, err := dynamic.NewForConfig(clientConfig)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Streaming secrets from the server")
+		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying if the secret list was properly streamed")
+		streamedSecrets := secretList.Items
+		gomega.Expect(cmp.Equal(expectedSecrets, streamedSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+
+		ginkgo.By("Verifying if expected requests were sent to the server")
+		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientFor(secretList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
 	})
 })
 
