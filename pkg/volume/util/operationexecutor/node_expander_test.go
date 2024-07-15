@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -33,9 +32,6 @@ import (
 )
 
 type fakeActualStateOfWorld struct {
-	// nodeName is the name of this node. This value is passed to Attach/Detach
-	nodeName types.NodeName
-
 	volumesWithFinalExpansionErrors sets.Set[v1.UniqueVolumeName]
 	sync.RWMutex
 }

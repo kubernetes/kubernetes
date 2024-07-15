@@ -180,6 +180,7 @@ type FakeVolumePlugin struct {
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
 	LastProvisionerOptions volume.VolumeOptions
+	LastResizeOptions      volume.NodeResizeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
 	NodeExpandCallCount    int
@@ -494,6 +495,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
 	plugin.NodeExpandCallCount++
+	plugin.LastResizeOptions = resizeOptions
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}

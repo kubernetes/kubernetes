@@ -39,7 +39,7 @@ type NodeExpander struct {
 	pvCap        resource.Quantity
 	resizeStatus v1.ClaimResourceStatus
 
-	// indicates that pvc spec size has actually changed since last we observerd size
+	// indicates that pvc spec size has actually changed since last we observed size
 	// on the kubelet
 	markExpansionInfeasible bool
 
