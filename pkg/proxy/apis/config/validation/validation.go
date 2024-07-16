@@ -54,13 +54,9 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	case kubeproxyconfig.ProxyModeNFTables:
 		allErrs = append(allErrs, validateKubeProxyNFTablesConfiguration(config.NFTables, newPath.Child("KubeProxyNFTablesConfiguration"))...)
 	}
-	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, newPath.Child("KubeProxyConntrackConfiguration"))...)
+	allErrs = append(allErrs, validateKubeProxyLinuxConfiguration(config.Linux, newPath.Child("KubeProxyLinuxConfiguration"))...)
 	allErrs = append(allErrs, validateProxyMode(config.Mode, newPath.Child("Mode"))...)
 	allErrs = append(allErrs, validateClientConnectionConfiguration(config.ClientConnection, newPath.Child("ClientConnection"))...)
-
-	if config.OOMScoreAdj != nil && (*config.OOMScoreAdj < -1000 || *config.OOMScoreAdj > 1000) {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
-	}
 
 	if config.ConfigSyncPeriod.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
@@ -173,6 +169,18 @@ func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTa
 
 	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
+	}
+
+	return allErrs
+}
+
+func validateKubeProxyLinuxConfiguration(config kubeproxyconfig.KubeProxyLinuxConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, fldPath.Child("KubeProxyConntrackConfiguration"))...)
+
+	if config.OOMScoreAdj != nil && (*config.OOMScoreAdj < -1000 || *config.OOMScoreAdj > 1000) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
 	}
 
 	return allErrs

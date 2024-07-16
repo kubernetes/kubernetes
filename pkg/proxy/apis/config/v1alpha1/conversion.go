@@ -28,6 +28,14 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 		return err
 	}
 	out.WindowsRunAsService = in.Windows.RunAsService
+	out.Conntrack = v1alpha1.KubeProxyConntrackConfiguration(in.Linux.Conntrack)
+	out.OOMScoreAdj = in.Linux.OOMScoreAdj
+	switch in.Mode {
+	case config.ProxyModeNFTables:
+		out.NFTables.MasqueradeAll = in.Linux.MasqueradeAll
+	default:
+		out.IPTables.MasqueradeAll = in.Linux.MasqueradeAll
+	}
 	return nil
 }
 
@@ -37,5 +45,23 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 		return err
 	}
 	out.Windows.RunAsService = in.WindowsRunAsService
+	out.Linux.Conntrack = config.KubeProxyConntrackConfiguration(in.Conntrack)
+	out.Linux.OOMScoreAdj = in.OOMScoreAdj
+	switch config.ProxyMode(in.Mode) {
+	case config.ProxyModeNFTables:
+		out.Linux.MasqueradeAll = in.NFTables.MasqueradeAll
+	default:
+		out.Linux.MasqueradeAll = in.IPTables.MasqueradeAll
+	}
 	return nil
+}
+
+// Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
+func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, scope conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in, out, scope)
+}
+
+// Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
+func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, scope)
 }

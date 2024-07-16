@@ -493,9 +493,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
-	if s.Config.OOMScoreAdj != nil {
+	if s.Config.Linux.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.Config.OOMScoreAdj)); err != nil {
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.Config.Linux.OOMScoreAdj)); err != nil {
 			logger.V(2).Info("Failed to apply OOMScore", "err", err)
 		}
 	}
