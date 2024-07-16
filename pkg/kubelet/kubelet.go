@@ -1544,10 +1544,14 @@ func (kl *Kubelet) initializeModules() error {
 
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
-	if err := kl.cadvisor.Start(); err != nil {
-		// Fail kubelet and rely on the babysitter to retry starting kubelet.
-		klog.ErrorS(err, "Failed to start cAdvisor")
-		os.Exit(1)
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI) && utilfeature.DefaultFeatureGate.Enabled(features.KubeletNodeCgroupStats) && sysruntime.GOOS != "windows" {
+		klog.V(3).InfoS("cAdvisor is not started when features are enabled on non-window OS", "feature", features.PodAndContainerStatsFromCRI, "feature", features.KubeletNodeCgroupStats)
+	} else {
+		if err := kl.cadvisor.Start(); err != nil {
+			// Fail kubelet and rely on the babysitter to retry starting kubelet.
+			klog.ErrorS(err, "Failed to start cAdvisor")
+			os.Exit(1)
+		}
 	}
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
