@@ -15,7 +15,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/hcsshim v0.12.5
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

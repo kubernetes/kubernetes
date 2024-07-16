@@ -14,6 +14,9 @@ type GuestState struct {
 	//  The path to an existing file uses for persistent guest state storage.  An empty string indicates the system should initialize new transient, in-memory guest state.
 	GuestStateFilePath string `json:"GuestStateFilePath,omitempty"`
 
+	//  The guest state file type affected by different guest isolation modes - whether a file or block storage.
+	GuestStateFileType string `json:"GuestStateFileType,omitempty"`
+
 	//  The path to an existing file for persistent runtime state storage.  An empty string indicates the system should initialize new transient, in-memory runtime state.
 	RuntimeStateFilePath string `json:"RuntimeStateFilePath,omitempty"`
 

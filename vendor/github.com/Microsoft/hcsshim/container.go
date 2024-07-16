@@ -1,3 +1,5 @@
+//go:build windows
+
 package hcsshim
 
 import (
@@ -60,7 +62,7 @@ type container struct {
 	waitCh   chan struct{}
 }
 
-// createComputeSystemAdditionalJSON is read from the environment at initialisation
+// createContainerAdditionalJSON is read from the environment at initialization
 // time. It allows an environment variable to define additional JSON which
 // is merged in the CreateComputeSystem call to HCS.
 var createContainerAdditionalJSON []byte
@@ -73,7 +75,7 @@ func init() {
 func CreateContainer(id string, c *ContainerConfig) (Container, error) {
 	fullConfig, err := mergemaps.MergeJSON(c, createContainerAdditionalJSON)
 	if err != nil {
-		return nil, fmt.Errorf("failed to merge additional JSON '%s': %s", createContainerAdditionalJSON, err)
+		return nil, fmt.Errorf("failed to merge additional JSON '%s': %w", createContainerAdditionalJSON, err)
 	}
 
 	system, err := hcs.CreateComputeSystem(context.Background(), id, fullConfig)

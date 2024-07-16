@@ -1,3 +1,5 @@
+//go:build windows
+
 package hns
 
 import (
@@ -7,6 +9,28 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+// EndpointState represents the states of an HNS Endpoint lifecycle.
+type EndpointState uint16
+
+// EndpointState const
+// The lifecycle of an Endpoint goes through created, attached, AttachedSharing - endpoint is being shared with other containers,
+// detached, after being attached, degraded and finally destroyed.
+// Note: This attribute is used by calico to define stale containers and is dependent on HNS v1 api, if we move to HNS v2 api we will need
+// to update the current calico code and cordinate the change with calico. Reach out to Microsoft to facilate the change via HNS.
+const (
+	Uninitialized   EndpointState = iota
+	Created         EndpointState = 1
+	Attached        EndpointState = 2
+	AttachedSharing EndpointState = 3
+	Detached        EndpointState = 4
+	Degraded        EndpointState = 5
+	Destroyed       EndpointState = 6
+)
+
+func (es EndpointState) String() string {
+	return [...]string{"Uninitialized", "Attached", "AttachedSharing", "Detached", "Degraded", "Destroyed"}[es]
+}
 
 // HNSEndpoint represents a network endpoint in HNS
 type HNSEndpoint struct {
@@ -20,6 +44,7 @@ type HNSEndpoint struct {
 	IPv6Address        net.IP            `json:",omitempty"`
 	DNSSuffix          string            `json:",omitempty"`
 	DNSServerList      string            `json:",omitempty"`
+	DNSDomain          string            `json:",omitempty"`
 	GatewayAddress     string            `json:",omitempty"`
 	GatewayAddressV6   string            `json:",omitempty"`
 	EnableInternalDNS  bool              `json:",omitempty"`
@@ -31,9 +56,10 @@ type HNSEndpoint struct {
 	Namespace          *Namespace        `json:",omitempty"`
 	EncapOverhead      uint16            `json:",omitempty"`
 	SharedContainers   []string          `json:",omitempty"`
+	State              EndpointState     `json:",omitempty"`
 }
 
-//SystemType represents the type of the system on which actions are done
+// SystemType represents the type of the system on which actions are done
 type SystemType string
 
 // SystemType const
@@ -145,7 +171,6 @@ func (endpoint *HNSEndpoint) IsAttached(vID string) (bool, error) {
 	}
 
 	return false, nil
-
 }
 
 // Create Endpoint by sending EndpointRequest to HNS. TODO: Create a separate HNS interface to place all these methods
@@ -280,7 +305,6 @@ func (endpoint *HNSEndpoint) HostAttach(compartmentID uint16) error {
 		return err
 	}
 	return hnsCall("POST", "/endpoints/"+endpoint.Id+"/attach", string(jsonString), &response)
-
 }
 
 // HostDetach detaches a nic on the host

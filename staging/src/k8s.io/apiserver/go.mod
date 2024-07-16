@@ -59,7 +59,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/hcsshim v0.12.5
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

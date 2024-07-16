@@ -1,5 +1,5 @@
-// Package hcn is a shim for the Host Compute Networking (HCN) service, which manages networking for Windows Server
-// containers and Hyper-V containers. Previous to RS5, HCN was referred to as Host Networking Service (HNS).
+//go:build windows
+
 package hcn
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/Microsoft/go-winio/pkg/guid"
 )
 
-//go:generate go run ../mksyscall_windows.go -output zsyscall_windows.go hcn.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go hcn.go
 
 /// HNS V1 API
 
@@ -122,7 +122,7 @@ func defaultQuery() HostComputeQuery {
 
 // PlatformDoesNotSupportError happens when users are attempting to use a newer shim on an older OS
 func platformDoesNotSupportError(featureName string) error {
-	return fmt.Errorf("Platform does not support feature %s", featureName)
+	return fmt.Errorf("platform does not support feature %s", featureName)
 }
 
 // V2ApiSupported returns an error if the HCN version does not support the V2 Apis.
@@ -228,7 +228,7 @@ func IPv6DualStackSupported() error {
 	return platformDoesNotSupportError("IPv6 DualStack")
 }
 
-//L4proxySupported returns an error if the HCN verison does not support L4Proxy
+// L4proxySupported returns an error if the HCN version does not support L4Proxy
 func L4proxyPolicySupported() error {
 	supported, err := GetCachedSupportedFeatures()
 	if err != nil {
@@ -240,7 +240,7 @@ func L4proxyPolicySupported() error {
 	return platformDoesNotSupportError("L4ProxyPolicy")
 }
 
-// L4WfpProxySupported returns an error if the HCN verison does not support L4WfpProxy
+// L4WfpProxySupported returns an error if the HCN version does not support L4WfpProxy
 func L4WfpProxyPolicySupported() error {
 	supported, err := GetCachedSupportedFeatures()
 	if err != nil {
@@ -298,6 +298,54 @@ func TierAclPolicySupported() error {
 		return nil
 	}
 	return platformDoesNotSupportError("TierAcl")
+}
+
+// NetworkACLPolicySupported returns an error if the HCN version does not support NetworkACLPolicy
+func NetworkACLPolicySupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.NetworkACL {
+		return nil
+	}
+	return platformDoesNotSupportError("NetworkACL")
+}
+
+// NestedIpSetSupported returns an error if the HCN version does not support NestedIpSet
+func NestedIpSetSupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.NestedIpSet {
+		return nil
+	}
+	return platformDoesNotSupportError("NestedIpSet")
+}
+
+// DisableHostPortSupported returns an error if the HCN version does not support DisableHostPort flag
+func DisableHostPortSupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.DisableHostPort {
+		return nil
+	}
+	return platformDoesNotSupportError("DisableHostPort")
+}
+
+// AccelnetSupported returns an error if the HCN version does not support Accelnet Feature.
+func AccelnetSupported() error {
+	supported, err := GetCachedSupportedFeatures()
+	if err != nil {
+		return err
+	}
+	if supported.Accelnet {
+		return nil
+	}
+	return platformDoesNotSupportError("Accelnet")
 }
 
 // RequestType are the different operations performed to settings.

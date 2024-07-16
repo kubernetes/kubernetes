@@ -250,7 +250,15 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		if qdisc.Quantum > 0 {
 			options.AddRtAttr(nl.TCA_FQ_CODEL_QUANTUM, nl.Uint32Attr((uint32(qdisc.Quantum))))
 		}
-
+		if qdisc.CEThreshold > 0 {
+			options.AddRtAttr(nl.TCA_FQ_CODEL_CE_THRESHOLD, nl.Uint32Attr(qdisc.CEThreshold))
+		}
+		if qdisc.DropBatchSize > 0 {
+			options.AddRtAttr(nl.TCA_FQ_CODEL_DROP_BATCH_SIZE, nl.Uint32Attr(qdisc.DropBatchSize))
+		}
+		if qdisc.MemoryLimit > 0 {
+			options.AddRtAttr(nl.TCA_FQ_CODEL_MEMORY_LIMIT, nl.Uint32Attr(qdisc.MemoryLimit))
+		}
 	case *Fq:
 		options.AddRtAttr(nl.TCA_FQ_RATE_ENABLE, nl.Uint32Attr((uint32(qdisc.Pacing))))
 
@@ -278,6 +286,14 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		if qdisc.FlowDefaultRate > 0 {
 			options.AddRtAttr(nl.TCA_FQ_FLOW_DEFAULT_RATE, nl.Uint32Attr((uint32(qdisc.FlowDefaultRate))))
 		}
+	case *Sfq:
+		opt := nl.TcSfqQoptV1{}
+		opt.TcSfqQopt.Quantum = qdisc.Quantum
+		opt.TcSfqQopt.Perturb = int32(qdisc.Perturb)
+		opt.TcSfqQopt.Limit = qdisc.Limit
+		opt.TcSfqQopt.Divisor = qdisc.Divisor
+
+		options = nl.NewRtAttr(nl.TCA_OPTIONS, opt.Serialize())
 	default:
 		options = nil
 	}
@@ -362,6 +378,8 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 					qdisc = &FqCodel{}
 				case "netem":
 					qdisc = &Netem{}
+				case "sfq":
+					qdisc = &Sfq{}
 				default:
 					qdisc = &GenericQdisc{QdiscType: qdiscType}
 				}
@@ -417,6 +435,10 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 					if err := parseNetemData(qdisc, attr.Value); err != nil {
 						return nil, err
 					}
+				case "sfq":
+					if err := parseSfqData(qdisc, attr.Value); err != nil {
+						return nil, err
+					}
 
 					// no options for ingress
 				}
@@ -446,7 +468,6 @@ func parsePrioData(qdisc Qdisc, value []byte) error {
 }
 
 func parseHtbData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
-	native = nl.NativeEndian()
 	htb := qdisc.(*Htb)
 	for _, datum := range data {
 		switch datum.Attr.Type {
@@ -466,7 +487,6 @@ func parseHtbData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 }
 
 func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
-	native = nl.NativeEndian()
 	fqCodel := qdisc.(*FqCodel)
 	for _, datum := range data {
 
@@ -483,6 +503,12 @@ func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 			fqCodel.Flows = native.Uint32(datum.Value)
 		case nl.TCA_FQ_CODEL_QUANTUM:
 			fqCodel.Quantum = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_CE_THRESHOLD:
+			fqCodel.CEThreshold = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_DROP_BATCH_SIZE:
+			fqCodel.DropBatchSize = native.Uint32(datum.Value)
+		case nl.TCA_FQ_CODEL_MEMORY_LIMIT:
+			fqCodel.MemoryLimit = native.Uint32(datum.Value)
 		}
 	}
 	return nil
@@ -490,13 +516,11 @@ func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 
 func parseHfscData(qdisc Qdisc, data []byte) error {
 	Hfsc := qdisc.(*Hfsc)
-	native = nl.NativeEndian()
 	Hfsc.Defcls = native.Uint16(data)
 	return nil
 }
 
 func parseFqData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
-	native = nl.NativeEndian()
 	fq := qdisc.(*Fq)
 	for _, datum := range data {
 		switch datum.Attr.Type {
@@ -561,7 +585,6 @@ func parseNetemData(qdisc Qdisc, value []byte) error {
 }
 
 func parseTbfData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
-	native = nl.NativeEndian()
 	tbf := qdisc.(*Tbf)
 	for _, datum := range data {
 		switch datum.Attr.Type {
@@ -582,6 +605,17 @@ func parseTbfData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 	return nil
 }
 
+func parseSfqData(qdisc Qdisc, value []byte) error {
+	sfq := qdisc.(*Sfq)
+	opt := nl.DeserializeTcSfqQoptV1(value)
+	sfq.Quantum = opt.TcSfqQopt.Quantum
+	sfq.Perturb = uint8(opt.TcSfqQopt.Perturb)
+	sfq.Limit = opt.TcSfqQopt.Limit
+	sfq.Divisor = opt.TcSfqQopt.Divisor
+
+	return nil
+}
+
 const (
 	TIME_UNITS_PER_SEC = 1000000
 )
@@ -598,10 +632,10 @@ func initClock() {
 		return
 	}
 	parts := strings.Split(strings.TrimSpace(string(data)), " ")
-	if len(parts) < 3 {
+	if len(parts) < 4 {
 		return
 	}
-	var vals [3]uint64
+	var vals [4]uint64
 	for i := range vals {
 		val, err := strconv.ParseUint(parts[i], 16, 32)
 		if err != nil {
@@ -615,7 +649,12 @@ func initClock() {
 	}
 	clockFactor = float64(vals[2]) / TIME_UNITS_PER_SEC
 	tickInUsec = float64(vals[0]) / float64(vals[1]) * clockFactor
-	hz = float64(vals[0])
+	if vals[2] == 1000000 {
+		// ref https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/tree/lib/utils.c#n963
+		hz = float64(vals[3])
+	} else {
+		hz = 100
+	}
 }
 
 func TickInUsec() float64 {
@@ -663,6 +702,11 @@ func latency(rate uint64, limit, buffer uint32) float64 {
 	return TIME_UNITS_PER_SEC*(float64(limit)/float64(rate)) - float64(tick2Time(buffer))
 }
 
-func Xmittime(rate uint64, size uint32) float64 {
-	return TickInUsec() * TIME_UNITS_PER_SEC * (float64(size) / float64(rate))
+func Xmittime(rate uint64, size uint32) uint32 {
+	// https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/tree/tc/tc_core.c#n62
+	return time2Tick(uint32(TIME_UNITS_PER_SEC * (float64(size) / float64(rate))))
+}
+
+func Xmitsize(rate uint64, ticks uint32) uint32 {
+	return uint32((float64(rate) * float64(tick2Time(ticks))) / TIME_UNITS_PER_SEC)
 }

@@ -1,6 +1,8 @@
 package nl
 
 import (
+	"bytes"
+	"encoding/binary"
 	"unsafe"
 )
 
@@ -172,6 +174,22 @@ const (
 )
 
 const (
+	IFLA_GENEVE_UNSPEC = iota
+	IFLA_GENEVE_ID     // vni
+	IFLA_GENEVE_REMOTE
+	IFLA_GENEVE_TTL
+	IFLA_GENEVE_TOS
+	IFLA_GENEVE_PORT // destination port
+	IFLA_GENEVE_COLLECT_METADATA
+	IFLA_GENEVE_REMOTE6
+	IFLA_GENEVE_UDP_CSUM
+	IFLA_GENEVE_UDP_ZERO_CSUM6_TX
+	IFLA_GENEVE_UDP_ZERO_CSUM6_RX
+	IFLA_GENEVE_LABEL
+	IFLA_GENEVE_MAX = IFLA_GENEVE_LABEL
+)
+
+const (
 	IFLA_GRE_UNSPEC = iota
 	IFLA_GRE_LINK
 	IFLA_GRE_IFLAGS
@@ -243,7 +261,9 @@ const (
 	IFLA_VF_STATS_TX_BYTES
 	IFLA_VF_STATS_BROADCAST
 	IFLA_VF_STATS_MULTICAST
-	IFLA_VF_STATS_MAX = IFLA_VF_STATS_MULTICAST
+	IFLA_VF_STATS_RX_DROPPED
+	IFLA_VF_STATS_TX_DROPPED
+	IFLA_VF_STATS_MAX = IFLA_VF_STATS_TX_DROPPED
 )
 
 const (
@@ -324,6 +344,59 @@ func DeserializeVfTxRate(b []byte) *VfTxRate {
 
 func (msg *VfTxRate) Serialize() []byte {
 	return (*(*[SizeofVfTxRate]byte)(unsafe.Pointer(msg)))[:]
+}
+
+//struct ifla_vf_stats {
+//	__u64 rx_packets;
+//	__u64 tx_packets;
+//	__u64 rx_bytes;
+//	__u64 tx_bytes;
+//	__u64 broadcast;
+//	__u64 multicast;
+//};
+
+type VfStats struct {
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
+	Multicast uint64
+	Broadcast uint64
+	RxDropped uint64
+	TxDropped uint64
+}
+
+func DeserializeVfStats(b []byte) VfStats {
+	var vfstat VfStats
+	stats, err := ParseRouteAttr(b)
+	if err != nil {
+		return vfstat
+	}
+	var valueVar uint64
+	for _, stat := range stats {
+		if err := binary.Read(bytes.NewBuffer(stat.Value), NativeEndian(), &valueVar); err != nil {
+			break
+		}
+		switch stat.Attr.Type {
+		case IFLA_VF_STATS_RX_PACKETS:
+			vfstat.RxPackets = valueVar
+		case IFLA_VF_STATS_TX_PACKETS:
+			vfstat.TxPackets = valueVar
+		case IFLA_VF_STATS_RX_BYTES:
+			vfstat.RxBytes = valueVar
+		case IFLA_VF_STATS_TX_BYTES:
+			vfstat.TxBytes = valueVar
+		case IFLA_VF_STATS_MULTICAST:
+			vfstat.Multicast = valueVar
+		case IFLA_VF_STATS_BROADCAST:
+			vfstat.Broadcast = valueVar
+		case IFLA_VF_STATS_RX_DROPPED:
+			vfstat.RxDropped = valueVar
+		case IFLA_VF_STATS_TX_DROPPED:
+			vfstat.TxDropped = valueVar
+		}
+	}
+	return vfstat
 }
 
 // struct ifla_vf_rate {
@@ -478,6 +551,14 @@ const (
 	IFLA_XDP_MAX      = IFLA_XDP_PROG_ID
 )
 
+// XDP program attach mode (used as dump value for IFLA_XDP_ATTACHED)
+const (
+	XDP_ATTACHED_NONE = iota
+	XDP_ATTACHED_DRV
+	XDP_ATTACHED_SKB
+	XDP_ATTACHED_HW
+)
+
 const (
 	IFLA_IPTUN_UNSPEC = iota
 	IFLA_IPTUN_LINK
@@ -607,4 +688,33 @@ const (
 	IFLA_IPOIB_MODE
 	IFLA_IPOIB_UMCAST
 	IFLA_IPOIB_MAX = IFLA_IPOIB_UMCAST
+)
+
+const (
+	IFLA_CAN_UNSPEC = iota
+	IFLA_CAN_BITTIMING
+	IFLA_CAN_BITTIMING_CONST
+	IFLA_CAN_CLOCK
+	IFLA_CAN_STATE
+	IFLA_CAN_CTRLMODE
+	IFLA_CAN_RESTART_MS
+	IFLA_CAN_RESTART
+	IFLA_CAN_BERR_COUNTER
+	IFLA_CAN_DATA_BITTIMING
+	IFLA_CAN_DATA_BITTIMING_CONST
+	IFLA_CAN_TERMINATION
+	IFLA_CAN_TERMINATION_CONST
+	IFLA_CAN_BITRATE_CONST
+	IFLA_CAN_DATA_BITRATE_CONST
+	IFLA_CAN_BITRATE_MAX
+	IFLA_CAN_MAX = IFLA_CAN_BITRATE_MAX
+)
+
+const (
+	IFLA_BAREUDP_UNSPEC = iota
+	IFLA_BAREUDP_PORT
+	IFLA_BAREUDP_ETHERTYPE
+	IFLA_BAREUDP_SRCPORT_MIN
+	IFLA_BAREUDP_MULTIPROTO_MODE
+	IFLA_BAREUDP_MAX = IFLA_BAREUDP_MULTIPROTO_MODE
 )
