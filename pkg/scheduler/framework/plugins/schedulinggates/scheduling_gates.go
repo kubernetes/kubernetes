@@ -58,9 +58,9 @@ func (pl *SchedulingGates) PreEnqueue(ctx context.Context, p *v1.Pod) *framework
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *SchedulingGates) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	if !pl.enableSchedulingQueueHint {
-		return nil
+		return nil, nil
 	}
 	// When the QueueingHint feature is enabled,
 	// the scheduling queue uses Pod/Update Queueing Hint
@@ -69,7 +69,7 @@ func (pl *SchedulingGates) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		// Pods can be more schedulable once it's gates are removed
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}, QueueingHintFn: pl.isSchedulableAfterPodChange},
-	}
+	}, nil
 }
 
 // New initializes a new plugin and returns it.

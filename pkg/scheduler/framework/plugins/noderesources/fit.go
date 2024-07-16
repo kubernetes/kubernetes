@@ -247,7 +247,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
+func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
 		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
@@ -257,7 +257,7 @@ func (f *Fit) EventsToRegister() []framework.ClusterEventWithHint {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodChange},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}, QueueingHintFn: f.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 // isSchedulableAfterPodChange is invoked whenever a pod deleted or updated. It checks whether
