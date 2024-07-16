@@ -60,7 +60,7 @@ var (
 	// Possible label values:
 	//   completion_mode: Indexed, NonIndexed
 	//   result:          failed, succeeded
-	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", ""
+	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", "FailedIndexes", "MaxFailedIndexesExceeded", ""
 	JobFinishedNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
