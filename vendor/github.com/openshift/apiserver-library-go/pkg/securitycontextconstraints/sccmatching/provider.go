@@ -100,7 +100,7 @@ func NewSimpleProvider(scc *securityv1.SecurityContextConstraints) (SecurityCont
 // on the PodSecurityContext it will not be changed.  Validate should be used after the context
 // is created to ensure it complies with the required restrictions.
 func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
-	sc := NewPodSecurityContextMutator(pod.Spec.SecurityContext)
+	sc := securitycontext.NewPodSecurityContextMutator(pod.Spec.SecurityContext)
 
 	annotationsCopy := copySS(pod.Annotations)
 
@@ -149,9 +149,9 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 // container's security context then it will not be changed.  Validation should be used after
 // the context is created to ensure it complies with the required restrictions.
 func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, error) {
-	sc := NewEffectiveContainerSecurityContextMutator(
-		NewPodSecurityContextAccessor(pod.Spec.SecurityContext),
-		NewContainerSecurityContextMutator(container.SecurityContext),
+	sc := securitycontext.NewEffectiveContainerSecurityContextMutator(
+		securitycontext.NewPodSecurityContextAccessor(pod.Spec.SecurityContext),
+		securitycontext.NewContainerSecurityContextMutator(container.SecurityContext),
 	)
 	if sc.RunAsUser() == nil {
 		uid, err := s.runAsUserStrategy.Generate(pod, container)
