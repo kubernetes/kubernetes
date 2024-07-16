@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"time"
 
@@ -65,6 +66,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const (
@@ -266,6 +268,14 @@ func NewKubeGenericRuntimeManager(
 	if _, err := osInterface.Stat(podLogsRootDirectory); os.IsNotExist(err) {
 		if err := osInterface.MkdirAll(podLogsRootDirectory, 0755); err != nil {
 			klog.ErrorS(err, "Failed to create pod log directory", "path", podLogsRootDirectory)
+		}
+
+		if runtime.GOOS == "windows" {
+			// On Windows we should not allow other users to read the logs directory
+			// to avoid allowing non-root containers from reading the logs of other pods.
+			if err := utilfs.Chmod(podLogsRootDirectory, 0750); err != nil {
+				klog.ErrorS(err, "Failed to set permissions on pod log directory", "path", podLogsRootDirectory)
+			}
 		}
 	}
 

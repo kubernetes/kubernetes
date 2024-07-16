@@ -35,3 +35,13 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 	}
 	return true, nil
 }
+
+// Chmod is the same as os.Chmod on Linux.
+func Chmod(name string, mode os.FileMode) error {
+	return os.Chmod(name, mode)
+}
+
+// MkdirAll is the same as os.MkdirAll on Linux.
+func MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
