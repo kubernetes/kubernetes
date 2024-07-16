@@ -1600,6 +1600,7 @@ message StatusRequest {
     bool verbose = 1;
 }
 
+// RuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message RuntimeHandlerFeatures {
     // recursive_read_only_mounts is set to true if the runtime handler supports
     // recursive read-only mounts.
@@ -1620,6 +1621,14 @@ message RuntimeHandler {
     RuntimeHandlerFeatures features = 2;
 }
 
+// RuntimeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the RuntimeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message RuntimeFeatures {
+    // supplemental_groups_policy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+    bool supplemental_groups_policy = 1;
+}
+
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
@@ -1630,6 +1639,9 @@ message StatusResponse {
     map<string, string> info = 2;
     // Runtime handlers.
     repeated RuntimeHandler runtime_handlers = 3;
+    // features describes the set of features implemented by the CRI implementation.
+    // This field is supposed to propagate to NodeFeatures in Kubernetes API.
+    RuntimeFeatures features = 4;
 }
 
 message ImageFsInfoRequest {}

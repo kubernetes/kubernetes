@@ -6103,6 +6103,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.DaemonEndpoint
       default: {}
+- name: io.k8s.api.core.v1.NodeFeatures
+  map:
+    fields:
+    - name: supplementalGroupsPolicy
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.NodeRuntimeHandler
   map:
     fields:
@@ -6231,6 +6237,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.NodeDaemonEndpoints
       default: {}
+    - name: features
+      type:
+        namedType: io.k8s.api.core.v1.NodeFeatures
     - name: images
       type:
         list:

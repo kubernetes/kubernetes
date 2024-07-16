@@ -2598,6 +2598,15 @@ message NodeDaemonEndpoints {
   optional DaemonEndpoint kubeletEndpoint = 1;
 }
 
+// NodeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the NodeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message NodeFeatures {
+  // SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+  // +optional
+  optional bool supplementalGroupsPolicy = 1;
+}
+
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
@@ -2628,7 +2637,7 @@ message NodeRuntimeHandler {
   optional NodeRuntimeHandlerFeatures features = 2;
 }
 
-// NodeRuntimeHandlerFeatures is a set of runtime features.
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message NodeRuntimeHandlerFeatures {
   // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
   // +featureGate=RecursiveReadOnlyMounts
@@ -2803,6 +2812,11 @@ message NodeStatus {
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
+
+  // Features describes the set of features implemented by the CRI implementation.
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional NodeFeatures features = 13;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.

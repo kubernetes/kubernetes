@@ -1206,6 +1206,15 @@ func (NodeDaemonEndpoints) SwaggerDoc() map[string]string {
 	return map_NodeDaemonEndpoints
 }
 
+var map_NodeFeatures = map[string]string{
+	"":                         "NodeFeatures describes the set of features implemented by the CRI implementation. The features contained in the NodeFeatures should depend only on the cri implementation independent of runtime handlers.",
+	"supplementalGroupsPolicy": "SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.",
+}
+
+func (NodeFeatures) SwaggerDoc() map[string]string {
+	return map_NodeFeatures
+}
+
 var map_NodeList = map[string]string{
 	"":         "NodeList is the whole list of all Nodes which have been registered with master.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -1236,7 +1245,7 @@ func (NodeRuntimeHandler) SwaggerDoc() map[string]string {
 }
 
 var map_NodeRuntimeHandlerFeatures = map[string]string{
-	"":                        "NodeRuntimeHandlerFeatures is a set of runtime features.",
+	"":                        "NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.",
 	"recursiveReadOnlyMounts": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
 	"userNamespaces":          "UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.",
 }
@@ -1304,6 +1313,7 @@ var map_NodeStatus = map[string]string{
 	"volumesAttached": "List of volumes that are attached to the node.",
 	"config":          "Status of the config assigned to the node via the dynamic Kubelet config feature.",
 	"runtimeHandlers": "The available runtime handlers.",
+	"features":        "Features describes the set of features implemented by the CRI implementation.",
 }
 
 func (NodeStatus) SwaggerDoc() map[string]string {
