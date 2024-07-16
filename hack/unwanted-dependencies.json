@@ -97,7 +97,6 @@
         "github.com/Microsoft/hcsshim",
         "github.com/containerd/cgroups",
         "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -164,13 +163,8 @@
       ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hcsshim",
-        "github.com/containerd/continuity",
-        "github.com/containerd/fifo",
-        "github.com/containerd/go-runc",
-        "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
-        "gotest.tools/v3",
         "k8s.io/kubectl",
         "k8s.io/kubernetes",
         "k8s.io/system-validators",
@@ -181,6 +175,7 @@
         "github.com/Microsoft/hcsshim"
       ],
       "golang.org/x/exp": [
+        "github.com/Microsoft/hcsshim",
         "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go",
         "k8s.io/mount-utils"
@@ -189,7 +184,7 @@
         "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
-        "github.com/containerd/ttrpc",
+        "github.com/Microsoft/hcsshim",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
         "go.etcd.io/etcd/api/v3",

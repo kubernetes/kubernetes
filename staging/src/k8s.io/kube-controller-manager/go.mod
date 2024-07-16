@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/Microsoft/hcsshim v0.12.5
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
