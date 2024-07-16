@@ -17,7 +17,7 @@ require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
-	github.com/containerd/cgroups v1.1.0
+	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/coredns/corefile-migration v1.0.21
 	github.com/coreos/go-oidc v2.2.1+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
@@ -133,8 +133,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/checkpoint-restore/go-criu/v5 v5.3.0 // indirect
-	github.com/cilium/ebpf v0.9.1 // indirect
-	github.com/containerd/cgroups/v3 v3.0.2 // indirect
+	github.com/cilium/ebpf v0.11.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/containerd/ttrpc v1.2.4 // indirect

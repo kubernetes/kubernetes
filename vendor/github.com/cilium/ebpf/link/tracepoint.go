@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/internal/tracefs"
 )
 
 // TracepointOptions defines additional parameters that will be used
@@ -17,7 +18,7 @@ type TracepointOptions struct {
 }
 
 // Tracepoint attaches the given eBPF program to the tracepoint with the given
-// group and name. See /sys/kernel/debug/tracing/events to find available
+// group and name. See /sys/kernel/tracing/events to find available
 // tracepoints. The top-level directory is the group, the event's subdirectory
 // is the name. Example:
 //
@@ -36,14 +37,11 @@ func Tracepoint(group, name string, prog *ebpf.Program, opts *TracepointOptions)
 	if prog == nil {
 		return nil, fmt.Errorf("prog cannot be nil: %w", errInvalidInput)
 	}
-	if !isValidTraceID(group) || !isValidTraceID(name) {
-		return nil, fmt.Errorf("group and name '%s/%s' must be alphanumeric or underscore: %w", group, name, errInvalidInput)
-	}
 	if prog.Type() != ebpf.TracePoint {
 		return nil, fmt.Errorf("eBPF program type %s is not a Tracepoint: %w", prog.Type(), errInvalidInput)
 	}
 
-	tid, err := getTraceEventID(group, name)
+	tid, err := tracefs.EventID(group, name)
 	if err != nil {
 		return nil, err
 	}
@@ -58,16 +56,9 @@ func Tracepoint(group, name string, prog *ebpf.Program, opts *TracepointOptions)
 		cookie = opts.Cookie
 	}
 
-	pe := &perfEvent{
-		typ:       tracepointEvent,
-		group:     group,
-		name:      name,
-		tracefsID: tid,
-		cookie:    cookie,
-		fd:        fd,
-	}
+	pe := newPerfEvent(fd, nil)
 
-	lnk, err := attachPerfEvent(pe, prog)
+	lnk, err := attachPerfEvent(pe, prog, cookie)
 	if err != nil {
 		pe.Close()
 		return nil, err

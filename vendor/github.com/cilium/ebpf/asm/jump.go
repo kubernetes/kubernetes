@@ -4,10 +4,10 @@ package asm
 
 // JumpOp affect control flow.
 //
-//    msb      lsb
-//    +----+-+---+
-//    |OP  |s|cls|
-//    +----+-+---+
+//	msb      lsb
+//	+----+-+---+
+//	|OP  |s|cls|
+//	+----+-+---+
 type JumpOp uint8
 
 const jumpMask OpCode = aluMask

@@ -95,7 +95,6 @@
       ],
       "github.com/gogo/protobuf": [
         "github.com/Microsoft/hcsshim",
-        "github.com/containerd/cgroups",
         "github.com/containerd/ttrpc",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
@@ -177,6 +176,7 @@
       "golang.org/x/exp": [
         "github.com/Microsoft/hcsshim",
         "github.com/antlr4-go/antlr/v4",
+        "github.com/cilium/ebpf",
         "github.com/google/cel-go",
         "k8s.io/mount-utils"
       ],

@@ -24,7 +24,7 @@ type ExtInfos struct {
 // loadExtInfosFromELF parses ext infos from the .BTF.ext section in an ELF.
 //
 // Returns an error wrapping ErrNotFound if no ext infos are present.
-func loadExtInfosFromELF(file *internal.SafeELFFile, ts types, strings *stringTable) (*ExtInfos, error) {
+func loadExtInfosFromELF(file *internal.SafeELFFile, spec *Spec) (*ExtInfos, error) {
 	section := file.Section(".BTF.ext")
 	if section == nil {
 		return nil, fmt.Errorf("btf ext infos: %w", ErrNotFound)
@@ -34,11 +34,11 @@ func loadExtInfosFromELF(file *internal.SafeELFFile, ts types, strings *stringTa
 		return nil, fmt.Errorf("compressed ext_info is not supported")
 	}
 
-	return loadExtInfos(section.ReaderAt, file.ByteOrder, ts, strings)
+	return loadExtInfos(section.ReaderAt, file.ByteOrder, spec, spec.strings)
 }
 
 // loadExtInfos parses bare ext infos.
-func loadExtInfos(r io.ReaderAt, bo binary.ByteOrder, ts types, strings *stringTable) (*ExtInfos, error) {
+func loadExtInfos(r io.ReaderAt, bo binary.ByteOrder, spec *Spec, strings *stringTable) (*ExtInfos, error) {
 	// Open unbuffered section reader. binary.Read() calls io.ReadFull on
 	// the header structs, resulting in one syscall per header.
 	headerRd := io.NewSectionReader(r, 0, math.MaxInt64)
@@ -60,7 +60,7 @@ func loadExtInfos(r io.ReaderAt, bo binary.ByteOrder, ts types, strings *stringT
 
 	funcInfos := make(map[string][]funcInfo, len(btfFuncInfos))
 	for section, bfis := range btfFuncInfos {
-		funcInfos[section], err = newFuncInfos(bfis, ts)
+		funcInfos[section], err = newFuncInfos(bfis, spec)
 		if err != nil {
 			return nil, fmt.Errorf("section %s: func infos: %w", section, err)
 		}
@@ -93,7 +93,7 @@ func loadExtInfos(r io.ReaderAt, bo binary.ByteOrder, ts types, strings *stringT
 
 	coreRelos := make(map[string][]coreRelocationInfo, len(btfCORERelos))
 	for section, brs := range btfCORERelos {
-		coreRelos[section], err = newRelocationInfos(brs, ts, strings)
+		coreRelos[section], err = newRelocationInfos(brs, spec, strings)
 		if err != nil {
 			return nil, fmt.Errorf("section %s: CO-RE relocations: %w", section, err)
 		}
@@ -114,7 +114,7 @@ func (ei *ExtInfos) Assign(insns asm.Instructions, section string) {
 	iter := insns.Iterate()
 	for iter.Next() {
 		if len(funcInfos) > 0 && funcInfos[0].offset == iter.Offset {
-			iter.Ins.Metadata.Set(funcInfoMeta{}, funcInfos[0].fn)
+			*iter.Ins = WithFuncMetadata(*iter.Ins, funcInfos[0].fn)
 			funcInfos = funcInfos[1:]
 		}
 
@@ -132,17 +132,37 @@ func (ei *ExtInfos) Assign(insns asm.Instructions, section string) {
 
 // MarshalExtInfos encodes function and line info embedded in insns into kernel
 // wire format.
-func MarshalExtInfos(insns asm.Instructions, typeID func(Type) (TypeID, error)) (funcInfos, lineInfos []byte, _ error) {
+//
+// Returns ErrNotSupported if the kernel doesn't support BTF-associated programs.
+func MarshalExtInfos(insns asm.Instructions) (_ *Handle, funcInfos, lineInfos []byte, _ error) {
+	// Bail out early if the kernel doesn't support Func(Proto). If this is the
+	// case, func_info will also be unsupported.
+	if err := haveProgBTF(); err != nil {
+		return nil, nil, nil, err
+	}
+
 	iter := insns.Iterate()
-	var fiBuf, liBuf bytes.Buffer
 	for iter.Next() {
+		_, ok := iter.Ins.Source().(*Line)
+		fn := FuncMetadata(iter.Ins)
+		if ok || fn != nil {
+			goto marshal
+		}
+	}
+
+	return nil, nil, nil, nil
+
+marshal:
+	var b Builder
+	var fiBuf, liBuf bytes.Buffer
+	for {
 		if fn := FuncMetadata(iter.Ins); fn != nil {
 			fi := &funcInfo{
 				fn:     fn,
 				offset: iter.Offset,
 			}
-			if err := fi.marshal(&fiBuf, typeID); err != nil {
-				return nil, nil, fmt.Errorf("write func info: %w", err)
+			if err := fi.marshal(&fiBuf, &b); err != nil {
+				return nil, nil, nil, fmt.Errorf("write func info: %w", err)
 			}
 		}
 
@@ -151,12 +171,18 @@ func MarshalExtInfos(insns asm.Instructions, typeID func(Type) (TypeID, error)) 
 				line:   line,
 				offset: iter.Offset,
 			}
-			if err := li.marshal(&liBuf); err != nil {
-				return nil, nil, fmt.Errorf("write line info: %w", err)
+			if err := li.marshal(&liBuf, &b); err != nil {
+				return nil, nil, nil, fmt.Errorf("write line info: %w", err)
 			}
 		}
+
+		if !iter.Next() {
+			break
+		}
 	}
-	return fiBuf.Bytes(), liBuf.Bytes(), nil
+
+	handle, err := NewHandle(&b)
+	return handle, fiBuf.Bytes(), liBuf.Bytes(), err
 }
 
 // btfExtHeader is found at the start of the .BTF.ext section.
@@ -311,8 +337,8 @@ type bpfFuncInfo struct {
 	TypeID  TypeID
 }
 
-func newFuncInfo(fi bpfFuncInfo, ts types) (*funcInfo, error) {
-	typ, err := ts.ByID(fi.TypeID)
+func newFuncInfo(fi bpfFuncInfo, spec *Spec) (*funcInfo, error) {
+	typ, err := spec.TypeByID(fi.TypeID)
 	if err != nil {
 		return nil, err
 	}
@@ -333,10 +359,10 @@ func newFuncInfo(fi bpfFuncInfo, ts types) (*funcInfo, error) {
 	}, nil
 }
 
-func newFuncInfos(bfis []bpfFuncInfo, ts types) ([]funcInfo, error) {
+func newFuncInfos(bfis []bpfFuncInfo, spec *Spec) ([]funcInfo, error) {
 	fis := make([]funcInfo, 0, len(bfis))
 	for _, bfi := range bfis {
-		fi, err := newFuncInfo(bfi, ts)
+		fi, err := newFuncInfo(bfi, spec)
 		if err != nil {
 			return nil, fmt.Errorf("offset %d: %w", bfi.InsnOff, err)
 		}
@@ -349,8 +375,8 @@ func newFuncInfos(bfis []bpfFuncInfo, ts types) ([]funcInfo, error) {
 }
 
 // marshal into the BTF wire format.
-func (fi *funcInfo) marshal(w io.Writer, typeID func(Type) (TypeID, error)) error {
-	id, err := typeID(fi.fn)
+func (fi *funcInfo) marshal(w *bytes.Buffer, b *Builder) error {
+	id, err := b.Add(fi.fn)
 	if err != nil {
 		return err
 	}
@@ -358,10 +384,14 @@ func (fi *funcInfo) marshal(w io.Writer, typeID func(Type) (TypeID, error)) erro
 		InsnOff: uint32(fi.offset),
 		TypeID:  id,
 	}
-	return binary.Write(w, internal.NativeEndian, &bfi)
+	buf := make([]byte, FuncInfoSize)
+	internal.NativeEndian.PutUint32(buf, bfi.InsnOff)
+	internal.NativeEndian.PutUint32(buf[4:], uint32(bfi.TypeID))
+	_, err = w.Write(buf)
+	return err
 }
 
-// parseLineInfos parses a func_info sub-section within .BTF.ext ito a map of
+// parseFuncInfos parses a func_info sub-section within .BTF.ext ito a map of
 // func infos indexed by section name.
 func parseFuncInfos(r io.Reader, bo binary.ByteOrder, strings *stringTable) (map[string][]bpfFuncInfo, error) {
 	recordSize, err := parseExtInfoRecordSize(r, bo)
@@ -428,12 +458,6 @@ type Line struct {
 	line       string
 	lineNumber uint32
 	lineColumn uint32
-
-	// TODO: We should get rid of the fields below, but for that we need to be
-	// able to write BTF.
-
-	fileNameOff uint32
-	lineOff     uint32
 }
 
 func (li *Line) FileName() string {
@@ -496,8 +520,6 @@ func newLineInfo(li bpfLineInfo, strings *stringTable) (*lineInfo, error) {
 			line,
 			lineNumber,
 			lineColumn,
-			li.FileNameOff,
-			li.LineOff,
 		},
 		asm.RawInstructionOffset(li.InsnOff),
 	}, nil
@@ -519,7 +541,7 @@ func newLineInfos(blis []bpfLineInfo, strings *stringTable) ([]lineInfo, error) 
 }
 
 // marshal writes the binary representation of the LineInfo to w.
-func (li *lineInfo) marshal(w io.Writer) error {
+func (li *lineInfo) marshal(w *bytes.Buffer, b *Builder) error {
 	line := li.line
 	if line.lineNumber > bpfLineMax {
 		return fmt.Errorf("line %d exceeds %d", line.lineNumber, bpfLineMax)
@@ -529,13 +551,30 @@ func (li *lineInfo) marshal(w io.Writer) error {
 		return fmt.Errorf("column %d exceeds %d", line.lineColumn, bpfColumnMax)
 	}
 
+	fileNameOff, err := b.addString(line.fileName)
+	if err != nil {
+		return fmt.Errorf("file name %q: %w", line.fileName, err)
+	}
+
+	lineOff, err := b.addString(line.line)
+	if err != nil {
+		return fmt.Errorf("line %q: %w", line.line, err)
+	}
+
 	bli := bpfLineInfo{
 		uint32(li.offset),
-		line.fileNameOff,
-		line.lineOff,
+		fileNameOff,
+		lineOff,
 		(line.lineNumber << bpfLineShift) | line.lineColumn,
 	}
-	return binary.Write(w, internal.NativeEndian, &bli)
+
+	buf := make([]byte, LineInfoSize)
+	internal.NativeEndian.PutUint32(buf, bli.InsnOff)
+	internal.NativeEndian.PutUint32(buf[4:], bli.FileNameOff)
+	internal.NativeEndian.PutUint32(buf[8:], bli.LineOff)
+	internal.NativeEndian.PutUint32(buf[12:], bli.LineCol)
+	_, err = w.Write(buf)
+	return err
 }
 
 // parseLineInfos parses a line_info sub-section within .BTF.ext ito a map of
@@ -605,9 +644,16 @@ type bpfCORERelo struct {
 }
 
 type CORERelocation struct {
+	// The local type of the relocation, stripped of typedefs and qualifiers.
 	typ      Type
 	accessor coreAccessor
 	kind     coreKind
+	// The ID of the local type in the source BTF.
+	id TypeID
+}
+
+func (cr *CORERelocation) String() string {
+	return fmt.Sprintf("CORERelocation(%s, %s[%s], local_id=%d)", cr.kind, cr.typ, cr.accessor, cr.id)
 }
 
 func CORERelocationMetadata(ins *asm.Instruction) *CORERelocation {
@@ -620,8 +666,8 @@ type coreRelocationInfo struct {
 	offset asm.RawInstructionOffset
 }
 
-func newRelocationInfo(relo bpfCORERelo, ts types, strings *stringTable) (*coreRelocationInfo, error) {
-	typ, err := ts.ByID(relo.TypeID)
+func newRelocationInfo(relo bpfCORERelo, spec *Spec, strings *stringTable) (*coreRelocationInfo, error) {
+	typ, err := spec.TypeByID(relo.TypeID)
 	if err != nil {
 		return nil, err
 	}
@@ -641,15 +687,16 @@ func newRelocationInfo(relo bpfCORERelo, ts types, strings *stringTable) (*coreR
 			typ,
 			accessor,
 			relo.Kind,
+			relo.TypeID,
 		},
 		asm.RawInstructionOffset(relo.InsnOff),
 	}, nil
 }
 
-func newRelocationInfos(brs []bpfCORERelo, ts types, strings *stringTable) ([]coreRelocationInfo, error) {
+func newRelocationInfos(brs []bpfCORERelo, spec *Spec, strings *stringTable) ([]coreRelocationInfo, error) {
 	rs := make([]coreRelocationInfo, 0, len(brs))
 	for _, br := range brs {
-		relo, err := newRelocationInfo(br, ts, strings)
+		relo, err := newRelocationInfo(br, spec, strings)
 		if err != nil {
 			return nil, fmt.Errorf("offset %d: %w", br.InsnOff, err)
 		}

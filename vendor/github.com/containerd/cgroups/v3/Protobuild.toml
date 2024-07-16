@@ -1,0 +1,31 @@
+version = "2"
+generators = ["go"]
+
+# Control protoc include paths. Below are usually some good defaults, but feel
+# free to try it without them if it works for your project.
+[includes]
+  # Include paths that will be added before all others. Typically, you want to
+  # treat the root of the project as an include, but this may not be necessary.
+  # before = ["."]
+
+  # Paths that will be added untouched to the end of the includes. We use
+  # `/usr/local/include` to pickup the common install location of protobuf.
+  # This is the default.
+  after = ["/usr/local/include", "/usr/include"]
+
+# Aggregrate the API descriptors to lock down API changes.
+[[descriptors]]
+prefix = "github.com/containerd/cgroups/cgroup1/stats"
+target = "cgroup1/stats/metrics.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+]
+[[descriptors]]
+prefix = "github.com/containerd/cgroups/cgroup2/stats"
+target = "cgroup2/stats/metrics.pb.txt"
+ignore_files = [
+	"google/protobuf/descriptor.proto",
+]
+
+[parameters.go]
+paths = "source_relative"
