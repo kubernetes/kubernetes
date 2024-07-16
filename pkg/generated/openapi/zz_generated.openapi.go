@@ -2257,6 +2257,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyBindingL
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -2362,6 +2363,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyList(ref
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -3444,6 +3446,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -3549,6 +3552,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyLi
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -4638,6 +4642,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyBin
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -4743,6 +4748,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyLis
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
