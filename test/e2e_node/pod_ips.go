@@ -40,7 +40,7 @@ import (
 
 var _ = common.SIGDescribe("Pod IPs", func() {
 	f := framework.NewDefaultFramework("pod-ips")
-	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
 	testFinalizer := "example.com/test-finalizer"
 
 	watchPodIPWhileTerminating := func(ctx context.Context, pod *v1.Pod) {
@@ -196,9 +196,7 @@ var _ = common.SIGDescribe("Pod IPs", func() {
 							Lifecycle: &v1.Lifecycle{
 								PreStop: &v1.LifecycleHandler{
 									Exec: &v1.ExecAction{
-										Command: ExecCommand(podName, execCommand{
-											Delay: 1,
-										}),
+										Command: []string{"/bin/sh", "sleep 1"},
 									},
 								},
 							},
