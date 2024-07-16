@@ -35,9 +35,9 @@ type ValidationErrorType string
 const (
 	// ValidationCompileError indicates that the expression fails to compile.
 	ValidationCompileError ValidationErrorType = "compile_error"
-	// ValidatingInternalError indicates that the expression fails due to internal
+	// ValidatingInvalidError indicates that the expression fails due to internal
 	// errors that are out of the control of the user.
-	ValidatingInternalError ValidationErrorType = "internal_error"
+	ValidatingInvalidError ValidationErrorType = "invalid_error"
 	// ValidatingOutOfBudget indicates that the expression fails due to running
 	// out of cost budget, or the budget cannot be obtained.
 	ValidatingOutOfBudget ValidationErrorType = "out_of_budget"
@@ -65,7 +65,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 			Help:           "Validation admission policy check total, labeled by policy and further identified by binding and enforcement action taken.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"policy", "policy_binding", "enforcement_action"},
+		[]string{"policy", "policy_binding", "error_type", "enforcement_action"},
 	)
 	latency := metrics.NewHistogramVec(&metrics.HistogramOpts{
 		Namespace: metricsNamespace,
@@ -83,7 +83,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 		Buckets:        []float64{0.0000005, 0.001, 0.01, 0.1, 1.0},
 		StabilityLevel: metrics.ALPHA,
 	},
-		[]string{"policy", "policy_binding", "enforcement_action"},
+		[]string{"policy", "policy_binding", "error_type", "enforcement_action"},
 	)
 
 	legacyregistry.MustRegister(check)
@@ -99,24 +99,24 @@ func (m *ValidatingAdmissionPolicyMetrics) Reset() {
 
 // ObserveAdmission observes a policy validation, with an optional error to indicate the error that may occur but ignored.
 func (m *ValidatingAdmissionPolicyMetrics) ObserveAdmission(ctx context.Context, elapsed time.Duration, policy, binding string, errorType ValidationErrorType) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "allow").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "allow").Observe(elapsed.Seconds())
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "allow").Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "allow").Observe(elapsed.Seconds())
 }
 
 // ObserveRejection observes a policy validation error that was at least one of the reasons for a deny.
-func (m *ValidatingAdmissionPolicyMetrics) ObserveRejection(ctx context.Context, elapsed time.Duration, policy, binding string) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "deny").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "deny").Observe(elapsed.Seconds())
+func (m *ValidatingAdmissionPolicyMetrics) ObserveRejection(ctx context.Context, elapsed time.Duration, policy, binding string, errorType ValidationErrorType) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "deny").Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "deny").Observe(elapsed.Seconds())
 }
 
 // ObserveAudit observes a policy validation audit annotation was published for a validation failure.
-func (m *ValidatingAdmissionPolicyMetrics) ObserveAudit(ctx context.Context, elapsed time.Duration, policy, binding string) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "audit").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "audit").Observe(elapsed.Seconds())
+func (m *ValidatingAdmissionPolicyMetrics) ObserveAudit(ctx context.Context, elapsed time.Duration, policy, binding string, errorType ValidationErrorType) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "audit").Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "audit").Observe(elapsed.Seconds())
 }
 
 // ObserveWarn observes a policy validation warning was published for a validation failure.
-func (m *ValidatingAdmissionPolicyMetrics) ObserveWarn(ctx context.Context, elapsed time.Duration, policy, binding string) {
-	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, "warn").Inc()
-	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, "warn").Observe(elapsed.Seconds())
+func (m *ValidatingAdmissionPolicyMetrics) ObserveWarn(ctx context.Context, elapsed time.Duration, policy, binding string, errorType ValidationErrorType) {
+	m.policyCheck.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "warn").Inc()
+	m.policyLatency.WithContext(ctx).WithLabelValues(policy, binding, string(errorType), "warn").Observe(elapsed.Seconds())
 }

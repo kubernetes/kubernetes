@@ -34,5 +34,5 @@ func ErrorType(err error) ValidationErrorType {
 	if errors.Is(err, apiservercel.ErrOutOfBudget) {
 		return ValidatingOutOfBudget
 	}
-	return ValidatingInternalError
+	return ValidatingInvalidError
 }

@@ -34,5 +34,5 @@ func ErrorType(decision *PolicyDecision) celmetrics.ValidationErrorType {
 	if strings.HasPrefix(decision.Message, "validation failed due to running out of cost budget") {
 		return celmetrics.ValidatingOutOfBudget
 	}
-	return celmetrics.ValidatingInternalError
+	return celmetrics.ValidatingInvalidError
 }
