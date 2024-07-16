@@ -22,7 +22,10 @@ package validation
 import (
 	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
@@ -33,7 +36,8 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		klog.Warningf(message, "CgroupsPerQOS", "--cgroups-per-qos", kc.CgroupsPerQOS)
 	}
 
-	if len(kc.EnforceNodeAllocatable) > 0 {
+	enforceNodeAllocatableWithoutNone := sets.New(kc.EnforceNodeAllocatable...).Delete(kubetypes.NodeAllocatableNoneKey)
+	if len(enforceNodeAllocatableWithoutNone) > 0 {
 		klog.Warningf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable)
 	}
 
