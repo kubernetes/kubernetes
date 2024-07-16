@@ -63,11 +63,11 @@ var (
 )
 
 // Server returning empty ResourceList for Group/Version.
-type emptyResponseError struct {
+type EmptyResponseError struct {
 	gv string
 }
 
-func (e *emptyResponseError) Error() string {
+func (e *EmptyResponseError) Error() string {
 	return fmt.Sprintf("received empty response for: %s", e.gv)
 }
 
@@ -114,7 +114,8 @@ func (d *memCacheClient) ServerResourcesForGroupVersion(groupVersion string) (*m
 		r, err := d.serverResourcesForGroupVersion(groupVersion)
 		if err != nil {
 			// Don't log "empty response" as an error; it is a common response for metrics.
-			if _, emptyErr := err.(*emptyResponseError); emptyErr {
+			var emptyErr *EmptyResponseError
+			if errors.As(err, &emptyErr) {
 				// Log at same verbosity as disk cache.
 				klog.V(3).Infof("%v", err)
 			} else {
@@ -280,7 +281,8 @@ func (d *memCacheClient) refreshLocked() error {
 				r, err := d.serverResourcesForGroupVersion(gv)
 				if err != nil {
 					// Don't log "empty response" as an error; it is a common response for metrics.
-					if _, emptyErr := err.(*emptyResponseError); emptyErr {
+					var emptyErr *EmptyResponseError
+					if errors.As(err, &emptyErr) {
 						// Log at same verbosity as disk cache.
 						klog.V(3).Infof("%v", err)
 					} else {
@@ -307,7 +309,7 @@ func (d *memCacheClient) serverResourcesForGroupVersion(groupVersion string) (*m
 		return r, err
 	}
 	if len(r.APIResources) == 0 {
-		return r, &emptyResponseError{gv: groupVersion}
+		return r, &EmptyResponseError{gv: groupVersion}
 	}
 	return r, nil
 }
