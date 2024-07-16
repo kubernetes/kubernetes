@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	// maxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
+	// defaultMaxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
 	// the TopologyManager supports on the underlying machine.
 	//
 	// At present, having more than this number of NUMA Nodes will result in a
@@ -37,7 +37,7 @@ const (
 	// generate hints for them. As such, if more NUMA Nodes than this are
 	// present on a machine and the TopologyManager is enabled, an error will
 	// be returned and the TopologyManager will not be loaded.
-	maxAllowableNUMANodes = 8
+	defaultMaxAllowableNUMANodes = 8
 	// ErrorTopologyAffinity represents the type for a TopologyAffinityError
 	ErrorTopologyAffinity = "TopologyAffinityError"
 )
@@ -151,8 +151,8 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		return nil, fmt.Errorf("cannot discover NUMA topology: %w", err)
 	}
 
-	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > maxAllowableNUMANodes {
-		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+	if topologyPolicyName != PolicyNone && len(numaInfo.Nodes) > opts.MaxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", opts.MaxAllowableNUMANodes)
 	}
 
 	var policy Policy

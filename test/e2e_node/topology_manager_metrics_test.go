@@ -66,7 +66,7 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 			policy := topologymanager.PolicySingleNumaNode
 			scope := podScopeTopology
 
-			newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, nil, 0)
+			newCfg, _ := configureTopologyManagerInKubelet(oldCfg, policy, scope, nil, nil, 0)
 			updateKubeletConfig(ctx, f, newCfg, true)
 
 		})
