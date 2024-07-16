@@ -2003,7 +2003,7 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 
 			rsOpts.NewSize = pvSpecCap
 			rsOpts.OldSize = pvcStatusCap
-			// rsOpts.VolumeSpec = volumeToMount.VolumeSpec
+			rsOpts.VolumeSpec = volumeToMount.VolumeSpec
 			resizeOp := nodeResizeOperationOpts{
 				vmt:                volumeToMount,
 				pvc:                pvc,

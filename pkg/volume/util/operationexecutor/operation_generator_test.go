@@ -375,9 +375,8 @@ func TestExpandDuringMount(t *testing.T) {
 				actualSize = pvc.Status.Capacity.Storage()
 			}
 			pluginResizeOpts := volume.NodeResizeOptions{
-				VolumeSpec: vmt.VolumeSpec,
-				NewSize:    *desiredSize,
-				OldSize:    *actualSize,
+				NewSize: *desiredSize,
+				OldSize: *actualSize,
 			}
 			asow := newFakeActualStateOfWorld()
 
