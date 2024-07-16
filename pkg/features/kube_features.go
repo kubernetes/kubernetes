@@ -1236,8 +1236,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
-
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	genericfeatures.KMSv1: {Default: false, PreRelease: featuregate.Deprecated},
