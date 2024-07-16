@@ -112,7 +112,7 @@ type SchedulingQueue interface {
 	Done(types.UID)
 	Update(logger klog.Logger, oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
-	// TODO(sanposhiho): move all PreEnqueueCkeck to Requeue and delete it from this parameter eventually.
+	// TODO(sanposhiho): move all PreEnqueueCheck to Requeue and delete it from this parameter eventually.
 	// Some PreEnqueueCheck include event filtering logic based on some in-tree plugins
 	// and it affect badly to other plugins.
 	// See https://github.com/kubernetes/kubernetes/issues/110175

@@ -363,7 +363,7 @@ type QueueSortPlugin interface {
 // Failures from other extension points are regarded as temporal errors (e.g., network failure),
 // and the scheduler requeue Pods without this extension point - always requeue Pods to activeQ after backoff.
 // This is because such temporal errors cannot be resolved by specific cluster events,
-// and we have no choise but keep retrying scheduling until the failure is resolved.
+// and we have no choose but keep retrying scheduling until the failure is resolved.
 //
 // Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) should implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
