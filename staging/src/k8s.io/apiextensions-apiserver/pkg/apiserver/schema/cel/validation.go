@@ -100,9 +100,15 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	var allOfValidators []*Validator
+	var elemType *cel.DeclType
+	if declType != nil {
+		elemType = declType.ElemType
+	} else {
+		elemType = declType
+	}
 
 	if validationSchema.Items != nil && nodeSchema.Items != nil {
-		itemsValidator = validator(validationSchema.Items, nodeSchema.Items, nodeSchema.Items.XEmbeddedResource, declType.ElemType, perCallLimit)
+		itemsValidator = validator(validationSchema.Items, nodeSchema.Items, nodeSchema.Items.XEmbeddedResource, elemType, perCallLimit)
 	}
 
 	if len(validationSchema.Properties) > 0 {
@@ -117,6 +123,9 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 
 			var fieldType *cel.DeclType
 			if escapedPropName, ok := cel.Escape(k); ok {
+				if declType == nil {
+					continue
+				}
 				if f, ok := declType.Fields[escapedPropName]; ok {
 					fieldType = f.Type
 				} else {
@@ -138,7 +147,7 @@ func validator(validationSchema, nodeSchema *schema.Structural, isResourceRoot b
 	}
 	if validationSchema.AdditionalProperties != nil && validationSchema.AdditionalProperties.Structural != nil &&
 		nodeSchema.AdditionalProperties != nil && nodeSchema.AdditionalProperties.Structural != nil {
-		additionalPropertiesValidator = validator(validationSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
+		additionalPropertiesValidator = validator(validationSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural, nodeSchema.AdditionalProperties.Structural.XEmbeddedResource, elemType, perCallLimit)
 	}
 
 	if validationSchema.ValueValidation != nil && len(validationSchema.ValueValidation.AllOf) > 0 {
