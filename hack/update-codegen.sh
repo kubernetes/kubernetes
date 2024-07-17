@@ -380,7 +380,6 @@ function codegen::defaults() {
     fi
 }
 
-
 # Validation generation
 #
 # Any package that wants validation functions generated must include a
@@ -389,8 +388,11 @@ function codegen::defaults() {
 #
 # The <VALUE> depends on context:
 #     on types:
-#       true:  always generate validations for this type
-#       false: never generate validations for this type
+#       true:  always generate validation for this type
+#       false: never generate validation for this type
+#     on packages:
+#       FIELDNAME: any object with a field of this name is a candidate
+#                  for having conversion generated
 function codegen::validation() {
     # Build the tool.
     GOPROXY=off go install \
