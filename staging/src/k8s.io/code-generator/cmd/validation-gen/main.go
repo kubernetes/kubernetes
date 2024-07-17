@@ -19,11 +19,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/code-generator/cmd/validation-gen/args"
-	"k8s.io/code-generator/cmd/validation-gen/generators"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/klog/v2"
@@ -31,7 +30,7 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
-	args := args.New()
+	args := &Args{}
 
 	args.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
@@ -43,13 +42,13 @@ func main() {
 	}
 
 	myTargets := func(context *generator.Context) []generator.Target {
-		return generators.GetTargets(context, args)
+		return GetTargets(context, args)
 	}
 
 	// Run it.
 	if err := gengo.Execute(
-		generators.NameSystems(),
-		generators.DefaultNameSystem(),
+		NameSystems(),
+		DefaultNameSystem(),
 		myTargets,
 		gengo.StdBuildTag,
 		pflag.Args(),
@@ -57,4 +56,29 @@ func main() {
 		klog.Fatalf("Error: %v", err)
 	}
 	klog.V(2).Info("Completed successfully.")
+}
+
+type Args struct {
+	OutputFile    string
+	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for validations.
+	GoHeaderFile  string
+}
+
+// AddFlags add the generator flags to the flag set.
+func (args *Args) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&args.OutputFile, "output-file", "generated.validations.go",
+		"the name of the file to be generated")
+	fs.StringSliceVar(&args.ExtraPeerDirs, "extra-peer-dirs", args.ExtraPeerDirs, //FIXME: need this?
+		"Comma-separated list of import paths which are considered, after tag-specified peers, for validations.")
+	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
+		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
+}
+
+// Validate checks the given arguments.
+func (args *Args) Validate() error {
+	if len(args.OutputFile) == 0 {
+		return fmt.Errorf("--output-file must be specified")
+	}
+
+	return nil
 }
