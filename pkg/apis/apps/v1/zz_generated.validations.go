@@ -38,8 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 func RegisterValidations(scheme *runtime.Scheme) error {
 	scheme.AddValidationFunc(&v1.DaemonSet{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.DaemonSet)
-			return Validate_DaemonSetSpec(&root.Spec, nil)
+			return Validate_DaemonSet(obj.(*v1.DaemonSet), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
@@ -51,8 +50,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&v1.Deployment{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.Deployment)
-			return Validate_DeploymentSpec(&root.Spec, nil)
+			return Validate_Deployment(obj.(*v1.Deployment), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
@@ -77,8 +75,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&v1.StatefulSet{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.StatefulSet)
-			return Validate_StatefulSetSpec(&root.Spec, nil)
+			return Validate_StatefulSet(obj.(*v1.StatefulSet), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})

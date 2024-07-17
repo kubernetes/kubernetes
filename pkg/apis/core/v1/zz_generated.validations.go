@@ -51,10 +51,6 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 		if len(subresources) == 0 {
 			return Validate_Namespace(obj.(*v1.Namespace), nil)
 		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*v1.Namespace)
-			return Validate_NamespaceStatus(&root.Status, nil)
-		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
 	scheme.AddValidationFunc(&v1.NamespaceList{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
@@ -82,23 +78,13 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&v1.PersistentVolume{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.PersistentVolume)
-			return Validate_PersistentVolumeSpec(&root.Spec, nil)
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*v1.PersistentVolume)
-			return Validate_PersistentVolumeStatus(&root.Status, nil)
+			return Validate_PersistentVolume(obj.(*v1.PersistentVolume), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
 	scheme.AddValidationFunc(&v1.PersistentVolumeClaim{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.PersistentVolumeClaim)
-			return Validate_PersistentVolumeClaimSpec(&root.Spec, nil)
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*v1.PersistentVolumeClaim)
-			return Validate_PersistentVolumeClaimStatus(&root.Status, nil)
+			return Validate_PersistentVolumeClaim(obj.(*v1.PersistentVolumeClaim), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
@@ -116,12 +102,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&v1.Pod{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.Pod)
-			return Validate_PodSpec(&root.Spec, nil)
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*v1.Pod)
-			return Validate_PodStatus(&root.Status, nil)
+			return Validate_Pod(obj.(*v1.Pod), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
@@ -181,12 +162,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&v1.Service{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*v1.Service)
-			return Validate_ServiceSpec(&root.Spec, nil)
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*v1.Service)
-			return Validate_ServiceStatus(&root.Status, nil)
+			return Validate_Service(obj.(*v1.Service), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})

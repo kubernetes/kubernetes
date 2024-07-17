@@ -48,12 +48,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	})
 	scheme.AddValidationFunc(&Flunder{}, func(obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			root := obj.(*Flunder)
-			return Validate_FlunderSpec(&root.Spec, nil)
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			root := obj.(*Flunder)
-			return Validate_FlunderStatus(&root.Status, nil)
+			return Validate_Flunder(obj.(*Flunder), nil)
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("No validation found for %T, subresources: %v", obj, subresources))}
 	})
