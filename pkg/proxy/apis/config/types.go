@@ -236,9 +236,6 @@ type KubeProxyConfiguration struct {
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration
-
-	// portRange was previously used to configure the userspace proxy, but is now unused.
-	PortRange string
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
