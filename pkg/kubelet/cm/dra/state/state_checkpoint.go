@@ -37,12 +37,6 @@ type CheckpointState interface {
 // ClaimInfoState is used to store claim info state in a checkpoint
 // +k8s:deepcopy-gen=true
 type ClaimInfoState struct {
-	// Name of the DRA driver
-	DriverName string
-
-	// ClassName is a resource class of the claim
-	ClassName string
-
 	// ClaimUID is an UID of the resource claim
 	ClaimUID types.UID
 
@@ -55,35 +49,25 @@ type ClaimInfoState struct {
 	// PodUIDs is a set of pod UIDs that reference a resource
 	PodUIDs sets.Set[string]
 
-	// CDIDevices is a map of DriverName --> CDI devices returned by the
-	// GRPC API call NodePrepareResource
-	CDIDevices map[string][]string
+	// DriverState contains information about all drivers which have allocation
+	// results in the claim, even if they don't provide devices for their results.
+	DriverState map[string]DriverState
 }
 
-// ClaimInfoStateWithoutResourceHandles is an old implementation of the ClaimInfoState
-// TODO: remove in Beta
-type ClaimInfoStateWithoutResourceHandles struct {
-	// Name of the DRA driver
-	DriverName string
+// DriverState is used to store per-device claim info state in a checkpoint
+// +k8s:deepcopy-gen=true
+type DriverState struct {
+	Devices []Device
+}
 
-	// ClassName is a resource class of the claim
-	ClassName string
-
-	// ClaimUID is an UID of the resource claim
-	ClaimUID types.UID
-
-	// ClaimName is a name of the resource claim
-	ClaimName string
-
-	// Namespace is a claim namespace
-	Namespace string
-
-	// PodUIDs is a set of pod UIDs that reference a resource
-	PodUIDs sets.Set[string]
-
-	// CDIDevices is a map of DriverName --> CDI devices returned by the
-	// GRPC API call NodePrepareResource
-	CDIDevices map[string][]string
+// Device is how a DRA driver described an allocated device in a claim
+// to kubelet. RequestName and CDI device IDs are optional.
+// +k8s:deepcopy-gen=true
+type Device struct {
+	PoolName     string
+	DeviceName   string
+	RequestNames []string
+	CDIDeviceIDs []string
 }
 
 type stateCheckpoint struct {

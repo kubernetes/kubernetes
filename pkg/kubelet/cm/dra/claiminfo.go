@@ -17,14 +17,15 @@ limitations under the License.
 package dra
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
-	"k8s.io/kubernetes/pkg/kubelet/cm/util/cdi"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -33,10 +34,7 @@ import (
 // +k8s:deepcopy-gen=true
 type ClaimInfo struct {
 	state.ClaimInfoState
-	// annotations is a mapping of container annotations per DRA plugin associated with
-	// a prepared resource
-	annotations map[string][]kubecontainer.Annotation
-	prepared    bool
+	prepared bool
 }
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
@@ -47,89 +45,45 @@ type claimInfoCache struct {
 }
 
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
-func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) *ClaimInfo {
-	// Grab the allocation.resourceHandles. If there are no
-	// allocation.resourceHandles, create a single resourceHandle with no
-	// content. This will trigger processing of this claim by a single
-	// kubelet plugin whose name matches resourceClaim.Status.DriverName.
-	resourceHandles := claim.Status.Allocation.ResourceHandles
-	if len(resourceHandles) == 0 {
-		resourceHandles = make([]resourceapi.ResourceHandle, 1)
-	}
+// It verifies that the kubelet can handle the claim.
+func newClaimInfoFromClaim(claim *resourceapi.ResourceClaim) (*ClaimInfo, error) {
 	claimInfoState := state.ClaimInfoState{
-		DriverName:      claim.Status.DriverName,
-		ClassName:       claim.Spec.ResourceClassName,
-		ClaimUID:        claim.UID,
-		ClaimName:       claim.Name,
-		Namespace:       claim.Namespace,
-		PodUIDs:         sets.New[string](),
-		ResourceHandles: resourceHandles,
-		CDIDevices:      make(map[string][]string),
+		ClaimUID:    claim.UID,
+		ClaimName:   claim.Name,
+		Namespace:   claim.Namespace,
+		PodUIDs:     sets.New[string](),
+		DriverState: make(map[string]state.DriverState),
+	}
+	if claim.Status.Allocation == nil {
+		return nil, errors.New("not allocated")
+	}
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		claimInfoState.DriverState[result.Driver] = state.DriverState{}
 	}
 	info := &ClaimInfo{
 		ClaimInfoState: claimInfoState,
-		annotations:    make(map[string][]kubecontainer.Annotation),
 		prepared:       false,
 	}
-	return info
+	return info, nil
 }
 
 // newClaimInfoFromClaim creates a new claim info from a checkpointed claim info state object.
 func newClaimInfoFromState(state *state.ClaimInfoState) *ClaimInfo {
 	info := &ClaimInfo{
 		ClaimInfoState: *state.DeepCopy(),
-		annotations:    make(map[string][]kubecontainer.Annotation),
 		prepared:       false,
-	}
-	for pluginName, devices := range info.CDIDevices {
-		annotations, _ := cdi.GenerateAnnotations(info.ClaimUID, info.DriverName, devices)
-		info.annotations[pluginName] = append(info.annotations[pluginName], annotations...)
 	}
 	return info
 }
 
 // setCDIDevices adds a set of CDI devices to the claim info.
-func (info *ClaimInfo) setCDIDevices(pluginName string, cdiDevices []string) error {
-	// NOTE: Passing CDI device names as annotations is a temporary solution
-	// It will be removed after all runtimes are updated
-	// to get CDI device names from the ContainerConfig.CDIDevices field
-	annotations, err := cdi.GenerateAnnotations(info.ClaimUID, info.DriverName, cdiDevices)
-	if err != nil {
-		return fmt.Errorf("failed to generate container annotations, err: %+v", err)
+func (info *ClaimInfo) addDevice(driverName string, device state.Device) {
+	if info.DriverState == nil {
+		info.DriverState = make(map[string]state.DriverState)
 	}
-
-	if info.CDIDevices == nil {
-		info.CDIDevices = make(map[string][]string)
-	}
-
-	if info.annotations == nil {
-		info.annotations = make(map[string][]kubecontainer.Annotation)
-	}
-
-	info.CDIDevices[pluginName] = cdiDevices
-	info.annotations[pluginName] = annotations
-
-	return nil
-}
-
-// annotationsAsList returns container annotations as a single list.
-func (info *ClaimInfo) annotationsAsList() []kubecontainer.Annotation {
-	var lst []kubecontainer.Annotation
-	for _, v := range info.annotations {
-		lst = append(lst, v...)
-	}
-	return lst
-}
-
-// cdiDevicesAsList returns a list of CDIDevices from the provided claim info.
-func (info *ClaimInfo) cdiDevicesAsList() []kubecontainer.CDIDevice {
-	var cdiDevices []kubecontainer.CDIDevice
-	for _, devices := range info.CDIDevices {
-		for _, device := range devices {
-			cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: device})
-		}
-	}
-	return cdiDevices
+	driverState := info.DriverState[driverName]
+	driverState.Devices = append(driverState.Devices, device)
+	info.DriverState[driverName] = driverState
 }
 
 // addPodReference adds a pod reference to the claim info.
@@ -239,4 +193,21 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 		claimInfoStateList = append(claimInfoStateList, infoClaim.ClaimInfoState)
 	}
 	return cache.state.Store(claimInfoStateList)
+}
+
+// cdiDevicesAsList returns a list of CDIDevices from the provided claim info.
+// When the request name is non-empty, only devices relevant for that request
+// are returned.
+func (info *ClaimInfo) cdiDevicesAsList(requestName string) []kubecontainer.CDIDevice {
+	var cdiDevices []kubecontainer.CDIDevice
+	for _, driverData := range info.DriverState {
+		for _, device := range driverData.Devices {
+			if requestName == "" || len(device.RequestNames) == 0 || slices.Contains(device.RequestNames, requestName) {
+				for _, cdiDeviceID := range device.CDIDeviceIDs {
+					cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: cdiDeviceID})
+				}
+			}
+		}
+	}
+	return cdiDevices
 }

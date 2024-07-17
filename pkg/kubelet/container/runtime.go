@@ -492,7 +492,8 @@ type DeviceInfo struct {
 
 // CDIDevice contains information about CDI device
 type CDIDevice struct {
-	// Name is a fully qualified device name
+	// Name is a fully qualified device name according to
+	// https://github.com/cncf-tags/container-device-interface/blob/e66544063aa7760c4ea6330ce9e6c757f8e61df2/README.md?plain=1#L9-L15
 	Name string
 }
 

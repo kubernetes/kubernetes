@@ -19,14 +19,12 @@ package state
 import (
 	"errors"
 	"os"
-	"path"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	cmerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -55,116 +53,120 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		expectedState     ClaimInfoStateList
 	}{
 		{
-			"Create non-existing checkpoint",
-			"",
-			"",
-			[]ClaimInfoState{},
+			description:       "Create non-existing checkpoint",
+			checkpointContent: "",
+			expectedError:     "",
+			expectedState:     []ClaimInfoState{},
 		},
 		{
-			"Restore checkpoint - single claim",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":[{"driverName":"test-driver.cdi.k8s.io","data":"{\"a\": \"b\"}"}],"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":113577689}`,
-			"",
-			[]ClaimInfoState{
+			description:       "Restore checkpoint - single claim",
+			checkpointContent: `{"version":"v1","entries":[{"ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-1","RequestNames":["test request"],"CDIDeviceIDs":["example.com/example=cdi-example"]}]}}}],"checksum":1925941526}`,
+			expectedState: []ClaimInfoState{
 				{
-					DriverName: "test-driver.cdi.k8s.io",
-					ClassName:  "class-name",
-					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
-					ClaimName:  "example",
-					Namespace:  "default",
-					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourceapi.ResourceHandle{
-						{
-							DriverName: "test-driver.cdi.k8s.io",
-							Data:       `{"a": "b"}`,
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: []string{"test request"},
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+							},
 						},
 					},
-					CDIDevices: map[string][]string{
-						"test-driver.cdi.k8s.io": {"example.com/example=cdi-example"},
-					},
+					ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+					ClaimName: "example",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 			},
 		},
 		{
-			"Restore checkpoint - single claim - multiple devices",
-			`{"version":"v1","entries":[{"DriverName":"meta-test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":[{"driverName":"test-driver-1.cdi.k8s.io","data":"{\"a\": \"b\"}"},{"driverName":"test-driver-2.cdi.k8s.io","data":"{\"c\": \"d\"}"}],"CDIDevices":{"test-driver-1.cdi.k8s.io":["example-1.com/example-1=cdi-example-1"],"test-driver-2.cdi.k8s.io":["example-2.com/example-2=cdi-example-2"]}}],"checksum":1466990255}`,
-			"",
-			[]ClaimInfoState{
+			description:       "Restore checkpoint - single claim - multiple devices",
+			checkpointContent: `{"version":"v1","entries":[{"ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-1","RequestNames":["test request"],"CDIDeviceIDs":["example.com/example=cdi-example"]},{"PoolName":"worker-1","DeviceName":"dev-2","RequestNames":["test request2"],"CDIDeviceIDs":["example.com/example=cdi-example2"]}]}}}],"checksum":3560752542}`,
+			expectedError:     "",
+			expectedState: []ClaimInfoState{
 				{
-					DriverName: "meta-test-driver.cdi.k8s.io",
-					ClassName:  "class-name",
-					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
-					ClaimName:  "example",
-					Namespace:  "default",
-					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourceapi.ResourceHandle{
-						{
-							DriverName: "test-driver-1.cdi.k8s.io",
-							Data:       `{"a": "b"}`,
-						},
-						{
-							DriverName: "test-driver-2.cdi.k8s.io",
-							Data:       `{"c": "d"}`,
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: []string{"test request"},
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-2",
+									RequestNames: []string{"test request2"},
+									CDIDeviceIDs: []string{"example.com/example=cdi-example2"},
+								},
+							},
 						},
 					},
-					CDIDevices: map[string][]string{
-						"test-driver-1.cdi.k8s.io": {"example-1.com/example-1=cdi-example-1"},
-						"test-driver-2.cdi.k8s.io": {"example-2.com/example-2=cdi-example-2"},
-					},
+					ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+					ClaimName: "example",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 			},
 		},
 		{
-			"Restore checkpoint - multiple claims",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name-1","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example-1","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":[{"driverName":"test-driver.cdi.k8s.io","data":"{\"a\": \"b\"}"}],"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-1"]}},{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name-2","ClaimUID":"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c","ClaimName":"example-2","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":[{"driverName":"test-driver.cdi.k8s.io","data":"{\"c\": \"d\"}"}],"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example-2"]}}],"checksum":471181742}`,
-			"",
-			[]ClaimInfoState{
+			description:       "Restore checkpoint - multiple claims",
+			checkpointContent: `{"version":"v1","entries":[{"ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example-1","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-1","RequestNames":["test request"],"CDIDeviceIDs":["example.com/example=cdi-example"]}]}}},{"ClaimUID":"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c","ClaimName":"example-2","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-1","RequestNames":["test request"],"CDIDeviceIDs":["example.com/example=cdi-example"]}]}}}],"checksum":351581974}`,
+			expectedError:     "",
+			expectedState: []ClaimInfoState{
 				{
-					DriverName: "test-driver.cdi.k8s.io",
-					ClassName:  "class-name-1",
-					ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
-					ClaimName:  "example-1",
-					Namespace:  "default",
-					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourceapi.ResourceHandle{
-						{
-							DriverName: "test-driver.cdi.k8s.io",
-							Data:       `{"a": "b"}`,
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: []string{"test request"},
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+							},
 						},
 					},
-					CDIDevices: map[string][]string{
-						"test-driver.cdi.k8s.io": {"example.com/example=cdi-example-1"},
-					},
+					ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+					ClaimName: "example-1",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 				{
-					DriverName: "test-driver.cdi.k8s.io",
-					ClassName:  "class-name-2",
-					ClaimUID:   "4cf8db2d-06c0-7d70-1a51-e59b25b2c16c",
-					ClaimName:  "example-2",
-					Namespace:  "default",
-					PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-					ResourceHandles: []resourceapi.ResourceHandle{
-						{
-							DriverName: "test-driver.cdi.k8s.io",
-							Data:       `{"c": "d"}`,
+					DriverState: map[string]DriverState{
+						"test-driver.cdi.k8s.io": {
+							Devices: []Device{
+								{
+									PoolName:     "worker-1",
+									DeviceName:   "dev-1",
+									RequestNames: []string{"test request"},
+									CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+								},
+							},
 						},
 					},
-					CDIDevices: map[string][]string{
-						"test-driver.cdi.k8s.io": {"example.com/example=cdi-example-2"},
-					},
+					ClaimUID:  "4cf8db2d-06c0-7d70-1a51-e59b25b2c16c",
+					ClaimName: "example-2",
+					Namespace: "default",
+					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 			},
 		},
 		{
-			"Restore checkpoint - invalid checksum",
-			`{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120168}`,
-			"checkpoint is corrupted",
-			[]ClaimInfoState{},
+			description:       "Restore checkpoint - invalid checksum",
+			checkpointContent: `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":1988120168}`,
+			expectedError:     "checkpoint is corrupted",
+			expectedState:     []ClaimInfoState{},
 		},
 		{
-			"Restore checkpoint with invalid JSON",
-			`{`,
-			"unexpected end of JSON input",
-			[]ClaimInfoState{},
+			description:       "Restore checkpoint with invalid JSON",
+			checkpointContent: `{`,
+			expectedError:     "unexpected end of JSON input",
+			expectedState:     []ClaimInfoState{},
 		},
 	}
 
@@ -198,8 +200,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 				state, err = checkpointState.GetOrCreate()
 			}
 			if strings.TrimSpace(tc.expectedError) != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedError)
+				assert.ErrorContains(t, err, tc.expectedError)
 			} else {
 				requireNoCheckpointError(t, err)
 				// compare state after restoration with the one expected
@@ -210,25 +211,40 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 }
 
 func TestCheckpointStateStore(t *testing.T) {
-	claimInfoState := ClaimInfoState{
-		DriverName: "test-driver.cdi.k8s.io",
-		ClassName:  "class-name",
-		ClaimUID:   "067798be-454e-4be4-9047-1aa06aea63f7",
-		ClaimName:  "example",
-		Namespace:  "default",
-		PodUIDs:    sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
-		ResourceHandles: []resourceapi.ResourceHandle{
-			{
-				DriverName: "test-driver.cdi.k8s.io",
-				Data:       `{"a": "b"}`,
+	claimInfoStateList := ClaimInfoStateList{
+		{
+			DriverState: map[string]DriverState{
+				"test-driver.cdi.k8s.io": {
+					Devices: []Device{{
+						PoolName:     "worker-1",
+						DeviceName:   "dev-1",
+						RequestNames: []string{"test request"},
+						CDIDeviceIDs: []string{"example.com/example=cdi-example"},
+					}},
+				},
 			},
+			ClaimUID:  "067798be-454e-4be4-9047-1aa06aea63f7",
+			ClaimName: "example-1",
+			Namespace: "default",
+			PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 		},
-		CDIDevices: map[string][]string{
-			"test-driver.cdi.k8s.io": {"example.com/example=cdi-example"},
+		{
+			DriverState: map[string]DriverState{
+				"test-driver.cdi.k8s.io": {
+					Devices: []Device{{
+						PoolName:   "worker-1",
+						DeviceName: "dev-2",
+					}},
+				},
+			},
+			ClaimUID:  "4cf8db2d-06c0-7d70-1a51-e59b25b2c16c",
+			ClaimName: "example-2",
+			Namespace: "default",
+			PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 		},
 	}
 
-	expectedCheckpoint := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":[{"driverName":"test-driver.cdi.k8s.io","data":"{\"a\": \"b\"}"}],"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":113577689}`
+	expectedCheckpoint := `{"version":"v1","entries":[{"ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example-1","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-1","RequestNames":["test request"],"CDIDeviceIDs":["example.com/example=cdi-example"]}]}}},{"ClaimUID":"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c","ClaimName":"example-2","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"DriverState":{"test-driver.cdi.k8s.io":{"Devices":[{"PoolName":"worker-1","DeviceName":"dev-2","RequestNames":null,"CDIDeviceIDs":null}]}}}],"checksum":1191151426}`
 
 	// Should return an error, stateDir cannot be an empty string
 	if _, err := NewCheckpointState("", testingCheckpoint); err == nil {
@@ -248,7 +264,7 @@ func TestCheckpointStateStore(t *testing.T) {
 
 	cs, err := NewCheckpointState(testingDir, testingCheckpoint)
 	assert.NoError(t, err, "could not create testing checkpointState instance")
-	err = cs.Store(ClaimInfoStateList{claimInfoState})
+	err = cs.Store(claimInfoStateList)
 	assert.NoError(t, err, "could not store ClaimInfoState")
 	checkpoint := NewDRAManagerCheckpoint()
 	cpm.GetCheckpoint(testingCheckpoint, checkpoint)
@@ -260,26 +276,6 @@ func TestCheckpointStateStore(t *testing.T) {
 	if _, err = NewCheckpointState(testingDir, ""); err == nil {
 		t.Fatal("expected error but got nil")
 	}
-}
-
-func TestOldCheckpointRestore(t *testing.T) {
-	testingDir := t.TempDir()
-	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
-	assert.NoError(t, err, "could not create testing checkpoint manager")
-
-	oldCheckpointData := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":153446146}`
-	err = os.WriteFile(path.Join(testingDir, testingCheckpoint), []byte(oldCheckpointData), 0644)
-	assert.NoError(t, err, "could not store checkpoint data")
-
-	checkpoint := NewDRAManagerCheckpoint()
-	err = cpm.GetCheckpoint(testingCheckpoint, checkpoint)
-	requireNoCheckpointError(t, err)
-
-	checkpointData, err := checkpoint.MarshalCheckpoint()
-	assert.NoError(t, err, "could not Marshal Checkpoint")
-
-	expectedData := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":null,"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":453625682}`
-	assert.Equal(t, expectedData, string(checkpointData), "expected ClaimInfoState does not equal to restored one")
 }
 
 func requireNoCheckpointError(t *testing.T, err error) {

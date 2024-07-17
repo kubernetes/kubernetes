@@ -661,10 +661,6 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 		if err != nil {
 			return nil, err
 		}
-		// NOTE: Passing CDI device names as annotations is a temporary solution
-		// It will be removed after all runtimes are updated
-		// to get CDI device names from the ContainerConfig.CDIDevices field
-		opts.Annotations = append(opts.Annotations, resOpts.Annotations...)
 		opts.CDIDevices = append(opts.CDIDevices, resOpts.CDIDevices...)
 	}
 	// Allocate should already be called during predicateAdmitHandler.Admit(),
@@ -965,19 +961,22 @@ func (cm *containerManagerImpl) GetDynamicResources(pod *v1.Pod, container *v1.C
 	}
 	for _, containerClaimInfo := range containerClaimInfos {
 		var claimResources []*podresourcesapi.ClaimResource
-		// TODO: Currently  we maintain a list of ClaimResources, each of which contains
-		// a set of CDIDevices from a different kubelet plugin. In the future we may want to
-		// include the name of the kubelet plugin and/or other types of resources that are
-		// not CDIDevices (assuming the DRAmanager supports this).
-		for _, klPluginCdiDevices := range containerClaimInfo.CDIDevices {
+		for driverName, driverState := range containerClaimInfo.DriverState {
 			var cdiDevices []*podresourcesapi.CDIDevice
-			for _, cdiDevice := range klPluginCdiDevices {
-				cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDevice})
+			for _, device := range driverState.Devices {
+				for _, cdiDeviceID := range device.CDIDeviceIDs {
+					cdiDevices = append(cdiDevices, &podresourcesapi.CDIDevice{Name: cdiDeviceID})
+				}
+				resources := &podresourcesapi.ClaimResource{
+					CDIDevices: cdiDevices,
+					DriverName: driverName,
+					PoolName:   device.PoolName,
+					DeviceName: device.DeviceName,
+				}
+				claimResources = append(claimResources, resources)
 			}
-			claimResources = append(claimResources, &podresourcesapi.ClaimResource{CDIDevices: cdiDevices})
 		}
 		containerDynamicResource := podresourcesapi.DynamicResource{
-			ClassName:      containerClaimInfo.ClassName,
 			ClaimName:      containerClaimInfo.ClaimName,
 			ClaimNamespace: containerClaimInfo.Namespace,
 			ClaimResources: claimResources,

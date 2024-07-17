@@ -42,7 +42,14 @@ type fakeV1alpha4GRPCServer struct {
 var _ drapb.NodeServer = &fakeV1alpha4GRPCServer{}
 
 func (f *fakeV1alpha4GRPCServer) NodePrepareResources(ctx context.Context, in *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
-	return &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"dummy": {CDIDevices: []string{"dummy"}}}}, nil
+	return &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"claim-uid": {
+		Devices: []*drapb.Device{
+			{
+				RequestNames: []string{"test-request"},
+				CDIDeviceIDs: []string{"test-cdi-id"},
+			},
+		},
+	}}}, nil
 }
 
 func (f *fakeV1alpha4GRPCServer) NodeUnprepareResources(ctx context.Context, in *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
@@ -136,7 +143,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 				Claims: []*drapb.Claim{
 					{
 						Namespace: "dummy-namespace",
-						Uid:       "dummy-uid",
+						UID:       "dummy-uid",
 						Name:      "dummy-claim",
 					},
 				},

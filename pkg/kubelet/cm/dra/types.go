@@ -50,8 +50,6 @@ type Manager interface {
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.
 type ContainerInfo struct {
-	// The Annotations for the container
-	Annotations []kubecontainer.Annotation
 	// CDI Devices for the container
 	CDIDevices []kubecontainer.CDIDevice
 }
