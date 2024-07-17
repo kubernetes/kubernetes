@@ -685,6 +685,103 @@ func TestCustomResourceValidatorsWithBlockingErrors(t *testing.T) {
 	})
 }
 
+// TestCustomResourceValidatorsWithSchemaConversion tests CRD replacement with schema conversion issue should not panic.
+func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create CRD with normal items+array schema
+	structuralWithValidators := crdWithSchema(t, "Structural", structuralSchemaWithItemsUnderArray)
+	crd, err := fixtures.CreateNewV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gvr := schema.GroupVersionResource{
+		Group:    crd.Spec.Group,
+		Version:  crd.Spec.Versions[0].Name,
+		Resource: crd.Spec.Names.Plural,
+	}
+	crClient := dynamicClient.Resource(gvr)
+
+	// Create a valid CR instance
+	name1 := names.SimpleNameGenerator.GenerateName("cr-1")
+	_, err = crClient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": gvr.Group + "/" + gvr.Version,
+		"kind":       crd.Spec.Names.Kind,
+		"metadata": map[string]interface{}{
+			"name": name1,
+		},
+		"spec": map[string]interface{}{
+			"backend": []interface{}{
+				map[string]interface{}{
+					"replicas": 8,
+				},
+			},
+		},
+	}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Errorf("Failed to create custom resource: %v", err)
+	}
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	structuralSchemaWithItemsUnderObject := crdWithSchema(t, "Structural", structuralSchemaWithItemsUnderObject)
+	structuralSchemaWithItemsUnderObject.SetResourceVersion(crd.GetResourceVersion())
+	// Update CRD with invalid schema items under object
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), structuralSchemaWithItemsUnderObject, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make an unrelated update to the previous persisted CR instance to make sure CRD handler doesn't panic
+	oldCR, err := crClient.Get(context.TODO(), name1, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
+	_, err = crClient.Update(context.TODO(), oldCR, metav1.UpdateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
+		t.Fatalf("expect error to contain \rule compiler initialization error: failed to convert to declType for CEL validation rules\" but get: %v", err)
+	}
+	// Create another CR instance with an array and be rejected
+	name2 := names.SimpleNameGenerator.GenerateName("cr-2")
+	_, err = crClient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": gvr.Group + "/" + gvr.Version,
+		"kind":       crd.Spec.Names.Kind,
+		"metadata": map[string]interface{}{
+			"name": name2,
+		},
+		"spec": map[string]interface{}{
+			"backend": []interface{}{
+				map[string]interface{}{
+					"replicas": 7,
+				},
+			},
+		},
+	}}, metav1.CreateOptions{})
+	if err == nil || !strings.Contains(err.Error(), "Invalid value: \"array\": spec.backend in body must be of type object: \"array\"") {
+		t.Fatalf("expect error to contain \"Invalid value: \"array\": spec.backend in body must be of type object: \"array\"\" but get: %v", err)
+	}
+	// Delete the CRD
+	err = fixtures.DeleteV1CustomResourceDefinition(structuralWithValidators, apiExtensionClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func nonStructuralCrdWithValidations() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -908,6 +1005,76 @@ var structuralSchemaWithBlockingErr = []byte(`
           "z": {
             "type": "integer",
 			"default": 0
+          }
+        }
+      }
+    }
+  }
+}`)
+
+var structuralSchemaWithItemsUnderArray = []byte(`
+{
+  "openAPIV3Schema": {
+    "description": "CRD with CEL validators",
+    "type": "object",
+    "properties": {
+      "spec": {
+        "type": "object",
+        "properties": {
+          "backend": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "replicas": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "replicas"
+              ],
+              "x-kubernetes-validations": [
+                {
+                  "rule": "0 <= self.replicas && self.replicas <= 10"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+var structuralSchemaWithItemsUnderObject = []byte(`
+{
+  "openAPIV3Schema": {
+    "description": "CRD with CEL validators",
+    "type": "object",
+    "properties": {
+      "spec": {
+        "type": "object",
+        "properties": {
+          "backend": {
+            "type": "object",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "replicas": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "replicas"
+              ],
+              "x-kubernetes-validations": [
+                {
+                  "rule": "0 <= self.replicas && self.replicas <= 10"
+                }
+              ]
+            }
           }
         }
       }

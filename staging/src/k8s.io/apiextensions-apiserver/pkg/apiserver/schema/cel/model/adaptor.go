@@ -55,6 +55,9 @@ func (s *Structural) Format() string {
 }
 
 func (s *Structural) Items() common.Schema {
+	if s.Structural.Items == nil {
+		return nil
+	}
 	return &Structural{Structural: s.Structural.Items}
 }
 
