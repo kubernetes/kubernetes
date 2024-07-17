@@ -65,7 +65,7 @@ func wardleEmulationVersionToKubeEmulationVersion(ver *version.Version) *version
 	}
 	kubeVer := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
 	// "1.1" maps to kubeVer
-	offset := int(ver.Minor()) - 1
+	offset := int(ver.Minor()) - 2
 	return kubeVer.OffsetMinor(offset)
 }
 

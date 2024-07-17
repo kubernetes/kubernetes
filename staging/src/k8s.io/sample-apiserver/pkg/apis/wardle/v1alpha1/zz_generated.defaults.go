@@ -36,6 +36,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_Flunder(in *Flunder) {
 	SetDefaults_FlunderSpec(&in.Spec)
+	if in.Spec.Reference == "" {
+		in.Spec.Reference = "this"
+	}
 }
 
 func SetObjectDefaults_FlunderList(in *FlunderList) {

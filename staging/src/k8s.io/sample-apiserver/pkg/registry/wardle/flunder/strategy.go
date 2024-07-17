@@ -27,14 +27,14 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/sample-apiserver/pkg/apis/wardle/validation"
-
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/sample-apiserver/pkg/apis/wardle/validation"
 )
 
 // NewStrategy creates and returns a flunderStrategy instance
-func NewStrategy(typer runtime.ObjectTyper) flunderStrategy {
-	return flunderStrategy{typer, names.SimpleNameGenerator}
+func NewStrategy(scheme *runtime.Scheme) flunderStrategy {
+	return flunderStrategy{scheme, names.SimpleNameGenerator}
 }
 
 // GetAttrs returns labels.Set, fields.Set, and error in case the given runtime.Object is not a Flunder
@@ -62,7 +62,7 @@ func SelectableFields(obj *wardle.Flunder) fields.Set {
 }
 
 type flunderStrategy struct {
-	runtime.ObjectTyper
+	*runtime.Scheme
 	names.NameGenerator
 }
 
@@ -76,9 +76,21 @@ func (flunderStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 func (flunderStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
-func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	flunder := obj.(*wardle.Flunder)
-	return validation.ValidateFlunder(flunder)
+	errs := validation.ValidateFlunder(flunder)
+
+	// TODO: How to properly convert here?
+
+	if obj.GetObjectKind().GroupVersionKind().Version == "v1alpha1" {
+		var v1alpha1Flunder *v1alpha1.Flunder
+		if err := s.Scheme.Convert(flunder, v1alpha1Flunder, nil); err != nil {
+			// TODO: handle
+			panic("unexpected failure to convert")
+		}
+		errs = append(errs, v1alpha1.Validate_Flunder(v1alpha1Flunder)...)
+	}
+	return errs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.

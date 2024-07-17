@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
+	ptr "k8s.io/utils/ptr"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
@@ -2840,6 +2841,8 @@ func schema_pkg_apis_wardle_v1alpha1_FlunderSpec(ref common.ReferenceCallback) c
 					"reference": {
 						SchemaProps: spec.SchemaProps{
 							Description: "A name of another flunder or fischer, depending on the reference type.",
+							Default:     "this",
+							MaxLength:   ptr.To[int64](128),
 							Type:        []string{"string"},
 							Format:      "",
 						},

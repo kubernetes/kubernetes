@@ -30,6 +30,9 @@ type FlunderList struct {
 	Items []Flunder `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// ReferenceType
+//
+// +enum
 type ReferenceType string
 
 const (
@@ -39,12 +42,44 @@ const (
 
 type FlunderSpec struct {
 	// A name of another flunder or fischer, depending on the reference type.
+	//
+	// +k8s:validation:format="ip"
+	// +k8s:validation:maxLength=128
+	// +k8s:validation:cel[0]:rule="oldSelf == self"
+	// +k8s:validation:cel[0]:message="immutable field"
 	Reference string `json:"reference,omitempty" protobuf:"bytes,1,opt,name=reference"`
 	// The reference type, defaults to "Flunder" if reference is set.
 	ReferenceType *ReferenceType `json:"referenceType,omitempty" protobuf:"bytes,2,opt,name=referenceType"`
+
+	Primary Widget `json:"primary,omitempty" protobuf:"bytes,3,opt,name=primary"`
+
+	Extras []Widget `json:"extras,omitempty" protobuf:"bytes,4,rep,name=extras"`
+
+	More map[string]Widget `json:"more,omitempty" protobuf:"bytes,5,rep,name=more"`
+
+	Layer *Layer `json:"layer,omitempty" protobuf:"bytes,6,opt,name=layer"`
+}
+
+type Layer struct {
+	Extras []Widget `json:"extras" protobuf:"bytes,1,rep,name=extras"`
+}
+
+// Widget
+type Widget struct {
+	// +k8s:validation:format="ip"
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+
+	Something []Something `json:"something" protobuf:"bytes,2,rep,name=something"`
+}
+
+type Something struct {
+	// +k8s:validation:format="ip"
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
 type FlunderStatus struct {
+	// +k8s:validation:format="ip"
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
 
 // +genclient
@@ -55,9 +90,8 @@ type FlunderStatus struct {
 type Flunder struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	Spec   FlunderSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
-	Status FlunderStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Spec              FlunderSpec   `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Status            FlunderStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // +genclient
@@ -73,6 +107,11 @@ type Fischer struct {
 	// DisallowedFlunders holds a list of Flunder.Names that are disallowed.
 	// +listType=atomic
 	DisallowedFlunders []string `json:"disallowedFlunders,omitempty" protobuf:"bytes,2,rep,name=disallowedFlunders"`
+
+	// +k8s:validation:format="ip"
+	Reference string `json:"reference,omitempty" protobuf:"bytes,4,opt,name=reference"`
+
+	Primary Widget `json:"primary,omitempty" protobuf:"bytes,3,opt,name=primary"`
 }
 
 // +genclient:nonNamespaced
