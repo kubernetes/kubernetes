@@ -309,7 +309,6 @@ const (
 	// owner: @serathius
 	// kep: http://kep.k8s.io/2340
 	// alpha: v1.28
-	// beta: v1.31
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
@@ -410,7 +409,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	WatchList: {Default: true, PreRelease: featuregate.Beta},
 
-	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
+	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
 	ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 }
