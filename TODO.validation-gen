@@ -47,3 +47,4 @@
     - unions
     - cross field validations
     - update validations
+- Use Go-standard-style names for generated functions
