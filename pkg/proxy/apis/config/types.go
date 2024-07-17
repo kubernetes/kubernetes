@@ -141,6 +141,10 @@ type DetectLocalConfiguration struct {
 	// LocalModeBridgeInterface, kube-proxy will consider traffic to be local if
 	// it originates from this bridge.
 	BridgeInterface string
+	// clusterCIDRs is the dual-stack list of CIDR ranges of the pods in the cluster. When
+	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
+	// traffic to be local if its source IP is in the range of any given CIDR.
+	ClusterCIDRs []string
 	// interfaceNamePrefix is an interface name prefix. When DetectLocalMode is set to
 	// LocalModeInterfaceNamePrefix, kube-proxy will consider traffic to be local if
 	// it originates from any interface whose name begins with this prefix.
@@ -212,12 +216,6 @@ type KubeProxyConfiguration struct {
 	DetectLocalMode LocalMode
 	// detectLocal contains optional configuration settings related to DetectLocalMode.
 	DetectLocal DetectLocalConfiguration
-	// clusterCIDR is the CIDR range of the pods in the cluster. (For dual-stack
-	// clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When
-	// DetectLocalMode is set to LocalModeClusterCIDR, kube-proxy will consider
-	// traffic to be local if its source IP is in this range. (Otherwise it is not
-	// used.)
-	ClusterCIDR string
 
 	// nodePortAddresses is a list of CIDR ranges that contain valid node IPs, or
 	// alternatively, the single string 'primary'. If set to a list of CIDRs,

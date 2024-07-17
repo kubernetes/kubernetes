@@ -305,7 +305,9 @@ func Test_checkBadConfig(t *testing.T) {
 			name: "single-stack NodePortAddresses with single-stack config",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR:       "10.0.0.0/8",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"10.0.0.0/8"},
+					},
 					NodePortAddresses: []string{"192.168.0.0/24"},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
@@ -316,7 +318,9 @@ func Test_checkBadConfig(t *testing.T) {
 			name: "dual-stack NodePortAddresses with dual-stack config",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"10.0.0.0/8", "fd09::/64"},
+					},
 					NodePortAddresses: []string{"192.168.0.0/24", "fd03::/64"},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
@@ -337,7 +341,9 @@ func Test_checkBadConfig(t *testing.T) {
 			name: "single-stack NodePortAddresses with dual-stack config",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR:       "10.0.0.0/8,fd09::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"10.0.0.0/8", "fd09::/64"},
+					},
 					NodePortAddresses: []string{"192.168.0.0/24"},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
@@ -348,7 +354,9 @@ func Test_checkBadConfig(t *testing.T) {
 			name: "wrong-single-stack NodePortAddresses",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR:       "fd09::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"fd09::/64"},
+					},
 					NodePortAddresses: []string{"192.168.0.0/24"},
 				},
 				PrimaryIPFamily: v1.IPv6Protocol,
@@ -392,7 +400,9 @@ func Test_checkBadIPConfig(t *testing.T) {
 			name: "ok single-stack clusterCIDR",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR: "10.0.0.0/8",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"10.0.0.0/8"},
+					},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
@@ -403,7 +413,9 @@ func Test_checkBadIPConfig(t *testing.T) {
 			name: "ok dual-stack clusterCIDR",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR: "10.0.0.0/8,fd01:2345::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"10.0.0.0/8", "fd01:2345::/64"},
+					},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
@@ -414,7 +426,9 @@ func Test_checkBadIPConfig(t *testing.T) {
 			name: "ok reversed dual-stack clusterCIDR",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR: "fd01:2345::/64,10.0.0.0/8",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"fd01:2345::/64", "10.0.0.0/8"},
+					},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
@@ -425,7 +439,9 @@ func Test_checkBadIPConfig(t *testing.T) {
 			name: "wrong-family clusterCIDR",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR: "fd01:2345::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"fd01:2345::/64"},
+					},
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,
 			},
@@ -438,7 +454,9 @@ func Test_checkBadIPConfig(t *testing.T) {
 			name: "wrong-family clusterCIDR when using ClusterCIDR LocalDetector",
 			proxy: &ProxyServer{
 				Config: &kubeproxyconfig.KubeProxyConfiguration{
-					ClusterCIDR:     "fd01:2345::/64",
+					DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+						ClusterCIDRs: []string{"fd01:2345::/64"},
+					},
 					DetectLocalMode: kubeproxyconfig.LocalModeClusterCIDR,
 				},
 				PrimaryIPFamily: v1.IPv4Protocol,

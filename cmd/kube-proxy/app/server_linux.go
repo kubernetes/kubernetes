@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"github.com/google/cadvisor/machine"
@@ -477,12 +476,11 @@ func getLocalDetectors(logger klog.Logger, primaryIPFamily v1.IPFamily, config *
 
 	switch config.DetectLocalMode {
 	case proxyconfigapi.LocalModeClusterCIDR:
-		clusterCIDRs := strings.Split(strings.TrimSpace(config.ClusterCIDR), ",")
-		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(clusterCIDRs) {
+		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(config.DetectLocal.ClusterCIDRs) {
 			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
 		}
 		if !localDetectors[primaryIPFamily].IsImplemented() {
-			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDR", config.ClusterCIDR)
+			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDRs", config.DetectLocal.ClusterCIDRs)
 		}
 
 	case proxyconfigapi.LocalModeNodeCIDR:

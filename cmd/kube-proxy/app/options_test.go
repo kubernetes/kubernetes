@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,7 +196,6 @@ nodePortAddresses:
 					Kubeconfig:         "/path/to/kubeconfig",
 					QPS:                7,
 				},
-				ClusterCIDR:      tc.clusterCIDR,
 				MinSyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:       metav1.Duration{Duration: 60 * time.Second},
 				ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
@@ -228,6 +229,7 @@ nodePortAddresses:
 				DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					BridgeInterface:     "cbr0",
+					ClusterCIDRs:        strings.Split(tc.clusterCIDR, ","),
 					InterfaceNamePrefix: "veth",
 				},
 				Logging: logsapi.LoggingConfiguration{
@@ -442,6 +444,15 @@ func TestProcessV1Alpha1Flags(t *testing.T) {
 			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
 				return config.SyncPeriod == metav1.Duration{Duration: 16 * time.Second} &&
 					config.MinSyncPeriod == metav1.Duration{Duration: 7 * time.Second}
+			},
+		},
+		{
+			name: "cluster cidr",
+			flags: []string{
+				"--cluster-cidr=2002:0:0:1234::/64,10.0.0.0/14",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				return reflect.DeepEqual(config.DetectLocal.ClusterCIDRs, []string{"2002:0:0:1234::/64", "10.0.0.0/14"})
 			},
 		},
 	}

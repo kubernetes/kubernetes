@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -48,6 +50,10 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 		out.IPTables.SyncPeriod = in.SyncPeriod
 		out.IPTables.MinSyncPeriod = in.MinSyncPeriod
 	}
+
+	if len(in.DetectLocal.ClusterCIDRs) > 0 {
+		out.ClusterCIDR = strings.Join(in.DetectLocal.ClusterCIDRs, ",")
+	}
 	return nil
 }
 
@@ -77,6 +83,10 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 		out.SyncPeriod = in.IPTables.SyncPeriod
 		out.MinSyncPeriod = in.IPTables.MinSyncPeriod
 	}
+
+	if len(in.ClusterCIDR) > 0 {
+		out.DetectLocal.ClusterCIDRs = strings.Split(in.ClusterCIDR, ",")
+	}
 	return nil
 }
 
@@ -93,4 +103,9 @@ func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfigur
 // Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
 func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, scope)
+}
+
+// Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
+func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in *config.DetectLocalConfiguration, out *v1alpha1.DetectLocalConfiguration, s conversion.Scope) error {
+	return autoConvert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration(in, out, s)
 }
