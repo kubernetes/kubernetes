@@ -53,27 +53,11 @@ type KubeProxyIPTablesConfiguration struct {
 	// iptables mode and IPv4; localhost NodePorts are never allowed with other proxy
 	// modes or with IPv6.)
 	LocalhostNodePorts *bool
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s',
-	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
-	// result in an immediate iptables resync.
-	MinSyncPeriod metav1.Duration
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPVSConfiguration struct {
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between IPVS rule resyncs (e.g. '5s', '1m',
-	// '2h22m'). A value of 0 means every Service or EndpointSlice change will result
-	// in an immediate IPVS resync.
-	MinSyncPeriod metav1.Duration
 	// scheduler is the IPVS scheduler to use
 	Scheduler string
 	// excludeCIDRs is a list of CIDRs which the ipvs proxier should not touch
@@ -99,14 +83,6 @@ type KubeProxyNFTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the nftables proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
-	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
-	// various re-synchronizing and cleanup operations are performed. Must be greater
-	// than 0.
-	SyncPeriod metav1.Duration
-	// minSyncPeriod is the minimum period between iptables rule resyncs (e.g. '5s',
-	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
-	// result in an immediate iptables resync.
-	MinSyncPeriod metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -251,6 +227,14 @@ type KubeProxyConfiguration struct {
 	// object. If unset, NodePort connections will be accepted on all local IPs.
 	NodePortAddresses []string
 
+	// syncPeriod is an interval (e.g. '5s', '1m', '2h22m') indicating how frequently
+	// various re-synchronizing and cleanup operations are performed. Must be greater
+	// than 0.
+	SyncPeriod metav1.Duration
+	// minSyncPeriod is the minimum period between proxier rule resyncs (e.g. '5s',
+	// '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will
+	// result in an immediate proxier resync.
+	MinSyncPeriod metav1.Duration
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
 	ConfigSyncPeriod metav1.Duration

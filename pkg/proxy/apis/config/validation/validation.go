@@ -61,6 +61,15 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	if config.ConfigSyncPeriod.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
+	if config.SyncPeriod.Duration <= 0 {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
+	}
+	if config.MinSyncPeriod.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
+	}
+	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", newPath.Child("MinSyncPeriod").String())))
+	}
 
 	if netutils.ParseIPSloppy(config.BindAddress) == nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
@@ -115,36 +124,11 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
 	}
-
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
-
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
-
-	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
-	}
-
 	return allErrs
 }
 
 func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
-
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
-
-	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
-	}
 
 	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
@@ -157,18 +141,6 @@ func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTa
 
 	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
-	}
-
-	if config.SyncPeriod.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.SyncPeriod, "must be greater than 0"))
-	}
-
-	if config.MinSyncPeriod.Duration < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MinSyncPeriod"), config.MinSyncPeriod, "must be greater than or equal to 0"))
-	}
-
-	if config.MinSyncPeriod.Duration > config.SyncPeriod.Duration {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
 	}
 
 	return allErrs
