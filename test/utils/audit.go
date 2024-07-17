@@ -128,55 +128,6 @@ func CheckAuditLinesFiltered(stream io.Reader, expected []AuditEvent, version sc
 	return missingReport, nil
 }
 
-// CheckAuditList searches an audit event list for the expected audit events.
-func CheckAuditList(el auditinternal.EventList, expected []AuditEvent) (missing []AuditEvent, err error) {
-	expectations := newAuditEventTracker(expected)
-
-	for _, e := range el.Items {
-		event, err := testEventFromInternal(&e)
-		if err != nil {
-			return expected, err
-		}
-
-		expectations.Mark(event)
-	}
-
-	return expectations.Missing(), nil
-}
-
-// CheckForDuplicates checks a list for duplicate events
-func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, error) {
-	// existingEvents holds a slice of audit events that have been seen
-	existingEvents := []AuditEvent{}
-	duplicates := auditinternal.EventList{}
-	for _, e := range el.Items {
-		event, err := testEventFromInternal(&e)
-		if err != nil {
-			return duplicates, err
-		}
-		event.ID = e.AuditID
-		for _, existing := range existingEvents {
-			if reflect.DeepEqual(existing, event) {
-				duplicates.Items = append(duplicates.Items, e)
-				continue
-			}
-		}
-		existingEvents = append(existingEvents, event)
-	}
-
-	var err error
-	if len(duplicates.Items) > 0 {
-		err = fmt.Errorf("failed duplicate check")
-	}
-
-	return duplicates, err
-}
-
-// testEventFromInternal takes an internal audit event and returns a test event
-func testEventFromInternal(e *auditinternal.Event) (AuditEvent, error) {
-	return testEventFromInternalFiltered(e, nil)
-}
-
 // testEventFromInternalFiltered takes an internal audit event and returns a test event, customAnnotationsFilter
 // controls which audit annotations are added to AuditEvent.CustomAuditAnnotations.
 // If the customAnnotationsFilter is nil, AuditEvent.CustomAuditAnnotations will be empty.
