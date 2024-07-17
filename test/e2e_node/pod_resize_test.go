@@ -1241,7 +1241,7 @@ func doPodResizeErrorTests() {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			ginkgo.By("waiting for the node to be ready", func() {
-				if !supportsInPlacePodVerticalScaling(ctx, f) || framework.NodeOSDistroIs("windows") {
+				if !supportsInPlacePodVerticalScaling(ctx, f) || framework.NodeOSDistroIs("windows") || isRunningOnArm64() {
 					e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 				}
 			})
@@ -1303,7 +1303,7 @@ func doPodResizeErrorTests() {
 //       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
 //       in test/node/pod_resize_test.go
 
-var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, func() {
+var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, "[NodeAlphaFeature:InPlacePodVerticalScaling]", func() {
 	if !podOnCgroupv2Node {
 		cgroupMemLimit = CgroupMemLimit
 		cgroupCPULimit = CgroupCPUQuota
