@@ -996,3 +996,100 @@ func TestIsSchedulableAfterCSINodeChange(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
+	table := []struct {
+		name    string
+		pod     *v1.Pod
+		oldPVC  interface{}
+		newPVC  interface{}
+		wantErr bool
+		expect  framework.QueueingHint
+	}{
+		{
+			name:    "pod has no pvc or ephemeral volumes",
+			pod:     makePod("pod-a").withEmptyDirVolume().Pod,
+			oldPVC:  makePVC("pvc-b", "sc-a").PersistentVolumeClaim,
+			newPVC:  makePVC("pvc-b", "sc-a").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "pvc with the same name as the one used by the pod in a different namespace is modified",
+			pod: makePod("pod-a").
+				withNamespace("ns-a").
+				withPVCVolume("pvc-a", "").
+				withPVCVolume("pvc-b", "").
+				Pod,
+			oldPVC:  nil,
+			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "pod has no pvc that is being modified",
+			pod: makePod("pod-a").
+				withPVCVolume("pvc-a", "").
+				withPVCVolume("pvc-c", "").
+				Pod,
+			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "pod has no generic ephemeral volume that is being modified",
+			pod: makePod("pod-a").
+				withGenericEphemeralVolume("ephemeral-a").
+				withGenericEphemeralVolume("ephemeral-c").
+				Pod,
+			oldPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
+			newPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.QueueSkip,
+		},
+		{
+			name: "pod has the pvc that is being modified",
+			pod: makePod("pod-a").
+				withPVCVolume("pvc-a", "").
+				withPVCVolume("pvc-b", "").
+				Pod,
+			oldPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			newPVC:  makePVC("pvc-b", "").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name: "pod has the generic ephemeral volume that is being modified",
+			pod: makePod("pod-a").
+				withGenericEphemeralVolume("ephemeral-a").
+				withGenericEphemeralVolume("ephemeral-b").
+				Pod,
+			oldPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
+			newPVC:  makePVC("pod-a-ephemeral-b", "").PersistentVolumeClaim,
+			wantErr: false,
+			expect:  framework.Queue,
+		},
+		{
+			name:    "type conversion error",
+			oldPVC:  new(struct{}),
+			newPVC:  new(struct{}),
+			wantErr: true,
+			expect:  framework.Queue,
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.name, func(t *testing.T) {
+			pl := &VolumeBinding{}
+			logger, _ := ktesting.NewTestContext(t)
+			qhint, err := pl.isSchedulableAfterPersistentVolumeClaimChange(logger, item.pod, item.oldPVC, item.newPVC)
+			if (err != nil) != item.wantErr {
+				t.Errorf("isSchedulableAfterPersistentVolumeClaimChange failed - got: %q", err)
+			}
+			if qhint != item.expect {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
+			}
+		})
+	}
+}
