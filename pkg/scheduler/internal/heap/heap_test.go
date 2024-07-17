@@ -23,8 +23,8 @@ import (
 	"testing"
 )
 
-func testHeapObjectKeyFunc(obj interface{}) (string, error) {
-	return obj.(testHeapObject).name, nil
+func testHeapObjectKeyFunc(obj testHeapObject) string {
+	return obj.name
 }
 
 type testHeapObject struct {
@@ -56,9 +56,9 @@ func mkHeapObj(name string, val interface{}) testHeapObject {
 	return testHeapObject{name: name, val: val}
 }
 
-func compareInts(val1 interface{}, val2 interface{}) bool {
-	first := val1.(testHeapObject).val.(int)
-	second := val2.(testHeapObject).val.(int)
+func compareInts(val1 testHeapObject, val2 testHeapObject) bool {
+	first := val1.val.(int)
+	second := val2.val.(int)
 	return first < second
 }
 
@@ -67,17 +67,18 @@ func TestHeapBasic(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
 	const amount = 500
 	var i int
+	var zero testHeapObject
 
 	// empty queue
-	if item := h.Peek(); item != nil {
+	if item, ok := h.Peek(); ok || item != zero {
 		t.Errorf("expected nil object but got %v", item)
 	}
 
 	for i = amount; i > 0; i-- {
-		h.Add(mkHeapObj(string([]rune{'a', rune(i)}), i))
+		h.AddOrUpdate(mkHeapObj(string([]rune{'a', rune(i)}), i))
 		// Retrieve head without removing it
-		head := h.Peek()
-		if e, a := i, head.(testHeapObject).val; a != e {
+		head, ok := h.Peek()
+		if e, a := i, head.val; !ok || a != e {
 			t.Errorf("expected %d, got %d", e, a)
 		}
 	}
@@ -85,41 +86,44 @@ func TestHeapBasic(t *testing.T) {
 	// Make sure that the numbers are popped in ascending order.
 	prevNum := 0
 	for i := 0; i < amount; i++ {
-		obj, err := h.Pop()
-		num := obj.(testHeapObject).val.(int)
+		item, err := h.Pop()
+		num := item.val.(int)
 		// All the items must be sorted.
 		if err != nil || prevNum > num {
-			t.Errorf("got %v out of order, last was %v", obj, prevNum)
+			t.Errorf("got %v out of order, last was %v", item, prevNum)
 		}
 		prevNum = num
 	}
 }
 
-// Tests Heap.Add and ensures that heap invariant is preserved after adding items.
-func TestHeap_Add(t *testing.T) {
+// TestHeap_AddOrUpdate_Add tests add capabilities of Heap.AddOrUpdate
+// and ensures that heap invariant is preserved after adding items.
+func TestHeap_AddOrUpdate_Add(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("baz", 11))
-	h.Add(mkHeapObj("zab", 30))
-	h.Add(mkHeapObj("foo", 13)) // This updates "foo".
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("zab", 30))
+	h.AddOrUpdate(mkHeapObj("foo", 13)) // This updates "foo".
 
 	item, err := h.Pop()
-	if e, a := 1, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 1, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	item, err = h.Pop()
-	if e, a := 11, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 11, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
-	h.Delete(mkHeapObj("baz", 11)) // Nothing is deleted.
-	h.Add(mkHeapObj("foo", 14))    // foo is updated.
+	if err := h.Delete(mkHeapObj("baz", 11)); err == nil { // Nothing is deleted.
+		t.Fatalf("nothing should be deleted from the heap")
+	}
+	h.AddOrUpdate(mkHeapObj("foo", 14)) // foo is updated.
 	item, err = h.Pop()
-	if e, a := 14, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 14, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	item, err = h.Pop()
-	if e, a := 30, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 30, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 }
@@ -128,21 +132,21 @@ func TestHeap_Add(t *testing.T) {
 // preserved after deleting items.
 func TestHeap_Delete(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("bal", 31))
-	h.Add(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("bal", 31))
+	h.AddOrUpdate(mkHeapObj("baz", 11))
 
 	// Delete head. Delete should work with "key" and doesn't care about the value.
 	if err := h.Delete(mkHeapObj("bar", 200)); err != nil {
 		t.Fatalf("Failed to delete head.")
 	}
 	item, err := h.Pop()
-	if e, a := 10, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 10, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
-	h.Add(mkHeapObj("zab", 30))
-	h.Add(mkHeapObj("faz", 30))
+	h.AddOrUpdate(mkHeapObj("zab", 30))
+	h.AddOrUpdate(mkHeapObj("faz", 30))
 	len := h.data.Len()
 	// Delete non-existing item.
 	if err = h.Delete(mkHeapObj("non-existent", 10)); err == nil || len != h.data.Len() {
@@ -157,11 +161,11 @@ func TestHeap_Delete(t *testing.T) {
 		t.Fatalf("Failed to delete item.")
 	}
 	item, err = h.Pop()
-	if e, a := 11, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 11, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	item, err = h.Pop()
-	if e, a := 30, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 30, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	if h.data.Len() != 0 {
@@ -169,26 +173,26 @@ func TestHeap_Delete(t *testing.T) {
 	}
 }
 
-// TestHeap_Update tests Heap.Update and ensures that heap invariant is
-// preserved after adding items.
-func TestHeap_Update(t *testing.T) {
+// TestHeap_AddOrUpdate_Update tests update capabilities of Heap.Update
+// and ensures that heap invariant is preserved after adding items.
+func TestHeap_AddOrUpdate_Update(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("bal", 31))
-	h.Add(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("bal", 31))
+	h.AddOrUpdate(mkHeapObj("baz", 11))
 
 	// Update an item to a value that should push it to the head.
-	h.Update(mkHeapObj("baz", 0))
+	h.AddOrUpdate(mkHeapObj("baz", 0))
 	if h.data.queue[0] != "baz" || h.data.items["baz"].index != 0 {
 		t.Fatalf("expected baz to be at the head")
 	}
 	item, err := h.Pop()
-	if e, a := 0, item.(testHeapObject).val; err != nil || a != e {
+	if e, a := 0, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
 	// Update bar to push it farther back in the queue.
-	h.Update(mkHeapObj("bar", 100))
+	h.AddOrUpdate(mkHeapObj("bar", 100))
 	if h.data.queue[0] != "foo" || h.data.items["foo"].index != 0 {
 		t.Fatalf("expected foo to be at the head")
 	}
@@ -197,19 +201,19 @@ func TestHeap_Update(t *testing.T) {
 // TestHeap_Get tests Heap.Get.
 func TestHeap_Get(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("bal", 31))
-	h.Add(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("bal", 31))
+	h.AddOrUpdate(mkHeapObj("baz", 11))
 
 	// Get works with the key.
-	obj, exists, err := h.Get(mkHeapObj("baz", 0))
-	if err != nil || exists == false || obj.(testHeapObject).val != 11 {
+	item, exists := h.Get(mkHeapObj("baz", 0))
+	if !exists || item.val != 11 {
 		t.Fatalf("unexpected error in getting element")
 	}
 	// Get non-existing object.
-	_, exists, err = h.Get(mkHeapObj("non-existing", 0))
-	if err != nil || exists {
+	_, exists = h.Get(mkHeapObj("non-existing", 0))
+	if exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }
@@ -217,18 +221,18 @@ func TestHeap_Get(t *testing.T) {
 // TestHeap_GetByKey tests Heap.GetByKey and is very similar to TestHeap_Get.
 func TestHeap_GetByKey(t *testing.T) {
 	h := New(testHeapObjectKeyFunc, compareInts)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("bal", 31))
-	h.Add(mkHeapObj("baz", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("bal", 31))
+	h.AddOrUpdate(mkHeapObj("baz", 11))
 
-	obj, exists, err := h.GetByKey("baz")
-	if err != nil || !exists || obj.(testHeapObject).val != 11 {
+	item, exists := h.GetByKey("baz")
+	if !exists || item.val != 11 {
 		t.Fatalf("unexpected error in getting element")
 	}
 	// Get non-existing object.
-	_, exists, err = h.GetByKey("non-existing")
-	if err != nil || exists {
+	_, exists = h.GetByKey("non-existing")
+	if exists {
 		t.Fatalf("didn't expect to get any object")
 	}
 }
@@ -249,14 +253,13 @@ func TestHeap_List(t *testing.T) {
 		"faz": 30,
 	}
 	for k, v := range items {
-		h.Add(mkHeapObj(k, v))
+		h.AddOrUpdate(mkHeapObj(k, v))
 	}
 	list = h.List()
 	if len(list) != len(items) {
 		t.Errorf("expected %d items, got %d", len(items), len(list))
 	}
-	for _, obj := range list {
-		heapObj := obj.(testHeapObject)
+	for _, heapObj := range list {
 		v, ok := items[heapObj.name]
 		if !ok || v != heapObj.val {
 			t.Errorf("unexpected item in the list: %v", heapObj)
@@ -267,10 +270,10 @@ func TestHeap_List(t *testing.T) {
 func TestHeapWithRecorder(t *testing.T) {
 	metricRecorder := new(testMetricRecorder)
 	h := NewWithRecorder(testHeapObjectKeyFunc, compareInts, metricRecorder)
-	h.Add(mkHeapObj("foo", 10))
-	h.Add(mkHeapObj("bar", 1))
-	h.Add(mkHeapObj("baz", 100))
-	h.Add(mkHeapObj("qux", 11))
+	h.AddOrUpdate(mkHeapObj("foo", 10))
+	h.AddOrUpdate(mkHeapObj("bar", 1))
+	h.AddOrUpdate(mkHeapObj("baz", 100))
+	h.AddOrUpdate(mkHeapObj("qux", 11))
 
 	if *metricRecorder != 4 {
 		t.Errorf("expected count to be 4 but got %d", *metricRecorder)

@@ -147,9 +147,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	logger := sched.logger
 	pod := obj.(*v1.Pod)
 	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
-	if err := sched.SchedulingQueue.Add(logger, pod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
-	}
+	sched.SchedulingQueue.Add(logger, pod)
 }
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
@@ -172,9 +170,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	}
 
 	logger.V(4).Info("Update event for unscheduled pod", "pod", klog.KObj(newPod))
-	if err := sched.SchedulingQueue.Update(logger, oldPod, newPod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
-	}
+	sched.SchedulingQueue.Update(logger, oldPod, newPod)
 }
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
@@ -199,9 +195,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	}
 
 	logger.V(3).Info("Delete event for unscheduled pod", "pod", klog.KObj(pod))
-	if err := sched.SchedulingQueue.Delete(pod); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
-	}
+	sched.SchedulingQueue.Delete(pod)
 	fwk, err := sched.frameworkForPod(pod)
 	if err != nil {
 		// This shouldn't happen, because we only accept for scheduling the pods
