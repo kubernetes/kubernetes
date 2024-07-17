@@ -544,9 +544,9 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 func waitForResizeStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
 	var actualResizeStatus v1.ClaimResourceStatus
 
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
@@ -563,9 +563,9 @@ func waitForResizeStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, c c
 
 func waitForAllocatedResource(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
 	expectedQuantity := resource.MustParse(expectedSize)
-	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
 		var err error
-		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
+		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pollContext, pvc.Name, metav1.GetOptions{})
 
 		if err != nil {
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
