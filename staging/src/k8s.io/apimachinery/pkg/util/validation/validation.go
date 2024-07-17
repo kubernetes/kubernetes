@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -68,6 +69,22 @@ func IsQualifiedName(value string) []string {
 		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc"))
 	}
 	return errs
+}
+
+func ValidateMaxLength(fldPath *field.Path, value string, max int) field.ErrorList {
+	if len(value) > max {
+		return field.ErrorList{field.Invalid(fldPath, value, MaxLenError(max))}
+	}
+	return nil
+}
+
+// TODO: scanning the symbols list is O(n) vs the O(1) set.has check used by hand written validation.
+func ValidateEnum[T ~string](fldPath *field.Path, value T, symbols ...string) field.ErrorList {
+	valueString := string(value)
+	if !slices.Contains(symbols, valueString) {
+		return field.ErrorList{field.NotSupported(fldPath, value, symbols)}
+	}
+	return nil
 }
 
 // IsFullyQualifiedName checks if the name is fully qualified. This is similar
