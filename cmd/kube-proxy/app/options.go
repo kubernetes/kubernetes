@@ -87,6 +87,7 @@ type Options struct {
 	iptablesMinSyncPeriod time.Duration
 	ipvsSyncPeriod        time.Duration
 	ipvsMinSyncPeriod     time.Duration
+	clusterCIDRs          string
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -143,7 +144,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic. This parameter is ignored if a config file is specified by --config.")
 	fs.StringVar(&o.config.DetectLocal.BridgeInterface, "pod-bridge-interface", o.config.DetectLocal.BridgeInterface, "A bridge interface name. When --detect-local-mode is set to BridgeInterface, kube-proxy will consider traffic to be local if it originates from this bridge.")
 	fs.StringVar(&o.config.DetectLocal.InterfaceNamePrefix, "pod-interface-name-prefix", o.config.DetectLocal.InterfaceNamePrefix, "An interface name prefix. When --detect-local-mode is set to InterfaceNamePrefix, kube-proxy will consider traffic to be local if it originates from any interface whose name begins with this prefix.")
-	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of the pods in the cluster. (For dual-stack clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When --detect-local-mode is set to ClusterCIDR, kube-proxy will consider traffic to be local if its source IP is in this range. (Otherwise it is not used.) "+
+	fs.StringVar(&o.clusterCIDRs, "cluster-cidr", strings.Join(o.config.DetectLocal.ClusterCIDRs, ","), "The CIDR range of the pods in the cluster. (For dual-stack clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When --detect-local-mode is set to ClusterCIDR, kube-proxy will consider traffic to be local if its source IP is in this range. (Otherwise it is not used.) "+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
@@ -325,6 +326,9 @@ func (o *Options) processV1Alpha1Flags(fs *pflag.FlagSet) {
 	}
 	if fs.Changed("ipvs-min-sync-period") && o.config.Mode == kubeproxyconfig.ProxyModeIPVS {
 		o.config.MinSyncPeriod.Duration = o.ipvsMinSyncPeriod
+	}
+	if fs.Changed("cluster-cidr") {
+		o.config.DetectLocal.ClusterCIDRs = strings.Split(o.clusterCIDRs, ",")
 	}
 }
 
