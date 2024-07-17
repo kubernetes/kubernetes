@@ -19,10 +19,10 @@ package util
 import (
 	"sort"
 
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	storagev1alpha1listers "k8s.io/client-go/listers/storage/v1alpha1"
+	storagev1beta1listers "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/klog/v2"
 )
 
@@ -32,13 +32,13 @@ const (
 )
 
 // GetDefaultVolumeAttributesClass returns the default VolumeAttributesClass from the store, or nil.
-func GetDefaultVolumeAttributesClass(lister storagev1alpha1listers.VolumeAttributesClassLister, driverName string) (*storagev1alpha1.VolumeAttributesClass, error) {
+func GetDefaultVolumeAttributesClass(lister storagev1beta1listers.VolumeAttributesClassLister, driverName string) (*storagev1beta1.VolumeAttributesClass, error) {
 	list, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	defaultClasses := []*storagev1alpha1.VolumeAttributesClass{}
+	defaultClasses := []*storagev1beta1.VolumeAttributesClass{}
 	for _, class := range list {
 		if IsDefaultVolumeAttributesClassAnnotation(class.ObjectMeta) && class.DriverName == driverName {
 			defaultClasses = append(defaultClasses, class)

@@ -74,7 +74,7 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		networking.Resource("ipaddresses").WithVersion("v1beta1"),
 		networking.Resource("servicecidrs").WithVersion("v1beta1"),
 		certificates.Resource("clustertrustbundles").WithVersion("v1alpha1"),
-		storage.Resource("volumeattributesclasses").WithVersion("v1alpha1"),
+		storage.Resource("volumeattributesclasses").WithVersion("v1beta1"),
 		storagemigration.Resource("storagemigrations").WithVersion("v1alpha1"),
 	}
 

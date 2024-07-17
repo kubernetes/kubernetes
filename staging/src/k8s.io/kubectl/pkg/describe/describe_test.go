@@ -42,7 +42,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3659,7 +3659,7 @@ Parameters:   param1=value1,param2=value2
 Events:       <none>
 `
 
-	f := fake.NewSimpleClientset(&storagev1alpha1.VolumeAttributesClass{
+	f := fake.NewSimpleClientset(&storagev1beta1.VolumeAttributesClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "4",

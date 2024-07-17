@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -97,7 +97,7 @@ func GetStorageClass(
 // CopyVolumeAttributesClass constructs a new VolumeAttributesClass instance
 // with a unique name that is based on namespace + suffix
 // using the VolumeAttributesClass passed in as a parameter
-func CopyVolumeAttributesClass(vac *storagev1alpha1.VolumeAttributesClass, ns string, suffix string) *storagev1alpha1.VolumeAttributesClass {
+func CopyVolumeAttributesClass(vac *storagev1beta1.VolumeAttributesClass, ns string, suffix string) *storagev1beta1.VolumeAttributesClass {
 	copy := vac.DeepCopy()
 	copy.ObjectMeta.Name = names.SimpleNameGenerator.GenerateName(ns + "-" + suffix)
 	copy.ResourceVersion = ""

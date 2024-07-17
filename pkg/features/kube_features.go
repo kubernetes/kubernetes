@@ -885,6 +885,7 @@ const (
 	// owner: @mattcarry, @sunnylovestiramisu
 	// kep: https://kep.k8s.io/3751
 	// alpha: v1.29
+	// beta: v1.31 (off by default)
 	//
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
@@ -1234,7 +1235,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	UnknownVersionInteroperabilityProxy: {Default: false, PreRelease: featuregate.Alpha},
 
-	VolumeAttributesClass: {Default: false, PreRelease: featuregate.Alpha},
+	VolumeAttributesClass: {Default: false, PreRelease: featuregate.Beta},
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
 

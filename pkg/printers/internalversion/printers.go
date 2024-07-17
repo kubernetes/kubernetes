@@ -43,7 +43,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -444,7 +444,7 @@ func AddHandlers(h printers.PrintHandler) {
 
 	volumeAttributesClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "DriverName", Type: "string", Description: storagev1alpha1.VolumeAttributesClass{}.SwaggerDoc()["driverName"]},
+		{Name: "DriverName", Type: "string", Description: storagev1beta1.VolumeAttributesClass{}.SwaggerDoc()["driverName"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
