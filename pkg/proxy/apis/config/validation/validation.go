@@ -90,17 +90,13 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 }
 
 func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTablesConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
-	}
-	return allErrs
+	return validateMasqueradeBit(config.MasqueradeBit, fldPath)
 }
 
 func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	allErrs = append(allErrs, validateMasqueradeBit(config.MasqueradeBit, fldPath)...)
 	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
@@ -108,13 +104,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 }
 
 func validateKubeProxyNFTablesConfiguration(config kubeproxyconfig.KubeProxyNFTablesConfiguration, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	if config.MasqueradeBit != nil && (*config.MasqueradeBit < 0 || *config.MasqueradeBit > 31) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), config.MasqueradeBit, "must be within the range [0, 31]"))
-	}
-
-	return allErrs
+	return validateMasqueradeBit(config.MasqueradeBit, fldPath)
 }
 
 func validateKubeProxyLinuxConfiguration(config kubeproxyconfig.KubeProxyLinuxConfiguration, fldPath *field.Path) field.ErrorList {
@@ -344,6 +334,14 @@ func validateDetectLocalConfiguration(mode kubeproxyconfig.LocalMode, config kub
 		if len(config.ClusterCIDRs) > 0 {
 			allErrs = append(allErrs, validateDualStackCIDRStrings(config.ClusterCIDRs, fldPath.Child("ClusterCIDRs"))...)
 		}
+	}
+	return allErrs
+}
+
+func validateMasqueradeBit(masqueradeBit *int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if masqueradeBit != nil && (*masqueradeBit < 0 || *masqueradeBit > 31) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("MasqueradeBit"), masqueradeBit, "must be within the range [0, 31]"))
 	}
 	return allErrs
 }

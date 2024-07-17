@@ -228,6 +228,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	}{
 		"IPVS Timeout can be 0": {
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](5),
 				TCPTimeout:    metav1.Duration{Duration: 0 * time.Second},
 				TCPFinTimeout: metav1.Duration{Duration: 0 * time.Second},
 				UDPTimeout:    metav1.Duration{Duration: 0 * time.Second},
@@ -236,6 +237,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 		},
 		"IPVS Timeout > 0": {
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](10),
 				TCPTimeout:    metav1.Duration{Duration: 1 * time.Second},
 				TCPFinTimeout: metav1.Duration{Duration: 2 * time.Second},
 				UDPTimeout:    metav1.Duration{Duration: 3 * time.Second},
@@ -244,6 +246,7 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 		},
 		"TCP,TCPFin,UDP Timeouts < 0": {
 			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](20),
 				TCPTimeout:    metav1.Duration{Duration: -1 * time.Second},
 				UDPTimeout:    metav1.Duration{Duration: -1 * time.Second},
 				TCPFinTimeout: metav1.Duration{Duration: -1 * time.Second},
@@ -251,6 +254,24 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
 				field.Invalid(newPath.Child("KubeIPVSConfiguration.TCPFinTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0"),
 				field.Invalid(newPath.Child("KubeIPVSConfiguration.UDPTimeout"), metav1.Duration{Duration: -1 * time.Second}, "must be greater than or equal to 0")},
+		},
+		"MasqueradeBit cannot be < 0": {
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](-1),
+				TCPTimeout:    metav1.Duration{Duration: 1 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 2 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 3 * time.Second},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.MasqueradeBit"), ptr.To[int32](-1), "must be within the range [0, 31]")},
+		},
+		"MasqueradeBit cannot be > 31": {
+			config: kubeproxyconfig.KubeProxyIPVSConfiguration{
+				MasqueradeBit: ptr.To[int32](32),
+				TCPTimeout:    metav1.Duration{Duration: 1 * time.Second},
+				TCPFinTimeout: metav1.Duration{Duration: 2 * time.Second},
+				UDPTimeout:    metav1.Duration{Duration: 3 * time.Second},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeIPVSConfiguration.MasqueradeBit"), ptr.To[int32](32), "must be within the range [0, 31]")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

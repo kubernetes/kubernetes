@@ -217,7 +217,8 @@ nodePortAddresses:
 					LocalhostNodePorts: ptr.To(true),
 				},
 				IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-					ExcludeCIDRs: []string{"10.20.30.40/16", "fd00:1::0/64"},
+					MasqueradeBit: ptr.To[int32](17),
+					ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 				},
 				NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
 					MasqueradeBit: ptr.To[int32](18),

@@ -46,7 +46,7 @@ type KubeProxyWindowsConfiguration struct {
 // details for the Kubernetes proxy server.
 type KubeProxyIPTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
-	// the iptables or ipvs proxy mode. Values must be within the range [0, 31].
+	// the iptables proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
 	// localhostNodePorts, if false, tells kube-proxy to disable the legacy behavior
 	// of allowing NodePort services to be accessed via localhost. (Applies only to
@@ -58,6 +58,9 @@ type KubeProxyIPTablesConfiguration struct {
 // KubeProxyIPVSConfiguration contains ipvs-related configuration
 // details for the Kubernetes proxy server.
 type KubeProxyIPVSConfiguration struct {
+	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
+	// the ipvs proxy mode. Values must be within the range [0, 31].
+	MasqueradeBit *int32
 	// scheduler is the IPVS scheduler to use
 	Scheduler string
 	// excludeCIDRs is a list of CIDRs which the ipvs proxier should not touch
