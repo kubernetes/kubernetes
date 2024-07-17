@@ -32,6 +32,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -219,5 +220,18 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			return nil
 		}
 		return validatingAdmission.Validate(ctx, finalAttributes, o)
+	}
+}
+
+func ValidateDeclaratively(ctx context.Context, obj runtime.Object, subresources ...string) field.ErrorList {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+		versionedObj, err := legacyscheme.Scheme.ConvertToVersion(obj, groupVersion)
+		if err != nil {
+			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
+		}
+		return legacyscheme.Scheme.Validate(versionedObj, subresources...)
+	} else {
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("could not find requestInfo in context"))}
 	}
 }
