@@ -1903,9 +1903,8 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 }
 
 func isPodFailed(p *v1.Pod, job *batch.Job) bool {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) && feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
-		// When PodDisruptionConditions is enabled, orphan Pods and unschedulable
-		// terminating Pods are marked as Failed. So we only need to check the phase.
+	if feature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && job.Spec.PodFailurePolicy != nil {
+		// Orphan Pods and unschedulable terminating Pods are marked as Failed. So we only need to check the phase.
 		return p.Status.Phase == v1.PodFailed
 	}
 	if p.Status.Phase == v1.PodFailed {

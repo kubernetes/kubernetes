@@ -411,14 +411,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
 		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
-		var condition *v1.PodCondition
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-			condition = &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  v1.PodReasonTerminationByKubelet,
-				Message: message,
-			}
+		condition := &v1.PodCondition{
+			Type:    v1.DisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  v1.PodReasonTerminationByKubelet,
+			Message: message,
 		}
 		if m.evictPod(pod, gracePeriodOverride, message, annotations, condition) {
 			metrics.Evictions.WithLabelValues(string(thresholdToReclaim.Signal)).Inc()

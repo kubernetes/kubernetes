@@ -1835,15 +1835,13 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		// copy over the pod disruption conditions from state which is already
-		// updated during the eviciton (due to either node resource pressure or
-		// node graceful shutdown). We do not re-generate the conditions based
-		// on the container statuses as they are added based on one-time events.
-		cType := v1.DisruptionTarget
-		if _, condition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); condition != nil {
-			s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, condition)
-		}
+	// copy over the pod disruption conditions from state which is already
+	// updated during the eviciton (due to either node resource pressure or
+	// node graceful shutdown). We do not re-generate the conditions based
+	// on the container statuses as they are added based on one-time events.
+	cType := v1.DisruptionTarget
+	if _, condition := podutil.GetPodConditionFromList(oldPodStatus.Conditions, cType); condition != nil {
+		s.Conditions = utilpod.ReplaceOrAppendPodCondition(s.Conditions, condition)
 	}
 
 	// set all Kubelet-owned conditions
