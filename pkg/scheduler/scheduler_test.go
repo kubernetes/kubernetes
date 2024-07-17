@@ -287,9 +287,7 @@ func TestFailureHandler(t *testing.T) {
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
-			if err := queue.Add(logger, testPod); err != nil {
-				t.Fatalf("Add failed: %v", err)
-			}
+			queue.Add(logger, testPod)
 
 			if _, err := queue.Pop(logger); err != nil {
 				t.Fatalf("Pop failed: %v", err)
