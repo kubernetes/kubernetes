@@ -224,7 +224,6 @@ nodePortAddresses:
 				},
 				MetricsBindAddress: tc.metricsBindAddress,
 				Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-				PortRange:          "2-7",
 				NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 				DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
 				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{

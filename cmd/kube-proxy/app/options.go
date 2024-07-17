@@ -170,8 +170,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	_ = fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
 	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
 	_ = fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "This was previously used to configure the userspace proxy, but is now unused.")
-	_ = fs.MarkDeprecated("proxy-port-range", "This flag has no effect and will be removed in a future release.")
 
 	logsapi.AddFlags(&o.config.Logging, fs)
 }
