@@ -26,8 +26,10 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -64,7 +66,7 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string) (http.Handler, error) {
+func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, listGVK schema.GroupVersionKind) (http.Handler, error) {
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -135,6 +137,33 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		serverShuttingDownCh = signals.ShuttingDown()
 	}
 
+	transformEvent := func(in watch.Event) watch.Event {
+		if in.Type != watch.Bookmark {
+			return in
+		}
+		if meta, err := meta.Accessor(in.Object); err != nil || meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] != "true" {
+			return in
+		}
+		in.Object = in.Object.DeepCopyObject()
+		meta, err := meta.Accessor(in.Object)
+		if err != nil {
+			return watch.Event{
+				Type: watch.Error,
+				Object: &metav1.Status{
+					Status: metav1.StatusFailure,
+				},
+			}
+		}
+		annotations := meta.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations[metav1.ListKindEventAnnotationKey] = listGVK.Kind
+		annotations[metav1.ListVersionEventAnnotationKey] = listGVK.GroupVersion().String()
+		meta.SetAnnotations(annotations)
+		return in
+	}
+
 	server := &WatchServer{
 		Watching: watcher,
 		Scope:    scope,
@@ -148,6 +177,7 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		MemoryAllocator:      memoryAllocator,
 		TimeoutFactory:       &realTimeoutFactory{timeout},
 		ServerShuttingDownCh: serverShuttingDownCh,
+		EventTransformer:     transformEvent,
 
 		metricsScope: metricsScope,
 	}
@@ -178,6 +208,7 @@ type WatchServer struct {
 	MemoryAllocator      runtime.MemoryAllocator
 	TimeoutFactory       TimeoutFactory
 	ServerShuttingDownCh <-chan struct{}
+	EventTransformer     func(watch.Event) watch.Event
 
 	metricsScope string
 }
@@ -245,6 +276,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
+
+			// poc: a client needs to know the correct list gvk in order to synthesize a
+			// list object from watch events
+			event = s.EventTransformer(event)
 
 			if err := watchEncoder.Encode(event); err != nil {
 				utilruntime.HandleError(err)

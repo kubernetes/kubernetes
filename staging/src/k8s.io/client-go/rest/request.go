@@ -784,10 +784,8 @@ type WatchListResult struct {
 	// the end of the stream.
 	initialEventsEndBookmarkRV string
 
-	// gv represents the API version
-	// it is used to construct the final list response
-	// normally this information is filled by the server
-	gv schema.GroupVersion
+	// gvk represents the API version and kind of the assembled list object
+	gvk schema.GroupVersionKind
 }
 
 func (r WatchListResult) Into(obj runtime.Object) error {
@@ -825,13 +823,7 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 	}
 	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
 
-	typeMeta, err := meta.TypeAccessor(obj)
-	if err != nil {
-		return err
-	}
-	version := r.gv.String()
-	typeMeta.SetAPIVersion(version)
-	typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
+	obj.GetObjectKind().SetGroupVersionKind(r.gvk)
 
 	return nil
 }
@@ -893,11 +885,15 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 				items = append(items, event.Object)
 				lastKey = key
 			case watch.Bookmark:
-				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+				if annotations := meta.GetAnnotations(); annotations[metav1.InitialEventsAnnotationKey] == "true" {
+					gv, err := schema.ParseGroupVersion(annotations[metav1.ListVersionEventAnnotationKey])
+					if err != nil {
+						return WatchListResult{err: err}
+					}
 					return WatchListResult{
 						items:                      items,
 						initialEventsEndBookmarkRV: meta.GetResourceVersion(),
-						gv:                         r.c.content.GroupVersion,
+						gvk:                        gv.WithKind(annotations[metav1.ListKindEventAnnotationKey]),
 					}
 				}
 			default:

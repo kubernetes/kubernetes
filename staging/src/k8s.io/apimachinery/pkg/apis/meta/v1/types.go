@@ -439,6 +439,10 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+
+	// TODO: consider names
+	ListKindEventAnnotationKey    = "kubernetes.io/list-kind"
+	ListVersionEventAnnotationKey = "kubernetes.io/list-version"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
