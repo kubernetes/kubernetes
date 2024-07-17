@@ -70,7 +70,7 @@ var (
 		# Wait for pod "busybox1" to be Ready
 		kubectl wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' pod/busybox1
 
-		# Wait for the service "loadbalancer" to have ingress.
+		# Wait for the service "loadbalancer" to have ingress
 		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
