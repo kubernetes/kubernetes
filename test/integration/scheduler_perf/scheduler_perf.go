@@ -182,6 +182,11 @@ type testCase struct {
 	DefaultPodTemplatePath *string
 	// Labels can be used to enable or disable workloads inside this test case.
 	Labels []string
+	// DefaultThresholdMetricSelector defines default metric used for threshold comparison.
+	// It is only populated to workloads without their ThresholdMetricSelector set.
+	// If nil, the default metric is set to "SchedulingThroughput".
+	// Optional
+	DefaultThresholdMetricSelector *thresholdMetricSelector
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -214,6 +219,73 @@ type workload struct {
 	Params params
 	// Labels can be used to enable or disable a workload.
 	Labels []string
+	// Threshold is compared to average value of metric specified using thresholdMetricSelector.
+	// The comparison is performed for op with CollectMetrics set to true.
+	// If the measured value is below the threshold, the workload's test case will fail.
+	// If set to zero, the threshold check is disabled.
+	// Optional
+	Threshold float64
+	// ThresholdMetricSelector defines to what metric the Threshold should be compared.
+	// If nil, the metric is set to DefaultThresholdMetricSelector of the testCase.
+	// If DefaultThresholdMetricSelector is nil, the metric is set to "SchedulingThroughput".
+	// Optional
+	ThresholdMetricSelector *thresholdMetricSelector
+}
+
+func (w *workload) isValid(mcc *metricsCollectorConfig) error {
+	if w.Threshold < 0 {
+		return fmt.Errorf("invalid Threshold=%f; should be non-negative", w.Threshold)
+	}
+
+	return w.ThresholdMetricSelector.isValid(mcc)
+}
+
+func (w *workload) setDefaults(testCaseThresholdMetricSelector *thresholdMetricSelector) {
+	if w.ThresholdMetricSelector != nil {
+		return
+	}
+	if testCaseThresholdMetricSelector != nil {
+		w.ThresholdMetricSelector = testCaseThresholdMetricSelector
+		return
+	}
+	// By defult, SchedulingThroughput should be compared with the threshold.
+	w.ThresholdMetricSelector = &thresholdMetricSelector{
+		Name: "SchedulingThroughput",
+	}
+}
+
+// thresholdMetricSelector defines the name and labels of metric to compare with threshold.
+type thresholdMetricSelector struct {
+	// Name of the metric is compared to "Metric" field in DataItem labels.
+	Name string
+	// Labels of the metric. All of them needs to match the metric's labels to assume equality.
+	Labels map[string]string
+	// ExpectLower defines whether the threshold should denote the maximum allowable value of the metric.
+	// If false, the threshold defines minimum allowable value.
+	// Optional
+	ExpectLower bool
+}
+
+func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
+	if ms.Name == "SchedulingThroughput" {
+		return nil
+	}
+
+	if mcc == nil {
+		mcc = &defaultMetricsCollectorConfig
+	}
+
+	labels, ok := mcc.Metrics[ms.Name]
+	if !ok {
+		return fmt.Errorf("the metric %v is targeted, but it's not collected during the test. Make sure the MetricsCollectorConfig is valid", ms.Name)
+	}
+
+	for _, labelsComb := range uniqueLVCombos(labels) {
+		if labelsMatch(labelsComb, ms.Labels) {
+			return nil
+		}
+	}
+	return fmt.Errorf("no matching labels found for metric %v", ms.Name)
 }
 
 type params struct {
@@ -881,6 +953,38 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 	return mustSetupCluster(tCtx, cfg, featureGates, outOfTreePluginRegistry)
 }
 
+func labelsMatch(actualLabels, requiredLabels map[string]string) bool {
+	for requiredLabel, requiredValue := range requiredLabels {
+		actualValue, ok := actualLabels[requiredLabel]
+		if !ok || requiredValue != actualValue {
+			return false
+		}
+	}
+	return true
+}
+
+func valueWithinThreshold(value, threshold float64, expectLower bool) bool {
+	if expectLower {
+		return value < threshold
+	}
+	return value > threshold
+}
+
+func compareMetricWithThreshold(items []DataItem, threshold float64, metricSelector thresholdMetricSelector) error {
+	if threshold == 0 {
+		return nil
+	}
+	for _, item := range items {
+		if item.Labels["Metric"] == metricSelector.Name && labelsMatch(item.Labels, metricSelector.Labels) && !valueWithinThreshold(item.Data["Average"], threshold, metricSelector.ExpectLower) {
+			if metricSelector.ExpectLower {
+				return fmt.Errorf("expected %s Average to be lower: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+			}
+			return fmt.Errorf("expected %s Average to be higher: got %f, want %f", metricSelector.Name, item.Data["Average"], threshold)
+		}
+	}
+	return nil
+}
+
 func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFactory informers.SharedInformerFactory) []DataItem {
 	b, benchmarking := tCtx.TB().(*testing.B)
 	if benchmarking {
@@ -1033,7 +1137,12 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 				collectorWG.Wait()
 				mu.Lock()
 				for _, collector := range collectors {
-					dataItems = append(dataItems, collector.collect()...)
+					items := collector.collect()
+					dataItems = append(dataItems, items...)
+					err := compareMetricWithThreshold(items, w.Threshold, *w.ThresholdMetricSelector)
+					if err != nil {
+						tCtx.Errorf("op %d: %s", opIndex, err)
+					}
 				}
 				mu.Unlock()
 			}
@@ -1432,6 +1541,11 @@ func getTestCases(path string) ([]*testCase, error) {
 	if err := getSpecFromFile(&path, &testCases); err != nil {
 		return nil, fmt.Errorf("parsing test cases error: %w", err)
 	}
+	for _, tc := range testCases {
+		for _, w := range tc.Workloads {
+			w.setDefaults(tc.DefaultThresholdMetricSelector)
+		}
+	}
 	return testCases, nil
 }
 
@@ -1463,6 +1577,12 @@ func validateTestCases(testCases []*testCase) error {
 		// TODO(#93795): make sure each workload within a test case has a unique
 		// name? The name is used to identify the stats in benchmark reports.
 		// TODO(#94404): check for unused template parameters? Probably a typo.
+		for _, w := range tc.Workloads {
+			err := w.isValid(tc.MetricsCollectorConfig)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
