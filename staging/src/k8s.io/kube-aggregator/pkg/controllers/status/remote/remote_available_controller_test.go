@@ -225,6 +225,7 @@ func TestSync(t *testing.T) {
 
 		expectedAvailability apiregistration.APIServiceCondition
 		expectedSyncError    string
+		expectedSkipped      bool
 	}{
 		{
 			name:           "local",
@@ -237,6 +238,7 @@ func TestSync(t *testing.T) {
 				Reason:  "Local",
 				Message: "Local APIServices are always available",
 			},
+			expectedSkipped: true,
 		},
 		{
 			name:           "no service",
@@ -418,6 +420,13 @@ func TestSync(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Fatalf("%v unexpected sync error: %v", tc.name, err)
+			}
+
+			if tc.expectedSkipped {
+				if len(fakeClient.Actions()) > 0 {
+					t.Fatalf("%v expected no actions, got %v", tc.name, fakeClient.Actions())
+				}
+				return
 			}
 
 			// ought to have one action writing status

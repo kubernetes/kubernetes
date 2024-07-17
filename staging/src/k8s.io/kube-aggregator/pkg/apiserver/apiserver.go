@@ -51,8 +51,9 @@ import (
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	openapiv3controller "k8s.io/kube-aggregator/pkg/controllers/openapiv3"
 	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
+	localavailability "k8s.io/kube-aggregator/pkg/controllers/status/local"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
-	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status/remote"
+	remoteavailability "k8s.io/kube-aggregator/pkg/controllers/status/remote"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
@@ -102,12 +103,11 @@ type ExtraConfig struct {
 
 	RejectForwardingRedirects bool
 
-	// DisableAvailableConditionController disables the controller that updates the Available conditions for
-	// APIServices, Endpoints and Services. This controller runs in kube-aggregator and can interfere with
-	// Generic Control Plane components when certain apis are not available.
-	// TODO: We should find a better way to handle this. For now it will be for Generic Control Plane authors to
-	// disable this controller if they see issues.
-	DisableAvailableConditionController bool
+	// DisableRemoteAvailableConditionController disables the controller that updates the Available conditions for
+	// remote APIServices via querying endpoints of the referenced services. In generic controlplane use-cases,
+	// the concept of services and endpoints might differ, and might require another implementation of this
+	// controller. Local APIService are reconciled nevertheless.
+	DisableRemoteAvailableConditionController bool
 }
 
 // Config represents the configuration needed to create an APIAggregator.
@@ -320,6 +320,12 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		})
 	}
 
+	s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
+		informerFactory.Start(context.Done())
+		c.GenericConfig.SharedInformerFactory.Start(context.Done())
+		return nil
+	})
+
 	// create shared (remote and local) availability metrics
 	// TODO: decouple from legacyregistry
 	metrics := availabilitymetrics.New()
@@ -328,10 +334,25 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
-	// If the AvailableConditionController is disabled, we don't need to start the informers
-	// and the controller.
-	if !c.ExtraConfig.DisableAvailableConditionController {
-		availableController, err := statuscontrollers.NewAvailableConditionController(
+	// always run local availability controller
+	local, err := localavailability.New(
+		informerFactory.Apiregistration().V1().APIServices(),
+		apiregistrationClient.ApiregistrationV1(),
+		metrics,
+	)
+	if err != nil {
+		return nil, err
+	}
+	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-local-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		// if we end up blocking for long periods of time, we may need to increase workers.
+		go local.Run(5, context.Done())
+		return nil
+	})
+
+	// conditionally run remote availability controller. This could be replaced in certain
+	// generic controlplane use-cases where there is another concept of services and/or endpoints.
+	if !c.ExtraConfig.DisableRemoteAvailableConditionController {
+		remote, err := remoteavailability.New(
 			informerFactory.Apiregistration().V1().APIServices(),
 			c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 			c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
@@ -344,16 +365,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		if err != nil {
 			return nil, err
 		}
-
-		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
-			informerFactory.Start(context.Done())
-			c.GenericConfig.SharedInformerFactory.Start(context.Done())
-			return nil
-		})
-
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-available-controller", func(context genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-status-remote-available-controller", func(context genericapiserver.PostStartHookContext) error {
 			// if we end up blocking for long periods of time, we may need to increase workers.
-			go availableController.Run(5, context.Done())
+			go remote.Run(5, context.Done())
 			return nil
 		})
 	}

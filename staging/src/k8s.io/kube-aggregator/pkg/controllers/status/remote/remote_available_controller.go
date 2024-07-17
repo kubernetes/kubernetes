@@ -88,8 +88,8 @@ type AvailableConditionController struct {
 	metrics *availabilitymetrics.Metrics
 }
 
-// NewAvailableConditionController returns a new AvailableConditionController.
-func NewAvailableConditionController(
+// New returns a new remote APIService AvailableConditionController.
+func New(
 	apiServiceInformer informers.APIServiceInformer,
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
@@ -110,7 +110,7 @@ func NewAvailableConditionController(
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 30*time.Second),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "AvailableConditionController"},
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "RemoteAvailabilityController"},
 		),
 		proxyTransportDial:         proxyTransportDial,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
@@ -159,6 +159,13 @@ func (c *AvailableConditionController) sync(key string) error {
 		return err
 	}
 
+	if originalAPIService.Spec.Service == nil {
+		// handled by the local APIService controller
+		return nil
+	}
+
+	apiService := originalAPIService.DeepCopy()
+
 	// if a particular transport was specified, use that otherwise build one
 	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
 	// that's not so bad) and sets a very short timeout.  This is a best effort GET that provides no additional information
@@ -188,19 +195,10 @@ func (c *AvailableConditionController) sync(key string) error {
 		},
 	}
 
-	apiService := originalAPIService.DeepCopy()
-
 	availableCondition := apiregistrationv1.APIServiceCondition{
 		Type:               apiregistrationv1.Available,
 		Status:             apiregistrationv1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
-	}
-
-	// local API services are always considered available
-	if apiService.Spec.Service == nil {
-		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, apiregistrationv1apihelper.NewLocalAvailableAPIServiceCondition())
-		_, err := c.updateAPIServiceStatus(originalAPIService, apiService)
-		return err
 	}
 
 	service, err := c.serviceLister.Services(apiService.Spec.Service.Namespace).Get(apiService.Spec.Service.Name)
@@ -410,14 +408,14 @@ func (c *AvailableConditionController) Run(workers int, stopCh <-chan struct{}) 
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Info("Starting AvailableConditionController")
-	defer klog.Info("Shutting down AvailableConditionController")
+	klog.Info("Starting RemoteAvailability controller")
+	defer klog.Info("Shutting down RemoteAvailability controller")
 
 	// This waits not just for the informers to sync, but for our handlers
 	// to be called; since the handlers are three different ways of
 	// enqueueing the same thing, waiting for this permits the queue to
 	// maximally de-duplicate the entries.
-	if !controllers.WaitForCacheSync("AvailableConditionController", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
+	if !controllers.WaitForCacheSync("RemoteAvailability", stopCh, c.apiServiceSynced, c.servicesSynced, c.endpointsSynced) {
 		return
 	}
 
