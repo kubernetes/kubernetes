@@ -541,7 +541,7 @@
     intervalMilliseconds: 1000
   - opcode: createPods
     countParam: $measurePods
-    podTemplatePath: config/templates//pod-default.yaml
+    podTemplatePath: config/templates/pod-default.yaml
     collectMetrics: true
   workloads:
   - name: 1000Nodes
