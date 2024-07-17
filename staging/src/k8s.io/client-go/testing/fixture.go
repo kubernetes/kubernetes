@@ -282,7 +282,10 @@ type tracker struct {
 	scheme  ObjectScheme
 	decoder runtime.Decoder
 	lock    sync.RWMutex
-	clk     clock.PassiveClock
+
+	clk               clock.PassiveClock
+	supportsFinalizer bool
+
 	objects map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object
 	// The value type of watchers is a map of which the key is either a namespace or
 	// all/non namespace aka "" and its value is list of fake watchers.
@@ -296,13 +299,38 @@ var _ ObjectTracker = &tracker{}
 
 // NewObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects for the fake clientset. Mostly useful for unit tests.
-func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) *tracker {
 	return &tracker{
 		scheme:   scheme,
 		decoder:  decoder,
 		clk:      clock.RealClock{},
 		objects:  make(map[schema.GroupVersionResource]map[types.NamespacedName]runtime.Object),
 		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
+	}
+}
+
+type ObjectTrackerOptions struct {
+	SupportsFinalizer bool
+	Clock             clock.PassiveClock
+	TypeConverter     managedfields.TypeConverter
+}
+
+func NewObjectTrackerWithOptions(scheme *runtime.Scheme, decoder runtime.Decoder, options ObjectTrackerOptions) ObjectTracker {
+	baseTracker := NewObjectTracker(scheme, decoder)
+	if options.Clock != nil {
+		baseTracker.clk = options.Clock
+	}
+	baseTracker.supportsFinalizer = options.SupportsFinalizer
+	if options.TypeConverter == nil {
+		return baseTracker
+	}
+
+	return &managedFieldObjectTracker{
+		ObjectTracker:   baseTracker,
+		scheme:          scheme,
+		objectConverter: scheme,
+		mapper:          testrestmapper.TestOnlyStaticRESTMapper(scheme),
+		typeConverter:   options.TypeConverter,
 	}
 }
 
@@ -556,7 +584,7 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	namespacedName := types.NamespacedName{Namespace: newMeta.GetNamespace(), Name: newMeta.GetName()}
 	if _, ok = t.objects[gvr][namespacedName]; ok {
 		if replaceExisting {
-			if shouldDeleteDuringUpdate(obj) {
+			if t.supportsFinalizer && shouldDeleteDuringUpdate(obj) {
 				return t.doDeleteLocked(gvr, namespacedName)
 			} else {
 				return t.doUpdateLocked(gvr, obj)
@@ -647,11 +675,13 @@ func (t *tracker) Delete(gvr schema.GroupVersionResource, ns, name string, opts 
 		return apierrors.NewNotFound(gvr.GroupResource(), name)
 	}
 
-	if objMeta, err := meta.Accessor(obj); err == nil {
-		if len(objMeta.GetFinalizers()) != 0 {
-			dt := metav1.Time{Time: t.clk.Now()}.Rfc3339Copy()
-			objMeta.SetDeletionTimestamp(&dt)
-			return t.doUpdateLocked(gvr, obj)
+	if t.supportsFinalizer {
+		if objMeta, err := meta.Accessor(obj); err == nil {
+			if len(objMeta.GetFinalizers()) != 0 {
+				dt := metav1.Time{Time: t.clk.Now()}.Rfc3339Copy()
+				objMeta.SetDeletionTimestamp(&dt)
+				return t.doUpdateLocked(gvr, obj)
+			}
 		}
 	}
 
@@ -685,13 +715,9 @@ var _ ObjectTracker = &managedFieldObjectTracker{}
 // NewFieldManagedObjectTracker returns an ObjectTracker that can be used to keep track
 // of objects and managed fields for the fake clientset. Mostly useful for unit tests.
 func NewFieldManagedObjectTracker(scheme *runtime.Scheme, decoder runtime.Decoder, typeConverter managedfields.TypeConverter) ObjectTracker {
-	return &managedFieldObjectTracker{
-		ObjectTracker:   NewObjectTracker(scheme, decoder),
-		scheme:          scheme,
-		objectConverter: scheme,
-		mapper:          testrestmapper.TestOnlyStaticRESTMapper(scheme),
-		typeConverter:   typeConverter,
-	}
+	return NewObjectTrackerWithOptions(scheme, decoder, ObjectTrackerOptions{
+		TypeConverter: typeConverter,
+	})
 }
 
 func (t *managedFieldObjectTracker) Create(gvr schema.GroupVersionResource, obj runtime.Object, ns string, vopts ...metav1.CreateOptions) error {

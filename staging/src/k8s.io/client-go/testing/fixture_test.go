@@ -646,7 +646,9 @@ func TestDeleteWithFinalizer(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
 
-	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o := NewObjectTrackerWithOptions(scheme, codecs.UniversalDecoder(), ObjectTrackerOptions{
+		SupportsFinalizer: true,
+	})
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "PersistentVolumeClaim"}
 	pvc := getArbitraryResource(gvr, "pvc", "test-ns")
 	require.NoError(t, o.Add(pvc))

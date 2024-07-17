@@ -120,15 +120,29 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 // This part of code is version-independent, unchanging.
 
 var managedFieldsClientset = `
-// NewClientset returns a clientset that will respond with the provided objects.
-// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
-// without applying any validations and/or defaults. It shouldn't be considered a replacement
-// for a real clientset and is mostly useful in simple unit tests.
-func NewClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewFieldManagedObjectTracker(
+type ClientsetOptions struct {
+    // Whether to block deletion when the object has finalizers, and delete the object if the finalizers are removed.
+	SupportsFinalizer bool
+	// Support field management to improve server side apply testing
+	ManagedFields bool
+
+	Clock clock.PassiveClock
+}
+
+// NewClientsetWithOptions likes NewClientset but takes additional options.
+func NewClientsetWithOptions(options ClientsetOptions, objects ...runtime.Object) *Clientset {
+	var typeConverter managedfields.TypeConverter
+	if options.ManagedFields {
+		typeConverter = $.newTypeConverter|raw$(scheme)
+	}
+	o := testing.NewObjectTrackerWithOptions(
 		scheme,
 		codecs.UniversalDecoder(),
-		$.newTypeConverter|raw$(scheme),
+		testing.ObjectTrackerOptions{
+			Clock:             options.Clock,
+			SupportsFinalizer: options.SupportsFinalizer,
+			TypeConverter:     typeConverter,
+		},
 	)
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
@@ -150,6 +164,16 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 	})
 
 	return cs
+}
+
+// NewClientset returns a clientset that will respond with the provided objects.
+// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
+// for a real clientset and is mostly useful in simple unit tests.
+func NewClientset(objects ...runtime.Object) *Clientset {
+	return NewClientsetWithOptions(ClientsetOptions{
+		ManagedFields:     true,
+	}, objects...)
 }
 `
 
