@@ -228,20 +228,27 @@ func (pl *VolumeBinding) isSchedulableAfterStorageClassChange(logger klog.Logger
 	return framework.QueueSkip, nil
 }
 
-// isSchedulableAfterCSIStorageCapacityChange checks whether a CSIStorageCapacity event might make a Pod schedulable or not.
-// Any CSIStorageCapacity addition and a CSIStorageCapacity update to capacity and maximumVolumeSize
-// might make a Pod schedulable.
-// Note that an update to nodeTopology and storageClassName is not allowed and we don't have to consider while examining the update event.
+// isSchedulableAfterCSIStorageCapacityChange checks whether a CSIStorageCapacity event
+// might make a Pod schedulable or not.
+// Any CSIStorageCapacity addition and a CSIStorageCapacity update to volume limit
+// (calculated based on capacity and maximumVolumeSize) might make a Pod schedulable.
+// Note that an update to nodeTopology and storageClassName is not allowed and
+// we don't have to consider while examining the update event.
 func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	oldCap, newCap, err := util.As[*storagev1.CSIStorageCapacity](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
 
+	oldLimit := volumeLimit(oldCap)
+	newLimit := volumeLimit(newCap)
+
 	logger = klog.LoggerWithValues(
 		logger,
 		"Pod", klog.KObj(pod),
 		"CSIStorageCapacity", klog.KObj(newCap),
+		"volumeLimit(new)", newLimit,
+		"volumeLimit(old)", oldLimit,
 	)
 
 	if oldCap == nil {
@@ -249,23 +256,8 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		return framework.Queue, nil
 	}
 
-	if newCap.Capacity != nil {
-		if oldCap.Capacity == nil {
-			logger.V(5).Info("Capacity was set, which could make a Pod schedulable", "Capacity(new)", newCap.Capacity)
-			return framework.Queue, nil
-		} else if newCap.Capacity.Value() > oldCap.Capacity.Value() {
-			logger.V(5).Info("Capacity was increased, which could make a Pod schedulable", "Capacity(new)", newCap.Capacity, "Capacity(old)", oldCap.Capacity)
-			return framework.Queue, nil
-		}
-	}
-
-	if newCap.MaximumVolumeSize == nil && oldCap.MaximumVolumeSize != nil {
-		logger.V(5).Info("MaximumVolumeSize was changed to nil, which could make a Pod schedulable", "MaximumVolumeSize(old)", oldCap.MaximumVolumeSize)
-		return framework.Queue, nil
-	}
-
-	if newCap.MaximumVolumeSize != nil && oldCap.MaximumVolumeSize != nil && newCap.MaximumVolumeSize.Value() > oldCap.MaximumVolumeSize.Value() {
-		logger.V(5).Info("MaximumVolumeSize was increased, which could make a Pod schedulable", "MaximumVolumeSize(new)", newCap.MaximumVolumeSize, "MaximumVolumeSize(old)", oldCap.MaximumVolumeSize)
+	if newLimit != nil && (oldLimit == nil || newLimit.Value() > oldLimit.Value()) {
+		logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable", "volumeLimit(new)", newLimit, "volumeLimit(old)", oldLimit)
 		return framework.Queue, nil
 	}
 
