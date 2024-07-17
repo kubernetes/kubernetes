@@ -1276,7 +1276,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 						select {
 						case <-ticker.C:
 							for i := range churnFns {
-								retVals[i][count%concreteOp.Number] = churnFns[i](retVals[i][count%concreteOp.Number])
+								retVals[i][(count+1)%concreteOp.Number] = churnFns[i](retVals[i][count%concreteOp.Number])
 							}
 							count++
 						case <-tCtx.Done():
