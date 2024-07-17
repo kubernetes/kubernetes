@@ -627,6 +627,7 @@ const (
 
 	// owner: @jessfraz
 	// alpha: v1.12
+	// beta: v1.31
 	//
 	// Enables control over ProcMountType for containers.
 	ProcMountType featuregate.Feature = "ProcMountType"
@@ -1133,7 +1134,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PortForwardWebsockets: {Default: true, PreRelease: featuregate.Beta},
 
-	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
+	ProcMountType: {Default: true, PreRelease: featuregate.Beta},
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
