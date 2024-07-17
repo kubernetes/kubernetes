@@ -21,16 +21,22 @@ var (
 			`\[Feature:UserNamespacesPodSecurityStandards\]`,
 			`\[Feature:Traffic Distribution\]`,
 			`\[Feature:UserNamespacesSupport\]`,
+			`\[Feature:DynamicResourceAllocation\]`,
+			`\[Feature:GPUUpgrade\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
-			`Monitoring`,               // Not installed, should be
-			`Cluster level logging`,    // Not installed yet
-			`Kibana`,                   // Not installed
-			`Ubernetes`,                // Can't set zone labels today
-			`kube-ui`,                  // Not installed by default
-			`Kubernetes Dashboard`,     // Not installed by default (also probably slow image pull)
-			`should proxy to cadvisor`, // we don't expose cAdvisor port directly for security reasons
+			`Monitoring`,                  // Not installed, should be
+			`Cluster level logging`,       // Not installed yet
+			`Kibana`,                      // Not installed
+			`Ubernetes`,                   // Can't set zone labels today
+			`kube-ui`,                     // Not installed by default
+			`Kubernetes Dashboard`,        // Not installed by default (also probably slow image pull)
+			`should proxy to cadvisor`,    // we don't expose cAdvisor port directly for security reasons
+			`\[Feature:BootstrapTokens\]`, // we don't serve cluster-info configmap
+			`\[Feature:KubeProxyDaemonSetMigration\]`,    // upgrades are run separately
+			`\[Feature:BoundServiceAccountTokenVolume\]`, // upgrades are run separately
+			`\[Feature:StatefulUpgrade\]`,                // upgrades are run separately
 		},
 		// tests that rely on special configuration that we do not yet support
 		"[Disabled:SpecialConfig]": {
