@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
@@ -49,16 +49,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyConfiguration)(nil), (*config.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(a.(*v1alpha1.KubeProxyConfiguration), b.(*config.KubeProxyConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.KubeProxyConfiguration)(nil), (*v1alpha1.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(a.(*config.KubeProxyConfiguration), b.(*v1alpha1.KubeProxyConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyConntrackConfiguration)(nil), (*config.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(a.(*v1alpha1.KubeProxyConntrackConfiguration), b.(*config.KubeProxyConntrackConfiguration), scope)
 	}); err != nil {
@@ -66,11 +56,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.KubeProxyConntrackConfiguration)(nil), (*v1alpha1.KubeProxyConntrackConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(a.(*config.KubeProxyConntrackConfiguration), b.(*v1alpha1.KubeProxyConntrackConfiguration), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyIPTablesConfiguration)(nil), (*config.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(a.(*v1alpha1.KubeProxyIPTablesConfiguration), b.(*config.KubeProxyIPTablesConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -89,11 +74,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1alpha1.KubeProxyNFTablesConfiguration)(nil), (*config.KubeProxyNFTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(a.(*v1alpha1.KubeProxyNFTablesConfiguration), b.(*config.KubeProxyNFTablesConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*config.KubeProxyNFTablesConfiguration)(nil), (*v1alpha1.KubeProxyNFTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration(a.(*config.KubeProxyNFTablesConfiguration), b.(*v1alpha1.KubeProxyNFTablesConfiguration), scope)
 	}); err != nil {
@@ -106,6 +86,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.KubeProxyWinkernelConfiguration)(nil), (*v1alpha1.KubeProxyWinkernelConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeProxyWinkernelConfiguration_To_v1alpha1_KubeProxyWinkernelConfiguration(a.(*config.KubeProxyWinkernelConfiguration), b.(*v1alpha1.KubeProxyWinkernelConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*config.KubeProxyConfiguration)(nil), (*v1alpha1.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(a.(*config.KubeProxyConfiguration), b.(*v1alpha1.KubeProxyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.KubeProxyConfiguration)(nil), (*config.KubeProxyConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(a.(*v1alpha1.KubeProxyConfiguration), b.(*config.KubeProxyConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.KubeProxyIPTablesConfiguration)(nil), (*config.KubeProxyIPTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(a.(*v1alpha1.KubeProxyIPTablesConfiguration), b.(*config.KubeProxyIPTablesConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.KubeProxyNFTablesConfiguration)(nil), (*config.KubeProxyNFTablesConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(a.(*v1alpha1.KubeProxyNFTablesConfiguration), b.(*config.KubeProxyNFTablesConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguratio
 
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *config.KubeProxyConfiguration, s conversion.Scope) error {
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.Logging = in.Logging
@@ -166,23 +166,19 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	}
 	out.ClusterCIDR = in.ClusterCIDR
 	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
-	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
-	if err := Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
-		return err
-	}
+	// WARNING: in.OOMScoreAdj requires manual conversion: does not exist in peer-type
+	// WARNING: in.Conntrack requires manual conversion: does not exist in peer-type
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	out.PortRange = in.PortRange
+	// WARNING: in.WindowsRunAsService requires manual conversion: does not exist in peer-type
 	return nil
 }
 
-// Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in *v1alpha1.KubeProxyConfiguration, out *config.KubeProxyConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in, out, s)
-}
-
 func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, s conversion.Scope) error {
+	// WARNING: in.Linux requires manual conversion: does not exist in peer-type
+	// WARNING: in.Windows requires manual conversion: does not exist in peer-type
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.Logging = in.Logging
@@ -212,18 +208,9 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	}
 	out.ClusterCIDR = in.ClusterCIDR
 	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
-	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
-	if err := Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
-		return err
-	}
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	out.PortRange = in.PortRange
 	return nil
-}
-
-// Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration is an autogenerated conversion function.
-func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, s conversion.Scope) error {
-	return autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *v1alpha1.KubeProxyConntrackConfiguration, out *config.KubeProxyConntrackConfiguration, s conversion.Scope) error {
@@ -260,21 +247,15 @@ func Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntra
 
 func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
-	out.MasqueradeAll = in.MasqueradeAll
+	// WARNING: in.MasqueradeAll requires manual conversion: does not exist in peer-type
 	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return nil
 }
 
-// Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in, out, s)
-}
-
 func autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(in *config.KubeProxyIPTablesConfiguration, out *v1alpha1.KubeProxyIPTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
-	out.MasqueradeAll = in.MasqueradeAll
 	out.LocalhostNodePorts = (*bool)(unsafe.Pointer(in.LocalhostNodePorts))
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
@@ -322,20 +303,14 @@ func Convert_config_KubeProxyIPVSConfiguration_To_v1alpha1_KubeProxyIPVSConfigur
 
 func autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
-	out.MasqueradeAll = in.MasqueradeAll
+	// WARNING: in.MasqueradeAll requires manual conversion: does not exist in peer-type
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return nil
 }
 
-// Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *config.KubeProxyNFTablesConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, s)
-}
-
 func autoConvert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration(in *config.KubeProxyNFTablesConfiguration, out *v1alpha1.KubeProxyNFTablesConfiguration, s conversion.Scope) error {
 	out.MasqueradeBit = (*int32)(unsafe.Pointer(in.MasqueradeBit))
-	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
 	return nil

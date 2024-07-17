@@ -243,6 +243,9 @@ type KubeProxyConfiguration struct {
 
 	// portRange was previously used to configure the userspace proxy, but is now unused.
 	PortRange string `json:"portRange"`
+
+	// windowsRunAsService, if true, enables Windows service control manager API integration.
+	WindowsRunAsService bool `json:"windowsRunAsService,omitempty"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
