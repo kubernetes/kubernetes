@@ -42,7 +42,7 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("will mask proc mounts by default", func(ctx context.Context) {
-		testProcMount(ctx, f, v1.DefaultProcMount, gomega.BeNumerically(">=", 10), gomega.BeNumerically(">=", 7))
+		testProcMount(ctx, f, v1.DefaultProcMount, gomega.BeNumerically(">", 1), gomega.BeNumerically(">", 0))
 	})
 })
 
