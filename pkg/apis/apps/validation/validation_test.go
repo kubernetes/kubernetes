@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -40,6 +41,8 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
+
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 )
 
 type statefulSetTweak func(ss *apps.StatefulSet)
@@ -107,6 +110,12 @@ func tweakPodManagementPolicy(policy apps.PodManagementPolicyType) statefulSetTw
 func tweakReplicas(replicas int32) statefulSetTweak {
 	return func(ss *apps.StatefulSet) {
 		ss.Spec.Replicas = replicas
+	}
+}
+
+func tweakServiceName(serviceName string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.ServiceName = serviceName
 	}
 }
 
@@ -525,6 +534,14 @@ func TestValidateStatefulSet(t *testing.T) {
 		errs: field.ErrorList{
 			field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
 		},
+	}, {
+		name: "invalid service name",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakServiceName("0123456789012345678901234567890123456789"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "serviceName"), nil, ""),
+		},
 	},
 	}
 
@@ -542,12 +559,17 @@ func TestValidateStatefulSet(t *testing.T) {
 			if strings.Contains(name, enableStatefulSetAutoDeletePVC) {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 			}
+			runtimetesting.RunValidationForEachVersion(t, &testCase.set, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
 
-			errs := ValidateStatefulSet(&testCase.set, pod.GetValidationOptionsFromPodTemplate(&testCase.set.Spec.Template, nil))
-			wantErrs := testCase.errs
-			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
-				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
-			}
+				wantErrs := testCase.errs
+				if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
+					t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+				}
+			})
 		})
 	}
 }
@@ -603,14 +625,35 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
-				corevalidation.PodValidationOptions{})
-			if tc.expectErr && len(errs) == 0 {
-				t.Errorf("Unexpected success")
-			}
-			if !tc.expectErr && len(errs) != 0 {
-				t.Errorf("Unexpected error(s): %v", errs)
-			}
+			root := &apps.StatefulSet{Spec: *tc.ss}
+			runtimetesting.RunValidationForEachVersion(t, root, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
+					corevalidation.PodValidationOptions{})
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+
+				if tc.expectErr && len(errs) == 0 {
+					t.Errorf("Unexpected success")
+				}
+				if !tc.expectErr && len(errs) != 0 {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
+			})
+
+			runtimetesting.RunStatusValidationForEachVersion(t, root, nil, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
+					corevalidation.PodValidationOptions{})
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if tc.expectErr && len(errs) == 0 {
+					t.Errorf("Unexpected success")
+				}
+				if !tc.expectErr && len(errs) != 0 {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
+			})
 		})
 	}
 }
@@ -736,10 +779,16 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 				AvailableReplicas:  test.availableReplicas,
 			}
 
-			errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
-			if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-				t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
-			}
+			root := &apps.StatefulSet{Status: status}
+			runtimetesting.RunStatusValidationForEachVersion(t, root, nil, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateStatefulSetStatus(&status, field.NewPath("status"))
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if hasErr := len(errs) > 0; hasErr != test.expectedErr {
+					t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errs.ToAggregate().Error())
+				}
+			})
 		})
 	}
 }
@@ -962,11 +1011,16 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
 
-			errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, pod.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))
-			wantErrs := testCase.errs
-			if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
-				t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &testCase.update, &testCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateStatefulSetUpdate(&testCase.update, &testCase.old, pod.GetValidationOptionsFromPodTemplate(&testCase.update.Spec.Template, &testCase.old.Spec.Template))
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				wantErrs := testCase.errs
+				if diff := cmp.Diff(wantErrs, errs, cmpOpts...); diff != "" {
+					t.Errorf("Unexpected validation errors (-want,+got):\n%s", diff)
+				}
+			})
 		})
 	}
 }
@@ -1032,13 +1086,19 @@ func TestValidateControllerRevision(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateControllerRevisionCreate(&tc.history)
-			if tc.isValid && len(errs) > 0 {
-				t.Errorf("%v: unexpected error: %v", name, errs)
-			}
-			if !tc.isValid && len(errs) == 0 {
-				t.Errorf("%v: unexpected non-error", name)
-			}
+			runtimetesting.RunValidationForEachVersion(t, &tc.history, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateControllerRevisionCreate(&tc.history)
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+
+				if tc.isValid && len(errs) > 0 {
+					t.Errorf("%v: unexpected error: %v", name, errs)
+				}
+				if !tc.isValid && len(errs) == 0 {
+					t.Errorf("%v: unexpected non-error", name)
+				}
+			})
 		})
 	}
 }
@@ -1113,13 +1173,18 @@ func TestValidateControllerRevisionUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := ValidateControllerRevisionUpdate(&tc.newHistory, &tc.oldHistory)
-			if tc.isValid && len(errs) > 0 {
-				t.Errorf("%v: unexpected error: %v", tc.name, errs)
-			}
-			if !tc.isValid && len(errs) == 0 {
-				t.Errorf("%v: unexpected non-error", tc.name)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &tc.newHistory, &tc.oldHistory, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateControllerRevisionUpdate(&tc.newHistory, &tc.oldHistory)
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if tc.isValid && len(errs) > 0 {
+					t.Errorf("%v: unexpected error: %v", tc.name, errs)
+				}
+				if !tc.isValid && len(errs) == 0 {
+					t.Errorf("%v: unexpected non-error", tc.name)
+				}
+			})
 		})
 	}
 }
@@ -1755,19 +1820,24 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 	}
 	for testName, successCase := range successCases {
 		t.Run(testName, func(t *testing.T) {
-			// ResourceVersion is required for updates.
-			successCase.old.ObjectMeta.ResourceVersion = "1"
-			successCase.update.ObjectMeta.ResourceVersion = "2"
-			// Check test setup
-			if successCase.expectedErrNum > 0 {
-				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
-			}
-			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
-				t.Errorf("%q has incorrect test setup with no resource version set", testName)
-			}
-			if errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-				t.Errorf("%q expected no error, but got: %v", testName, errs)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &successCase.update, &successCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// ResourceVersion is required for updates.
+				successCase.old.ObjectMeta.ResourceVersion = "1"
+				successCase.update.ObjectMeta.ResourceVersion = "2"
+				// Check test setup
+				if successCase.expectedErrNum > 0 {
+					t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+				}
+				if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+					t.Errorf("%q has incorrect test setup with no resource version set", testName)
+				}
+
+				errs := ValidateDaemonSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{})
+				errs = append(errs, versionValidationErrors...)
+				if len(errs) != 0 {
+					t.Errorf("%q expected no error, but got: %v", testName, errs)
+				}
+			})
 		})
 	}
 	errorCases := map[string]dsUpdateTest{
@@ -1948,23 +2018,28 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
+		// ResourceVersion is required for updates.
+		errorCase.old.ObjectMeta.ResourceVersion = "1"
+		errorCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if errorCase.expectedErrNum <= 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+		}
+		if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
 		t.Run(testName, func(t *testing.T) {
-			// ResourceVersion is required for updates.
-			errorCase.old.ObjectMeta.ResourceVersion = "1"
-			errorCase.update.ObjectMeta.ResourceVersion = "2"
-			// Check test setup
-			if errorCase.expectedErrNum <= 0 {
-				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
-			}
-			if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
-				t.Errorf("%q has incorrect test setup with no resource version set", testName)
-			}
-			// Run the tests
-			if errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
-				t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
-			} else {
-				t.Logf("(PASS) %q got errors %v", testName, errs)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &errorCase.update, &errorCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				errs := ValidateDaemonSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{})
+				errs = append(errs, versionValidationErrors...)
+				if len(errs) != errorCase.expectedErrNum {
+					t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+				} else {
+					t.Logf("(PASS) %q got errors %v", testName, errs)
+				}
+			})
+
 		})
 	}
 }
@@ -2607,21 +2682,27 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 		},
 	}
 	for testName, successCase := range successCases {
+		// ResourceVersion is required for updates.
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if successCase.expectedErrNum > 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+		}
+		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
 		t.Run(testName, func(t *testing.T) {
-			// ResourceVersion is required for updates.
-			successCase.old.ObjectMeta.ResourceVersion = "1"
-			successCase.update.ObjectMeta.ResourceVersion = "2"
-			// Check test setup
-			if successCase.expectedErrNum > 0 {
-				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
-			}
-			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
-				t.Errorf("%q has incorrect test setup with no resource version set", testName)
-			}
-			// Run the tests
-			if errs := ValidateDeploymentUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-				t.Errorf("%q expected no error, but got: %v", testName, errs)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &successCase.update, &successCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateDeploymentUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{})
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if len(errs) != 0 {
+					t.Errorf("%q expected no error, but got: %v", testName, errs)
+				}
+			})
 		})
 		errorCases := map[string]depUpdateTest{
 			"invalid selector": {
@@ -2686,23 +2767,28 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 			},
 		}
 		for testName, errorCase := range errorCases {
+			errorCase.old.ObjectMeta.ResourceVersion = "1"
+			errorCase.update.ObjectMeta.ResourceVersion = "2"
+			// Check test setup
+			if errorCase.expectedErrNum <= 0 {
+				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+			}
+			if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+				t.Errorf("%q has incorrect test setup with no resource version set", testName)
+			}
+			// Run the tests
 			t.Run(testName, func(t *testing.T) {
-				// ResourceVersion is required for updates.
-				errorCase.old.ObjectMeta.ResourceVersion = "1"
-				errorCase.update.ObjectMeta.ResourceVersion = "2"
-				// Check test setup
-				if errorCase.expectedErrNum <= 0 {
-					t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
-				}
-				if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
-					t.Errorf("%q has incorrect test setup with no resource version set", testName)
-				}
-				// Run the tests
-				if errs := ValidateDeploymentUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
-					t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
-				} else {
-					t.Logf("(PASS) %q got errors %v", testName, errs)
-				}
+				runtimetesting.RunUpdateValidationForEachVersion(t, &successCase.update, &successCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+					// Continue to run handwritten validation until migration to declarative validation is complete.
+					errs := ValidateDeploymentUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{})
+					// Run declarative validation for the version
+					errs = append(errs, versionValidationErrors...)
+					if len(errs) != errorCase.expectedErrNum {
+						t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+					} else {
+						t.Logf("(PASS) %q got errors %v", testName, errs)
+					}
+				})
 			})
 		}
 	}
@@ -2994,21 +3080,27 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 	}
 	for testName, successCase := range successCases {
+		// ResourceVersion is required for updates.
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if successCase.expectedErrNum > 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
+		}
+		if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
 		t.Run(testName, func(t *testing.T) {
-			// ResourceVersion is required for updates.
-			successCase.old.ObjectMeta.ResourceVersion = "1"
-			successCase.update.ObjectMeta.ResourceVersion = "2"
-			// Check test setup
-			if successCase.expectedErrNum > 0 {
-				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected no error", testName, successCase.expectedErrNum)
-			}
-			if len(successCase.old.ObjectMeta.ResourceVersion) == 0 || len(successCase.update.ObjectMeta.ResourceVersion) == 0 {
-				t.Errorf("%q has incorrect test setup with no resource version set", testName)
-			}
-			// Run the tests
-			if errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-				t.Errorf("%q expected no error, but got: %v", testName, errs)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &successCase.update, &successCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateReplicaSetUpdate(&successCase.update, &successCase.old, corevalidation.PodValidationOptions{})
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if len(errs) != 0 {
+					t.Errorf("%q expected no error, but got: %v", testName, errs)
+				}
+			})
 		})
 	}
 	errorCases := map[string]rcUpdateTest{
@@ -3068,23 +3160,29 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 		},
 	}
 	for testName, errorCase := range errorCases {
+		// ResourceVersion is required for updates.
+		errorCase.old.ObjectMeta.ResourceVersion = "1"
+		errorCase.update.ObjectMeta.ResourceVersion = "2"
+		// Check test setup
+		if errorCase.expectedErrNum <= 0 {
+			t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
+		}
+		if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
+			t.Errorf("%q has incorrect test setup with no resource version set", testName)
+		}
+		// Run the tests
 		t.Run(testName, func(t *testing.T) {
-			// ResourceVersion is required for updates.
-			errorCase.old.ObjectMeta.ResourceVersion = "1"
-			errorCase.update.ObjectMeta.ResourceVersion = "2"
-			// Check test setup
-			if errorCase.expectedErrNum <= 0 {
-				t.Errorf("%q has incorrect test setup with expectedErrNum %d, expected at least one error", testName, errorCase.expectedErrNum)
-			}
-			if len(errorCase.old.ObjectMeta.ResourceVersion) == 0 || len(errorCase.update.ObjectMeta.ResourceVersion) == 0 {
-				t.Errorf("%q has incorrect test setup with no resource version set", testName)
-			}
-			// Run the tests
-			if errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{}); len(errs) != errorCase.expectedErrNum {
-				t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
-			} else {
-				t.Logf("(PASS) %q got errors %v", testName, errs)
-			}
+			runtimetesting.RunUpdateValidationForEachVersion(t, &errorCase.update, &errorCase.old, func(t *testing.T, versionValidationErrors field.ErrorList) {
+				// Continue to run handwritten validation until migration to declarative validation is complete.
+				errs := ValidateReplicaSetUpdate(&errorCase.update, &errorCase.old, corevalidation.PodValidationOptions{})
+				// Run declarative validation for the version
+				errs = append(errs, versionValidationErrors...)
+				if len(errs) != errorCase.expectedErrNum {
+					t.Errorf("%q expected %d errors, but got %d error: %v", testName, errorCase.expectedErrNum, len(errs), errs)
+				} else {
+					t.Logf("(PASS) %q got errors %v", testName, errs)
+				}
+			})
 		})
 	}
 }
@@ -3460,6 +3558,9 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
+
+			// TODO: How to add declarative validation for a deeply nested type like this?
+
 			errs := ValidateRollingUpdateDaemonSet(tc.ds, field.NewPath("spec", "updateStrategy", "rollingUpdate"))
 			if tc.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
