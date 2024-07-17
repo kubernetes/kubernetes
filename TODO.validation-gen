@@ -29,7 +29,6 @@
 - Replace panics with error plumbing in validation-gen `validation.go`.
 - Deduplicate `jsontagutil.go`. It was copy-pasted in from applyconfig-gen
 - Deduplicate most of enum.go, it was copy-pasted in from kube-openapi
-- Get rid of redundant buildCallTree calls in generator (efficiency)
 - Add opt-in/opt-out controls
   - Ability to opt-out of declarative validation for:
     - type

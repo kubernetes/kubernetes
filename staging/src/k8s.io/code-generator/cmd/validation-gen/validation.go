@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -46,12 +45,12 @@ type genValidations struct {
 	peerPackages            []string
 	inputToPkg              map[string]string // Maps input packages to generated validation packages
 	initTypes               []*types.Type
-	validationFunctionTypes sets.Set[*types.Type]
+	validationFunctionTypes map[*types.Type]*callNode
 	imports                 namer.ImportTracker
 	declarativeValidator    validators.DeclarativeValidator
 }
 
-func NewGenValidations(outputFilename, typesPackage, outputPackage string, initTypes []*types.Type, validationFunctionTypes sets.Set[*types.Type], peerPkgs []string, inputToPkg map[string]string, declarativeValidator validators.DeclarativeValidator) generator.Generator {
+func NewGenValidations(outputFilename, typesPackage, outputPackage string, initTypes []*types.Type, validationFunctionTypes map[*types.Type]*callNode, peerPkgs []string, inputToPkg map[string]string, declarativeValidator validators.DeclarativeValidator) generator.Generator {
 	return &genValidations{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
@@ -75,7 +74,8 @@ func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
 }
 
 func (g *genValidations) Filter(_ *generator.Context, t *types.Type) bool {
-	return g.validationFunctionTypes.Has(t)
+	_, ok := g.validationFunctionTypes[t]
+	return ok
 }
 
 func (g *genValidations) Imports(_ *generator.Context) (imports []string) {
@@ -116,10 +116,9 @@ func (g *genValidations) Init(c *generator.Context, w io.Writer) error {
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
 	sw.Do("func RegisterValidations(scheme $.|raw$) error {\n", schemePtr)
 	for _, t := range sortTypes(g.initTypes) {
-		// TODO: avoid redundant calls to build
-		callTree, err := buildCallTree(g.declarativeValidator, g.inputToPkg, t)
-		if err != nil {
-			return err
+		callTree, ok := g.validationFunctionTypes[t]
+		if !ok {
+			continue
 		}
 		if callTree == nil {
 			continue
@@ -178,9 +177,9 @@ func (g *genValidations) Init(c *generator.Context, w io.Writer) error {
 func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	klog.V(5).Infof("generating for type %v", t)
 
-	callTree, err := buildCallTree(g.declarativeValidator, g.inputToPkg, t)
-	if err != nil {
-		return err
+	callTree, ok := g.validationFunctionTypes[t]
+	if !ok {
+		return fmt.Errorf("unable to find type to generate in map of generated types")
 	}
 	if callTree == nil {
 		klog.V(5).Infof("  no validations defined")
@@ -214,13 +213,15 @@ type callTreeForType struct {
 	declarativeValidator   validators.DeclarativeValidator
 	inputToPkg             map[string]string
 	currentlyBuildingTypes map[*types.Type]bool
+	visited                map[*types.Type]*callNode
 }
 
-func buildCallTree(declarativeValidator validators.DeclarativeValidator, inputToPkg map[string]string, t *types.Type) (*callNode, error) {
+func buildCallTree(declarativeValidator validators.DeclarativeValidator, inputToPkg map[string]string, t *types.Type, visited map[*types.Type]*callNode) (*callNode, error) {
 	tree := &callTreeForType{
 		declarativeValidator:   declarativeValidator,
 		inputToPkg:             inputToPkg,
 		currentlyBuildingTypes: make(map[*types.Type]bool),
+		visited:                visited,
 	}
 	return tree.build(t, true)
 }
@@ -239,6 +240,9 @@ func (c *callTreeForType) findValidationFunction(t *types.Type) (types.Name, boo
 // value may be nil if there are no functions to call on type or the type is a primitive (validation functions are only visited for
 // structs today).
 func (c *callTreeForType) build(t *types.Type, root bool) (*callNode, error) {
+	if v, ok := c.visited[t]; ok {
+		return v, nil
+	}
 	parent := &callNode{}
 
 	if root {
@@ -515,6 +519,18 @@ func (n *callNode) visitInOrder(ancestors []*callNode, fn CallNodeVisitorFunc) {
 	for i := range n.children {
 		n.children[i].visitInOrder(ancestors, fn)
 	}
+}
+
+func (n *callNode) asRootType() *callNode {
+	// Create a copy without any field related information grouped onto a node when used as a child node of a struct
+	root := &callNode{}
+	*root = *n
+	root.elem = true
+	root.field = ""
+	root.jsonName = ""
+	root.key = false
+	root.index = false
+	return root
 }
 
 var (
