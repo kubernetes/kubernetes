@@ -2478,6 +2478,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
@@ -2582,6 +2583,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyLi
 						},
 					},
 				},
+				Required: []string{"items"},
 			},
 		},
 		Dependencies: []string{
