@@ -96,7 +96,14 @@ var _ = SIGDescribe("Job", func() {
 		gomega.Expect(successes).To(gomega.Equal(completions), "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
-	ginkgo.It("should allow to use the pod failure policy on exit code to fail the job early", func(ctx context.Context) {
+	/*
+		Release: v1.31
+		Testname: Verify Pod Failure policy allows to fail job early on exit code.
+		Description: Create a job with pod failure policy, and exactly one
+		pod failing. The exit code of the failed pod matches the pod failure
+		policy triggering the Job failure.
+	*/
+	framework.ConformanceIt("should allow to use the pod failure policy on exit code to fail the job early", func(ctx context.Context) {
 
 		// We fail the Job's pod only once to ensure the backoffLimit is not
 		// reached and thus the job is failed due to the pod failure policy
