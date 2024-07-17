@@ -1,0 +1,49 @@
+- Use "+k8s:" as tag prefix
+  - openapi-gen currently uses "+k8s:validations" so we need to do work there too
+- Pick location for validator library
+  - k8s.io/apimachinery/pkg/util/validation introduces risk of drift if someone uses code-generator and a different rev of apimachinery
+- Fix subresources
+  - "spec" and "status" are hard coded in generator, drive them off of a `+subresource=status` tag?
+  - Do we need to do anything special for "scale"?
+- ValidateUpdate support [LARGE CHANGE!]
+  - Plumb oldObject in through all the validation calls
+  - Define how update validators are authored (CEL transition rules have explored WHEN a update rule should trigger)
+- Warning support
+  - Decide how to implement
+- Ratcheting support?
+  - Do we need to do anything with feature gate awareness?
+  - Some handwritten validations take options params that guide validation behavior. How to support?
+- Stop using "+k8s:validation-gen=TypeMeta" to find root types
+  - Stop generating validation for list types
+- Add OpenAPI value validation
+  - Size limits (+min{Length,Properties,Items}, +max{Length,Properties,Items})
+  - Numeric limits (+minimum, +maximum, +exclusiveMinimum, +exclusiveMaximum)
+  - String formats (+format)
+- Add metadata.name/generateName validation (+nameFormat?)
+- Add required field validation (+optional)
+- Add SMD/SSA validation (+listType, +listMapKey, +patchMergeKey, +patchStrategy)
+- Add CEL validation rules
+- Fix enum generator to generate refs to enum constants instead of string literals.  Also generate a sets.Set for each enum?
+- Add generator support for tags on pointers/type aliases.
+- Fix `childPath == (pathPart{})` hack in `writeValidationFunctionBody` (see todo)
+- Replace panics with error plumbing in validation-gen `validation.go`.
+- Deduplicate `jsontagutil.go`. It was copy-pasted in from applyconfig-gen
+- Deduplicate most of enum.go, it was copy-pasted in from kube-openapi
+- Get rid of redundant buildCallTree calls in generator (efficiency)
+- Add opt-in/opt-out controls
+  - Ability to opt-out of declarative validation for:
+    - type
+    - field (and subfields)
+    - specific tag(s)
+- Migrate core group to declarative validation
+  - xref: Alex's WIP for jobs: https://github.com/alexzielenski/kubectl-validate/blob/jobset/jobset/patches/apis/jobset.x-k8s.io/v1alpha2.json
+  - Enable declarative validation for strategies and test
+  - Migrate
+    - enums
+    - required field validation
+    - SMD/SSA validation
+    - OpenAPI value validation
+    - metadata.name/generateName validation
+    - unions
+    - cross field validations
+    - update validations
