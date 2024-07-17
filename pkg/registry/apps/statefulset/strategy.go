@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
@@ -140,7 +140,10 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&statefulSet.Spec.Template, nil)
-	return validation.ValidateStatefulSet(statefulSet, opts)
+
+	allErrs := validation.ValidateStatefulSet(statefulSet, opts)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -168,7 +171,9 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	oldStatefulSet := old.(*apps.StatefulSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
+	allErrs := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, obj, old)...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -219,7 +224,9 @@ func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old 
 // ValidateUpdate is the default update validation for an end user updating status
 func (statefulSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
-	return validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
+	allErrs := validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj, "status")...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

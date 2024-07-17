@@ -19,6 +19,8 @@ package daemonset
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.
@@ -121,7 +122,9 @@ func (daemonSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*apps.DaemonSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&daemonSet.Spec.Template, nil)
-	return validation.ValidateDaemonSet(daemonSet, opts)
+	allErrs := validation.ValidateDaemonSet(daemonSet, opts)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -166,6 +169,8 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 		}
 	}
 
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, newDaemonSet)...) // TODO: Call update when implemented
+
 	return allErrs
 }
 
@@ -209,7 +214,9 @@ func (daemonSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 }
 
 func (daemonSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateDaemonSetStatusUpdate(obj.(*apps.DaemonSet), old.(*apps.DaemonSet))
+	allErrs := validation.ValidateDaemonSetStatusUpdate(obj.(*apps.DaemonSet), old.(*apps.DaemonSet))
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj, "status")...) // TODO: Call update when implemented
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

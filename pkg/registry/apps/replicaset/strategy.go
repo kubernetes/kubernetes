@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -41,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -114,7 +115,9 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
 	opts := pod.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
-	return appsvalidation.ValidateReplicaSet(rs, opts)
+	allErrs := appsvalidation.ValidateReplicaSet(rs, opts)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -161,6 +164,8 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newReplicaSet.Spec.Selector, oldReplicaSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 		}
 	}
+
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, newReplicaSet)...) // TODO: Call update when implemented
 
 	return allErrs
 }
@@ -234,7 +239,9 @@ func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return appsvalidation.ValidateReplicaSetStatusUpdate(obj.(*apps.ReplicaSet), old.(*apps.ReplicaSet))
+	allErrs := appsvalidation.ValidateReplicaSetStatusUpdate(obj.(*apps.ReplicaSet), old.(*apps.ReplicaSet))
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, obj)...) // TODO: Call update when implemented
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
