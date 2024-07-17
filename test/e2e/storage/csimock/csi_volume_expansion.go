@@ -473,11 +473,11 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error
 	ginkgo.By("Waiting for resizer to set allocated resource")
-	err = waitForAllocatedResource(pvc, m, test.allocatedResource)
+	err = waitForAllocatedResource(ctx, pvc, m, test.allocatedResource)
 	framework.ExpectNoError(err, "While waiting for allocated resource to be updated")
 
 	ginkgo.By("Waiting for resizer to set resize status")
-	err = waitForResizeStatus(pvc, m.cs, test.expectedResizeStatus)
+	err = waitForResizeStatus(ctx, pvc, m.cs, test.expectedResizeStatus)
 	framework.ExpectNoError(err, "While waiting for resize status to be set")
 
 	ginkgo.By("Recover pvc size")
@@ -500,7 +500,7 @@ func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClai
 	// if expansion succeeded on controller but failed on the node
 	if test.simulatedCSIDriverError == expansionFailedOnNode {
 		ginkgo.By("Wait for expansion to fail on node again")
-		err = waitForResizeStatus(pvc, m.cs, v1.PersistentVolumeClaimNodeResizeInfeasible)
+		err = waitForResizeStatus(ctx, pvc, m.cs, v1.PersistentVolumeClaimNodeResizeInfeasible)
 		framework.ExpectNoError(err, "While waiting for resize status to be set to expansion-failed-on-node")
 
 		ginkgo.By("verify allocated resources after recovery")
@@ -541,10 +541,10 @@ func validateExpansionSuccess(ctx context.Context, pvc *v1.PersistentVolumeClaim
 	gomega.Expect(resizeStatus).To(gomega.BeZero(), "resize status should be empty")
 }
 
-func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
-	var actualResizeStatus *v1.ClaimResourceStatus
+func waitForResizeStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clientset.Interface, expectedState v1.ClaimResourceStatus) error {
+	var actualResizeStatus v1.ClaimResourceStatus
 
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err := c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
@@ -552,18 +552,18 @@ func waitForResizeStatus(pvc *v1.PersistentVolumeClaim, c clientset.Interface, e
 			return false, fmt.Errorf("error fetching pvc %q for checking for resize status: %w", pvc.Name, err)
 		}
 
-		actualResizeStatus := updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+		actualResizeStatus = updatedPVC.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 		return (actualResizeStatus == expectedState), nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %v", expectedState, *actualResizeStatus, waitErr)
+		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %v", expectedState, actualResizeStatus, waitErr)
 	}
 	return nil
 }
 
-func waitForAllocatedResource(pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
+func waitForAllocatedResource(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, expectedSize string) error {
 	expectedQuantity := resource.MustParse(expectedSize)
-	waitErr := wait.PollImmediate(resizePollInterval, csiResizeWaitPeriod, func() (bool, error) {
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(ctx context.Context) (bool, error) {
 		var err error
 		updatedPVC, err := m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 
