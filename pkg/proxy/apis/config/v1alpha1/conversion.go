@@ -36,6 +36,18 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 	default:
 		out.IPTables.MasqueradeAll = in.Linux.MasqueradeAll
 	}
+
+	switch in.Mode {
+	case config.ProxyModeIPVS:
+		out.IPVS.SyncPeriod = in.SyncPeriod
+		out.IPVS.MinSyncPeriod = in.MinSyncPeriod
+	case config.ProxyModeNFTables:
+		out.NFTables.SyncPeriod = in.SyncPeriod
+		out.NFTables.MinSyncPeriod = in.MinSyncPeriod
+	default:
+		out.IPTables.SyncPeriod = in.SyncPeriod
+		out.IPTables.MinSyncPeriod = in.MinSyncPeriod
+	}
 	return nil
 }
 
@@ -53,12 +65,29 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 	default:
 		out.Linux.MasqueradeAll = in.IPTables.MasqueradeAll
 	}
+
+	switch config.ProxyMode(in.Mode) {
+	case config.ProxyModeIPVS:
+		out.SyncPeriod = in.IPVS.SyncPeriod
+		out.MinSyncPeriod = in.IPVS.MinSyncPeriod
+	case config.ProxyModeNFTables:
+		out.SyncPeriod = in.NFTables.SyncPeriod
+		out.MinSyncPeriod = in.NFTables.MinSyncPeriod
+	default:
+		out.SyncPeriod = in.IPTables.SyncPeriod
+		out.MinSyncPeriod = in.IPTables.MinSyncPeriod
+	}
 	return nil
 }
 
 // Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
 func Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in *v1alpha1.KubeProxyIPTablesConfiguration, out *config.KubeProxyIPTablesConfiguration, scope conversion.Scope) error {
 	return autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(in, out, scope)
+}
+
+// Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
+func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in *v1alpha1.KubeProxyIPVSConfiguration, out *config.KubeProxyIPVSConfiguration, scope conversion.Scope) error {
+	return autoConvert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfiguration(in, out, scope)
 }
 
 // Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.

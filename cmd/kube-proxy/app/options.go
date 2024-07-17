@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
@@ -79,6 +80,13 @@ type Options struct {
 	hostnameOverride string
 
 	logger klog.Logger
+
+	// The fields below here are placeholders for flags that can't be directly mapped into
+	// config.KubeProxyConfiguration.
+	iptablesSyncPeriod    time.Duration
+	iptablesMinSyncPeriod time.Duration
+	ipvsSyncPeriod        time.Duration
+	ipvsMinSyncPeriod     time.Duration
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -120,11 +128,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", ptr.Deref(o.config.IPTables.MasqueradeBit, 14), "If using the iptables or ipvs proxy mode, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.BoolVar(&o.config.Linux.MasqueradeAll, "masquerade-all", o.config.Linux.MasqueradeAll, "SNAT all traffic sent via Service cluster IPs. This may be required with some CNI plugins. Only supported on Linux.")
 	fs.BoolVar(o.config.IPTables.LocalhostNodePorts, "iptables-localhost-nodeports", ptr.Deref(o.config.IPTables.LocalhostNodePorts, true), "If false, kube-proxy will disable the legacy behavior of allowing NodePort services to be accessed via localhost. (Applies only to iptables mode and IPv4; localhost NodePorts are never allowed with other proxy modes or with IPv6.)")
-	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
-	fs.DurationVar(&o.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.")
+	fs.DurationVar(&o.iptablesSyncPeriod, "iptables-sync-period", o.config.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
+	fs.DurationVar(&o.iptablesMinSyncPeriod, "iptables-min-sync-period", o.config.MinSyncPeriod.Duration, "The minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.")
 
-	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
-	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum period between IPVS rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate IPVS resync.")
+	fs.DurationVar(&o.ipvsSyncPeriod, "ipvs-sync-period", o.config.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
+	fs.DurationVar(&o.ipvsMinSyncPeriod, "ipvs-min-sync-period", o.config.MinSyncPeriod.Duration, "The minimum period between IPVS rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate IPVS resync.")
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDRs which the ipvs proxier should not touch when cleaning up IPVS rules.")
 	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
@@ -216,6 +224,8 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		if err := o.initWatcher(); err != nil {
 			return err
 		}
+	} else {
+		o.processV1Alpha1Flags(fs)
 	}
 
 	o.platformApplyDefaults(o.config)
@@ -300,6 +310,22 @@ func (o *Options) processHostnameOverrideFlag() error {
 	}
 
 	return nil
+}
+
+// processV1Alpha1Flags processes v1alpha1 flags which can't be directly mapped to internal config.
+func (o *Options) processV1Alpha1Flags(fs *pflag.FlagSet) {
+	if fs.Changed("iptables-sync-period") && o.config.Mode != kubeproxyconfig.ProxyModeIPVS {
+		o.config.SyncPeriod.Duration = o.iptablesSyncPeriod
+	}
+	if fs.Changed("iptables-min-sync-period") && o.config.Mode != kubeproxyconfig.ProxyModeIPVS {
+		o.config.MinSyncPeriod.Duration = o.iptablesMinSyncPeriod
+	}
+	if fs.Changed("ipvs-sync-period") && o.config.Mode == kubeproxyconfig.ProxyModeIPVS {
+		o.config.SyncPeriod.Duration = o.ipvsSyncPeriod
+	}
+	if fs.Changed("ipvs-min-sync-period") && o.config.Mode == kubeproxyconfig.ProxyModeIPVS {
+		o.config.MinSyncPeriod.Duration = o.ipvsMinSyncPeriod
+	}
 }
 
 // Validate validates all the required options.
