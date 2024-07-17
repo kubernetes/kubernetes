@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -50,9 +52,13 @@ import (
 	openapiv3controller "k8s.io/kube-aggregator/pkg/controllers/openapiv3"
 	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
+	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
+
+// making sure we only register metrics once into legacy registry
+var registerIntoLegacyRegistryOnce sync.Once
 
 func init() {
 	// we need to add the options (like ListOptions) to empty v1
@@ -314,6 +320,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		})
 	}
 
+	// create shared (remote and local) availability metrics
+	// TODO: decouple from legacyregistry
+	metrics := availabilitymetrics.New()
+	registerIntoLegacyRegistryOnce.Do(func() { err = metrics.Register(legacyregistry.Register, legacyregistry.CustomRegister) })
+	if err != nil {
+		return nil, err
+	}
+
 	// If the AvailableConditionController is disabled, we don't need to start the informers
 	// and the controller.
 	if !c.ExtraConfig.DisableAvailableConditionController {
@@ -325,6 +339,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			proxyTransportDial,
 			(func() ([]byte, []byte))(s.proxyCurrentCertKeyContent),
 			s.serviceResolver,
+			metrics,
 		)
 		if err != nil {
 			return nil, err

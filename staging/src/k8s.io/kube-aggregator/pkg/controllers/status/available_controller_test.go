@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
 	"k8s.io/utils/pointer"
 
 	v1 "k8s.io/api/core/v1"
@@ -133,7 +134,7 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			workqueue.NewTypedItemExponentialFailureRateLimiter[string](5*time.Millisecond, 30*time.Second),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "AvailableConditionController"},
 		),
-		metrics: newAvailabilityMetrics(),
+		metrics: availabilitymetrics.New(),
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -395,7 +396,7 @@ func TestSync(t *testing.T) {
 				endpointsLister:            v1listers.NewEndpointsLister(endpointsIndexer),
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
-				metrics:                    newAvailabilityMetrics(),
+				metrics:                    availabilitymetrics.New(),
 			}
 			c.sync(tc.apiServiceName)
 
@@ -447,7 +448,7 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
 	c := AvailableConditionController{
 		apiServiceClient: fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter),
-		metrics:          newAvailabilityMetrics(),
+		metrics:          availabilitymetrics.New(),
 	}
 
 	c.updateAPIServiceStatus(foo, foo)

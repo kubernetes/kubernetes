@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
@@ -47,10 +46,8 @@ import (
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers"
+	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
 )
-
-// making sure we only register metrics once into legacy registry
-var registerIntoLegacyRegistryOnce sync.Once
 
 type certKeyFunc func() ([]byte, []byte)
 
@@ -88,7 +85,7 @@ type AvailableConditionController struct {
 	cacheLock sync.RWMutex
 
 	// metrics registered into legacy registry
-	metrics *availabilityMetrics
+	metrics *availabilitymetrics.Metrics
 }
 
 // NewAvailableConditionController returns a new AvailableConditionController.
@@ -100,6 +97,7 @@ func NewAvailableConditionController(
 	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
+	metrics *availabilitymetrics.Metrics,
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -116,7 +114,7 @@ func NewAvailableConditionController(
 		),
 		proxyTransportDial:         proxyTransportDial,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
-		metrics:                    newAvailabilityMetrics(),
+		metrics:                    metrics,
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
@@ -147,15 +145,6 @@ func NewAvailableConditionController(
 	c.endpointsSynced = endpointsHandler.HasSynced
 
 	c.syncFn = c.sync
-
-	// TODO: decouple from legacyregistry
-	var err error
-	registerIntoLegacyRegistryOnce.Do(func() {
-		err = c.metrics.Register(legacyregistry.Register, legacyregistry.CustomRegister)
-	})
-	if err != nil {
-		return nil, err
-	}
 
 	return c, nil
 }
@@ -385,7 +374,7 @@ func (c *AvailableConditionController) sync(key string) error {
 // apiservices. Doing that means we don't want to quickly issue no-op updates.
 func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
 	// update this metric on every sync operation to reflect the actual state
-	c.setUnavailableGauge(newAPIService)
+	c.metrics.SetUnavailableGauge(newAPIService)
 
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
@@ -412,7 +401,7 @@ func (c *AvailableConditionController) updateAPIServiceStatus(originalAPIService
 		return nil, err
 	}
 
-	c.setUnavailableCounter(originalAPIService, newAPIService)
+	c.metrics.SetUnavailableCounter(originalAPIService, newAPIService)
 	return newAPIService, nil
 }
 
@@ -597,30 +586,5 @@ func (c *AvailableConditionController) deleteEndpoints(obj interface{}) {
 	}
 	for _, apiService := range c.getAPIServicesFor(castObj) {
 		c.queue.Add(apiService)
-	}
-}
-
-// setUnavailableGauge set the metrics so that it reflect the current state base on availability of the given service
-func (c *AvailableConditionController) setUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
-	if apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available) {
-		c.metrics.SetAPIServiceAvailable(newAPIService.Name)
-		return
-	}
-
-	c.metrics.SetAPIServiceUnavailable(newAPIService.Name)
-}
-
-// setUnavailableCounter increases the metrics only if the given service is unavailable and its APIServiceCondition has changed
-func (c *AvailableConditionController) setUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
-	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
-	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
-	statusChanged := isAvailable != wasAvailable
-
-	if statusChanged && !isAvailable {
-		reason := "UnknownReason"
-		if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
-			reason = newCondition.Reason
-		}
-		c.metrics.UnavailableCounter(newAPIService.Name, reason).Inc()
 	}
 }
