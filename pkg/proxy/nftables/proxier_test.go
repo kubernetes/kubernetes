@@ -4835,3 +4835,70 @@ func TestProxier_OnServiceCIDRsChanged(t *testing.T) {
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
 	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112,fd00:172:30::/112")
 }
+
+// TestBadIPs tests that "bad" IPs and CIDRs in Services/Endpoints are rewritten to
+// be "good" in the input provided to nft
+func TestBadIPs(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = "172.30.0.041"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.004",
+			}}
+			svc.Spec.ExternalIPs = []string{"192.168.099.022"}
+			svc.Spec.LoadBalancerSourceRanges = []string{"203.0.113.000/025"}
+		}),
+	)
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.00.001"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	expected := baseRules + dedent.Dedent(`
+		# svc1
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
+
+		add chain ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 goto service-ULMVA6XW-ns1/svc1/tcp/p80
+
+		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
+		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
+		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+
+		add chain ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80 ip saddr != { 203.0.113.0/25 } drop
+
+		add element ip kube-proxy cluster-ips { 172.30.0.41 }
+		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-ips { 192.168.99.22 . tcp . 80 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-ips { 1.2.3.4 . tcp . 80 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-nodeports { tcp . 3001 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy firewall-ips { 1.2.3.4 . tcp . 80 : goto firewall-ULMVA6XW-ns1/svc1/tcp/p80 }
+		`)
+
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
+}
