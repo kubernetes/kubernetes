@@ -799,7 +799,8 @@
             "type": "integer"
           }
         },
-        "type": "object"
+        "type": "object",
+        "x-kubernetes-map-type": "atomic"
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
         "description": "APIResource specifies the name of a resource and whether it is namespaced.",
