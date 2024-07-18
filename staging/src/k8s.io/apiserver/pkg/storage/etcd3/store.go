@@ -118,6 +118,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc, newListFunc func
 		client:        c,
 		codec:         codec,
 		newFunc:       newFunc,
+		newListFunc:   newListFunc,
 		groupResource: groupResource,
 		versioner:     versioner,
 		transformer:   transformer,
