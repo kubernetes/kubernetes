@@ -126,7 +126,7 @@ func (sc *stateCheckpoint) GetOrCreate() (ClaimInfoStateList, error) {
 		return ClaimInfoStateList{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get checkpoint %v: %v", sc.checkpointName, err)
+		return nil, fmt.Errorf("failed to get checkpoint %v: %w", sc.checkpointName, err)
 	}
 
 	return checkpoint.Entries, nil

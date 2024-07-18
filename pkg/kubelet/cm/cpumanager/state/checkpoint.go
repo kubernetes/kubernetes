@@ -110,8 +110,12 @@ func (cp *CPUManagerCheckpointV1) VerifyChecksum() error {
 
 	hash := fnv.New32a()
 	fmt.Fprintf(hash, "%v", object)
-	if cp.Checksum != checksum.Checksum(hash.Sum32()) {
-		return errors.ErrCorruptCheckpoint
+	actualCS := checksum.Checksum(hash.Sum32())
+	if cp.Checksum != actualCS {
+		return &errors.CorruptCheckpointError{
+			ActualCS:   uint64(actualCS),
+			ExpectedCS: uint64(cp.Checksum),
+		}
 	}
 
 	return nil
