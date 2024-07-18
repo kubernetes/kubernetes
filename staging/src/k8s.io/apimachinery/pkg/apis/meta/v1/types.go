@@ -439,6 +439,13 @@ const (
 	//
 	// The annotation is added to a "Bookmark" event.
 	InitialEventsAnnotationKey = "k8s.io/initial-events-end"
+
+	// InitialEventsListGVKAnnotationKey the name of the key
+	// under which an annotation holding serialized GVK
+	// of the list is stored.
+	//
+	// The annotation is added to a "Bookmark" event.
+	InitialEventsListGVKAnnotationKey = "kubernetes.io/initial-events-list-gvk"
 )
 
 // resourceVersionMatch specifies how the resourceVersion parameter is applied. resourceVersionMatch
