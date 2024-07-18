@@ -51,6 +51,7 @@ import (
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 )
 
@@ -634,15 +635,28 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context,
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
+	var newClaim *v1.PersistentVolumeClaim
+	var updateErr error
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
+		newClaim, updateErr = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
+		if updateErr == nil {
+			return nil
+		}
+		if updated, err := ctrl.claimLister.PersistentVolumeClaims(claimClone.Namespace).Get(claimClone.Name); err == nil {
+			// make a copy so we don't mutate the shared cache
+			claimClone = updated.DeepCopy()
+		} else {
+			utilruntime.HandleError(fmt.Errorf("error getting updated Claim %s from lister: %v", claimClone.Name, err))
+		}
+		return updateErr
+	})
+
 	// TODO: remove the beta storage provisioner anno after the deprecation period
 	logger := klog.FromContext(ctx)
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnBetaStorageProvisioner, provisionerName)
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, storagehelpers.AnnStorageProvisioner, provisionerName)
 	updateMigrationAnnotations(logger, ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
-	if err != nil {
-		return newClaim, err
-	}
 	_, err = ctrl.storeClaimUpdate(logger, newClaim)
 	if err != nil {
 		return newClaim, err
