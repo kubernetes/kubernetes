@@ -50,6 +50,8 @@ var (
 	AssignedPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "AssignedPodUpdate"}
 	// UnscheduledPodAdd is the event when an unscheduled pod is added.
 	UnscheduledPodAdd = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "UnschedulablePodAdd"}
+	// AssignedPodOtherUpdate is the event when an assigned pod got updated in fields that are not covered by framework.UpdatePodXXX.
+	AssignedPodOtherUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.UpdatePodOther, Label: "AssignedPodUpdate"}
 	// UnscheduledPodUpdate is the event when an unscheduled pod is updated.
 	UnscheduledPodUpdate = framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update, Label: "UnschedulablePodUpdate"}
 	// UnscheduledPodDelete is the event when an unscheduled pod is deleted.
@@ -117,7 +119,9 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fra
 	}
 
 	if len(events) == 0 {
-		events = append(events, AssignedPodUpdate)
+		// When no specific event is found, we use AssignedPodOtherUpdate,
+		// which should only trigger plugins registering a general Pod/Update event.
+		events = append(events, AssignedPodOtherUpdate)
 	}
 
 	return
