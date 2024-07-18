@@ -83,6 +83,9 @@ type cacheWatcher struct {
 	// stateMutex protects state
 	stateMutex sync.Mutex
 
+	//
+	newListFunc func() runtime.Object
+
 	// state holds a numeric value indicating the current state of the watcher
 	state int
 }
@@ -91,6 +94,7 @@ func newCacheWatcher(
 	chanSize int,
 	filter filterWithAttrsFunc,
 	forget func(bool),
+	newListFunc func() runtime.Object,
 	versioner storage.Versioner,
 	deadline time.Time,
 	allowWatchBookmarks bool,
@@ -104,6 +108,7 @@ func newCacheWatcher(
 		filter:              filter,
 		stopped:             false,
 		forget:              forget,
+		newListFunc:         newListFunc,
 		versioner:           versioner,
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
@@ -363,7 +368,7 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 	if event.Type == watch.Bookmark {
 		e := &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
 		if !c.wasBookmarkAfterRvSent() {
-			if err := storage.AnnotateInitialEventsEndBookmark(e.Object); err != nil {
+			if err := storage.AnnotateInitialEventsEndBookmark(e.Object, c.newListFunc()); err != nil {
 				utilruntime.HandleError(fmt.Errorf("error while accessing object's metadata gr: %v, identifier: %v, obj: %#v, err: %v", c.groupResource, c.identifier, e.Object, err))
 				return nil
 			}

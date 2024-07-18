@@ -617,6 +617,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		chanSize,
 		filterWithAttrsAndPrefixFunction(key, pred),
 		emptyFunc,
+		c.newListFunc,
 		c.versioner,
 		deadline,
 		pred.AllowWatchBookmarks,
