@@ -363,7 +363,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "untracked properties of pod is updated",
 			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
-			want:   []framework.ClusterEvent{AssignedPodUpdate},
+			want:   []framework.ClusterEvent{AssignedPodOtherUpdate},
 		},
 	}
 	for _, tt := range tests {
