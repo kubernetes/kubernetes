@@ -1901,16 +1901,11 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 }
 
 func isPodFailed(p *v1.Pod, job *batch.Job) bool {
-	if job.Spec.PodFailurePolicy != nil {
-		// Orphan Pods and unschedulable terminating Pods are marked as Failed,
-		// so we only need to check the phase.
-		return p.Status.Phase == v1.PodFailed
-	}
 	if p.Status.Phase == v1.PodFailed {
 		return true
 	}
 	if onlyReplaceFailedPods(job) {
-		return p.Status.Phase == v1.PodFailed
+		return false
 	}
 	// Count deleted Pods as failures to account for orphan Pods that
 	// never have a chance to reach the Failed phase.
