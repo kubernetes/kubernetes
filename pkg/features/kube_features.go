@@ -45,6 +45,13 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
+	// owner: @aojea
+	// Deprecated: v1.31
+	//
+	// Allow kubelet to request a certificate without any Node IP available, only
+	// with DNS names.
+	AllowDNSOnlyNodeCSR featuregate.Feature = "AllowDNSOnlyNodeCSR"
+
 	// owner: @thockin
 	// deprecated: v1.29
 	//
@@ -990,6 +997,8 @@ func init() {
 // when adding or removing one entry.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
+
+	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
 
 	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
 
