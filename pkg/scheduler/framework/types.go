@@ -71,7 +71,7 @@ const (
 	// UpdatePodOther is a update for pod's other fields.
 	// NOT RECOMMENDED using it in your plugin's EventsToRegister,
 	// use Pod/Update instead when you have to subscribe Pod updates which are not covered by other UpdatePodXYZ events.
-	// Otherwise, your plugin would be broken when the upstream supports a new Pod specific Update event.
+	// Otherwise, your plugin might be broken when the upstream supports a new Pod specific Update event.
 	// It's used only for the internal event handling.
 	UpdatePodOther
 
@@ -89,7 +89,7 @@ type GVK string
 // Note:
 // - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
 // Use specific events rather than general ones (updatePodLabel vs update) can make the requeueing process more efficient
-// and consume less memories as less events will be cached at scheduler.
+// and consume less memory as less events will be cached at scheduler.
 const (
 	// There are a couple of notes about how the scheduler notifies the events of Pods:
 	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.

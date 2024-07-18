@@ -130,7 +130,9 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []fra
 type podChangeExtractor func(newNode *v1.Pod, oldNode *v1.Pod) *framework.ClusterEvent
 
 func extractPodResourceRequestChange(newPod, oldPod *v1.Pod) *framework.ClusterEvent {
-	opt := resource.PodResourcesOptions{InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)}
+	opt := resource.PodResourcesOptions{
+		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+	}
 	if !equality.Semantic.DeepEqual(resource.PodRequests(newPod, opt), resource.PodRequests(oldPod, opt)) {
 		return &PodRequestChange
 	}
