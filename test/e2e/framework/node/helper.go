@@ -50,7 +50,7 @@ func WaitForAllNodesSchedulable(ctx context.Context, c clientset.Interface, time
 		ctx,
 		30*time.Second,
 		timeout,
-		false,
+		true,
 		CheckReadyForTests(ctx, c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
