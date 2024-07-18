@@ -66,9 +66,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	f := framework.NewDefaultFramework("dra-node")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	var kubeletPlugin, kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
-
 	f.Context("Resource Kubelet Plugin", f.WithSerial(), func() {
+		var kubeletPlugin *testdriver.ExamplePlugin
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			kubeletPlugin = newKubeletPlugin(ctx, getNodeName(ctx, f), driverName)
 		})
@@ -306,6 +305,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
+		var kubeletPlugin1, kubeletPlugin2 *testdriver.ExamplePlugin
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			kubeletPlugin1 = newKubeletPlugin(ctx, getNodeName(ctx, f), kubeletPlugin1Name)
 			kubeletPlugin2 = newKubeletPlugin(ctx, getNodeName(ctx, f), kubeletPlugin2Name)
@@ -378,7 +378,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		ginkgo.It("must run pod if NodePrepareResources is in progress for one plugin when Kubelet restarts", func(ctx context.Context) {
-			unblock := kubeletPlugin.BlockNodePrepareResources()
+			unblock := kubeletPlugin1.BlockNodePrepareResources()
 			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", true, []string{kubeletPlugin1Name, kubeletPlugin2Name})
 
 			ginkgo.By("wait for pod to be in Pending state")
