@@ -25,7 +25,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -34,12 +33,10 @@ import (
 	cpnames "k8s.io/cloud-provider/names"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	cmoptions "k8s.io/controller-manager/options"
-	"k8s.io/klog/v2"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -276,16 +273,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Generic.ClientConnection.Kubeconfig, "kubeconfig", s.Generic.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization and master location information (the master location can be overridden by the master flag).")
-
-	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
-		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
-			// it turns out that there are some integration tests that start multiple control plane components which
-			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
-			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
-			klog.Errorf("unable to set %s feature gate, err: %v", clientgofeaturegate.WatchListClient, err)
-		}
-	}
-
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
