@@ -32,7 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
