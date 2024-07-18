@@ -20,6 +20,7 @@ package fake
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/watch"
 	applyconfigurations "k8s.io/client-go/applyconfigurations"
 	"k8s.io/client-go/discovery"
@@ -132,6 +133,7 @@ import (
 	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
 	fakestoragemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1/fake"
 	"k8s.io/client-go/testing"
+	"k8s.io/utils/clock"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -183,15 +185,29 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-// NewClientset returns a clientset that will respond with the provided objects.
-// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
-// without applying any validations and/or defaults. It shouldn't be considered a replacement
-// for a real clientset and is mostly useful in simple unit tests.
-func NewClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewFieldManagedObjectTracker(
+type ClientsetOptions struct {
+	// Whether to block deletion when the object has finalizers, and delete the object if the finalizers are removed.
+	SupportsFinalizer bool
+	// Support field management to improve server side apply testing
+	ManagedFields bool
+
+	Clock clock.PassiveClock
+}
+
+// NewClientsetWithOptions likes NewClientset but takes additional options.
+func NewClientsetWithOptions(options ClientsetOptions, objects ...runtime.Object) *Clientset {
+	var typeConverter managedfields.TypeConverter
+	if options.ManagedFields {
+		typeConverter = applyconfigurations.NewTypeConverter(scheme)
+	}
+	o := testing.NewObjectTrackerWithOptions(
 		scheme,
 		codecs.UniversalDecoder(),
-		applyconfigurations.NewTypeConverter(scheme),
+		testing.ObjectTrackerOptions{
+			Clock:             options.Clock,
+			SupportsFinalizer: options.SupportsFinalizer,
+			TypeConverter:     typeConverter,
+		},
 	)
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
@@ -213,6 +229,16 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 	})
 
 	return cs
+}
+
+// NewClientset returns a clientset that will respond with the provided objects.
+// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
+// for a real clientset and is mostly useful in simple unit tests.
+func NewClientset(objects ...runtime.Object) *Clientset {
+	return NewClientsetWithOptions(ClientsetOptions{
+		ManagedFields: true,
+	}, objects...)
 }
 
 var (
