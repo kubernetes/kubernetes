@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"strconv"
 	"sync/atomic"
 
@@ -120,12 +121,12 @@ func GetCurrentResourceVersionFromStorage(ctx context.Context, storage Interface
 	return uint64(currentResourceVersion), nil
 }
 
-// AnnotateInitialEventsEndBookmark adds a special annotation to the given object
+// AnnotateInitialEventsEndBookmark adds a special annotations to the given object
 // which indicates that the initial events have been sent.
 //
 // Note that this function assumes that the obj's annotation
 // field is a reference type (i.e. a map).
-func AnnotateInitialEventsEndBookmark(obj runtime.Object) error {
+func AnnotateInitialEventsEndBookmark(obj, listObj runtime.Object) error {
 	objMeta, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -135,7 +136,11 @@ func AnnotateInitialEventsEndBookmark(obj runtime.Object) error {
 		objAnnotations = map[string]string{}
 	}
 	objAnnotations[metav1.InitialEventsAnnotationKey] = "true"
+	if unstructuredList, isUnstructured := listObj.(*unstructured.UnstructuredList); isUnstructured {
+		objAnnotations[metav1.InitialEventsListGVKAnnotationKey] = unstructuredList.GroupVersionKind().String()
+	}
 	objMeta.SetAnnotations(objAnnotations)
+
 	return nil
 }
 
