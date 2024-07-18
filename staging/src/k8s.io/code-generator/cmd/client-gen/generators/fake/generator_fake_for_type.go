@@ -575,8 +575,8 @@ func (c *Fake$.type|publicPlural$) Apply(ctx context.Context, $.type|private$Nam
 	}
 	emptyResult := &$.resultType|raw${}
 	obj, err := c.Fake.
-		$if .namespaced$Invokes($.NewPatchSubresourceActionWithOptions|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, opts.ToPatchOptions(), "status"), emptyResult)
-		$else$Invokes($.NewRootPatchSubresourceActionWithOptions|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, opts.ToPatchOptions(), "status"), emptyResult)$end$
+		$if .namespaced$Invokes($.NewPatchSubresourceActionWithOptions|raw$($.type|allLowercasePlural$Resource, c.ns, $.type|private$Name, $.ApplyPatchType|raw$, data, opts.ToPatchOptions(), "$.inputType|private$"), emptyResult)
+		$else$Invokes($.NewRootPatchSubresourceActionWithOptions|raw$($.type|allLowercasePlural$Resource, $.type|private$Name, $.ApplyPatchType|raw$, data, opts.ToPatchOptions(), "$.inputType|private$"), emptyResult)$end$
 	if obj == nil {
 		return emptyResult, err
 	}

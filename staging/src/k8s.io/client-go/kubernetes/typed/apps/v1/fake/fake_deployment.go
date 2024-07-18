@@ -234,7 +234,7 @@ func (c *FakeDeployments) ApplyScale(ctx context.Context, deploymentName string,
 	}
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, opts.ToPatchOptions(), "scale"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err
