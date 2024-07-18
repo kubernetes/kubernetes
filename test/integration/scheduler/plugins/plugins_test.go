@@ -2627,10 +2627,10 @@ func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWithEvents) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *SchedulingGatesPluginWithEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Update}},
-	}
+	}, nil
 }
 
 type SchedulingGatesPluginWOEvents struct {
@@ -2647,8 +2647,8 @@ func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.P
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
-func (pl *SchedulingGatesPluginWOEvents) EventsToRegister() []framework.ClusterEventWithHint {
-	return nil
+func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
 }
 
 // This test helps to verify registering nil events for PreEnqueue plugin works as expected.

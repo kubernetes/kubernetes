@@ -318,7 +318,7 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *VolumeRestrictions) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
 		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
@@ -331,7 +331,7 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEventWithHin
 		// This PVC is required to exist to check its access modes.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
 			QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimAdded},
-	}
+	}, nil
 }
 
 // isSchedulableAfterPersistentVolumeClaimAdded is invoked whenever a PersistentVolumeClaim added or changed, It checks whether

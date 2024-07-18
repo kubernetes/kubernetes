@@ -1112,7 +1112,10 @@ func TestEventsToRegister(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fp := &Fit{enableInPlacePodVerticalScaling: test.inPlacePodVerticalScalingEnabled}
-			actualClusterEvents := fp.EventsToRegister()
+			actualClusterEvents, err := fp.EventsToRegister(context.TODO())
+			if err != nil {
+				t.Fatal(err)
+			}
 			for i := range actualClusterEvents {
 				actualClusterEvents[i].QueueingHintFn = nil
 			}

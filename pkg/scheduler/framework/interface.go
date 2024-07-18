@@ -375,11 +375,13 @@ type EnqueueExtensions interface {
 	// filters out events to reduce useless retry of Pod's scheduling.
 	// The events will be registered when instantiating the internal scheduling queue,
 	// and leveraged to build event handlers dynamically.
-	// Note: the returned list needs to be static (not depend on configuration parameters);
-	// otherwise it would lead to undefined behavior.
+	// When it returns an error, the scheduler fails to start.
+	// Note: the returned list needs to be determined at a startup,
+	// and the scheduler only evaluates it once during start up.
+	// Do not change the result during runtime, for example, based on the cluster's state etc.
 	//
 	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
-	EventsToRegister() []ClusterEventWithHint
+	EventsToRegister(context.Context) ([]ClusterEventWithHint, error)
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying
