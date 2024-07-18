@@ -2803,11 +2803,28 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		return pod
 	}
 
+	// If the pod cannot be resized, use the old resource spec during the rest of SyncPod()
+	// for a case where a container is restarted.
+	// Extract the old spec from the latest container status.
+	copyPodResourceToSpec := func(podCopy *v1.Pod) {
+		for i, container := range podCopy.Spec.Containers {
+			containerStatus, found := podutil.GetContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
+			if !found {
+				continue
+			}
+			if containerStatus.Resources != nil {
+				podCopy.Spec.Containers[i].Resources = *containerStatus.Resources
+			}
+		}
+	}
+
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
 	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
 	if updatedPod == nil {
-		return pod
+		updatedPod = pod.DeepCopy()
+		copyPodResourceToSpec(updatedPod)
+		return updatedPod
 	}
 	if fit {
 		// Update pod resource allocation checkpoint
@@ -2828,6 +2845,12 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	}
 	kl.podManager.UpdatePod(updatedPod)
 	kl.statusManager.SetPodStatus(updatedPod, updatedPod.Status)
+
+	if !fit {
+		// This copying should be done after podManager.UpdatePod() so that this change is ephemeral only during
+		// the current sync.
+		copyPodResourceToSpec(updatedPod)
+	}
 	return updatedPod
 }
 
