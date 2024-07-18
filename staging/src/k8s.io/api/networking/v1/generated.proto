@@ -533,7 +533,7 @@ message NetworkPolicySpec {
   // If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
   // Likewise, if you want to write a policy that specifies that no egress is allowed,
   // you must specify a policyTypes value that include "Egress" (since such a policy would not include
-  // an egress section and would otherwise default to just [ "Ingress" ]).
+  // an egress section or would have an empty egress section, causing it to default to [ "Ingress" ] only).
   // This field is beta-level in 1.8
   // +optional
   // +listType=atomic
