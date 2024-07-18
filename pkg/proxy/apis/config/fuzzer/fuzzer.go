@@ -28,12 +28,23 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+func getRandomDualStackIPPair(c fuzz.Continue) []string {
+	ipv4 := fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
+
+	byts := make([]byte, 16)
+	c.Read(byts)
+	ipv6 := fmt.Sprintf("%x:%x:%x:%x:%x:%x:%x:%x",
+		byts[0:2], byts[2:4], byts[4:6], byts[6:8],
+		byts[8:10], byts[10:12], byts[12:14], byts[14:16])
+	return []string{ipv4, ipv6}
+}
+
 // Funcs returns the fuzzer functions for the kube-proxy apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(obj *kubeproxyconfig.KubeProxyConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
+			obj.NodeIPOverride = getRandomDualStackIPPair(c)[:1+c.Intn(2)]
 			obj.ClientConnection.ContentType = c.RandString()
 			obj.Linux.Conntrack.MaxPerCore = ptr.To(c.Int31())
 			obj.Linux.Conntrack.Min = ptr.To(c.Int31())

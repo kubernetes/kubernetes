@@ -182,10 +182,9 @@ type KubeProxyConfiguration struct {
 	// kube-proxy is running on. If unset, the node name is assumed to be the same as
 	// the node's hostname.
 	HostnameOverride string
-	// bindAddress can be used to override kube-proxy's idea of what its node's
-	// primary IP is. Note that the name is a historical artifact, and kube-proxy does
-	// not actually bind any sockets to this IP.
-	BindAddress string
+	// nodeIPOverride can be used to override kube-proxy's idea of what its node's
+	// primary IPs are.
+	NodeIPOverride []string
 	// healthzBindAddress is the IP address and port for the health check server to
 	// serve on, defaulting to "0.0.0.0:10256" (if bindAddress is unset or IPv4), or
 	// "[::]:10256" (if bindAddress is IPv6).

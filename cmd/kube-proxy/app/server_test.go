@@ -142,71 +142,71 @@ func Test_detectNodeIPs(t *testing.T) {
 	cases := []struct {
 		name           string
 		rawNodeIPs     []net.IP
-		bindAddress    string
+		nodeIPOverride []string
 		expectedFamily v1.IPFamily
 		expectedIPv4   string
 		expectedIPv6   string
 	}{
 		{
-			name:           "Bind address IPv4 unicast address and no Node object",
+			name:           "NodeIPOverride IPv4 unicast address and no Node object",
 			rawNodeIPs:     nil,
-			bindAddress:    "10.0.0.1",
+			nodeIPOverride: []string{"10.0.0.1"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "10.0.0.1",
 			expectedIPv6:   "::1",
 		},
 		{
-			name:           "Bind address IPv6 unicast address and no Node object",
+			name:           "NodeIPOverride IPv6 unicast address and no Node object",
 			rawNodeIPs:     nil,
-			bindAddress:    "fd00:4321::2",
+			nodeIPOverride: []string{"fd00:4321::2"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:4321::2",
 		},
 		{
-			name:           "No Valid IP found and no bind address",
+			name:           "No Valid IP found and no NodeIPOverride",
 			rawNodeIPs:     nil,
-			bindAddress:    "",
+			nodeIPOverride: []string{},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "::1",
 		},
 		{
-			name:           "No Valid IP found and unspecified bind address",
+			name:           "No Valid IP found and unspecified NodeIPOverride",
 			rawNodeIPs:     nil,
-			bindAddress:    "0.0.0.0",
+			nodeIPOverride: []string{"0.0.0.0"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "::1",
 		},
 		{
-			name:           "Bind address 0.0.0.0 and node with IPv4 InternalIP set",
+			name:           "NodeIPOverride 0.0.0.0 and node with IPv4 InternalIP set",
 			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
-			bindAddress:    "0.0.0.0",
+			nodeIPOverride: []string{"0.0.0.0"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
 			expectedIPv6:   "::1",
 		},
 		{
-			name:           "Bind address :: and node with IPv4 InternalIP set",
+			name:           "NodeIPOverride :: and node with IPv4 InternalIP set",
 			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
-			bindAddress:    "::",
+			nodeIPOverride: []string{"::"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "192.168.1.1",
 			expectedIPv6:   "::1",
 		},
 		{
-			name:           "Bind address 0.0.0.0 and node with IPv6 InternalIP set",
+			name:           "NodeIPOverride 0.0.0.0 and node with IPv6 InternalIP set",
 			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("fd00:1234::1")},
-			bindAddress:    "0.0.0.0",
+			nodeIPOverride: []string{"0.0.0.0"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
 		},
 		{
-			name:           "Bind address :: and node with IPv6 InternalIP set",
+			name:           "NodeIPOverride :: and node with IPv6 InternalIP set",
 			rawNodeIPs:     []net.IP{netutils.ParseIPSloppy("fd00:1234::1")},
-			bindAddress:    "::",
+			nodeIPOverride: []string{"::"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "fd00:1234::1",
@@ -217,7 +217,7 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("90.90.90.90"),
 				netutils.ParseIPSloppy("2001:db8::2"),
 			},
-			bindAddress:    "::",
+			nodeIPOverride: []string{"::"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "90.90.90.90",
 			expectedIPv6:   "2001:db8::2",
@@ -228,7 +228,7 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("2001:db8::2"),
 				netutils.ParseIPSloppy("90.90.90.90"),
 			},
-			bindAddress:    "0.0.0.0",
+			nodeIPOverride: []string{"0.0.0.0"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "90.90.90.90",
 			expectedIPv6:   "2001:db8::2",
@@ -239,7 +239,7 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("2001:db8::2"),
 				netutils.ParseIPSloppy("90.90.90.90"),
 			},
-			bindAddress:    "80.80.80.80",
+			nodeIPOverride: []string{"80.80.80.80"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "80.80.80.80",
 			expectedIPv6:   "2001:db8::2",
@@ -250,7 +250,7 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("90.90.90.90"),
 				netutils.ParseIPSloppy("2001:db8::2"),
 			},
-			bindAddress:    "2001:db8::555",
+			nodeIPOverride: []string{"2001:db8::555"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "90.90.90.90",
 			expectedIPv6:   "2001:db8::555",
@@ -261,7 +261,7 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("2001:db8::2"),
 				netutils.ParseIPSloppy("90.90.90.90"),
 			},
-			bindAddress:    "127.0.0.1",
+			nodeIPOverride: []string{"127.0.0.1"},
 			expectedFamily: v1.IPv4Protocol,
 			expectedIPv4:   "127.0.0.1",
 			expectedIPv6:   "2001:db8::2",
@@ -272,16 +272,60 @@ func Test_detectNodeIPs(t *testing.T) {
 				netutils.ParseIPSloppy("90.90.90.90"),
 				netutils.ParseIPSloppy("2001:db8::2"),
 			},
-			bindAddress:    "::1",
+			nodeIPOverride: []string{"::1"},
 			expectedFamily: v1.IPv6Protocol,
 			expectedIPv4:   "90.90.90.90",
 			expectedIPv6:   "::1",
+		},
+		{
+			name: "Dual stack, override with unspecified addresses, IPv6",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("2001:db8::2"),
+				netutils.ParseIPSloppy("90.90.90.90"),
+			},
+			nodeIPOverride: []string{"0.0.0.0", "::"},
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name: "Dual stack, override with specified addresses, IPv4",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("2001:db8::2"),
+				netutils.ParseIPSloppy("90.90.90.90"),
+			},
+			nodeIPOverride: []string{"80.80.80.80", "2001:bd8::3"},
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "80.80.80.80",
+			expectedIPv6:   "2001:bd8::3",
+		},
+		{
+			name: "Dual stack, override with unspecified addresses, IPv4",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("90.90.90.90"),
+				netutils.ParseIPSloppy("2001:db8::2"),
+			},
+			nodeIPOverride: []string{"::", "0.0.0.0"},
+			expectedFamily: v1.IPv4Protocol,
+			expectedIPv4:   "90.90.90.90",
+			expectedIPv6:   "2001:db8::2",
+		},
+		{
+			name: "Dual stack, override with specified addresses, IPv6",
+			rawNodeIPs: []net.IP{
+				netutils.ParseIPSloppy("90.90.90.90"),
+				netutils.ParseIPSloppy("2001:db8::2"),
+			},
+			nodeIPOverride: []string{"2001:bd8::3", "80.80.80.80"},
+			expectedFamily: v1.IPv6Protocol,
+			expectedIPv4:   "80.80.80.80",
+			expectedIPv6:   "2001:bd8::3",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.bindAddress)
+			primaryFamily, ips := detectNodeIPs(ctx, c.rawNodeIPs, c.nodeIPOverride)
 			if primaryFamily != c.expectedFamily {
 				t.Errorf("Expected family %q got %q", c.expectedFamily, primaryFamily)
 			}
