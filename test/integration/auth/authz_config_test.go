@@ -33,6 +33,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,6 +127,7 @@ func TestMultiWebhookAuthzConfig(t *testing.T) {
 	authzmetrics.ResetMetricsForTest()
 	defer authzmetrics.ResetMetricsForTest()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthorizationConfiguration, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, true)
 
 	dir := t.TempDir()
 
@@ -253,6 +256,41 @@ users:
 		t.Fatal(err)
 	}
 
+	// returns allow responses when called with a label selector containing an allow key, and records the selectors it saw
+	selectorName := "selector.example.com"
+	serverSelectorCalled := atomic.Int32{}
+	var selectorLabelAttributes *authorizationv1.LabelSelectorAttributes
+	var selectorFieldAttributes *authorizationv1.FieldSelectorAttributes
+	selectorServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		selectorLabelAttributes = nil
+		selectorFieldAttributes = nil
+		serverSelectorCalled.Add(1)
+		sar := &authorizationv1.SubjectAccessReview{}
+		if err := json.NewDecoder(req.Body).Decode(sar); err != nil {
+			t.Error(err)
+		}
+		t.Log("selector", sar)
+		if sar.Spec.ResourceAttributes != nil {
+			selectorLabelAttributes = sar.Spec.ResourceAttributes.LabelSelector.DeepCopy()
+			selectorFieldAttributes = sar.Spec.ResourceAttributes.FieldSelector.DeepCopy()
+			if sar.Spec.ResourceAttributes.LabelSelector != nil {
+				for _, req := range sar.Spec.ResourceAttributes.LabelSelector.Requirements {
+					if req.Key == "allow" {
+						sar.Status.Allowed = true
+					}
+				}
+			}
+		}
+		if err := json.NewEncoder(w).Encode(sar); err != nil {
+			t.Error(err)
+		}
+	}))
+	defer selectorServer.Close()
+	serverSelectorKubeconfigName := filepath.Join(dir, "selector.yaml")
+	if err := os.WriteFile(serverSelectorKubeconfigName, []byte(fmt.Sprintf(kubeconfigTemplate, selectorServer.URL)), os.FileMode(0644)); err != nil {
+		t.Fatal(err)
+	}
+
 	// returns an allow response when called
 	allowName := "allow.example.com"
 	serverAllowCalled := atomic.Int32{}
@@ -303,6 +341,7 @@ users:
 		serverDenyCalled.Store(0)
 		serverNoOpinionCalled.Store(0)
 		serverFailOpenCalled.Store(0)
+		serverSelectorCalled.Store(0)
 		serverAllowCalled.Store(0)
 		serverAllowReloadedCalled.Store(0)
 		authorizationmetrics.ResetMetricsForTest()
@@ -311,7 +350,7 @@ users:
 	}
 	var adminClient *clientset.Clientset
 	type counts struct {
-		errorCount, timeoutCount, denyCount, noOpinionCount, failOpenCount, allowCount, allowReloadedCount, webhookExclusionCount, evalErrorsCount int32
+		errorCount, timeoutCount, denyCount, noOpinionCount, failOpenCount, selectorCount, allowCount, allowReloadedCount, webhookExclusionCount, evalErrorsCount int32
 	}
 	assertCounts := func(c counts) {
 		t.Helper()
@@ -346,6 +385,7 @@ users:
 		if e, a := c.denyCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: denyName}]["denied"]; e != int32(a) {
 			t.Fatalf("expected deny webhook denied metrics calls: %d, got %d", e, a)
 		}
+		assertCount(selectorName, c.selectorCount, &serverSelectorCalled)
 		assertCount(noOpinionName, c.noOpinionCount, &serverNoOpinionCalled)
 		assertCount(failOpenName, c.failOpenCount, &serverFailOpenCalled)
 		expectedFailOpenCounts := map[string]int{}
@@ -355,6 +395,7 @@ users:
 		if !reflect.DeepEqual(expectedFailOpenCounts, metrics.whFailOpenTotal) {
 			t.Fatalf("expected fail open %#v, got %#v", expectedFailOpenCounts, metrics.whFailOpenTotal)
 		}
+
 		assertCount(allowName, c.allowCount, &serverAllowCalled)
 		if e, a := c.allowCount, metrics.decisions[authorizerKey{authorizerType: "Webhook", authorizerName: allowName}]["allowed"]; e != int32(a) {
 			t.Fatalf("expected allow webhook allowed metrics calls: %d, got %d", e, a)
@@ -429,6 +470,21 @@ authorizers:
     - expression: 'request.resourceAttributes.namespace == "fail"'
 
 - type: Webhook
+  name: `+selectorName+`
+  webhook:
+    timeout: 5s
+    failurePolicy: NoOpinion
+    subjectAccessReviewVersion: v1
+    matchConditionSubjectAccessReviewVersion: v1
+    authorizedTTL: 1ms
+    unauthorizedTTL: 1ms
+    connectionInfo:
+      type: KubeConfigFile
+      kubeConfigFile: `+serverSelectorKubeconfigName+`
+    matchConditions:
+    - expression: request.?resourceAttributes.labelSelector.requirements.orValue([]).exists(r, r.key=='testselector')
+
+- type: Webhook
   name: `+noOpinionName+`
   webhook:
     timeout: 5s
@@ -452,6 +508,7 @@ authorizers:
     connectionInfo:
       type: KubeConfigFile
       kubeConfigFile: `+serverFailOpenKubeconfigName+`
+
 
 - type: Webhook
   name: `+allowName+`
@@ -477,6 +534,10 @@ authorizers:
 	t.Cleanup(server.TearDownFn)
 
 	adminClient = clientset.NewForConfigOrDie(server.ClientConfig)
+
+	impersonationConfig := rest.CopyConfig(server.ClientConfig)
+	impersonationConfig.Impersonate.UserName = "alice"
+	aliceClient := clientset.NewForConfigOrDie(impersonationConfig)
 
 	// malformed webhook short circuits
 	t.Log("checking error")
@@ -559,7 +620,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 3})
+		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 4})
 	}
 
 	// the timeout webhook results in match condition eval errors when evaluating a non-resource request
@@ -580,6 +641,101 @@ authorizers:
 		// timeout webhook matchConditions error on non-resource request
 		assertCounts(counts{webhookExclusionCount: 1, evalErrorsCount: 1})
 	}
+
+	disorderedFieldSelector := "spec.nodeName=mynode,metadata.name!=b,metadata.name!=a"
+	orderedFieldRequirements := &authorizationv1.FieldSelectorAttributes{Requirements: []metav1.FieldSelectorRequirement{
+		{Key: "metadata.name", Operator: "NotIn", Values: []string{"a"}},
+		{Key: "metadata.name", Operator: "NotIn", Values: []string{"b"}},
+		{Key: "spec.nodeName", Operator: "In", Values: []string{"mynode"}}}}
+	disorderedFieldRequirements := &authorizationv1.FieldSelectorAttributes{Requirements: []metav1.FieldSelectorRequirement{
+		{Key: "spec.nodeName", Operator: "In", Values: []string{"mynode"}},
+		{Key: "metadata.name", Operator: "NotIn", Values: []string{"b"}},
+		{Key: "metadata.name", Operator: "NotIn", Values: []string{"a"}}}}
+	disorderedUnknownFieldRequirements := disorderedFieldRequirements.DeepCopy()
+	disorderedUnknownFieldRequirements.Requirements = append(disorderedUnknownFieldRequirements.Requirements, metav1.FieldSelectorRequirement{Key: "x", Operator: "Unknown"})
+	disorderedLabelSelector := "testselector in (b,a),allow=true"
+	orderedLabelRequirements := &authorizationv1.LabelSelectorAttributes{Requirements: []metav1.LabelSelectorRequirement{
+		{Key: "allow", Operator: "In", Values: []string{"true"}},
+		{Key: "testselector", Operator: "In", Values: []string{"a", "b"}}}}
+	disorderedLabelRequirements := &authorizationv1.LabelSelectorAttributes{Requirements: []metav1.LabelSelectorRequirement{
+		{Key: "testselector", Operator: "In", Values: []string{"b", "a"}},
+		{Key: "allow", Operator: "In", Values: []string{"true"}}}}
+	disorderedUnknownLabelRequirements := disorderedLabelRequirements.DeepCopy()
+	disorderedUnknownLabelRequirements.Requirements = append(disorderedUnknownLabelRequirements.Requirements, metav1.LabelSelectorRequirement{Key: "x", Operator: "Unknown"})
+
+	// make request matching selector webhook matchCondition
+	// check fieldSelector and labelSelector are parsed and normalized
+	_, err := aliceClient.CoreV1().Pods("").List(context.Background(), metav1.ListOptions{FieldSelector: disorderedFieldSelector, LabelSelector: disorderedLabelSelector})
+	assertCounts(counts{selectorCount: 1, webhookExclusionCount: 3})
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+	if e, a := orderedFieldRequirements.DeepCopy(), selectorFieldAttributes; !reflect.DeepEqual(e, a) {
+		t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+	}
+	if e, a := orderedLabelRequirements.DeepCopy(), selectorLabelAttributes; !reflect.DeepEqual(e, a) {
+		t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+	}
+	selectorFieldAttributes = nil
+	selectorLabelAttributes = nil
+
+	// make subjectaccessreview request containing fieldSelector and labelSelector requirements
+	// check known fieldSelector and labelSelector requirements get passed through to the webhook as-is
+	if result, err := adminClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &authorizationv1.SubjectAccessReview{Spec: authorizationv1.SubjectAccessReviewSpec{
+		User: "alice",
+		ResourceAttributes: &authorizationv1.ResourceAttributes{
+			Verb:          "list",
+			Version:       "v1",
+			Resource:      "pods",
+			FieldSelector: disorderedUnknownFieldRequirements.DeepCopy(),
+			LabelSelector: disorderedUnknownLabelRequirements.DeepCopy(),
+		},
+	}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	} else if !result.Status.Allowed {
+		t.Fatal("expected allowed, got denied")
+	} else {
+		t.Log(result.Status.Reason)
+		t.Log(result.Status.EvaluationError)
+		assertCounts(counts{selectorCount: 1, webhookExclusionCount: 3})
+		if e, a := disorderedFieldRequirements.DeepCopy(), selectorFieldAttributes; !reflect.DeepEqual(e, a) {
+			t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+		}
+		if e, a := disorderedLabelRequirements.DeepCopy(), selectorLabelAttributes; !reflect.DeepEqual(e, a) {
+			t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+		}
+	}
+	selectorFieldAttributes = nil
+	selectorLabelAttributes = nil
+
+	// make subjectaccessreview request containing fieldSelector and labelSelector rawSelector
+	// check fieldSelector and labelSelector rawSelector get parsed and passed to the webhook
+	if result, err := adminClient.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), &authorizationv1.SubjectAccessReview{Spec: authorizationv1.SubjectAccessReviewSpec{
+		User: "alice",
+		ResourceAttributes: &authorizationv1.ResourceAttributes{
+			Verb:          "list",
+			Version:       "v1",
+			Resource:      "pods",
+			FieldSelector: &authorizationv1.FieldSelectorAttributes{RawSelector: disorderedFieldSelector},
+			LabelSelector: &authorizationv1.LabelSelectorAttributes{RawSelector: disorderedLabelSelector},
+		},
+	}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	} else if !result.Status.Allowed {
+		t.Fatal("expected allowed, got denied")
+	} else {
+		t.Log(result.Status.Reason)
+		t.Log(result.Status.EvaluationError)
+		assertCounts(counts{selectorCount: 1, webhookExclusionCount: 3})
+		if e, a := orderedFieldRequirements.DeepCopy(), selectorFieldAttributes; !reflect.DeepEqual(e, a) {
+			t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+		}
+		if e, a := orderedLabelRequirements.DeepCopy(), selectorLabelAttributes; !reflect.DeepEqual(e, a) {
+			t.Fatalf("unexpected diff:\n%s", cmp.Diff(a, e))
+		}
+	}
+	selectorFieldAttributes = nil
+	selectorLabelAttributes = nil
 
 	// check last loaded success/failure metric timestamps, ensure success is present, failure is not
 	initialMetrics, err := getMetrics(t, adminClient)
@@ -642,7 +798,7 @@ authorizers:
 		t.Fatal("expected allowed, got denied")
 	} else {
 		t.Log(result.Status.Reason)
-		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 3})
+		assertCounts(counts{noOpinionCount: 1, failOpenCount: 1, allowCount: 1, webhookExclusionCount: 4})
 	}
 
 	// write good config with different webhook
