@@ -138,8 +138,8 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.Logging = in.Logging
 	out.HostnameOverride = in.HostnameOverride
 	// WARNING: in.BindAddress requires manual conversion: does not exist in peer-type
-	out.HealthzBindAddress = in.HealthzBindAddress
-	out.MetricsBindAddress = in.MetricsBindAddress
+	// WARNING: in.HealthzBindAddress requires manual conversion: does not exist in peer-type
+	// WARNING: in.MetricsBindAddress requires manual conversion: does not exist in peer-type
 	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
@@ -180,8 +180,10 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.Logging = in.Logging
 	out.HostnameOverride = in.HostnameOverride
 	// WARNING: in.NodeIPOverride requires manual conversion: does not exist in peer-type
-	out.HealthzBindAddress = in.HealthzBindAddress
-	out.MetricsBindAddress = in.MetricsBindAddress
+	// WARNING: in.HealthzBindAddresses requires manual conversion: does not exist in peer-type
+	// WARNING: in.HealthzBindPort requires manual conversion: does not exist in peer-type
+	// WARNING: in.MetricsBindAddresses requires manual conversion: does not exist in peer-type
+	// WARNING: in.MetricsBindPort requires manual conversion: does not exist in peer-type
 	out.BindAddressHardFail = in.BindAddressHardFail
 	out.EnableProfiling = in.EnableProfiling
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion

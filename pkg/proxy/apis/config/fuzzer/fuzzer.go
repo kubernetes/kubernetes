@@ -51,12 +51,14 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Linux.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
 			obj.Linux.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
 			obj.FeatureGates = map[string]bool{c.RandString(): true}
-			obj.HealthzBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
+			obj.HealthzBindAddresses = []string{fmt.Sprintf("%d.%d.%d.%d/32", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))}
+			obj.HealthzBindPort = 1000 + c.Int31n(65536)
 			obj.IPTables.MasqueradeBit = ptr.To(c.Int31())
 			obj.IPTables.LocalhostNodePorts = ptr.To(c.RandBool())
 			obj.NFTables.MasqueradeBit = ptr.To(c.Int31())
 			obj.IPVS.MasqueradeBit = obj.IPTables.MasqueradeBit
-			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
+			obj.MetricsBindAddresses = []string{fmt.Sprintf("%d.%d.%d.%d/32", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))}
+			obj.MetricsBindPort = 1000 + c.Int31n(65536)
 			obj.Linux.OOMScoreAdj = ptr.To(c.Int31())
 			obj.ClientConnection.ContentType = "bar"
 			obj.NodePortAddresses = []string{"1.2.3.0/24"}

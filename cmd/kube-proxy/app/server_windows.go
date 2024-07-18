@@ -97,7 +97,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
+			int(config.HealthzBindPort),
 			config.Winkernel,
 		)
 	} else {
@@ -109,7 +109,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
+			int(config.HealthzBindPort),
 			config.Winkernel,
 		)
 	}

@@ -19,7 +19,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,9 +41,9 @@ import (
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
 
@@ -89,6 +91,8 @@ type Options struct {
 	ipvsMinSyncPeriod     time.Duration
 	clusterCIDRs          string
 	bindAddress           string
+	healthzBindAddress    string
+	metricsBindAddress    string
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -112,8 +116,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will be used as the name of the Node that kube-proxy is running on. If unset, the node name is assumed to be the same as the node's hostname.")
 	fs.Var(&utilflag.IPVar{Val: &o.bindAddress}, "bind-address", "Overrides kube-proxy's idea of what its node's primary IP is. Note that the name is a historical artifact, and kube-proxy does not actually bind any sockets to this IP. This parameter is ignored if a config file is specified by --config.")
-	fs.Var(&utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on, defaulting to \"0.0.0.0:10256\". This parameter is ignored if a config file is specified by --config.")
-	fs.Var(&utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on, defaulting to \"127.0.0.1:10249\". (Set to \"0.0.0.0:10249\" / \"[::]:10249\" to bind on all interfaces.) Set empty to disable. This parameter is ignored if a config file is specified by --config.")
+	fs.Var(&utilflag.IPPortVar{Val: &o.healthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on, defaulting to \"0.0.0.0:10256\". This parameter is ignored if a config file is specified by --config.")
+	fs.Var(&utilflag.IPPortVar{Val: &o.metricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on, defaulting to \"127.0.0.1:10249\". (Set to \"0.0.0.0:10249\" / \"[::]:10249\" to bind on all interfaces.) Set empty to disable. This parameter is ignored if a config file is specified by --config.")
 	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler. This parameter is ignored if a config file is specified by --config.")
 	fs.StringVar(&o.config.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.config.ShowHiddenMetricsForVersion,
@@ -167,11 +171,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.config.Linux.Conntrack.UDPStreamTimeout.Duration, "conntrack-udp-timeout-stream", o.config.Linux.Conntrack.UDPStreamTimeout.Duration, "Idle timeout for ASSURED UDP connections (0 to leave as-is)")
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
 
-	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	_ = fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
-	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
-	_ = fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-
 	logsapi.AddFlags(&o.config.Logging, fs)
 }
 
@@ -200,11 +199,6 @@ func NewOptions() *Options {
 
 // Complete completes all the required options.
 func (o *Options) Complete(fs *pflag.FlagSet) error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
-		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
-	}
-
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
 		c, err := o.loadConfigFromFile(o.ConfigFile)
@@ -332,6 +326,32 @@ func (o *Options) processV1Alpha1Flags(fs *pflag.FlagSet) {
 	if fs.Changed("bind-address") {
 		o.config.NodeIPOverride = []string{o.bindAddress}
 	}
+	if fs.Changed("healthz-bind-address") {
+		host, port, _ := net.SplitHostPort(o.healthzBindAddress)
+		ip := netutils.ParseIPSloppy(host)
+		if ip.IsUnspecified() {
+			o.config.HealthzBindAddresses = []string{fmt.Sprintf("%s/0", host)}
+		} else if netutils.IsIPv4(ip) {
+			o.config.HealthzBindAddresses = []string{fmt.Sprintf("%s/32", host)}
+		} else {
+			o.config.HealthzBindAddresses = []string{fmt.Sprintf("%s/128", host)}
+		}
+		intPort, _ := strconv.Atoi(port)
+		o.config.HealthzBindPort = int32(intPort)
+	}
+	if fs.Changed("metrics-bind-address") {
+		host, port, _ := net.SplitHostPort(o.metricsBindAddress)
+		ip := netutils.ParseIPSloppy(host)
+		if ip.IsUnspecified() {
+			o.config.MetricsBindAddresses = []string{fmt.Sprintf("%s/0", host)}
+		} else if netutils.IsIPv4(ip) {
+			o.config.MetricsBindAddresses = []string{fmt.Sprintf("%s/32", host)}
+		} else {
+			o.config.MetricsBindAddresses = []string{fmt.Sprintf("%s/128", host)}
+		}
+		intPort, _ := strconv.Atoi(port)
+		o.config.MetricsBindPort = int32(intPort)
+	}
 }
 
 // Validate validates all the required options.
@@ -418,17 +438,6 @@ func (o *Options) writeConfigFile() (err error) {
 	o.logger.Info("Wrote configuration", "file", o.WriteConfigTo)
 
 	return nil
-}
-
-// addressFromDeprecatedFlags returns server address from flags
-// passed on the command line based on the following rules:
-// 1. If port is 0, disable the server (e.g. set address to empty).
-// 2. Otherwise, set the port portion of the config accordingly.
-func addressFromDeprecatedFlags(addr string, port int32) string {
-	if port == 0 {
-		return ""
-	}
-	return proxyutil.AppendPortIfNeeded(addr, port)
 }
 
 // newLenientSchemeAndCodecs returns a scheme that has only v1alpha1 registered into

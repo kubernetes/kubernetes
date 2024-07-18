@@ -17,11 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	netutils "k8s.io/utils/net"
 )
 
 // Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
@@ -56,6 +60,15 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 	}
 	if len(in.NodeIPOverride) > 0 {
 		out.BindAddress = strings.Join(in.NodeIPOverride, ",")
+	}
+
+	if len(in.HealthzBindAddresses) > 0 && in.HealthzBindPort > 0 {
+		host, _, _ := netutils.ParseCIDRSloppy(in.HealthzBindAddresses[0])
+		out.HealthzBindAddress = net.JoinHostPort(host.String(), strconv.Itoa(int(in.HealthzBindPort)))
+	}
+	if len(in.MetricsBindAddresses) > 0 && in.MetricsBindPort > 0 {
+		host, _, _ := netutils.ParseCIDRSloppy(in.MetricsBindAddresses[0])
+		out.MetricsBindAddress = net.JoinHostPort(host.String(), strconv.Itoa(int(in.MetricsBindPort)))
 	}
 	return nil
 }
@@ -92,6 +105,33 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 	}
 	out.IPVS.MasqueradeBit = in.IPTables.MasqueradeBit
 	out.NodeIPOverride = strings.Split(in.BindAddress, ",")
+
+	var prefix int
+	host, portStr, _ := net.SplitHostPort(in.HealthzBindAddress)
+	port, _ := strconv.Atoi(portStr)
+	hostIP := netutils.ParseIPSloppy(host)
+	if hostIP.IsUnspecified() {
+		prefix = 0
+	} else if netutils.IsIPv4(hostIP) {
+		prefix = 32
+	} else {
+		prefix = 128
+	}
+	out.HealthzBindAddresses = []string{fmt.Sprintf("%s/%d", hostIP.String(), prefix)}
+	out.HealthzBindPort = int32(port)
+
+	host, portStr, _ = net.SplitHostPort(in.MetricsBindAddress)
+	port, _ = strconv.Atoi(portStr)
+	hostIP = netutils.ParseIPSloppy(host)
+	if hostIP.IsUnspecified() {
+		prefix = 0
+	} else if netutils.IsIPv4(hostIP) {
+		prefix = 32
+	} else {
+		prefix = 128
+	}
+	out.MetricsBindAddresses = []string{fmt.Sprintf("%s/%d", hostIP.String(), prefix)}
+	out.MetricsBindPort = int32(port)
 	return nil
 }
 

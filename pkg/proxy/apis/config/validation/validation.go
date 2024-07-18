@@ -74,10 +74,15 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, validateDualStackIPStrings(config.NodeIPOverride, newPath.Child("NodeIPOverride"))...)
 	}
 
-	if config.HealthzBindAddress != "" {
-		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
+	if len(config.HealthzBindAddresses) > 0 {
+		allErrs = append(allErrs, validateDualStackCIDRStrings(config.HealthzBindAddresses, newPath.Child("HealthzBindAddresses"))...)
 	}
-	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
+	if config.HealthzBindPort > 0 {
+		allErrs = append(allErrs, validatePort(config.HealthzBindPort, newPath.Child("HealthzBindPort"))...)
+	}
+
+	allErrs = append(allErrs, validateDualStackCIDRStrings(config.MetricsBindAddresses, newPath.Child("MetricsBindAddresses"))...)
+	allErrs = append(allErrs, validatePort(config.MetricsBindPort, newPath.Child("MetricsBindPort"))...)
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
@@ -365,6 +370,14 @@ func validateDualStackIPStrings(ipStrings []string, fldPath *field.Path) field.E
 				allErrs = append(allErrs, field.Invalid(fldPath, ipStrings, "must be a either a single IP or dual-stack pair of IPs (e.g. [10.100.0.0, fde4:8dba:82e1::])"))
 			}
 		}
+	}
+	return allErrs
+}
+
+func validatePort(port int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if port < 1 || port > 65535 {
+		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	}
 	return allErrs
 }

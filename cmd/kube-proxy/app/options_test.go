@@ -89,94 +89,130 @@ nodePortAddresses:
 `
 
 	testCases := []struct {
-		name               string
-		mode               string
-		bindAddress        string
-		clusterCIDR        string
-		healthzBindAddress string
-		metricsBindAddress string
-		extraConfig        string
+		name                         string
+		mode                         string
+		bindAddress                  string
+		clusterCIDR                  string
+		healthzBindAddress           string
+		metricsBindAddress           string
+		extraConfig                  string
+		expectedHealthzBindAddresses []string
+		expectedHealthzPort          int32
+		expectedMetricsBindAddresses []string
+		expectedMetricsPort          int32
 	}{
 		{
-			name:               "iptables mode, IPv4 all-zeros bind address",
-			mode:               "iptables",
-			bindAddress:        "0.0.0.0",
-			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
-			metricsBindAddress: "2.3.4.5:23456",
+			name:                         "iptables mode, IPv4 all-zeros bind address",
+			mode:                         "iptables",
+			bindAddress:                  "0.0.0.0",
+			clusterCIDR:                  "1.2.3.0/24",
+			healthzBindAddress:           "1.2.3.4:12345",
+			metricsBindAddress:           "2.3.4.5:23456",
+			expectedHealthzBindAddresses: []string{"1.2.3.4/32"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"2.3.4.5/32"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
-			name:               "iptables mode, non-zeros IPv4 config",
-			mode:               "iptables",
-			bindAddress:        "9.8.7.6",
-			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
-			metricsBindAddress: "2.3.4.5:23456",
+			name:                         "iptables mode, non-zeros IPv4 config",
+			mode:                         "iptables",
+			bindAddress:                  "9.8.7.6",
+			clusterCIDR:                  "1.2.3.0/24",
+			healthzBindAddress:           "1.2.3.4:12345",
+			metricsBindAddress:           "2.3.4.5:23456",
+			expectedHealthzBindAddresses: []string{"1.2.3.4/32"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"2.3.4.5/32"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
 			// Test for 'bindAddress: "::"' (IPv6 all-zeros) in kube-proxy
 			// config file. The user will need to put quotes around '::' since
 			// 'bindAddress: ::' is invalid yaml syntax.
-			name:               "iptables mode, IPv6 \"::\" bind address",
-			mode:               "iptables",
-			bindAddress:        "\"::\"",
-			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
-			metricsBindAddress: "[fd00:2::5]:23456",
+			name:                         "iptables mode, IPv6 \"::\" bind address",
+			mode:                         "iptables",
+			bindAddress:                  "\"::\"",
+			clusterCIDR:                  "fd00:1::0/64",
+			healthzBindAddress:           "[fd00:1::5]:12345",
+			metricsBindAddress:           "[fd00:2::5]:23456",
+			expectedHealthzBindAddresses: []string{"fd00:1::5/128"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"fd00:2::5/128"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
 			// Test for 'bindAddress: "[::]"' (IPv6 all-zeros in brackets)
 			// in kube-proxy config file. The user will need to use
 			// surrounding quotes here since 'bindAddress: [::]' is invalid
 			// yaml syntax.
-			name:               "iptables mode, IPv6 \"[::]\" bind address",
-			mode:               "iptables",
-			bindAddress:        "\"[::]\"",
-			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
-			metricsBindAddress: "[fd00:2::5]:23456",
+			name:                         "iptables mode, IPv6 \"[::]\" bind address",
+			mode:                         "iptables",
+			bindAddress:                  "\"[::]\"",
+			clusterCIDR:                  "fd00:1::0/64",
+			healthzBindAddress:           "[fd00:1::5]:12345",
+			metricsBindAddress:           "[fd00:2::5]:23456",
+			expectedHealthzBindAddresses: []string{"fd00:1::5/128"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"fd00:2::5/128"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
 			// Test for 'bindAddress: ::0' (another form of IPv6 all-zeros).
 			// No surrounding quotes are required around '::0'.
-			name:               "iptables mode, IPv6 ::0 bind address",
-			mode:               "iptables",
-			bindAddress:        "::0",
-			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
-			metricsBindAddress: "[fd00:2::5]:23456",
+			name:                         "iptables mode, IPv6 ::0 bind address",
+			mode:                         "iptables",
+			bindAddress:                  "::0",
+			clusterCIDR:                  "fd00:1::0/64",
+			healthzBindAddress:           "[fd00:1::5]:12345",
+			metricsBindAddress:           "[fd00:2::5]:23456",
+			expectedHealthzBindAddresses: []string{"fd00:1::5/128"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"fd00:2::5/128"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
-			name:               "ipvs mode, IPv6 config",
-			mode:               "ipvs",
-			bindAddress:        "2001:db8::1",
-			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
-			metricsBindAddress: "[fd00:2::5]:23456",
+			name:                         "ipvs mode, IPv6 config",
+			mode:                         "ipvs",
+			bindAddress:                  "2001:db8::1",
+			clusterCIDR:                  "fd00:1::0/64",
+			healthzBindAddress:           "[fd00:1::5]:12345",
+			metricsBindAddress:           "[fd00:2::5]:23456",
+			expectedHealthzBindAddresses: []string{"fd00:1::5/128"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"fd00:2::5/128"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
 			// Test for unknown field within config.
 			// For v1alpha1 a lenient path is implemented and will throw a
 			// strict decoding warning instead of failing to load
-			name:               "unknown field",
-			mode:               "iptables",
-			bindAddress:        "9.8.7.6",
-			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
-			metricsBindAddress: "2.3.4.5:23456",
-			extraConfig:        "foo: bar",
+			name:                         "unknown field",
+			mode:                         "iptables",
+			bindAddress:                  "9.8.7.6",
+			clusterCIDR:                  "1.2.3.0/24",
+			healthzBindAddress:           "1.2.3.4:12345",
+			metricsBindAddress:           "2.3.4.5:23456",
+			extraConfig:                  "foo: bar",
+			expectedHealthzBindAddresses: []string{"1.2.3.4/32"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"2.3.4.5/32"},
+			expectedMetricsPort:          int32(23456),
 		},
 		{
 			// Test for duplicate field within config.
 			// For v1alpha1 a lenient path is implemented and will throw a
 			// strict decoding warning instead of failing to load
-			name:               "duplicate field",
-			mode:               "iptables",
-			bindAddress:        "9.8.7.6",
-			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
-			metricsBindAddress: "2.3.4.5:23456",
-			extraConfig:        "bindAddress: 9.8.7.6",
+			name:                         "duplicate field",
+			mode:                         "iptables",
+			bindAddress:                  "9.8.7.6",
+			clusterCIDR:                  "1.2.3.0/24",
+			healthzBindAddress:           "1.2.3.4:12345",
+			metricsBindAddress:           "2.3.4.5:23456",
+			extraConfig:                  "bindAddress: 9.8.7.6",
+			expectedHealthzBindAddresses: []string{"1.2.3.4/32"},
+			expectedHealthzPort:          int32(12345),
+			expectedMetricsBindAddresses: []string{"2.3.4.5/32"},
+			expectedMetricsPort:          int32(23456),
 		},
 	}
 
@@ -209,9 +245,10 @@ nodePortAddresses:
 					MasqueradeAll: true,
 					OOMScoreAdj:   ptr.To[int32](17),
 				},
-				FeatureGates:       map[string]bool{},
-				HealthzBindAddress: tc.healthzBindAddress,
-				HostnameOverride:   "foo",
+				FeatureGates:         map[string]bool{},
+				HealthzBindAddresses: tc.expectedHealthzBindAddresses,
+				HealthzBindPort:      tc.expectedHealthzPort,
+				HostnameOverride:     "foo",
 				IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 					MasqueradeBit:      ptr.To[int32](17),
 					LocalhostNodePorts: ptr.To(true),
@@ -223,10 +260,11 @@ nodePortAddresses:
 				NFTables: kubeproxyconfig.KubeProxyNFTablesConfiguration{
 					MasqueradeBit: ptr.To[int32](18),
 				},
-				MetricsBindAddress: tc.metricsBindAddress,
-				Mode:               kubeproxyconfig.ProxyMode(tc.mode),
-				NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
-				DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
+				MetricsBindAddresses: tc.expectedMetricsBindAddresses,
+				MetricsBindPort:      tc.expectedMetricsPort,
+				Mode:                 kubeproxyconfig.ProxyMode(tc.mode),
+				NodePortAddresses:    []string{"10.20.30.40/16", "fd00:1::0/64"},
+				DetectLocalMode:      kubeproxyconfig.LocalModeClusterCIDR,
 				DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
 					BridgeInterface:     "cbr0",
 					ClusterCIDRs:        strings.Split(tc.clusterCIDR, ","),
@@ -464,6 +502,36 @@ func TestProcessV1Alpha1Flags(t *testing.T) {
 				return reflect.DeepEqual(config.NodeIPOverride, []string{"0.0.0.0"})
 			},
 		},
+		{
+			name: "metrics and healthz address ipv4",
+			flags: []string{
+				"--healthz-bind-address=0.0.0.0:54321",
+				"--metrics-bind-address=127.0.0.1:3306",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				if reflect.DeepEqual(config.HealthzBindAddresses, []string{"0.0.0.0/0"}) &&
+					reflect.DeepEqual(config.MetricsBindAddresses, []string{"127.0.0.1/32"}) &&
+					config.HealthzBindPort == 54321 && config.MetricsBindPort == 3306 {
+					return true
+				}
+				return false
+			},
+		},
+		{
+			name: "metrics and healthz address ipv6",
+			flags: []string{
+				"--healthz-bind-address=[fd00:4321::2]:9090",
+				"--metrics-bind-address=[::1]:8080",
+			},
+			validate: func(config *kubeproxyconfig.KubeProxyConfiguration) bool {
+				if reflect.DeepEqual(config.HealthzBindAddresses, []string{"fd00:4321::2/128"}) &&
+					reflect.DeepEqual(config.MetricsBindAddresses, []string{"::1/128"}) &&
+					config.HealthzBindPort == 9090 && config.MetricsBindPort == 8080 {
+					return true
+				}
+				return false
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -599,74 +667,6 @@ kind: KubeProxyConfiguration
 			require.NoError(t, fs.Parse(flags))
 			require.NoError(t, options.Complete(fs))
 			require.Equal(t, tc.expected, options.config)
-		})
-	}
-}
-
-func TestAddressFromDeprecatedFlags(t *testing.T) {
-	testCases := []struct {
-		name               string
-		healthzPort        int32
-		healthzBindAddress string
-		metricsPort        int32
-		metricsBindAddress string
-		expHealthz         string
-		expMetrics         string
-	}{
-		{
-			name:               "IPv4 bind address",
-			healthzBindAddress: "1.2.3.4",
-			healthzPort:        12345,
-			metricsBindAddress: "2.3.4.5",
-			metricsPort:        23456,
-			expHealthz:         "1.2.3.4:12345",
-			expMetrics:         "2.3.4.5:23456",
-		},
-		{
-			name:               "IPv4 bind address has port",
-			healthzBindAddress: "1.2.3.4:12345",
-			healthzPort:        23456,
-			metricsBindAddress: "2.3.4.5:12345",
-			metricsPort:        23456,
-			expHealthz:         "1.2.3.4:12345",
-			expMetrics:         "2.3.4.5:12345",
-		},
-		{
-			name:               "IPv6 bind address",
-			healthzBindAddress: "fd00:1::5",
-			healthzPort:        12345,
-			metricsBindAddress: "fd00:1::6",
-			metricsPort:        23456,
-			expHealthz:         "[fd00:1::5]:12345",
-			expMetrics:         "[fd00:1::6]:23456",
-		},
-		{
-			name:               "IPv6 bind address has port",
-			healthzBindAddress: "[fd00:1::5]:12345",
-			healthzPort:        56789,
-			metricsBindAddress: "[fd00:1::6]:56789",
-			metricsPort:        12345,
-			expHealthz:         "[fd00:1::5]:12345",
-			expMetrics:         "[fd00:1::6]:56789",
-		},
-		{
-			name:               "Invalid IPv6 Config",
-			healthzBindAddress: "[fd00:1::5]",
-			healthzPort:        12345,
-			metricsBindAddress: "[fd00:1::6]",
-			metricsPort:        56789,
-			expHealthz:         "[fd00:1::5]",
-			expMetrics:         "[fd00:1::6]",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			gotHealthz := addressFromDeprecatedFlags(tc.healthzBindAddress, tc.healthzPort)
-			gotMetrics := addressFromDeprecatedFlags(tc.metricsBindAddress, tc.metricsPort)
-
-			require.Equal(t, tc.expHealthz, gotHealthz)
-			require.Equal(t, tc.expMetrics, gotMetrics)
 		})
 	}
 }
