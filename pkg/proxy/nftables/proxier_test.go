@@ -445,7 +445,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.45 . tcp . 80 : goto service-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-ips { 5.6.7.8 . tcp . 80 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
-		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 comment "ns5/svc5:p80" : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
+		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
