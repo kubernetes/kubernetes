@@ -55,7 +55,6 @@ type Config struct {
 	DriverName                  string
 	AttachLimit                 int64
 	NodeExpansionRequired       bool
-	NodeVolumeStatRequired      bool
 	NodeVolumeConditionRequired bool
 	VolumeMountGroupRequired    bool
 	DisableControllerExpansion  bool

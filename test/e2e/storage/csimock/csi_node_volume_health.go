@@ -93,7 +93,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 		for _, t := range tests {
 			test := t
 			ginkgo.It(test.name, func(ctx context.Context) {
-				// Hooks appear to be required for enableNodeVolumeStat.
 				m.init(ctx, testParameters{
 					registerDriver:            true,
 					enableNodeVolumeCondition: test.nodeVolumeConditionRequired,

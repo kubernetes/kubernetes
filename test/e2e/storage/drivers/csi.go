@@ -306,7 +306,6 @@ type mockCSIDriver struct {
 	requiresRepublish             *bool
 	fsGroupPolicy                 *storagev1.FSGroupPolicy
 	enableVolumeMountGroup        bool
-	enableNodeVolumeStat          bool
 	enableNodeVolumeCondition     bool
 	embedded                      bool
 	calls                         MockCSICalls
@@ -356,7 +355,6 @@ type CSIMockDriverOpts struct {
 	EnableNodeExpansion           bool
 	EnableSnapshot                bool
 	EnableVolumeMountGroup        bool
-	EnableNodeVolumeStat          bool
 	EnableNodeVolumeCondition     bool
 	TokenRequests                 []storagev1.TokenRequest
 	RequiresRepublish             *bool
@@ -589,7 +587,6 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 			DriverName:                  "csi-mock-" + f.UniqueName,
 			AttachLimit:                 int64(m.attachLimit),
 			NodeExpansionRequired:       m.enableNodeExpansion,
-			NodeVolumeStatRequired:      m.enableNodeVolumeStat,
 			NodeVolumeConditionRequired: m.enableNodeVolumeCondition,
 			VolumeMountGroupRequired:    m.enableVolumeMountGroup,
 			EnableTopology:              m.enableTopology,
