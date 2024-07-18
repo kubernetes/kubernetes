@@ -2131,10 +2131,12 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// Convert Requests
 		if status.AllocatedResources != nil {
 			requests = make(v1.ResourceList)
-			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
-				requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
-			} else {
-				determineResource(v1.ResourceCPU, status.AllocatedResources, oldStatus.Resources.Requests, requests)
+			if _, found := status.AllocatedResources[v1.ResourceCPU]; found {
+				if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
+					requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+				} else {
+					determineResource(v1.ResourceCPU, status.AllocatedResources, oldStatus.Resources.Requests, requests)
+				}
 			}
 			if memory, found := status.AllocatedResources[v1.ResourceMemory]; found {
 				requests[v1.ResourceMemory] = memory.DeepCopy()

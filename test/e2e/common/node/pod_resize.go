@@ -848,6 +848,24 @@ func doPodResizeTests(f *framework.Framework) {
 			},
 			addExtendedResource: true,
 		},
+		{
+			name: "Burstable QoS pod, one container with only memory requests - increase memory requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{MemReq: "200Mi"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"memory":"300Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{MemReq: "300Mi"},
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
