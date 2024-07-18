@@ -46,7 +46,6 @@ import (
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
@@ -350,20 +349,7 @@ func (config *NetworkingTestConfig) DialFromContainer(ctx context.Context, proto
 		}
 		if responses.Difference(expectedResponses).Len() > 0 {
 			returnMsg := fmt.Errorf("received unexpected responses... \nAttempt %d\nCommand %v\nretrieved %v\nexpected %v", i, cmd, responses, expectedResponses)
-			// TODO(aojea) Remove once issues.k8s.io/123760 is solved
-			// Dump the nodes network routes and addresses for troubleshooting #123760
 			framework.Logf("encountered error during dial (%v)", returnMsg)
-			hostExec := storageutils.NewHostExec(config.f)
-			ginkgo.DeferCleanup(hostExec.Cleanup)
-			cmd := `echo "IP routes: " && ip route && echo "IP addresses:" && ip addr && echo "Open sockets: " && ss -anp --socket=tcp`
-			for _, node := range config.Nodes {
-				result, err := hostExec.IssueCommandWithResult(ctx, cmd, &node)
-				if err != nil {
-					framework.Logf("error occurred while executing command %s on node: %v", cmd, err)
-					continue
-				}
-				framework.Logf("Dump network information for node %s:\n%s", node.Name, result)
-			}
 			return returnMsg
 		}
 
