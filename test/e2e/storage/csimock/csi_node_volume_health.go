@@ -25,6 +25,7 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -130,15 +131,15 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
 				// the mocked csidriver register doesn't regist itself to normal csidriver.
 				if test.nodeVolumeConditionRequired {
-					nodeName, err := e2epod.GetPodNodeName(ctx, f.ClientSet, pod.Namespace, pod.Name)
-					framework.ExpectNoError(err, "no error of node name")
+					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					framework.ExpectNoError(err, "Failed to get pods: %v", err)
 					grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
 					framework.ExpectNoError(err, "creating the metrics grabber")
 					waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
 						framework.Logf("Grabbing Kubelet metrics")
 						// Grab kubelet metrics from the node the pod was scheduled on
 						var err error
-						kubeMetrics, err := grabber.GrabFromKubelet(ctx, nodeName)
+						kubeMetrics, err := grabber.GrabFromKubelet(ctx, pod.Spec.NodeName)
 						if err != nil {
 							framework.Logf("Error fetching kubelet metrics err: %v", err)
 							return false, err

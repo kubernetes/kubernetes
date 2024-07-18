@@ -856,14 +856,3 @@ func WaitForContainerTerminated(ctx context.Context, c clientset.Interface, name
 		return false, nil
 	})
 }
-
-func GetPodNodeName(ctx context.Context, c clientset.Interface, ns, name string) (string, error) {
-	pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	if pod.Spec.NodeName == "" {
-		return "", fmt.Errorf("pod %s/%s has no node name", ns, name)
-	}
-	return pod.Spec.NodeName, nil
-}
