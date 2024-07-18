@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -166,9 +167,9 @@ func (hs *ProxierHealthServer) Run() error {
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/healthz", healthzHandler{hs: hs})
 	serveMux.Handle("/livez", livezHandler{hs: hs})
-	server := hs.httpFactory.New(hs.addr, serveMux)
+	server := hs.httpFactory.New(serveMux)
 
-	listener, err := hs.listener.Listen(hs.addr)
+	listener, err := hs.listener.Listen(context.TODO(), hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to start proxier healthz on %s: %v", hs.addr, err)
 	}

@@ -460,17 +460,31 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 	configz.InstallHandler(proxyMux)
 
 	fn := func() {
-		err := http.ListenAndServe(bindAddress, proxyMux)
-		if err != nil {
-			err = fmt.Errorf("starting metrics server failed: %w", err)
-			utilruntime.HandleError(err)
-			if errCh != nil {
-				errCh <- err
-				// if in hardfail mode, never retry again
-				blockCh := make(chan error)
-				<-blockCh
+		var err error
+		defer func() {
+			if err != nil {
+				err = fmt.Errorf("starting metrics server failed: %w", err)
+				utilruntime.HandleError(err)
+				if errCh != nil {
+					errCh <- err
+					// if in hardfail mode, never retry again
+					blockCh := make(chan error)
+					<-blockCh
+				}
 			}
+		}()
+
+		listener, err := netutils.MultiListen(context.TODO(), "tcp", bindAddress)
+		if err != nil {
+			return
 		}
+
+		server := &http.Server{Handler: proxyMux}
+		err = server.Serve(listener)
+		if err != nil {
+			return
+		}
+
 	}
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
