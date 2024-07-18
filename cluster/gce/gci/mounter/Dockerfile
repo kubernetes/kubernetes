@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:xenial
+FROM ubuntu:xenial-20201014
 
 RUN apt-get update && apt-get install -y netbase nfs-common=1:1.2.8-9ubuntu12
 
