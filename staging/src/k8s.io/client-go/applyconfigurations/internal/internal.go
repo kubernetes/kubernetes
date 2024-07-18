@@ -10939,6 +10939,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: number
       type:
         scalar: numeric
+    elementRelationship: atomic
 - name: io.k8s.api.networking.v1alpha1.IPAddress
   map:
     fields:
