@@ -5352,6 +5352,97 @@ func TestValidateVolumes(t *testing.T) {
 				field: "projected.sources[1]",
 			}},
 		},
+		// ImageVolumeSource
+		{
+			name: "valid image volume on pod",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+		}, {
+			name: "feature disabled",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: false},
+			errs: []verr{{
+				etype:  field.ErrorTypeRequired,
+				field:  "field[0]",
+				detail: "must specify a volume type",
+			}},
+		}, {
+			name: "image volume with empty name",
+			vol: core.Volume{
+				Name: "",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "name",
+			}},
+		}, {
+			name: "image volume with empty reference on pod",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: true},
+			errs: []verr{{
+				etype: field.ErrorTypeRequired,
+				field: "image.reference",
+			}},
+		}, {
+			name: "image volume with empty reference on other object",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "",
+						PullPolicy: "IfNotPresent",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true, ResourceIsPod: false},
+		}, {
+			name: "image volume with wrong pullPolicy",
+			vol: core.Volume{
+				Name: "image-volume",
+				VolumeSource: core.VolumeSource{
+					Image: &core.ImageVolumeSource{
+						Reference:  "quay.io/my/artifact:v1",
+						PullPolicy: "wrong",
+					},
+				},
+			},
+			opts: PodValidationOptions{AllowImageVolumeSource: true},
+			errs: []verr{{
+				etype: field.ErrorTypeNotSupported,
+				field: "image.pullPolicy",
+			}},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -5368,7 +5459,7 @@ func TestValidateVolumes(t *testing.T) {
 				if err.Type != expErr.etype {
 					t.Errorf("unexpected error type:\n\twant: %q\n\t got: %q", expErr.etype, err.Type)
 				}
-				if !strings.HasSuffix(err.Field, "."+expErr.field) {
+				if err.Field != expErr.field && !strings.HasSuffix(err.Field, "."+expErr.field) {
 					t.Errorf("unexpected error field:\n\twant: %q\n\t got: %q", expErr.field, err.Field)
 				}
 				if !strings.Contains(err.Detail, expErr.detail) {
@@ -6959,8 +7050,10 @@ func TestValidateVolumeMounts(t *testing.T) {
 				},
 			},
 		}}}},
+		{Name: "image-volume", VolumeSource: core.VolumeSource{Image: &core.ImageVolumeSource{Reference: "quay.io/my/artifact:v1", PullPolicy: "IfNotPresent"}}},
 	}
-	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), PodValidationOptions{})
+	opts := PodValidationOptions{AllowImageVolumeSource: true}
+	vols, v1err := ValidateVolumes(volumes, nil, field.NewPath("field"), opts)
 	if len(v1err) > 0 {
 		t.Errorf("Invalid test volume - expected success %v", v1err)
 		return
@@ -6988,38 +7081,41 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/rro-ifpossible", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)},
 		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
 		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
+		{Name: "image-volume", MountPath: "/image-volume"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
 		{Name: "uvw", DevicePath: "/foofoo/share/test"},
 	}
-	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), opts); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]core.VolumeMount{
-		"empty name":                             {{Name: "", MountPath: "/foo"}},
-		"name not found":                         {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
-		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
-		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
-		"name exists in volumeDevice":            {{Name: "xyz", MountPath: "/bar"}},
-		"mountpath exists in volumeDevice":       {{Name: "uvw", MountPath: "/mnt/exists"}},
-		"both exist in volumeDevice":             {{Name: "xyz", MountPath: "/mnt/exists"}},
-		"rro but not ro":                         {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
-		"rro with incompatible propagation":      {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
-		"rro-if-possible but not ro":             {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"empty name":                                       {{Name: "", MountPath: "/foo"}},
+		"name not found":                                   {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                                  {{Name: "abc", MountPath: ""}},
+		"mountpath collision":                              {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                                 {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                                    {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                              {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                               {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate":           {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"name exists in volumeDevice":                      {{Name: "xyz", MountPath: "/bar"}},
+		"mountpath exists in volumeDevice":                 {{Name: "uvw", MountPath: "/mnt/exists"}},
+		"both exist in volumeDevice":                       {{Name: "xyz", MountPath: "/mnt/exists"}},
+		"rro but not ro":                                   {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
+		"rro with incompatible propagation":                {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
+		"rro-if-possible but not ro":                       {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"subPath not allowed for image volume sources":     {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
+		"subPathExpr not allowed for image volume sources": {{Name: "image-volume", MountPath: "/image-volume-err-2", SubPathExpr: "$(POD_NAME)"}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
 	}
 
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, GetVolumeDeviceMap(badVolumeDevice), vols, &container, field.NewPath("field"), opts); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
@@ -7085,7 +7181,7 @@ func TestValidateSubpathMutuallyExclusive(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -7141,7 +7237,7 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 	}
 
 	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
+		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"), PodValidationOptions{})
 
 		if len(errs) != 0 && !test.expectError {
 			t.Errorf("test %v failed: %+v", name, errs)
@@ -7249,7 +7345,7 @@ func TestValidateMountPropagation(t *testing.T) {
 		return
 	}
 	for i, test := range tests {
-		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"))
+		errs := ValidateVolumeMounts([]core.VolumeMount{test.mount}, nil, vols2, test.container, field.NewPath("field"), PodValidationOptions{})
 		if test.expectError && len(errs) == 0 {
 			t.Errorf("test %d expected error, got none", i)
 		}

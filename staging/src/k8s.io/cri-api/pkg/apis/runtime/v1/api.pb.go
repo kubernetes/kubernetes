@@ -651,7 +651,7 @@ type Mount struct {
 	// - (readonly == false && recursive_read_only == false) does not make the mount read-only.
 	RecursiveReadOnly bool `protobuf:"varint,8,opt,name=recursive_read_only,json=recursiveReadOnly,proto3" json:"recursive_read_only,omitempty"`
 	// Mount an image reference (image ID, with or without digest), which is a
-	// special use case for OCI volume mounts. If this field is set, then
+	// special use case for image volume mounts. If this field is set, then
 	// host_path should be unset. All OCI mounts are per feature definition
 	// readonly. The kubelet does an PullImage RPC and evaluates the returned
 	// PullImageResponse.image_ref value, which is then set to the

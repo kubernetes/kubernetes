@@ -732,6 +732,14 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			}
 		}
 	}
+	if opts.AllowImageVolumeSource && source.Image != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("image"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateImageVolumeSource(source.Image, fldPath.Child("image"), opts)...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -2892,7 +2900,7 @@ func GetVolumeDeviceMap(devices []core.VolumeDevice) map[string]string {
 	return volDevices
 }
 
-func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]core.VolumeSource, container *core.Container, fldPath *field.Path) field.ErrorList {
+func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]string, volumes map[string]core.VolumeSource, container *core.Container, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	mountpoints := sets.New[string]()
 
@@ -2918,6 +2926,18 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		}
 		if mountPathAlreadyExists(mnt.MountPath, voldevices) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must not already exist as a path in volumeDevices"))
+		}
+
+		// Disallow subPath/subPathExpr for image volumes
+		if opts.AllowImageVolumeSource {
+			if v, ok := volumes[mnt.Name]; ok && v.Image != nil {
+				if len(mnt.SubPath) != 0 {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPath"), mnt.SubPath, "not allowed in image volume sources"))
+				}
+				if len(mnt.SubPathExpr) != 0 {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "not allowed in image volume sources"))
+				}
+			}
 		}
 
 		if len(mnt.SubPath) > 0 {
@@ -3560,7 +3580,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
 	allErrs = append(allErrs, ValidateEnv(ctr.Env, path.Child("env"), opts)...)
 	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"), opts)...)
-	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
+	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"), opts)...)
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
@@ -4010,6 +4030,8 @@ type PodValidationOptions struct {
 	ResourceIsPod bool
 	// Allow relaxed validation of environment variable names
 	AllowRelaxedEnvironmentVariableValidation bool
+	// Allow the use of the ImageVolumeSource API.
+	AllowImageVolumeSource bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -8171,4 +8193,13 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 		}
 	}
 	return allErrors
+}
+
+func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if opts.ResourceIsPod && len(imageVolume.Reference) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("reference"), ""))
+	}
+	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
+	return allErrs
 }
