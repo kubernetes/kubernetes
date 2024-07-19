@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 
 				ginkgo.By("Waiting for pod to be running")
 				err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
-				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+				framework.ExpectNoError(err, "wait for running pod")
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.PollUntilContextTimeout(ctx, time.Second, csiNodeVolumeStatWaitPeriod, true, func(c context.Context) (done bool, err error) {
 					var index int
@@ -131,7 +131,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 				// the mocked csidriver register doesn't regist itself to normal csidriver.
 				if test.nodeVolumeConditionRequired {
 					pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err, "Failed to get pods: %v", err)
+					framework.ExpectNoError(err, "get running pod")
 					grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
 					framework.ExpectNoError(err, "creating the metrics grabber")
 					waitErr := wait.PollUntilContextTimeout(ctx, 30*time.Second, csiNodeVolumeStatWaitPeriod, true, func(ctx context.Context) (bool, error) {
