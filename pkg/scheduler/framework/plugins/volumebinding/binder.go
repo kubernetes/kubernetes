@@ -1054,9 +1054,6 @@ func capacitySufficient(capacity *storagev1.CSIStorageCapacity, sizeInBytes int6
 }
 
 func volumeLimit(capacity *storagev1.CSIStorageCapacity) *resource.Quantity {
-	if capacity == nil {
-		return nil
-	}
 	if capacity.MaximumVolumeSize != nil {
 		// Prefer MaximumVolumeSize if available, it is more precise.
 		return capacity.MaximumVolumeSize
