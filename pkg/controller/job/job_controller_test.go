@@ -6446,10 +6446,8 @@ func TestWatchJobs(t *testing.T) {
 	}
 	// Start only the job watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method.
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	sharedInformerFactory.Start(stopCh)
-	sharedInformerFactory.WaitForCacheSync(stopCh)
+	sharedInformerFactory.Start(ctx.Done())
+	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 	go manager.Run(ctx, 1)
 
 	// We're sending new job to see if it reaches syncHandler.
@@ -6494,9 +6492,7 @@ func TestWatchPods(t *testing.T) {
 	}
 	// Start only the pod watcher and the workqueue, send a watch event,
 	// and make sure it hits the sync method for the right job.
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go sharedInformerFactory.Core().V1().Pods().Informer().Run(stopCh)
+	go sharedInformerFactory.Core().V1().Pods().Informer().Run(ctx.Done())
 	go manager.Run(ctx, 1)
 
 	pods := newPodList(1, v1.PodRunning, testJob)
@@ -6519,11 +6515,9 @@ func TestWatchOrphanPods(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(stopCh)
-	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
+	go podInformer.Run(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
 	// Create job but don't add it to the store.
@@ -6592,11 +6586,9 @@ func TestSyncOrphanPod(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	podInformer := sharedInformers.Core().V1().Pods().Informer()
-	go podInformer.Run(stopCh)
-	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
+	go podInformer.Run(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 	go manager.Run(ctx, 1)
 
 	cases := map[string]struct {
@@ -7507,10 +7499,8 @@ func TestFinalizersRemovedExpectations(t *testing.T) {
 		t.Errorf("Different expectations for removed finalizers after syncJob (-want,+got):\n%s", diff)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go sharedInformers.Core().V1().Pods().Informer().Run(stopCh)
-	cache.WaitForCacheSync(stopCh, podInformer.HasSynced)
+	go sharedInformers.Core().V1().Pods().Informer().Run(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), podInformer.HasSynced)
 
 	// Make sure the first syncJob sets the expectations, even after the caches synced.
 	gotExpectedUIDs = manager.finalizerExpectations.getExpectedUIDs(jobKey)
