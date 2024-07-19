@@ -736,6 +736,7 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 	compiler := authorizationcel.NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
 	seenExpressions := sets.NewString()
 	var compilationResults []authorizationcel.CompilationResult
+	var usesFieldSelector, usesLabelSelector bool
 
 	for i, condition := range matchConditions {
 		fldPath := fldPath.Child("matchConditions").Index(i).Child("expression")
@@ -754,12 +755,16 @@ func compileMatchConditions(matchConditions []api.WebhookMatchCondition, fldPath
 			continue
 		}
 		compilationResults = append(compilationResults, compilationResult)
+		usesFieldSelector = usesFieldSelector || compilationResult.UsesFieldSelector
+		usesLabelSelector = usesLabelSelector || compilationResult.UsesLabelSelector
 	}
 	if len(compilationResults) == 0 {
 		return nil, allErrs
 	}
 	return &authorizationcel.CELMatcher{
 		CompilationResults: compilationResults,
+		UsesFieldSelector:  usesFieldSelector,
+		UsesLabelSelector:  usesLabelSelector,
 	}, allErrs
 }
 

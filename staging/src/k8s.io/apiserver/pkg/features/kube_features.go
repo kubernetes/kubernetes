@@ -95,6 +95,13 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
+	// owner: @deads2k
+	// kep: https://kep.k8s.io/4601
+	// alpha: v1.31
+	//
+	// Allows authorization to use field and label selectors.
+	AuthorizeWithSelectors featuregate.Feature = "AuthorizeWithSelectors"
+
 	// owner: @cici37 @jpbetz
 	// kep: http://kep.k8s.io/3488
 	// alpha: v1.26
@@ -357,6 +364,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerTracing: {Default: true, PreRelease: featuregate.Beta},
 
 	APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
+
+	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 

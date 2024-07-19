@@ -630,6 +630,18 @@ func TestAuthzLibrary(t *testing.T) {
 			expectRuntimeCost:   6,
 		},
 		{
+			name:                "fieldSelector",
+			expr:                "authorizer.group('').resource('pods').fieldSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com')",
+			expectEstimatedCost: checker.CostEstimate{Min: 1821, Max: 1821},
+			expectRuntimeCost:   1821, // authorizer(1) + group(1) + resource(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
+			name:                "labelSelector",
+			expr:                "authorizer.group('').resource('pods').labelSelector('spec.nodeName=example-node-name.fully.qualified.domain.name.example.com')",
+			expectEstimatedCost: checker.CostEstimate{Min: 1821, Max: 1821},
+			expectRuntimeCost:   1821, // authorizer(1) + group(1) + resource(1) + fieldSelector(10 + ceil(71/2)*50=1800 + ceil(71*.1)=8)
+		},
+		{
 			name:                "path check allowed",
 			expr:                "authorizer.path('/healthz').check('get').allowed()",
 			expectEstimatedCost: checker.CostEstimate{Min: 350003, Max: 350003},
@@ -1053,6 +1065,10 @@ func TestSetsCost(t *testing.T) {
 }
 
 func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate, expectRuntimeCost uint64) {
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	env, err := cel.NewEnv(
 		ext.Strings(ext.StringsVersion(2)),
@@ -1060,6 +1076,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		Regex(),
 		Lists(),
 		Authz(),
+		AuthzSelectors(),
 		Quantity(),
 		ext.Sets(),
 		IP(),
@@ -1168,6 +1185,11 @@ func TestSize(t *testing.T) {
 			expectSize: checker.SizeEstimate{Min: 2, Max: 4},
 		},
 	}
+
+	originalPanicOnUnknown := panicOnUnknown
+	panicOnUnknown = true
+	t.Cleanup(func() { panicOnUnknown = originalPanicOnUnknown })
+
 	est := &CostEstimator{SizeEstimator: &testCostEstimator{}}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
