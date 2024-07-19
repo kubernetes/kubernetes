@@ -265,7 +265,7 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		return framework.Queue, nil
 	}
 
-	logger.V(5).Info("CSIStorageCapacity was updated, But it doesn't make this pod schedulable")
+	logger.V(5).Info("CSIStorageCapacity was updated, but it doesn't make this pod schedulable")
 	return framework.QueueSkip, nil
 }
 
