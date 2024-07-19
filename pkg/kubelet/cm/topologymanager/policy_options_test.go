@@ -21,7 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -52,10 +51,23 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
 			featureGateEnable: true,
 			expectedOptions: PolicyOptions{
-				PreferClosestNUMA: true,
+				PreferClosestNUMA:     true,
+				MaxAllowableNUMANodes: 8,
 			},
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
+				MaxAllowableNUMANodes:  "8",
+			},
+		},
+		{
+			description:       "return TopologyManagerOptions with MaxAllowableNUMANodes set to 12",
+			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
+			featureGateEnable: true,
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes: 12,
+			},
+			policyOptions: map[string]string{
+				MaxAllowableNUMANodes: "12",
 			},
 		},
 		{
@@ -63,14 +75,18 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			featureGate: pkgfeatures.TopologyManagerPolicyBetaOptions,
 			policyOptions: map[string]string{
 				PreferClosestNUMANodes: "true",
+				MaxAllowableNUMANodes:  "8",
 			},
 			expectedErr: fmt.Errorf("Topology Manager Policy Beta-level Options not enabled,"),
 		},
 		{
 			description: "return empty TopologyManagerOptions",
+			expectedOptions: PolicyOptions{
+				MaxAllowableNUMANodes: 8,
+			},
 		},
 		{
-			description:       "fail to parse options",
+			description:       "fail to parse options with error PreferClosestNUMANodes",
 			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
 			featureGateEnable: true,
 			policyOptions: map[string]string{
@@ -79,11 +95,24 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			expectedErr: fmt.Errorf("bad value for option"),
 		},
 		{
+			description:       "fail to parse options with error MaxAllowableNUMANodes",
+			featureGate:       pkgfeatures.TopologyManagerPolicyAlphaOptions,
+			featureGateEnable: true,
+			policyOptions: map[string]string{
+				MaxAllowableNUMANodes: "can't parse to int",
+			},
+			expectedErr: fmt.Errorf("unable to convert policy option to integer"),
+		},
+		{
 			description:       "test beta options success",
 			featureGate:       pkgfeatures.TopologyManagerPolicyBetaOptions,
 			featureGateEnable: true,
 			policyOptions: map[string]string{
 				fancyBetaOption: "true",
+			},
+			expectedOptions: PolicyOptions{
+				PreferClosestNUMA:     false,
+				MaxAllowableNUMANodes: 8,
 			},
 		},
 		{
@@ -101,6 +130,10 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			policyOptions: map[string]string{
 				fancyAlphaOption: "true",
 			},
+			expectedOptions: PolicyOptions{
+				PreferClosestNUMA:     false,
+				MaxAllowableNUMANodes: 8,
+			},
 		},
 		{
 			description: "test alpha options fail",
@@ -112,7 +145,7 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 	}
 
 	betaOptions.Insert(fancyBetaOption)
-	alphaOptions = sets.New[string](fancyAlphaOption)
+	alphaOptions.Insert(fancyAlphaOption)
 
 	for _, tcase := range testCases {
 		t.Run(tcase.description, func(t *testing.T) {
@@ -122,13 +155,13 @@ func TestNewTopologyManagerOptions(t *testing.T) {
 			opts, err := NewPolicyOptions(tcase.policyOptions)
 			if tcase.expectedErr != nil {
 				if !strings.Contains(err.Error(), tcase.expectedErr.Error()) {
-					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), tcase.expectedErr.Error())
+					t.Errorf("Unexpected error message. Have: %s, wants %s", err.Error(), tcase.expectedErr.Error())
 				}
+				return
 			}
 
 			if opts != tcase.expectedOptions {
 				t.Errorf("Expected TopologyManagerOptions to equal %v, not %v", tcase.expectedOptions, opts)
-
 			}
 		})
 	}

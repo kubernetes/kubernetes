@@ -40,12 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
@@ -299,22 +296,6 @@ func RunDeployment(ctx context.Context, config DeploymentConfig) error {
 	return config.start(ctx)
 }
 
-func (config *DeploymentConfig) Run(ctx context.Context) error {
-	return RunDeployment(ctx, *config)
-}
-
-func (config *DeploymentConfig) GetKind() schema.GroupKind {
-	return extensionsinternal.Kind("Deployment")
-}
-
-func (config *DeploymentConfig) GetGroupResource() schema.GroupResource {
-	return extensionsinternal.Resource("deployments")
-}
-
-func (config *DeploymentConfig) GetGroupVersionResource() schema.GroupVersionResource {
-	return extensionsinternal.SchemeGroupVersion.WithResource("deployments")
-}
-
 func (config *DeploymentConfig) create() error {
 	deployment := &apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -386,22 +367,6 @@ func RunReplicaSet(ctx context.Context, config ReplicaSetConfig) error {
 	return config.start(ctx)
 }
 
-func (config *ReplicaSetConfig) Run(ctx context.Context) error {
-	return RunReplicaSet(ctx, *config)
-}
-
-func (config *ReplicaSetConfig) GetKind() schema.GroupKind {
-	return extensionsinternal.Kind("ReplicaSet")
-}
-
-func (config *ReplicaSetConfig) GetGroupResource() schema.GroupResource {
-	return extensionsinternal.Resource("replicasets")
-}
-
-func (config *ReplicaSetConfig) GetGroupVersionResource() schema.GroupVersionResource {
-	return extensionsinternal.SchemeGroupVersion.WithResource("replicasets")
-}
-
 func (config *ReplicaSetConfig) create() error {
 	rs := &apps.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -467,55 +432,6 @@ func RunRC(ctx context.Context, config RCConfig) error {
 		return err
 	}
 	return config.start(ctx)
-}
-
-func (config *RCConfig) Run(ctx context.Context) error {
-	return RunRC(ctx, *config)
-}
-
-func (config *RCConfig) GetName() string {
-	return config.Name
-}
-
-func (config *RCConfig) GetNamespace() string {
-	return config.Namespace
-}
-
-func (config *RCConfig) GetKind() schema.GroupKind {
-	return api.Kind("ReplicationController")
-}
-
-func (config *RCConfig) GetGroupResource() schema.GroupResource {
-	return api.Resource("replicationcontrollers")
-}
-
-func (config *RCConfig) GetGroupVersionResource() schema.GroupVersionResource {
-	return api.SchemeGroupVersion.WithResource("replicationcontrollers")
-}
-
-func (config *RCConfig) GetClient() clientset.Interface {
-	return config.Client
-}
-
-func (config *RCConfig) GetScalesGetter() scaleclient.ScalesGetter {
-	return config.ScalesGetter
-}
-
-func (config *RCConfig) SetClient(c clientset.Interface) {
-	config.Client = c
-}
-
-func (config *RCConfig) SetScalesClient(getter scaleclient.ScalesGetter) {
-	config.ScalesGetter = getter
-}
-
-func (config *RCConfig) GetReplicas() int {
-	return config.Replicas
-}
-
-func (config *RCConfig) GetLabelValue(key string) (string, bool) {
-	value, found := config.Labels[key]
-	return value, found
 }
 
 func (config *RCConfig) create() error {
@@ -1504,94 +1420,4 @@ func attachServiceAccountTokenProjection(template *v1.PodTemplateSpec, name stri
 				},
 			},
 		})
-}
-
-type DaemonConfig struct {
-	Client    clientset.Interface
-	Name      string
-	Namespace string
-	Image     string
-	// If set this function will be used to print log lines instead of klog.
-	LogFunc func(fmt string, args ...interface{})
-	// How long we wait for DaemonSet to become running.
-	Timeout time.Duration
-}
-
-func (config *DaemonConfig) Run(ctx context.Context) error {
-	if config.Image == "" {
-		config.Image = imageutils.GetE2EImage(imageutils.Pause)
-	}
-	nameLabel := map[string]string{
-		"name": config.Name + "-daemon",
-	}
-	daemon := &apps.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: config.Name,
-		},
-		Spec: apps.DaemonSetSpec{
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: nameLabel,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  config.Name,
-							Image: config.Image,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	if err := CreateDaemonSetWithRetries(config.Client, config.Namespace, daemon); err != nil {
-		return fmt.Errorf("error creating daemonset: %v", err)
-	}
-
-	var nodes *v1.NodeList
-	var err error
-	for i := 0; i < retries; i++ {
-		// Wait for all daemons to be running
-		nodes, err = config.Client.CoreV1().Nodes().List(ctx, metav1.ListOptions{ResourceVersion: "0"})
-		if err == nil {
-			break
-		} else if i+1 == retries {
-			return fmt.Errorf("error listing Nodes while waiting for DaemonSet %v: %v", config.Name, err)
-		}
-	}
-
-	timeout := config.Timeout
-	if timeout <= 0 {
-		timeout = 5 * time.Minute
-	}
-
-	ps, err := NewPodStore(config.Client, config.Namespace, labels.SelectorFromSet(nameLabel), fields.Everything())
-	if err != nil {
-		return err
-	}
-	defer ps.Stop()
-
-	err = wait.Poll(time.Second, timeout, func() (bool, error) {
-		pods := ps.List()
-
-		nodeHasDaemon := sets.NewString()
-		for _, pod := range pods {
-			podReady, _ := PodRunningReady(pod)
-			if pod.Spec.NodeName != "" && podReady {
-				nodeHasDaemon.Insert(pod.Spec.NodeName)
-			}
-		}
-
-		running := len(nodeHasDaemon)
-		config.LogFunc("Found %v/%v Daemons %v running", running, config.Name, len(nodes.Items))
-		return running == len(nodes.Items), nil
-	})
-	if err != nil {
-		config.LogFunc("Timed out while waiting for DaemonSet %v/%v to be running.", config.Namespace, config.Name)
-	} else {
-		config.LogFunc("Created Daemon %v/%v", config.Namespace, config.Name)
-	}
-
-	return err
 }

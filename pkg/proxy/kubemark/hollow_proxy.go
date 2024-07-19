@@ -68,7 +68,9 @@ func NewHollowProxy(
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
 				ConfigSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-				OOMScoreAdj:      ptr.To[int32](0),
+				Linux: proxyconfigapi.KubeProxyLinuxConfiguration{
+					OOMScoreAdj: ptr.To[int32](0),
+				},
 			},
 
 			Client:      client,

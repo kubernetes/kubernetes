@@ -30,7 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -224,13 +224,9 @@ func (m *ManagerImpl) PrepareResources(pod *v1.Pod) error {
 			// Loop through all plugins and prepare for calling NodePrepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
 				claim := &drapb.Claim{
-					Namespace:      claimInfo.Namespace,
-					Uid:            string(claimInfo.ClaimUID),
-					Name:           claimInfo.ClaimName,
-					ResourceHandle: resourceHandle.Data,
-				}
-				if resourceHandle.StructuredData != nil {
-					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
+					Namespace: claimInfo.Namespace,
+					Uid:       string(claimInfo.ClaimUID),
+					Name:      claimInfo.ClaimName,
 				}
 				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)
@@ -455,13 +451,9 @@ func (m *ManagerImpl) unprepareResources(podUID types.UID, namespace string, cla
 			// Loop through all plugins and prepare for calling NodeUnprepareResources.
 			for _, resourceHandle := range claimInfo.ResourceHandles {
 				claim := &drapb.Claim{
-					Namespace:      claimInfo.Namespace,
-					Uid:            string(claimInfo.ClaimUID),
-					Name:           claimInfo.ClaimName,
-					ResourceHandle: resourceHandle.Data,
-				}
-				if resourceHandle.StructuredData != nil {
-					claim.StructuredResourceHandle = []*resourceapi.StructuredResourceHandle{resourceHandle.StructuredData}
+					Namespace: claimInfo.Namespace,
+					Uid:       string(claimInfo.ClaimUID),
+					Name:      claimInfo.ClaimName,
 				}
 				pluginName := resourceHandle.DriverName
 				batches[pluginName] = append(batches[pluginName], claim)

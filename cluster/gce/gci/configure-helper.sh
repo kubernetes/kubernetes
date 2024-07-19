@@ -3152,7 +3152,7 @@ Or you can download it at:
   https://storage.googleapis.com/gke-release/kubernetes/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:
-  https://github.com/kubernetes/kubernetes/tree/${gitref}
+  https://github.com/kubernetes/kubernetes/tree/${gitref/-gke.*/}
 ${devel}
 For Kubernetes copyright and licensing information, see:
   /home/kubernetes/LICENSES

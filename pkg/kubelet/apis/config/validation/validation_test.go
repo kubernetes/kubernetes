@@ -105,10 +105,10 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		name: "specify EnforceNodeAllocatable without enabling CgroupsPerQOS",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.CgroupsPerQOS = false
-			conf.EnforceNodeAllocatable = []string{"pods"}
+			conf.EnforceNodeAllocatable = []string{kubetypes.NodeAllocatableEnforcementKey}
 			return conf
 		},
-		errMsg: "invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) is not supported unless cgroupsPerQOS (--cgroups-per-qos) is set to true",
+		errMsg: "invalid configuration: cgroupsPerQOS (--cgroups-per-qos) must be set to true when \"pods\" contained in enforceNodeAllocatable (--enforce-node-allocatable)",
 	}, {
 		name: "specify SystemCgroups without CgroupRoot",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
@@ -399,6 +399,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 			return conf
 		},
 		errMsg: "invalid configuration: enforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when \"none\" is specified",
+	}, {
+		name: "duplicated EnforceNodeAllocatable",
+		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+			conf.EnforceNodeAllocatable = []string{kubetypes.NodeAllocatableNoneKey, kubetypes.NodeAllocatableNoneKey}
+			return conf
+		},
+		errMsg: "invalid configuration: duplicated enforcements \"none\" in enforceNodeAllocatable (--enforce-node-allocatable)",
 	}, {
 		name: "invalid EnforceNodeAllocatable",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {

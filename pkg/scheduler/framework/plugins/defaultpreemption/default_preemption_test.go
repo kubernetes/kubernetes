@@ -340,7 +340,7 @@ func TestPostFilter(t *testing.T) {
 			for _, pod := range tt.pods {
 				podItems = append(podItems, *pod)
 			}
-			cs := clientsetfake.NewSimpleClientset(&v1.PodList{Items: podItems})
+			cs := clientsetfake.NewClientset(&v1.PodList{Items: podItems})
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
 			podInformer.GetStore().Add(tt.pod)
@@ -365,7 +365,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
 				frameworkruntime.WithLogger(logger),
@@ -1087,7 +1087,7 @@ func TestDryRunPreemption(t *testing.T) {
 			for _, n := range nodes {
 				objs = append(objs, n)
 			}
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(objs...), 0)
 			parallelism := parallelize.DefaultParallelism
 			if tt.disableParallelism {
 				// We need disableParallelism because of the non-deterministic nature
@@ -1102,7 +1102,7 @@ func TestDryRunPreemption(t *testing.T) {
 			fwk, err := tf.NewFramework(
 				ctx,
 				registeredPlugins, "",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithParallelism(parallelism),
@@ -1347,7 +1347,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			for _, pod := range tt.pods {
 				objs = append(objs, pod)
 			}
-			cs := clientsetfake.NewSimpleClientset(objs...)
+			cs := clientsetfake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
 			logger, ctx := ktesting.NewTestContext(t)
@@ -1361,7 +1361,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithLogger(logger),
 			)
@@ -1466,7 +1466,6 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.fts.EnablePodDisruptionConditions = true
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -1659,7 +1658,7 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
+			client := clientsetfake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods().Informer()
 			podInformer.GetStore().Add(test.pod)
@@ -1746,7 +1745,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
+				frameworkruntime.WithPodNominator(internalqueue.NewTestPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithWaitingPods(waitingPods),

@@ -58,7 +58,7 @@ func TestDefaultBinder(t *testing.T) {
 			defer cancel()
 
 			var gotBinding *v1.Binding
-			client := fake.NewSimpleClientset(testPod)
+			client := fake.NewClientset(testPod)
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				if action.GetSubresource() != "binding" {
 					return false, nil, nil

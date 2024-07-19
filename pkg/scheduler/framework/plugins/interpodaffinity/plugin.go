@@ -57,7 +57,7 @@ func (pl *InterPodAffinity) Name() string {
 
 // EventsToRegister returns the possible events that may make a failed Pod
 // schedulable
-func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
@@ -77,7 +77,7 @@ func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEventWithHint 
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.All}, QueueingHintFn: pl.isSchedulableAfterPodChange},
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 // New initializes a new plugin and returns it.

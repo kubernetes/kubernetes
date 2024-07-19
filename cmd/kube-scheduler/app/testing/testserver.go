@@ -103,6 +103,9 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		fs.AddFlagSet(f)
 	}
 	fs.Parse(customFlags)
+	if err := opts.ComponentGlobalsRegistry.Set(); err != nil {
+		return result, err
+	}
 
 	if opts.SecureServing.BindPort != 0 {
 		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()

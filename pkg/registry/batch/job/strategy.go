@@ -98,9 +98,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
-		job.Spec.PodFailurePolicy = nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		job.Spec.ManagedBy = nil
 	}
@@ -137,9 +134,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
-		newJob.Spec.PodFailurePolicy = nil
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) && oldJob.Spec.SuccessPolicy == nil {
 		newJob.Spec.SuccessPolicy = nil
 	}
@@ -376,12 +370,15 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 		isJobCompleteChanged := batchvalidation.IsJobComplete(oldJob) != batchvalidation.IsJobComplete(newJob)
 		isJobFailedChanged := batchvalidation.IsJobFailed(oldJob) != batchvalidation.IsJobFailed(newJob)
 		isJobFailureTargetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobFailureTarget) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobFailureTarget)
+		isJobSuccessCriteriaMetChanged := batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet) != batchvalidation.IsConditionTrue(newJob.Status.Conditions, batch.JobSuccessCriteriaMet)
 		isCompletedIndexesChanged := oldJob.Status.CompletedIndexes != newJob.Status.CompletedIndexes
 		isFailedIndexesChanged := !ptr.Equal(oldJob.Status.FailedIndexes, newJob.Status.FailedIndexes)
 		isActiveChanged := oldJob.Status.Active != newJob.Status.Active
 		isStartTimeChanged := !ptr.Equal(oldJob.Status.StartTime, newJob.Status.StartTime)
 		isCompletionTimeChanged := !ptr.Equal(oldJob.Status.CompletionTime, newJob.Status.CompletionTime)
 		isUncountedTerminatedPodsChanged := !apiequality.Semantic.DeepEqual(oldJob.Status.UncountedTerminatedPods, newJob.Status.UncountedTerminatedPods)
+		isReadyChanged := !ptr.Equal(oldJob.Status.Ready, newJob.Status.Ready)
+		isTerminatingChanged := !ptr.Equal(oldJob.Status.Terminating, newJob.Status.Terminating)
 
 		return batchvalidation.JobStatusValidationOptions{
 			// We allow to decrease the counter for succeeded pods for jobs which
@@ -394,6 +391,8 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompletedIndexesForNonIndexedJob:       isCompletedIndexesChanged,
 			RejectFailedIndexesForNoBackoffLimitPerIndex: isFailedIndexesChanged,
 			RejectFailedIndexesOverlappingCompleted:      isFailedIndexesChanged || isCompletedIndexesChanged,
+			RejectFailedJobWithoutFailureTarget:          isJobFailedChanged || isFailedIndexesChanged,
+			RejectCompleteJobWithoutSuccessCriteriaMet:   isJobCompleteChanged || isJobSuccessCriteriaMetChanged,
 			RejectFinishedJobWithActivePods:              isJobFinishedChanged || isActiveChanged,
 			RejectFinishedJobWithoutStartTime:            isJobFinishedChanged || isStartTimeChanged,
 			RejectFinishedJobWithUncountedTerminatedPods: isJobFinishedChanged || isUncountedTerminatedPodsChanged,
@@ -404,9 +403,19 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
 			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
+			AllowForSuccessCriteriaMetInExtendedScope:    true,
+			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
+			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 		}
 	}
-	return batchvalidation.JobStatusValidationOptions{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
+		return batchvalidation.JobStatusValidationOptions{
+			AllowForSuccessCriteriaMetInExtendedScope: true,
+		}
+	}
+	return batchvalidation.JobStatusValidationOptions{
+		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet),
+	}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

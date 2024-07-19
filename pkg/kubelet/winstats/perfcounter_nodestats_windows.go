@@ -20,10 +20,7 @@ limitations under the License.
 package winstats
 
 import (
-	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -33,6 +30,7 @@ import (
 	"unsafe"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -58,10 +56,33 @@ type MemoryStatusEx struct {
 	AvailExtendedVirtual uint64
 }
 
+// PerformanceInfo is the same as Windows structure PERFORMANCE_INFORMATION
+// https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-performance_information
+type PerformanceInformation struct {
+	cb                     uint32
+	CommitTotalPages       uint64
+	CommitLimitPages       uint64
+	CommitPeakPages        uint64
+	PhysicalTotalPages     uint64
+	PhysicalAvailablePages uint64
+	SystemCachePages       uint64
+	KernelTotalPages       uint64
+	KernelPagesPages       uint64
+	KernelNonpagedPages    uint64
+	PageSize               uint64
+	HandleCount            uint32
+	ProcessCount           uint32
+	ThreadCount            uint32
+}
+
 var (
+	// kernel32.dll system calls
 	modkernel32                 = windows.NewLazySystemDLL("kernel32.dll")
 	procGlobalMemoryStatusEx    = modkernel32.NewProc("GlobalMemoryStatusEx")
 	procGetActiveProcessorCount = modkernel32.NewProc("GetActiveProcessorCount")
+	// psapi.dll system calls
+	modpsapi               = windows.NewLazySystemDLL("psapi.dll")
+	procGetPerformanceInfo = modpsapi.NewProc("GetPerformanceInfo")
 )
 
 const allProcessorGroups = 0xFFFF
@@ -256,15 +277,21 @@ func (p *perfCounterNodeStatsClient) getCPUUsageNanoCores() uint64 {
 }
 
 func getSystemUUID() (string, error) {
-	result, err := exec.Command("wmic", "csproduct", "get", "UUID").Output()
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\HardwareConfig`, registry.QUERY_VALUE)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to open registry key HKLM\\SYSTEM\\HardwareConfig")
 	}
-	fields := strings.Fields(string(result))
-	if len(fields) != 2 {
-		return "", fmt.Errorf("received unexpected value retrieving vm uuid: %q", string(result))
+	defer k.Close()
+
+	uuid, _, err := k.GetStringValue("LastConfig")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read registry value LastConfig from key HKLM\\SYSTEM\\HardwareConfig")
 	}
-	return fields[1], nil
+
+	uuid = strings.Trim(uuid, "{")
+	uuid = strings.Trim(uuid, "}")
+	uuid = strings.ToUpper(uuid)
+	return uuid, nil
 }
 
 func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
@@ -288,6 +315,16 @@ func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	}
 
 	return statex.TotalPhys, nil
+}
+
+func GetPerformanceInfo() (*PerformanceInformation, error) {
+	var pi PerformanceInformation
+	pi.cb = uint32(unsafe.Sizeof(pi))
+	ret, _, _ := procGetPerformanceInfo.Call(uintptr(unsafe.Pointer(&pi)), uintptr(pi.cb))
+	if ret == 0 {
+		return nil, errors.New("unable to read Windows performance information")
+	}
+	return &pi, nil
 }
 
 func getBootID() (string, error) {

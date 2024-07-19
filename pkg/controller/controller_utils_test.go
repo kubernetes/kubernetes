@@ -58,6 +58,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -183,7 +184,7 @@ func TestControllerExpectations(t *testing.T) {
 
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
-	assert.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
+	require.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
 
 	e.SetExpectations(logger, rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -238,7 +239,7 @@ func TestControllerExpectations(t *testing.T) {
 				e.SetExpectations(logger, rcKey, test.expectationsToSet[0], test.expectationsToSet[1])
 			}
 			podExp, exists, err := e.GetExpectations(rcKey)
-			assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
+			require.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
 			assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
 
 			add, del := podExp.GetExpectations()
@@ -382,12 +383,12 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			}
 
 			err := test.podCreationFunc(podControl)
-			assert.NoError(t, err, "unexpected error: %v", err)
+			require.NoError(t, err, "unexpected error: %v", err)
 
 			fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
 			var actualPod = &v1.Pod{}
 			err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
-			assert.NoError(t, err, "unexpected error: %v", err)
+			require.NoError(t, err, "unexpected error: %v", err)
 			assert.True(t, apiequality.Semantic.DeepDerivative(test.wantPod, actualPod),
 				"Body: %s", fakeHandler.RequestBody)
 		})
@@ -426,10 +427,10 @@ func TestCountTerminatingPods(t *testing.T) {
 
 	terminatingPods := CountTerminatingPods(podPointers)
 
-	assert.Equal(t, terminatingPods, int32(2))
+	assert.Equal(t, int32(2), terminatingPods)
 
 	terminatingList := FilterTerminatingPods(podPointers)
-	assert.Equal(t, len(terminatingList), int(2))
+	assert.Len(t, terminatingList, int(2))
 }
 
 func TestActivePodFiltering(t *testing.T) {
@@ -957,7 +958,7 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		err := RemoveTaintOffNode(context.TODO(), test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
-		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
+		require.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
@@ -1196,7 +1197,7 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 			assert.Equal(t, test.expectedErr, err, "AddOrUpdateTaintOnNode get unexpected error")
 			continue
 		}
-		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
+		require.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(context.TODO(), test.nodeName, metav1.GetOptions{})
 		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,

@@ -429,9 +429,9 @@ func (pl *dynamicResources) Name() string {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *dynamicResources) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	if !pl.enabled {
-		return nil
+		return nil, nil
 	}
 
 	events := []framework.ClusterEventWithHint{
@@ -460,7 +460,7 @@ func (pl *dynamicResources) EventsToRegister() []framework.ClusterEventWithHint 
 		// A pod might be waiting for a class to get created or modified.
 		{Event: framework.ClusterEvent{Resource: framework.ResourceClass, ActionType: framework.Add | framework.Update}},
 	}
-	return events
+	return events, nil
 }
 
 // PreEnqueue checks if there are known reasons why a pod currently cannot be

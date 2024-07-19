@@ -1460,7 +1460,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 
 	// Sync with an empty pod list to delete all mirror pods.
 	kl.HandlePodCleanups(ctx)
-	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
+	assert.Empty(t, manager.GetPods(), "Expected no mirror pods")
 	for i, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
 		creates, deletes := manager.GetCounts(name)

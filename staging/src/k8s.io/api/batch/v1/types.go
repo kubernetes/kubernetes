@@ -176,7 +176,7 @@ type PodFailurePolicyOnExitCodesRequirement struct {
 	// When specified, it should match one the container or initContainer
 	// names in the pod template.
 	// +optional
-	ContainerName *string `json:"containerName" protobuf:"bytes,1,opt,name=containerName"`
+	ContainerName *string `json:"containerName,omitempty" protobuf:"bytes,1,opt,name=containerName"`
 
 	// Represents the relationship between the container exit code(s) and the
 	// specified values. Containers completed with success (exit code 0) are
@@ -236,14 +236,14 @@ type PodFailurePolicyRule struct {
 
 	// Represents the requirement on the container exit codes.
 	// +optional
-	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes" protobuf:"bytes,2,opt,name=onExitCodes"`
+	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes,omitempty" protobuf:"bytes,2,opt,name=onExitCodes"`
 
 	// Represents the requirement on the pod conditions. The requirement is represented
 	// as a list of pod condition patterns. The requirement is satisfied if at
 	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
 	// +listType=atomic
 	// +optional
-	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
+	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty" protobuf:"bytes,3,opt,name=onPodConditions"`
 }
 
 // PodFailurePolicy describes how failed pods influence the backoffLimit.
@@ -338,8 +338,6 @@ type JobSpec struct {
 	// checked against the backoffLimit. This field cannot be used in combination
 	// with restartPolicy=OnFailure.
 	//
-	// This field is beta-level. It can be used when the `JobPodFailurePolicy`
-	// feature gate is enabled (enabled by default).
 	// +optional
 	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty" protobuf:"bytes,11,opt,name=podFailurePolicy"`
 
@@ -636,7 +634,6 @@ const (
 	// JobReasonPodFailurePolicy reason indicates a job failure condition is added due to
 	// a failed pod matching a pod failure policy rule
 	// https://kep.k8s.io/3329
-	// This is currently a beta field.
 	JobReasonPodFailurePolicy string = "PodFailurePolicy"
 	// JobReasonBackOffLimitExceeded reason indicates that pods within a job have failed a number of
 	// times higher than backOffLimit times.

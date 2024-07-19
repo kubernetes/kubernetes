@@ -237,9 +237,6 @@ var (
 	// Marks a single test that tests pod-to-pod connectivity between every pair of nodes.
 	NoSNAT = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	PersistentVolumeLastPhaseTransitionTime = framework.WithFeature(framework.ValidFeatures.Add("PersistentVolumeLastPhaseTransitionTime"))
-
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
@@ -336,6 +333,11 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StorageVersionAPI = framework.WithFeature(framework.ValidFeatures.Add("StorageVersionAPI"))
+
+	// Owner: sig-node
+	// Marks tests that require a cluster with SupplementalGroupsPolicy
+	// (used for testing fine-grained SupplementalGroups control <https://kep.k8s.io/3619>)
+	SupplementalGroupsPolicy = framework.WithFeature(framework.ValidFeatures.Add("SupplementalGroupsPolicy"))
 
 	// Owner: sig-network
 	// Marks tests that require a cluster with Topology Hints enabled.

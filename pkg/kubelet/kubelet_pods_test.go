@@ -6111,9 +6111,9 @@ func TestGetNonExistentImagePullSecret(t *testing.T) {
 	}
 
 	pullSecrets := testKubelet.kubelet.getPullSecretsForPod(testPod)
-	assert.Equal(t, 0, len(pullSecrets))
+	assert.Empty(t, pullSecrets)
 
-	assert.Equal(t, 1, len(fakeRecorder.Events))
+	assert.Len(t, fakeRecorder.Events, 1)
 	event := <-fakeRecorder.Events
 	assert.Equal(t, event, expectedEvent)
 }

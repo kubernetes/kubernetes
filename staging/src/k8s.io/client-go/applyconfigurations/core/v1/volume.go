@@ -270,3 +270,11 @@ func (b *VolumeApplyConfiguration) WithEphemeral(value *EphemeralVolumeSourceApp
 	b.Ephemeral = value
 	return b
 }
+
+// WithImage sets the Image field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Image field is set to the value of the last call.
+func (b *VolumeApplyConfiguration) WithImage(value *ImageVolumeSourceApplyConfiguration) *VolumeApplyConfiguration {
+	b.Image = value
+	return b
+}

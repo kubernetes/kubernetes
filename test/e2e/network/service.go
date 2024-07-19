@@ -986,6 +986,9 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 	})
 
+	// NOTE: base on fundamental requirement of the kubernetes networking model(https://kubernetes.io/docs/concepts/services-networking/)
+	// pods can communicate with all other pods on any other node without NAT
+	// we should avoid masquerading the internal Pod traffic, detail see #126089
 	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func(ctx context.Context) {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
@@ -1055,7 +1058,9 @@ var _ = common.SIGDescribe("Services", func() {
 		for _, pausePod := range pausePods.Items {
 			sourceIP, execPodIP := execSourceIPTest(pausePod, serviceAddress)
 			ginkgo.By("Verifying the preserved source ip")
-			gomega.Expect(sourceIP).To(gomega.Equal(execPodIP))
+			gomega.Expect(sourceIP).To(gomega.Equal(execPodIP),
+				"expected preserved source IP is %s, if not, please check whether the internal pod traffic is masqueraded",
+				sourceIP)
 		}
 	})
 

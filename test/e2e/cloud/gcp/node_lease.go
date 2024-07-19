@@ -142,13 +142,17 @@ var _ = SIGDescribe(framework.WithDisruptive(), "NodeLease", func() {
 			var deletedNodeName string
 			for _, originalNode := range originalNodes.Items {
 				originalNodeName := originalNode.ObjectMeta.Name
+				var found bool
 				for _, targetNode := range targetNodes.Items {
 					if originalNodeName == targetNode.ObjectMeta.Name {
-						continue
+						found = true
+						break
 					}
 				}
-				deletedNodeName = originalNodeName
-				break
+				if !found {
+					deletedNodeName = originalNodeName
+					break
+				}
 			}
 			gomega.Expect(deletedNodeName).NotTo(gomega.BeEmpty())
 			gomega.Eventually(ctx, func() error {

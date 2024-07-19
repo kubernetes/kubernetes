@@ -104,7 +104,7 @@ with the apiserver API to configure the proxy.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
-			if err := initForOS(opts.WindowsService); err != nil {
+			if err := initForOS(opts.config.Windows.RunAsService); err != nil {
 				return fmt.Errorf("failed os init: %w", err)
 			}
 
@@ -493,9 +493,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
-	if s.Config.OOMScoreAdj != nil {
+	if s.Config.Linux.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
-		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.Config.OOMScoreAdj)); err != nil {
+		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.Config.Linux.OOMScoreAdj)); err != nil {
 			logger.V(2).Info("Failed to apply OOMScore", "err", err)
 		}
 	}

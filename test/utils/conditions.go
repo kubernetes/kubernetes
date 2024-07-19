@@ -103,13 +103,3 @@ func TerminatedContainers(pod *v1.Pod) map[string]string {
 	}
 	return states
 }
-
-// PodNotReady checks whether pod p's has a ready condition of status false.
-func PodNotReady(p *v1.Pod) (bool, error) {
-	// Check the ready condition is false.
-	if podutil.IsPodReady(p) {
-		return false, fmt.Errorf("pod '%s' on '%s' didn't have condition {%v %v}; conditions: %v",
-			p.ObjectMeta.Name, p.Spec.NodeName, v1.PodReady, v1.ConditionFalse, p.Status.Conditions)
-	}
-	return true, nil
-}

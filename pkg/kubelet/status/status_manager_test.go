@@ -549,7 +549,7 @@ func TestStaticPod(t *testing.T) {
 
 	t.Logf("Should not sync pod in syncBatch because there is no corresponding mirror pod for the static pod.")
 	m.syncBatch(true)
-	assert.Equal(t, len(m.kubeClient.(*fake.Clientset).Actions()), 0, "Expected no updates after syncBatch, got %+v", m.kubeClient.(*fake.Clientset).Actions())
+	assert.Empty(t, m.kubeClient.(*fake.Clientset).Actions(), "Expected no updates after syncBatch")
 
 	t.Logf("Create the mirror pod")
 	m.podManager.(mutablePodManager).AddPod(mirrorPod)

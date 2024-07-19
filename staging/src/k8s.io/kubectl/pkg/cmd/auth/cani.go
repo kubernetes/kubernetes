@@ -83,9 +83,8 @@ var (
 		# Check to see if I can list deployments in my current namespace
 		kubectl auth can-i list deployments.apps
 
-		# Check to see if service account "foo" of namespace "dev" can list pods
-		# in the namespace "prod".
-		# You must be allowed to use impersonation for the global option "--as".
+		# Check to see if service account "foo" of namespace "dev" can list pods in the namespace "prod"
+		# You must be allowed to use impersonation for the global option "--as"
 		kubectl auth can-i list pods --as=system:serviceaccount:dev:foo -n prod
 
 		# Check to see if I can do everything in my current namespace ("*" means all)

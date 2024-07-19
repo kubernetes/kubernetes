@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -180,7 +181,7 @@ func TestSchedulerCreation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
@@ -277,7 +278,7 @@ func TestFailureHandler(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
-			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+			client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			podInformer := informerFactory.Core().V1().Pods()
 			// Need to add/update/delete testPod to the store.
@@ -337,7 +338,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Node("foo").Obj()
 
-	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
+	client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	podInformer := informerFactory.Core().V1().Pods()
 	// Need to add testPod to the store.
@@ -384,7 +385,7 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client := fake.NewClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 			_, ctx := ktesting.NewTestContext(t)
@@ -596,6 +597,7 @@ const (
 	fakeNode                       = "fakeNode"
 	fakePod                        = "fakePod"
 	emptyEventsToRegister          = "emptyEventsToRegister"
+	errorEventsToRegister          = "errorEventsToRegister"
 	queueSort                      = "no-op-queue-sort-plugin"
 	fakeBind                       = "bind-plugin"
 	emptyEventExtensions           = "emptyEventExtensions"
@@ -608,6 +610,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 		plugins             []framework.Plugin
 		want                map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction
 		featuregateDisabled bool
+		wantErr             error
 	}{
 		{
 			name:    "filter without EnqueueExtensions plugin",
@@ -705,6 +708,12 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "one EventsToRegister returns an error",
+			plugins: []framework.Plugin{&errorEventsToRegisterPlugin{}},
+			want:    map[framework.ClusterEvent][]*internalqueue.QueueingHintFunction{},
+			wantErr: errors.New("mock error"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -738,7 +747,16 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				return exts[i].Name() < exts[j].Name()
 			})
 
-			got := buildQueueingHintMap(exts)
+			got, err := buildQueueingHintMap(ctx, exts)
+			if err != nil {
+				if tt.wantErr != nil && tt.wantErr.Error() != err.Error() {
+					t.Fatalf("unexpected error from buildQueueingHintMap: expected: %v, actual: %v", tt.wantErr, err)
+				}
+
+				if tt.wantErr == nil {
+					t.Fatalf("unexpected error from buildQueueingHintMap: %v", err)
+				}
+			}
 
 			for e, fns := range got {
 				wantfns, ok := tt.want[e]
@@ -894,9 +912,12 @@ func Test_UnionedGVKs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
+			queueingHintMap, err := buildQueueingHintMap(ctx, fwk.EnqueueExtensions())
+			if err != nil {
+				t.Fatal(err)
+			}
 			queueingHintsPerProfile := internalqueue.QueueingHintMapPerProfile{
-				"default": buildQueueingHintMap(fwk.EnqueueExtensions()),
+				"default": queueingHintMap,
 			}
 			got := unionedGVKs(queueingHintsPerProfile)
 
@@ -910,7 +931,7 @@ func Test_UnionedGVKs(t *testing.T) {
 func newFramework(ctx context.Context, r frameworkruntime.Registry, profile schedulerapi.KubeSchedulerProfile) (framework.Framework, error) {
 	return frameworkruntime.NewFramework(ctx, r, &profile,
 		frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(nil, nil)),
-		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)),
+		frameworkruntime.WithInformerFactory(informers.NewSharedInformerFactory(fake.NewClientset(), 0)),
 	)
 }
 
@@ -994,7 +1015,7 @@ func TestFrameworkHandler_IterateOverWaitingPods(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set up scheduler for the 3 nodes.
 			objs := append([]runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
-			fakeClient := fake.NewSimpleClientset(objs...)
+			fakeClient := fake.NewClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
 			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fakeClient.EventsV1()})
 			defer eventBroadcaster.Shutdown()
@@ -1115,10 +1136,10 @@ func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 	return nil
 }
 
-func (pl *fakeNodePlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakeNodePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add}, QueueingHintFn: fakeNodePluginQueueingFn},
-	}
+	}, nil
 }
 
 var hintFromFakePod = framework.QueueingHint(101)
@@ -1135,10 +1156,10 @@ func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.P
 	return nil
 }
 
-func (pl *fakePodPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fakePodPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Add}, QueueingHintFn: fakePodPluginQueueingFn},
-	}
+	}, nil
 }
 
 type emptyEventPlugin struct{}
@@ -1149,8 +1170,21 @@ func (*emptyEventPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v
 	return nil
 }
 
-func (pl *emptyEventPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *emptyEventPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
+}
+
+// errorEventsToRegisterPlugin is a mock plugin that returns an error for EventsToRegister method
+type errorEventsToRegisterPlugin struct{}
+
+func (*errorEventsToRegisterPlugin) Name() string { return errorEventsToRegister }
+
+func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
+}
+
+func (*errorEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, errors.New("mock error")
 }
 
 // emptyEventsToRegisterPlugin implement interface framework.EnqueueExtensions, but returns nil from EventsToRegister.
@@ -1164,7 +1198,9 @@ func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.Cycle
 	return nil
 }
 
-func (*emptyEventsToRegisterPlugin) EventsToRegister() []framework.ClusterEventWithHint { return nil }
+func (*emptyEventsToRegisterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
+}
 
 // fakePermitPlugin only implements PermitPlugin interface.
 type fakePermitPlugin struct {

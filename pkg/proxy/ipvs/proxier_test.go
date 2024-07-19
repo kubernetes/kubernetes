@@ -4431,7 +4431,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 	assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
 	realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
 func TestHealthCheckNodePortE2E(t *testing.T) {
@@ -4829,7 +4829,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 		assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
 		realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
 		assert.Nil(t, rsErr2, "Expected no error getting real servers")
-		assert.Len(t, realServers2, 0, "Expected 0 real servers")
+		assert.Empty(t, realServers2, "Expected 0 real servers")
 	}
 }
 
@@ -4999,11 +4999,11 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
 	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
@@ -5171,11 +5171,11 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
 	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceOnlyReadyTerminatingCluster tests that when there are only ready terminating
@@ -5343,11 +5343,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
 	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
@@ -5512,11 +5512,11 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 
 	realServers1, rsErr1 = ipvs.GetRealServers(clusterIPServer)
 	assert.Nil(t, rsErr1, "Expected no error getting real servers")
-	assert.Len(t, realServers1, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers1, "Expected 0 real servers")
 
 	realServers2, rsErr2 = ipvs.GetRealServers(externalIPServer)
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
-	assert.Len(t, realServers2, 0, "Expected 0 real servers")
+	assert.Empty(t, realServers2, "Expected 0 real servers")
 }
 
 func TestIpIsValidForSet(t *testing.T) {

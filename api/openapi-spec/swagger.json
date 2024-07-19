@@ -497,6 +497,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -555,6 +558,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -1136,6 +1142,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -1194,6 +1203,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -1609,6 +1621,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -1667,6 +1682,9 @@
           "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
         }
       },
+      "required": [
+        "items"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -4771,7 +4789,7 @@
         },
         "podFailurePolicy": {
           "$ref": "#/definitions/io.k8s.api.batch.v1.PodFailurePolicy",
-          "description": "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure.\n\nThis field is beta-level. It can be used when the `JobPodFailurePolicy` feature gate is enabled (enabled by default)."
+          "description": "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of failed pods, represented by the jobs's .status.failed field, is incremented and it is checked against the backoffLimit. This field cannot be used in combination with restartPolicy=OnFailure."
         },
         "podReplacementPolicy": {
           "description": "podReplacementPolicy specifies when to create replacement Pods. Possible values are: - TerminatingOrFailed means that we recreate pods\n  when they are terminating (has a metadata.deletionTimestamp) or failed.\n- Failed means to wait until a previously created Pod is fully terminated (has phase\n  Failed or Succeeded) before creating a replacement Pod.\n\nWhen using podFailurePolicy, Failed is the the only allowed value. TerminatingOrFailed and Failed are allowed values when podFailurePolicy is not in use. This is an beta field. To use this, enable the JobPodReplacementPolicy feature toggle. This is on by default.",
@@ -7482,6 +7500,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "ip"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.HostPathVolumeSource": {
@@ -7619,6 +7640,20 @@
         "iqn",
         "lun"
       ],
+      "type": "object"
+    },
+    "io.k8s.api.core.v1.ImageVolumeSource": {
+      "description": "ImageVolumeSource represents a image volume resource.",
+      "properties": {
+        "pullPolicy": {
+          "description": "Policy for pulling OCI objects. Possible values are: Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails. Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present. IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.",
+          "type": "string"
+        },
+        "reference": {
+          "description": "Required: Image or artifact reference to be used. Behaves in the same way as pod.spec.containers[*].image. Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets.",
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "io.k8s.api.core.v1.KeyToPath": {
@@ -8222,6 +8257,16 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.NodeFeatures": {
+      "description": "NodeFeatures describes the set of features implemented by the CRI implementation. The features contained in the NodeFeatures should depend only on the cri implementation independent of runtime handlers.",
+      "properties": {
+        "supplementalGroupsPolicy": {
+          "description": "SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.core.v1.NodeList": {
       "description": "NodeList is the whole list of all Nodes which have been registered with master.",
       "properties": {
@@ -8272,10 +8317,14 @@
       "type": "object"
     },
     "io.k8s.api.core.v1.NodeRuntimeHandlerFeatures": {
-      "description": "NodeRuntimeHandlerFeatures is a set of runtime features.",
+      "description": "NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.",
       "properties": {
         "recursiveReadOnlyMounts": {
           "description": "RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.",
+          "type": "boolean"
+        },
+        "userNamespaces": {
+          "description": "UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.",
           "type": "boolean"
         }
       },
@@ -8441,6 +8490,10 @@
         "daemonEndpoints": {
           "$ref": "#/definitions/io.k8s.api.core.v1.NodeDaemonEndpoints",
           "description": "Endpoints of daemons running on the Node."
+        },
+        "features": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.NodeFeatures",
+          "description": "Features describes the set of features implemented by the CRI implementation."
         },
         "images": {
           "description": "List of container images on this node",
@@ -9052,7 +9105,7 @@
       "properties": {
         "lastPhaseTransitionTime": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-          "description": "lastPhaseTransitionTime is the time the phase transitioned from one to another and automatically resets to current time everytime a volume phase transitions. This is a beta field and requires the PersistentVolumeLastPhaseTransitionTime feature to be enabled (enabled by default)."
+          "description": "lastPhaseTransitionTime is the time the phase transitioned from one to another and automatically resets to current time everytime a volume phase transitions."
         },
         "message": {
           "description": "message is a human-readable message indicating details about why the volume is in this state.",
@@ -9293,6 +9346,9 @@
           "type": "string"
         }
       },
+      "required": [
+        "ip"
+      ],
       "type": "object"
     },
     "io.k8s.api.core.v1.PodList": {
@@ -10054,7 +10110,7 @@
           "type": "integer"
         },
         "sources": {
-          "description": "sources is the list of volume projections",
+          "description": "sources is the list of volume projections. Each entry in this list handles one source.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.core.v1.VolumeProjection"
           },
@@ -10935,7 +10991,7 @@
           "type": "boolean"
         },
         "procMount": {
-          "description": "procMount denotes the type of proc mount to use for the containers. The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.",
+          "description": "procMount denotes the type of proc mount to use for the containers. The default value is Default which uses the container runtime defaults for readonly paths and masked paths. This requires the ProcMountType feature flag to be enabled. Note that this field cannot be set when spec.os.name is windows.",
           "type": "string"
         },
         "readOnlyRootFilesystem": {
@@ -11690,6 +11746,10 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.HostPathVolumeSource",
           "description": "hostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath"
         },
+        "image": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ImageVolumeSource",
+          "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine. The volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails. - Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present. - IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation. A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message. The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field. The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images. The volume will be mounted read-only (ro) and non-executable files (noexec). Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath)."
+        },
         "iscsi": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ISCSIVolumeSource",
           "description": "iscsi represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://examples.k8s.io/volumes/iscsi/README.md"
@@ -11841,7 +11901,7 @@
       "type": "object"
     },
     "io.k8s.api.core.v1.VolumeProjection": {
-      "description": "Projection that may be projected along with other supported volume types",
+      "description": "Projection that may be projected along with other supported volume types. Exactly one of these fields must be set.",
       "properties": {
         "clusterTrustBundle": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ClusterTrustBundleProjection",
@@ -14052,7 +14112,8 @@
           "type": "integer"
         }
       },
-      "type": "object"
+      "type": "object",
+      "x-kubernetes-map-type": "atomic"
     },
     "io.k8s.api.networking.v1beta1.IPAddress": {
       "description": "IPAddress represents a single IP of a single IP Family. The object is designed to be used by APIs that operate on IP addresses. The object is used by the Service core API for allocation of IP addresses. An IP address can be represented in different formats, to guarantee the uniqueness of the IP, the name of the object is the IP address in canonical format, four decimal digits separated by dots suppressing leading zeros for IPv4 and the representation defined by RFC 5952 for IPv6. Valid: 192.168.1.5 or 2001:db8::1 or 2001:db8:aaaa:bbbb:cccc:dddd:eeee:1 Invalid: 10.01.2.3 or 2001:db8:0:0:0::1",

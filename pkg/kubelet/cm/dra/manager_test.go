@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
-	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1alpha3"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -48,16 +48,16 @@ const (
 )
 
 type fakeDRADriverGRPCServer struct {
-	drapbv1.UnimplementedNodeServer
+	drapb.UnimplementedNodeServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
 	unprepareResourceCalls     atomic.Uint32
-	prepareResourcesResponse   *drapbv1.NodePrepareResourcesResponse
-	unprepareResourcesResponse *drapbv1.NodeUnprepareResourcesResponse
+	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
+	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
 }
 
-func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapbv1.NodePrepareResourcesRequest) (*drapbv1.NodePrepareResourcesResponse, error) {
+func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
 	s.prepareResourceCalls.Add(1)
 
 	if s.timeout != nil {
@@ -67,8 +67,8 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	if s.prepareResourcesResponse == nil {
 		deviceName := "claim-" + req.Claims[0].Uid
 		result := s.driverName + "/" + driverClassName + "=" + deviceName
-		return &drapbv1.NodePrepareResourcesResponse{
-			Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+		return &drapb.NodePrepareResourcesResponse{
+			Claims: map[string]*drapb.NodePrepareResourceResponse{
 				req.Claims[0].Uid: {
 					CDIDevices: []string{result},
 				},
@@ -79,7 +79,7 @@ func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req 
 	return s.prepareResourcesResponse, nil
 }
 
-func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapbv1.NodeUnprepareResourcesRequest) (*drapbv1.NodeUnprepareResourcesResponse, error) {
+func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
 	s.unprepareResourceCalls.Add(1)
 
 	if s.timeout != nil {
@@ -87,8 +87,8 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	}
 
 	if s.unprepareResourcesResponse == nil {
-		return &drapbv1.NodeUnprepareResourcesResponse{
-			Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{
+		return &drapb.NodeUnprepareResourcesResponse{
+			Claims: map[string]*drapb.NodeUnprepareResourceResponse{
 				req.Claims[0].Uid: {},
 			},
 		}, nil
@@ -108,7 +108,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapbv1.NodePrepareResourcesResponse, unprepareResourcesResponse *drapbv1.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -147,7 +147,7 @@ func setupFakeDRADriverGRPCServer(shouldTimeout bool, pluginClientTimeout *time.
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drapbv1.RegisterNodeServer(s, fakeDRADriverGRPCServer)
+	drapb.RegisterNodeServer(s, fakeDRADriverGRPCServer)
 
 	go func() {
 		go s.Serve(l)
@@ -345,7 +345,7 @@ func TestPrepareResources(t *testing.T) {
 		pod                  *v1.Pod
 		claimInfo            *ClaimInfo
 		resourceClaim        *resourcev1alpha2.ResourceClaim
-		resp                 *drapbv1.NodePrepareResourcesResponse
+		resp                 *drapb.NodePrepareResourcesResponse
 		wantErr              bool
 		wantTimeout          bool
 		wantResourceSkipped  bool
@@ -484,7 +484,7 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp:                 &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"test-reserved": nil}},
+			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"test-reserved": nil}},
 			expectedCDIDevices:   []string{},
 			ExpectedPrepareCalls: 1,
 		},
@@ -541,7 +541,7 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp:                 &drapbv1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1.NodePrepareResourceResponse{"test-reserved": nil}},
+			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{"test-reserved": nil}},
 			expectedCDIDevices:   []string{},
 			ExpectedPrepareCalls: 1,
 		},
@@ -748,8 +748,8 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -810,8 +810,8 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -884,8 +884,8 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp: &drapbv1.NodePrepareResourcesResponse{
-				Claims: map[string]*drapbv1.NodePrepareResourceResponse{
+			resp: &drapb.NodePrepareResourcesResponse{
+				Claims: map[string]*drapb.NodePrepareResourceResponse{
 					"test-reserved": {CDIDevices: []string{fmt.Sprintf("%s/%s=claim-test-reserved", driverName, driverClassName)}},
 				},
 			},
@@ -977,7 +977,7 @@ func TestUnprepareResources(t *testing.T) {
 		driverName             string
 		pod                    *v1.Pod
 		claimInfo              *ClaimInfo
-		resp                   *drapbv1.NodeUnprepareResourcesResponse
+		resp                   *drapb.NodeUnprepareResourcesResponse
 		wantErr                bool
 		wantTimeout            bool
 		wantResourceSkipped    bool
@@ -1117,7 +1117,7 @@ func TestUnprepareResources(t *testing.T) {
 					},
 				},
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"test-reserved": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"test-reserved": {}}},
 			wantErr:                true,
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
@@ -1168,7 +1168,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"": {}}},
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -1217,7 +1217,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: false,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"": {}}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"": {}}},
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -1267,7 +1267,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			resp:                   &drapbv1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1.NodeUnprepareResourceResponse{"test-reserved": nil}},
+			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{"test-reserved": nil}},
 			expectedUnprepareCalls: 1,
 		},
 	} {
@@ -1428,7 +1428,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 
 			fakeClaimInfos, err := manager.GetContainerClaimInfos(test.pod, test.container)
 			assert.NoError(t, err)
-			assert.Equal(t, 1, len(fakeClaimInfos))
+			assert.Len(t, fakeClaimInfos, 1)
 			assert.Equal(t, test.expectedClaimName, fakeClaimInfos[0].ClaimInfoState.ClaimName)
 
 			manager.cache.delete(test.pod.Spec.ResourceClaims[0].Name, "default")

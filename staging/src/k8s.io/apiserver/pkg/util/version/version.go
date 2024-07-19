@@ -155,3 +155,15 @@ func DefaultKubeEffectiveVersion() MutableEffectiveVersion {
 	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).WithInfo(baseversion.Get())
 	return newEffectiveVersion(binaryVersion)
 }
+
+// ValidateKubeEffectiveVersion validates the EmulationVersion is equal to the binary version at 1.31 for kube components.
+// TODO: remove in 1.32
+// emulationVersion is introduced in 1.31, so it is only allowed to be equal to the binary version at 1.31.
+func ValidateKubeEffectiveVersion(effectiveVersion EffectiveVersion) error {
+	binaryVersion := version.MajorMinor(effectiveVersion.BinaryVersion().Major(), effectiveVersion.BinaryVersion().Minor())
+	if binaryVersion.EqualTo(version.MajorMinor(1, 31)) && !effectiveVersion.EmulationVersion().EqualTo(binaryVersion) {
+		return fmt.Errorf("emulation version needs to be equal to binary version(%s) in compatibility-version alpha, got %s",
+			binaryVersion.String(), effectiveVersion.EmulationVersion().String())
+	}
+	return nil
+}

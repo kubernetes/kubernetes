@@ -385,6 +385,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowInvalidTopologySpreadConstraintLabelSelector: false,
 		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
 		AllowNonLocalProjectedTokenPath:                   false,
+		AllowImageVolumeSource:                            utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -713,6 +714,7 @@ func dropDisabledFields(
 	}
 
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
+	dropImageVolumes(podSpec, oldPodSpec)
 }
 
 func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
@@ -1259,4 +1261,57 @@ func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 			}
 		}
 	}
+}
+
+// KEP: https://kep.k8s.io/4639
+func dropImageVolumes(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) || imageVolumesInUse(oldPodSpec) {
+		return
+	}
+
+	imageVolumeNames := sets.New[string]()
+	var newVolumes []api.Volume
+	for _, v := range podSpec.Volumes {
+		if v.Image != nil {
+			imageVolumeNames.Insert(v.Name)
+			continue
+		}
+		newVolumes = append(newVolumes, v)
+	}
+	podSpec.Volumes = newVolumes
+
+	dropVolumeMounts := func(givenMounts []api.VolumeMount) (newVolumeMounts []api.VolumeMount) {
+		for _, m := range givenMounts {
+			if !imageVolumeNames.Has(m.Name) {
+				newVolumeMounts = append(newVolumeMounts, m)
+			}
+		}
+		return newVolumeMounts
+	}
+
+	for i, c := range podSpec.Containers {
+		podSpec.Containers[i].VolumeMounts = dropVolumeMounts(c.VolumeMounts)
+	}
+
+	for i, c := range podSpec.InitContainers {
+		podSpec.InitContainers[i].VolumeMounts = dropVolumeMounts(c.VolumeMounts)
+	}
+
+	for i, c := range podSpec.EphemeralContainers {
+		podSpec.EphemeralContainers[i].VolumeMounts = dropVolumeMounts(c.VolumeMounts)
+	}
+}
+
+func imageVolumesInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, v := range podSpec.Volumes {
+		if v.Image != nil {
+			return true
+		}
+	}
+
+	return false
 }

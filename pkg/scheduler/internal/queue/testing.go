@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -38,7 +39,7 @@ func NewTestQueueWithObjects(
 	objs []runtime.Object,
 	opts ...Option,
 ) *PriorityQueue {
-	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
+	informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(objs...), 0)
 	return NewTestQueueWithInformerFactory(ctx, lessFn, informerFactory, opts...)
 }
 
@@ -52,4 +53,18 @@ func NewTestQueueWithInformerFactory(
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 	return pq
+}
+
+// NewPodNominator creates a nominator as a backing of framework.PodNominator.
+// A podLister is passed in so as to check if the pod exists
+// before adding its nominatedNode info.
+func NewTestPodNominator(podLister listersv1.PodLister) framework.PodNominator {
+	nominatedPodsToInfo := func(nominatedPods []PodRef) []*framework.PodInfo {
+		pods := make([]*framework.PodInfo, len(nominatedPods))
+		for i, np := range nominatedPods {
+			pods[i] = &framework.PodInfo{Pod: np.ToPod()}
+		}
+		return pods
+	}
+	return newPodNominator(podLister, nominatedPodsToInfo)
 }

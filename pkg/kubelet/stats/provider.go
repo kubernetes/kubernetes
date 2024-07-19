@@ -18,8 +18,10 @@ package stats
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	cadvisormemory "github.com/google/cadvisor/cache/memory"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -113,6 +115,9 @@ func (p *Provider) RlimitStats() (*statsapi.RlimitStats, error) {
 func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
+		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
+			return nil, nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
+		}
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
@@ -126,6 +131,9 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 func (p *Provider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
 	if err != nil {
+		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
+			return nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
+		}
 		return nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.

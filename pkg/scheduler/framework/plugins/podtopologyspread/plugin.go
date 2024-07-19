@@ -134,7 +134,7 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
@@ -156,7 +156,7 @@ func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEventWithHint
 		// We can remove UpdateNodeTaint when we remove the preCheck feature.
 		// See: https://github.com/kubernetes/kubernetes/issues/110175
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel | framework.UpdateNodeTaint}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
-	}
+	}, nil
 }
 
 func involvedInTopologySpreading(incomingPod, podWithSpreading *v1.Pod) bool {

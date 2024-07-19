@@ -309,30 +309,34 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		return authorizer.DecisionNoOpinion, "cannot authorize ResourceSlice subresources", nil
 	}
 
-	// allowed verbs: get, create, update, patch, delete
+	// allowed verbs: get, create, update, patch, delete, watch, list, deletecollection
 	verb := attrs.GetVerb()
 	switch verb {
-	case "get", "create", "update", "patch", "delete":
-		// Okay, but check individual object permission below.
-	case "watch", "list":
-		// Okay. The kubelet is trusted to use a filter for its own objects.
+	case "create":
+		// The request must come from a node with the same name as the ResourceSlice.NodeName field.
+		//
+		// For create, the noderestriction admission plugin is performing this check.
+		// Here we don't have access to the content of the new object.
+		return authorizer.DecisionAllow, "", nil
+	case "get", "update", "patch", "delete":
+		// Checking the existing object must have established that access
+		// is allowed by recording a graph edge.
+		return r.authorize(nodeName, sliceVertexType, attrs)
+	case "watch", "list", "deletecollection":
+		// Okay. The kubelet is trusted to use a filter for its own objects in watch and list.
+		// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
+		// ensures that the node is not deleting some ResourceSlice belonging to
+		// some other node.
+		//
+		// TODO (https://github.com/kubernetes/kubernetes/issues/125355):
+		// Once https://github.com/kubernetes/enhancements/pull/4600 is implemented,
+		// this code needs to be extended to verify that the node filter is indeed set.
+		// Then the admission check can be removed.
 		return authorizer.DecisionAllow, "", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a ResourceSlice", nil
+		return authorizer.DecisionNoOpinion, "only the following verbs are allowed for a ResourceSlice: get, watch, list, create, update, patch, delete, deletecollection", nil
 	}
-
-	// The request must come from a node with the same name as the ResourceSlice.NodeName field.
-	//
-	// For create, the noderestriction admission plugin is performing this check.
-	// Here we don't have access to the content of the new object.
-	if verb == "create" {
-		return authorizer.DecisionAllow, "", nil
-	}
-
-	// For any other verb, checking the existing object must have established that access
-	// is allowed by recording a graph edge.
-	return r.authorize(nodeName, sliceVertexType, attrs)
 }
 
 // hasPathFrom returns true if there is a directed path from the specified type/namespace/name to the specified Node

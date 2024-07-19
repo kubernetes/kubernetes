@@ -29,7 +29,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -38,7 +37,6 @@ import (
 	"k8s.io/klog/v2"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/podgc/metrics"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -343,23 +341,18 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	logger := klog.FromContext(ctx)
 	logger.Info("PodGC is force deleting Pod", "pod", klog.KObj(pod))
 	// Patch the pod to make sure it is transitioned to the Failed phase before deletion.
-	// This is needed for the JobPodReplacementPolicy feature to make sure Job replacement pods are created.
-	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-apps/3939-allow-replacement-when-fully-terminated#risks-and-mitigations
-	// for more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) || utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-
-		// Mark the pod as failed - this is especially important in case the pod
-		// is orphaned, in which case the pod would remain in the Running phase
-		// forever as there is no kubelet running to change the phase.
-		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			newStatus := pod.Status.DeepCopy()
-			newStatus.Phase = v1.PodFailed
-			if condition != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				apipod.UpdatePodCondition(newStatus, condition)
-			}
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-				return err
-			}
+	//
+	// Mark the pod as failed - this is especially important in case the pod
+	// is orphaned, in which case the pod would remain in the Running phase
+	// forever as there is no kubelet running to change the phase.
+	if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+		newStatus := pod.Status.DeepCopy()
+		newStatus.Phase = v1.PodFailed
+		if condition != nil {
+			apipod.UpdatePodCondition(newStatus, condition)
+		}
+		if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+			return err
 		}
 	}
 	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))

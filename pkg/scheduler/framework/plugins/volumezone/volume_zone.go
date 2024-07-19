@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -158,21 +159,7 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
 			return nil, s
 		}
-
-		for _, key := range topologyLabels {
-			if value, ok := pv.ObjectMeta.Labels[key]; ok {
-				volumeVSet, err := volumehelpers.LabelZonesToSet(value)
-				if err != nil {
-					logger.Info("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
-					continue
-				}
-				podPVTopologies = append(podPVTopologies, pvTopology{
-					pvName: pv.Name,
-					key:    key,
-					values: sets.Set[string](volumeVSet),
-				})
-			}
-		}
+		podPVTopologies = append(podPVTopologies, pl.getPVTopologies(logger, pv)...)
 	}
 	return podPVTopologies, nil
 }
@@ -272,11 +259,11 @@ func getErrorAsStatus(err error) *framework.Status {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}},
+		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
 		// A new node or updating a node's volume zone labels may make a pod schedulable.
 		//
 		// A note about UpdateNodeTaint event:
@@ -292,8 +279,8 @@ func (pl *VolumeZone) EventsToRegister() []framework.ClusterEventWithHint {
 		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}},
-	}
+		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
+	}, nil
 }
 
 // getPersistentVolumeClaimNameFromPod gets pvc names bound to a pod.
@@ -340,6 +327,69 @@ func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.Persiste
 	}
 	logger.V(5).Info("PVC is not referred from the pod", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 	return false
+}
+
+// isSchedulableAfterStorageClassAdded is invoked whenever a StorageClass is added.
+// It checks whether the addition of StorageClass has made a previously unschedulable pod schedulable.
+// Only a new StorageClass with WaitForFirstConsumer will cause a pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	_, addedStorageClass, err := util.As[*storage.StorageClass](nil, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
+	}
+	if (addedStorageClass.VolumeBindingMode == nil) || (*addedStorageClass.VolumeBindingMode != storage.VolumeBindingWaitForFirstConsumer) {
+		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
+		return framework.QueueSkip, nil
+	}
+
+	logger.V(5).Info("StorageClass with waitForFirstConsumer mode was created and it might make this pod schedulable", "pod", klog.KObj(pod), "StorageClass", klog.KObj(addedStorageClass))
+	return framework.Queue, nil
+}
+
+// isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
+// It checks whether the change of PV has made a previously unschedulable pod schedulable.
+// Changing the PV topology labels could cause the pod to become schedulable.
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	originalPV, modifiedPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
+	}
+	if originalPV == nil {
+		logger.V(5).Info("PV is newly created, which might make the pod schedulable")
+		return framework.Queue, nil
+	}
+	originalPVTopologies := pl.getPVTopologies(logger, originalPV)
+	modifiedPVTopologies := pl.getPVTopologies(logger, modifiedPV)
+	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
+		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+		return framework.Queue, nil
+	}
+
+	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
+	return framework.QueueSkip, nil
+}
+
+// getPVTopologies retrieves pvTopology from a given PV and returns the array
+// This function doesn't check spec.nodeAffinity
+// because it's read-only after creation and thus cannot be updated
+// and nodeAffinity is being handled in node affinity plugin
+func (pl *VolumeZone) getPVTopologies(logger klog.Logger, pv *v1.PersistentVolume) []pvTopology {
+	podPVTopologies := make([]pvTopology, 0)
+	for _, key := range topologyLabels {
+		if value, ok := pv.ObjectMeta.Labels[key]; ok {
+			labelZonesSet, err := volumehelpers.LabelZonesToSet(value)
+			if err != nil {
+				logger.V(5).Info("failed to parse PV's topology label, ignoring the label", "label", fmt.Sprintf("%s:%s", key, value), "err", err)
+				continue
+			}
+			podPVTopologies = append(podPVTopologies, pvTopology{
+				pvName: pv.Name,
+				key:    key,
+				values: sets.Set[string](labelZonesSet),
+			})
+		}
+	}
+	return podPVTopologies
 }
 
 // New initializes a new plugin and returns it.

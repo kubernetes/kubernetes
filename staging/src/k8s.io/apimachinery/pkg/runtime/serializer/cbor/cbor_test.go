@@ -121,15 +121,27 @@ func (p *anyObject) UnmarshalCBOR(in []byte) error {
 	return modes.Decode.Unmarshal(in, &p.Value)
 }
 
-type structWithRawExtensionField struct {
-	Extension runtime.RawExtension `json:"extension"`
+type structWithRawFields struct {
+	FieldsV1            metav1.FieldsV1       `json:"f"`
+	FieldsV1Pointer     *metav1.FieldsV1      `json:"fp"`
+	RawExtension        runtime.RawExtension  `json:"r"`
+	RawExtensionPointer *runtime.RawExtension `json:"rp"`
 }
 
-func (p structWithRawExtensionField) GetObjectKind() schema.ObjectKind {
+func (structWithRawFields) GetObjectKind() schema.ObjectKind {
 	return schema.EmptyObjectKind
 }
 
-func (structWithRawExtensionField) DeepCopyObject() runtime.Object {
+func (structWithRawFields) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+type structWithEmbeddedMetas struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+}
+
+func (structWithEmbeddedMetas) DeepCopyObject() runtime.Object {
 	panic("unimplemented")
 }
 
@@ -192,6 +204,42 @@ func TestEncode(t *testing.T) {
 			assertOnError: func(t *testing.T, err error) {
 				if err != nil {
 					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "unsupported marshaler",
+			in:   &textMarshalerObject{},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
+		{
+			name: "unsupported marshaler within unstructured content",
+			in: &unstructured.Unstructured{
+				Object: map[string]interface{}{"": textMarshalerObject{}},
+			},
+			assertOnWriter: func() (io.Writer, func(*testing.T)) {
+				var b bytes.Buffer
+				return &b, func(t *testing.T) {
+					if b.Len() != 0 {
+						t.Errorf("expected no bytes to be written, got %d", b.Len())
+					}
+				}
+			},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize map[string]interface {}: cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
 				}
 			},
 		},
@@ -277,13 +325,35 @@ func TestDecode(t *testing.T) {
 			},
 		},
 		{
-			name:        "rawextension transcoded",
-			data:        []byte{0xa1, 0x49, 'e', 'x', 't', 'e', 'n', 's', 'i', 'o', 'n', 0xa1, 0x41, 'a', 0x01},
+			name:        "raw types transcoded",
+			data:        []byte{0xa4, 0x41, 'f', 0xa1, 0x41, 'a', 0x01, 0x42, 'f', 'p', 0xa1, 0x41, 'z', 0x02, 0x41, 'r', 0xa1, 0x41, 'b', 0x03, 0x42, 'r', 'p', 0xa1, 0x41, 'y', 0x04},
 			gvk:         &schema.GroupVersionKind{},
 			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
 			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
-			into:        &structWithRawExtensionField{},
-			expectedObj: &structWithRawExtensionField{Extension: runtime.RawExtension{Raw: []byte(`{"a":1}`)}},
+			into:        &structWithRawFields{},
+			expectedObj: &structWithRawFields{
+				FieldsV1:            metav1.FieldsV1{Raw: []byte(`{"a":1}`)},
+				FieldsV1Pointer:     &metav1.FieldsV1{Raw: []byte(`{"z":2}`)},
+				RawExtension:        runtime.RawExtension{Raw: []byte(`{"b":3}`)},
+				RawExtensionPointer: &runtime.RawExtension{Raw: []byte(`{"y":4}`)},
+			},
+			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
+			assertOnError: func(t *testing.T, err error) {
+				if err != nil {
+					t.Errorf("expected nil error, got: %v", err)
+				}
+			},
+		},
+		{
+			name:        "object with embedded typemeta and objectmeta",
+			data:        []byte("\xa2\x48metadata\xa1\x44name\x43foo\x44spec\xa0"), // {"metadata": {"name": "foo"}}
+			gvk:         &schema.GroupVersionKind{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Group: "x", Version: "y", Kind: "z"}}},
+			into:        &structWithEmbeddedMetas{},
+			expectedObj: &structWithEmbeddedMetas{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			},
 			expectedGVK: &schema.GroupVersionKind{Group: "x", Version: "y", Kind: "z"},
 			assertOnError: func(t *testing.T, err error) {
 				if err != nil {
@@ -591,6 +661,19 @@ func TestDecode(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "into unsupported marshaler",
+			data:        []byte("\xa0"),
+			into:        &textMarshalerObject{},
+			metaFactory: stubMetaFactory{gvk: &schema.GroupVersionKind{}},
+			typer:       stubTyper{gvks: []schema.GroupVersionKind{{Version: "v", Kind: "k"}}},
+			expectedGVK: &schema.GroupVersionKind{Version: "v", Kind: "k"},
+			assertOnError: func(t *testing.T, err error) {
+				if want := "unable to serialize *cbor.textMarshalerObject: *cbor.textMarshalerObject implements encoding.TextMarshaler without corresponding cbor interface"; err == nil || err.Error() != want {
+					t.Errorf("expected error %q, got: %v", want, err)
+				}
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := newSerializer(tc.metaFactory, tc.creater, tc.typer, tc.options...)
@@ -607,6 +690,20 @@ func TestDecode(t *testing.T) {
 			}
 		})
 	}
+}
+
+type textMarshalerObject struct{}
+
+func (p textMarshalerObject) GetObjectKind() schema.ObjectKind {
+	return schema.EmptyObjectKind
+}
+
+func (textMarshalerObject) DeepCopyObject() runtime.Object {
+	panic("unimplemented")
+}
+
+func (textMarshalerObject) MarshalText() ([]byte, error) {
+	return nil, nil
 }
 
 func TestMetaFactoryInterpret(t *testing.T) {

@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +44,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -129,22 +127,20 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 }
 
 func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
-	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
+	pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	newStatus := pod.Status.DeepCopy()
+	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
+		Type:    v1.DisruptionTarget,
+		Status:  v1.ConditionTrue,
+		Reason:  "DeletionByTaintManager",
+		Message: "Taint manager: deleting due to NoExecute taint",
+	})
+	if updated {
+		if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
 			return err
-		}
-		newStatus := pod.Status.DeepCopy()
-		updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
-			Type:    v1.DisruptionTarget,
-			Status:  v1.ConditionTrue,
-			Reason:  "DeletionByTaintManager",
-			Message: "Taint manager: deleting due to NoExecute taint",
-		})
-		if updated {
-			if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
-				return err
-			}
 		}
 	}
 	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})

@@ -19,6 +19,7 @@ package dra
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"net"
@@ -38,10 +39,19 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery/cached/memory"
 	resourceapiinformer "k8s.io/client-go/informers/resource/v1alpha2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
@@ -52,22 +62,26 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"sigs.k8s.io/yaml"
 )
 
 const (
-	NodePrepareResourcesMethod      = "/v1alpha3.Node/NodePrepareResources"
-	NodeUnprepareResourcesMethod    = "/v1alpha3.Node/NodeUnprepareResources"
-	NodeListAndWatchResourcesMethod = "/v1alpha3.Node/NodeListAndWatchResources"
+	NodePrepareResourcesMethod   = "/v1alpha3.Node/NodePrepareResources"
+	NodeUnprepareResourcesMethod = "/v1alpha3.Node/NodeUnprepareResources"
 )
 
 type Nodes struct {
 	NodeNames []string
 }
 
+//go:embed test-driver/deploy/example/plugin-permissions.yaml
+var pluginPermissions string
+
 // NewNodes selects nodes to run the test on.
 func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 	nodes := &Nodes{}
 	ginkgo.BeforeEach(func(ctx context.Context) {
+
 		ginkgo.By("selecting nodes")
 		// The kubelet plugin is harder. We deploy the builtin manifest
 		// after patching in the driver name and all nodes on which we
@@ -167,15 +181,19 @@ type MethodInstance struct {
 }
 
 type Driver struct {
-	f       *framework.Framework
-	ctx     context.Context
-	cleanup []func() // executed first-in-first-out
-	wg      sync.WaitGroup
+	f                  *framework.Framework
+	ctx                context.Context
+	cleanup            []func() // executed first-in-first-out
+	wg                 sync.WaitGroup
+	serviceAccountName string
 
 	NameSuffix string
 	Controller *app.ExampleController
 	Name       string
-	Nodes      map[string]*app.ExamplePlugin
+
+	// Nodes contains entries for each node selected for a test when the test runs.
+	// In addition, there is one entry for a fictional node.
+	Nodes map[string]KubeletPlugin
 
 	parameterMode         parameterMode
 	parameterAPIGroup     string
@@ -190,6 +208,11 @@ type Driver struct {
 	callCounts map[MethodInstance]int64
 }
 
+type KubeletPlugin struct {
+	*app.ExamplePlugin
+	ClientSet kubernetes.Interface
+}
+
 type parameterMode string
 
 const (
@@ -200,7 +223,7 @@ const (
 
 func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	ginkgo.By(fmt.Sprintf("deploying driver on nodes %v", nodes.NodeNames))
-	d.Nodes = map[string]*app.ExamplePlugin{}
+	d.Nodes = make(map[string]KubeletPlugin)
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 	resources.DriverName = d.Name
 
@@ -251,6 +274,13 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 		framework.Failf("unknown test driver parameter mode: %s", d.parameterMode)
 	}
 
+	// Create service account and corresponding RBAC rules.
+	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + "-service-account"
+	content := pluginPermissions
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.f.Namespace.Name)
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name)
+	d.createFromYAML(ctx, []byte(content), d.f.Namespace.Name)
+
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
@@ -263,6 +293,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			item.Spec.Replicas = &numNodes
 			item.Spec.Selector.MatchLabels[instanceKey] = d.Name
 			item.Spec.Template.Labels[instanceKey] = d.Name
+			item.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
 			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = d.Name
 			item.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
@@ -306,15 +337,31 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	framework.ExpectNoError(err, "list proxy pods")
 	gomega.Expect(numNodes).To(gomega.Equal(int32(len(pods.Items))), "number of proxy pods")
 
-	// Run registar and plugin for each of the pods.
+	// Run registrar and plugin for each of the pods.
 	for _, pod := range pods.Items {
 		// Need a local variable, not the loop variable, for the anonymous
 		// callback functions below.
 		pod := pod
 		nodename := pod.Spec.NodeName
+
+		// Authenticate the plugin so that it has the exact same
+		// permissions as the daemonset pod. This includes RBAC and a
+		// validating admission policy which limits writes to per-node
+		// ResourceSlices.
+		//
+		// We could retrieve
+		// /var/run/secrets/kubernetes.io/serviceaccount/token from
+		// each pod and use it. That would check that
+		// ServiceAccountTokenNodeBindingValidation works. But that's
+		// better covered by a test owned by SIG Auth (like the one in
+		// https://github.com/kubernetes/kubernetes/pull/124711).
+		//
+		// Here we merely use impersonation, which is faster.
+		driverClient := d.impersonateKubeletPlugin(&pod)
+
 		logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin"), "node", pod.Spec.NodeName, "pod", klog.KObj(&pod))
 		loggerCtx := klog.NewContext(ctx, logger)
-		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, nodename,
+		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename,
 			app.FileOperations{
 				Create: func(name string, content []byte) error {
 					klog.Background().Info("creating CDI file", "node", nodename, "filename", name, "content", string(content))
@@ -343,7 +390,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 			// Depends on cancel being called first.
 			plugin.Stop()
 		})
-		d.Nodes[nodename] = plugin
+		d.Nodes[nodename] = KubeletPlugin{ExamplePlugin: plugin, ClientSet: driverClient}
 	}
 
 	// Wait for registration.
@@ -360,6 +407,26 @@ func (d *Driver) SetUp(nodes *Nodes, resources app.Resources) {
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "hosts where the plugin has not been registered yet")
 }
 
+func (d *Driver) impersonateKubeletPlugin(pod *v1.Pod) kubernetes.Interface {
+	ginkgo.GinkgoHelper()
+	driverUserInfo := (&serviceaccount.ServiceAccountInfo{
+		Name:      d.serviceAccountName,
+		Namespace: pod.Namespace,
+		NodeName:  pod.Spec.NodeName,
+		PodName:   pod.Name,
+		PodUID:    string(pod.UID),
+	}).UserInfo()
+	driverClientConfig := d.f.ClientConfig()
+	driverClientConfig.Impersonate = rest.ImpersonationConfig{
+		UserName: driverUserInfo.GetName(),
+		Groups:   driverUserInfo.GetGroups(),
+		Extra:    driverUserInfo.GetExtra(),
+	}
+	driverClient, err := kubernetes.NewForConfig(driverClientConfig)
+	framework.ExpectNoError(err, "create client for driver")
+	return driverClient
+}
+
 func (d *Driver) createFile(pod *v1.Pod, name string, content []byte) error {
 	buffer := bytes.NewBuffer(content)
 	// Writing the content can be slow. Better create a temporary file and
@@ -374,6 +441,57 @@ func (d *Driver) createFile(pod *v1.Pod, name string, content []byte) error {
 
 func (d *Driver) removeFile(pod *v1.Pod, name string) error {
 	return d.podIO(pod).RemoveAll(name)
+}
+
+func (d *Driver) createFromYAML(ctx context.Context, content []byte, namespace string) {
+	// Not caching the discovery result isn't very efficient, but good enough.
+	discoveryCache := memory.NewMemCacheClient(d.f.ClientSet.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryCache)
+
+	for _, content := range bytes.Split(content, []byte("---\n")) {
+		if len(content) == 0 {
+			continue
+		}
+
+		var obj *unstructured.Unstructured
+		framework.ExpectNoError(yaml.UnmarshalStrict(content, &obj), fmt.Sprintf("Full YAML:\n%s\n", string(content)))
+
+		gv, err := schema.ParseGroupVersion(obj.GetAPIVersion())
+		framework.ExpectNoError(err, fmt.Sprintf("extract group+version from object %q", klog.KObj(obj)))
+		gk := schema.GroupKind{Group: gv.Group, Kind: obj.GetKind()}
+
+		mapping, err := restMapper.RESTMapping(gk, gv.Version)
+		framework.ExpectNoError(err, fmt.Sprintf("map %q to resource", gk))
+
+		resourceClient := d.f.DynamicClient.Resource(mapping.Resource)
+		options := metav1.CreateOptions{
+			// If the YAML input is invalid, then we want the
+			// apiserver to tell us via an error. This can
+			// happen because decoding into an unstructured object
+			// doesn't validate.
+			FieldValidation: "Strict",
+		}
+		switch mapping.Scope.Name() {
+		case meta.RESTScopeNameRoot:
+			_, err = resourceClient.Create(ctx, obj, options)
+		case meta.RESTScopeNameNamespace:
+			if namespace == "" {
+				framework.Failf("need namespace for object type %s", gk)
+			}
+			_, err = resourceClient.Namespace(namespace).Create(ctx, obj, options)
+		}
+		framework.ExpectNoError(err, "create object")
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			del := resourceClient.Delete
+			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+				del = resourceClient.Namespace(namespace).Delete
+			}
+			err := del(ctx, obj.GetName(), metav1.DeleteOptions{})
+			if !apierrors.IsNotFound(err) {
+				framework.ExpectNoError(err, fmt.Sprintf("deleting %s.%s %s", obj.GetKind(), obj.GetAPIVersion(), klog.KObj(obj)))
+			}
+		})
+	}
 }
 
 func (d *Driver) podIO(pod *v1.Pod) proxy.PodDirIO {

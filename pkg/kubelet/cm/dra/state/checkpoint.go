@@ -18,6 +18,7 @@ package state
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"strings"
@@ -25,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	cmerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 var _ checkpointmanager.Checkpoint = &DRAManagerCheckpoint{}
@@ -79,7 +80,7 @@ func (dc *DRAManagerCheckpoint) VerifyChecksum() error {
 	ck := dc.Checksum
 	dc.Checksum = 0
 	err := ck.Verify(dc)
-	if err == errors.ErrCorruptCheckpoint {
+	if errors.Is(err, cmerrors.CorruptCheckpointError{}) {
 		// Verify with old structs without ResourceHandles field
 		// TODO: remove in Beta
 		err = verifyChecksumWithoutResourceHandles(dc, ck)
@@ -115,8 +116,12 @@ func verifyChecksumWithoutResourceHandles(dc *DRAManagerCheckpoint, checkSum che
 	object = strings.Replace(object, "ClaimInfoStateListWithoutResourceHandles", "ClaimInfoStateList", 1)
 	hash := fnv.New32a()
 	fmt.Fprintf(hash, "%v", object)
-	if checkSum != checksum.Checksum(hash.Sum32()) {
-		return errors.ErrCorruptCheckpoint
+	actualCS := checksum.Checksum(hash.Sum32())
+	if checkSum != actualCS {
+		return &cmerrors.CorruptCheckpointError{
+			ActualCS:   uint64(actualCS),
+			ExpectedCS: uint64(checkSum),
+		}
 	}
 	return nil
 }

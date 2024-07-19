@@ -301,7 +301,6 @@ const (
 
 	// owner: @p0lyn0mial
 	// alpha: v1.27
-	// beta: v1.31
 	//
 	// Allow the API server to stream individual items instead of chunking
 	WatchList featuregate.Feature = "WatchList"
@@ -309,7 +308,6 @@ const (
 	// owner: @serathius
 	// kep: http://kep.k8s.io/2340
 	// alpha: v1.28
-	// beta: v1.31
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
@@ -408,9 +406,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	InPlacePodVerticalScaling: {Default: false, PreRelease: featuregate.Alpha},
 
-	WatchList: {Default: true, PreRelease: featuregate.Beta},
+	WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
-	ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
+	ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
 	ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 }

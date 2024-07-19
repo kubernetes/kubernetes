@@ -232,7 +232,7 @@ func (c *FakeReplicaSets) ApplyScale(ctx context.Context, replicaSetName string,
 	}
 	emptyResult := &v1beta1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, replicaSetName, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(replicasetsResource, c.ns, replicaSetName, types.ApplyPatchType, data, opts.ToPatchOptions(), "scale"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

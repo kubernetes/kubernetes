@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gcustom"
 	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
@@ -891,17 +892,98 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			driver := NewDriver(f, nodes, perNode(1, nodes))
 			driver.parameterMode = parameterModeStructured
 
-			f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
-				nodeName := nodes.NodeNames[0]
-				driverName := driver.Name
+			f.It("must apply per-node permission checks", func(ctx context.Context) {
+				// All of the operations use the client set of a kubelet plugin for
+				// a fictional node which both don't exist, so nothing interferes
+				// when we actually manage to create a slice.
+				fictionalNodeName := "dra-fictional-node"
+				gomega.Expect(nodes.NodeNames).NotTo(gomega.ContainElement(fictionalNodeName))
+				fictionalNodeClient := driver.impersonateKubeletPlugin(&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fictionalNodeName + "-dra-plugin",
+						Namespace: f.Namespace.Name,
+						UID:       "12345",
+					},
+					Spec: v1.PodSpec{
+						NodeName: fictionalNodeName,
+					},
+				})
 
-				// Check for gRPC call on one node. If that already fails, then
-				// we have a fundamental problem.
-				m := MethodInstance{nodeName, NodeListAndWatchResourcesMethod}
-				ginkgo.By("wait for NodeListAndWatchResources call")
-				gomega.Eventually(ctx, func() int64 {
-					return driver.CallCount(m)
-				}).WithTimeout(podStartTimeout).Should(gomega.BeNumerically(">", int64(0)), "NodeListAndWatchResources call count")
+				// This is for some actual node in the cluster.
+				realNodeName := nodes.NodeNames[0]
+				realNodeClient := driver.Nodes[realNodeName].ClientSet
+
+				// This is the slice that we try to create. It needs to be deleted
+				// after testing, if it still exists at that time.
+				fictionalNodeSlice := &resourcev1alpha2.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fictionalNodeName + "-slice",
+					},
+					NodeName:   fictionalNodeName,
+					DriverName: "dra.example.com",
+					ResourceModel: resourcev1alpha2.ResourceModel{
+						NamedResources: &resourcev1alpha2.NamedResourcesResources{},
+					},
+				}
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					err := f.ClientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, fictionalNodeSlice.Name, metav1.DeleteOptions{})
+					if !apierrors.IsNotFound(err) {
+						framework.ExpectNoError(err)
+					}
+				})
+
+				// Message from test-driver/deploy/example/plugin-permissions.yaml
+				matchVAPDeniedError := gomega.MatchError(gomega.ContainSubstring("may only modify resourceslices that belong to the node the pod is running on"))
+
+				mustCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice) *resourcev1alpha2.ResourceSlice {
+					ginkgo.GinkgoHelper()
+					slice, err := clientSet.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+					framework.ExpectNoError(err, fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
+					return slice
+				}
+				mustUpdate := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice) *resourcev1alpha2.ResourceSlice {
+					ginkgo.GinkgoHelper()
+					slice, err := clientSet.ResourceV1alpha2().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+					framework.ExpectNoError(err, fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
+					return slice
+				}
+				mustDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice) {
+					ginkgo.GinkgoHelper()
+					err := clientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err, fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
+				}
+				mustFailToCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice, matchError types.GomegaMatcher) {
+					ginkgo.GinkgoHelper()
+					_, err := clientSet.ResourceV1alpha2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+					gomega.Expect(err).To(matchError, fmt.Sprintf("CREATE: %s + %s", clientName, slice.Name))
+				}
+				mustFailToUpdate := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice, matchError types.GomegaMatcher) {
+					ginkgo.GinkgoHelper()
+					_, err := clientSet.ResourceV1alpha2().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+					gomega.Expect(err).To(matchError, fmt.Sprintf("UPDATE: %s + %s", clientName, slice.Name))
+				}
+				mustFailToDelete := func(clientSet kubernetes.Interface, clientName string, slice *resourcev1alpha2.ResourceSlice, matchError types.GomegaMatcher) {
+					ginkgo.GinkgoHelper()
+					err := clientSet.ResourceV1alpha2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{})
+					gomega.Expect(err).To(matchError, fmt.Sprintf("DELETE: %s + %s", clientName, slice.Name))
+				}
+
+				// Create with different clients, keep it in the end.
+				mustFailToCreate(realNodeClient, "real plugin", fictionalNodeSlice, matchVAPDeniedError)
+				createdFictionalNodeSlice := mustCreate(fictionalNodeClient, "fictional plugin", fictionalNodeSlice)
+
+				// Update with different clients.
+				mustFailToUpdate(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError)
+				createdFictionalNodeSlice = mustUpdate(fictionalNodeClient, "fictional plugin", createdFictionalNodeSlice)
+				createdFictionalNodeSlice = mustUpdate(f.ClientSet, "admin", createdFictionalNodeSlice)
+
+				// Delete with different clients.
+				mustFailToDelete(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError)
+				mustDelete(fictionalNodeClient, "fictional plugin", createdFictionalNodeSlice)
+			})
+
+			f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
+				driverName := driver.Name
 
 				// Now check for exactly the right set of objects for all nodes.
 				ginkgo.By("check if ResourceSlice object(s) exist on the API server")
@@ -1109,6 +1191,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b := newBuilder(f, driver)
 			preScheduledTests(b, driver, resourcev1alpha2.AllocationModeImmediate)
 			claimTests(b, driver, resourcev1alpha2.AllocationModeImmediate)
+
 		})
 	})
 

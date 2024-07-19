@@ -139,7 +139,7 @@ func TestRelisting(t *testing.T) {
 	// changed.
 	pleg.Relist()
 	actual = getEventsFromChannel(ch)
-	assert.True(t, len(actual) == 0, "no container has changed, event length should be 0")
+	assert.Empty(t, actual, "no container has changed, event length should be 0")
 
 	runtime.AllPodList = []*containertest.FakePod{
 		{Pod: &kubecontainer.Pod{
@@ -227,7 +227,7 @@ func TestEventChannelFull(t *testing.T) {
 	}
 	// event channel is full, discard events
 	actual = getEventsFromChannel(ch)
-	assert.True(t, len(actual) == 4, "channel length should be 4")
+	assert.Len(t, actual, 4, "channel length should be 4")
 	assert.Subsetf(t, allEvents, actual, "actual events should in all events")
 }
 

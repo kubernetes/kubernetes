@@ -526,6 +526,10 @@
                   "volumeAttributesClassName": "volumeAttributesClassNameValue"
                 }
               }
+            },
+            "image": {
+              "reference": "referenceValue",
+              "pullPolicy": "pullPolicyValue"
             }
           }
         ],

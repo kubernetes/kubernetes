@@ -70,6 +70,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletConfigDropInDir = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
 
+	// KubeletSeparateDiskGC (SIG-node, used for testing separate image filesystem <https://kep.k8s.io/4191>)
+	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
+	KubeletSeparateDiskGC = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletSeparateDiskGC"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LSCIQuotaMonitoring = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
 
@@ -85,6 +89,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	ProcMountType = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ProcMountType"))
+
 	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)
 	RecursiveReadOnlyMounts = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RecursiveReadOnlyMounts"))
 
@@ -94,16 +101,18 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RuntimeHandler = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
+
 	// Added to test Swap Feature
 	// This label should be used when testing KEP-2400 (Node Swap Support)
 	Swap = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeSwap"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	SystemNodeCriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
 
+	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	UserNamespacesSupport = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("UserNamespacesSupport"))
 	// Please keep the list in alphabetical order.
 )
 
