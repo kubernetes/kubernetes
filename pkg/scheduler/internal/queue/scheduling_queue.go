@@ -497,6 +497,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				continue
 			}
 
+			start := time.Now()
 			hint, err := hintfn.QueueingHintFn(logger, pod, oldObj, newObj)
 			if err != nil {
 				// If the QueueingHintFn returned an error, we should treat the event as Queue so that we can prevent
@@ -509,6 +510,8 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				}
 				hint = framework.Queue
 			}
+			metrics.QueueingHintExecutionDuration.WithLabelValues(hintfn.PluginName, event.Label, queueingHintToLabel(hint, err)).Observe(metrics.SinceInSeconds(start))
+
 			if hint == framework.QueueSkip {
 				continue
 			}
@@ -534,6 +537,23 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 	}
 
 	return queueStrategy
+}
+
+// queueingHintToLabel converts a hint and an error from QHint to a label string.
+func queueingHintToLabel(hint framework.QueueingHint, err error) string {
+	if err != nil {
+		return metrics.QueueingHintResultError
+	}
+
+	switch hint {
+	case framework.Queue:
+		return metrics.QueueingHintResultQueue
+	case framework.QueueSkip:
+		return metrics.QueueingHintResultQueueSkip
+	}
+
+	// Shouldn't reach here.
+	return ""
 }
 
 // runPreEnqueuePlugins iterates PreEnqueue function in each registered PreEnqueuePlugin.

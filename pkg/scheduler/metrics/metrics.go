@@ -20,8 +20,10 @@ import (
 	"sync"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/features"
 	volumebindingmetrics "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
 
@@ -71,6 +73,12 @@ const (
 	Reserve                     = "Reserve"
 	Unreserve                   = "Unreserve"
 	Permit                      = "Permit"
+)
+
+const (
+	QueueingHintResultQueue     = "Queue"
+	QueueingHintResultQueueSkip = "QueueSkip"
+	QueueingHintResultError     = "Error"
 )
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
@@ -198,6 +206,19 @@ var (
 		},
 		[]string{"plugin", "extension_point", "status"})
 
+	// This is only available when the QHint feature gate is enabled.
+	QueueingHintExecutionDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "queueing_hint_execution_duration_seconds",
+			Help:      "Duration for running a queueing hint from a plugin.",
+			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// so that we have better granularity since plugin latency is very sensitive.
+			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"plugin", "event", "hint"})
+
 	SchedulerQueueIncomingPods = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -269,6 +290,9 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		RegisterMetrics(metricsList...)
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			RegisterMetrics(QueueingHintExecutionDuration)
+		}
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 	})
 }
