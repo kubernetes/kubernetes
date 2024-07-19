@@ -83,6 +83,16 @@ var (
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
 
+	EventHandlingLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "event_handling_duration_seconds",
+			Help:      "Event handling latency in seconds.",
+			// Start with 0.1ms with the last bucket being [~200ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"event"})
+
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -234,6 +244,7 @@ var (
 		scheduleAttempts,
 		schedulingLatency,
 		SchedulingAlgorithmLatency,
+		EventHandlingLatency,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
