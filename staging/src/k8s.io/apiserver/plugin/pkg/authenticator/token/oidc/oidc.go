@@ -42,9 +42,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
+
+	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -58,7 +60,6 @@ import (
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/klog/v2"
 )
 
 var (

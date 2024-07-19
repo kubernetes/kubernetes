@@ -18,9 +18,7 @@ limitations under the License.
 
 package handlers
 
-import (
-	"gopkg.in/square/go-jose.v2"
-)
+import "github.com/go-jose/go-jose/v3"
 
 type Token struct {
 	IDToken      string `json:"id_token"`

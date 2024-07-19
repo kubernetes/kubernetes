@@ -87,7 +87,6 @@ process_content () {
      # more than two path elements. For example:
      # - gopkg.in/yaml.v2
      # - gopkg.in/inf.v0
-     # - gopkg.in/square/go-jose.v2
      package_root=$(echo "${package}" |grep -oh '.*\.v[0-9]')
      ;;
     */*)

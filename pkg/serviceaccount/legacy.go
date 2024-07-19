@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
+	"github.com/go-jose/go-jose/v3/jwt"
+
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/warning"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	typedv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/klog/v2"
 )
 
 const InvalidSinceLabelKey = "kubernetes.io/legacy-token-invalid-since"

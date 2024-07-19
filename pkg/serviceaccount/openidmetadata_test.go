@@ -28,8 +28,8 @@ import (
 	"testing"
 
 	restful "github.com/emicklei/go-restful/v3"
+	"github.com/go-jose/go-jose/v3"
 	"github.com/google/go-cmp/cmp"
-	jose "gopkg.in/square/go-jose.v2"
 
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"

@@ -29,10 +29,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/coreos/go-oidc"
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
-	"gopkg.in/square/go-jose.v2/jwt"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )

@@ -26,11 +26,12 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	jose "gopkg.in/square/go-jose.v2"
+	"github.com/go-jose/go-jose/v3"
+
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 )
 
 const (
