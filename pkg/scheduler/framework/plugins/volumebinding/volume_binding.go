@@ -240,6 +240,15 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		return framework.Queue, err
 	}
 
+	if oldCap == nil {
+		logger.V(5).Info(
+			"A new CSIStorageCapacity was created, which could make a Pod schedulable",
+			"Pod", klog.KObj(pod),
+			"CSIStorageCapacity", klog.KObj(newCap),
+		)
+		return framework.Queue, nil
+	}
+
 	oldLimit := volumeLimit(oldCap)
 	newLimit := volumeLimit(newCap)
 
@@ -250,11 +259,6 @@ func (pl *VolumeBinding) isSchedulableAfterCSIStorageCapacityChange(logger klog.
 		"volumeLimit(new)", newLimit,
 		"volumeLimit(old)", oldLimit,
 	)
-
-	if oldCap == nil {
-		logger.V(5).Info("A new CSIStorageCapacity was created, which could make a Pod schedulable")
-		return framework.Queue, nil
-	}
 
 	if newLimit != nil && (oldLimit == nil || newLimit.Value() > oldLimit.Value()) {
 		logger.V(5).Info("VolumeLimit was increased, which could make a Pod schedulable", "volumeLimit(new)", newLimit, "volumeLimit(old)", oldLimit)
