@@ -162,6 +162,10 @@ func (w *worker) run() {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+		if w.spec.HTTPGet != nil {
+			key := probeKey{podUID: w.pod.UID, containerName: w.container.Name, probeType: w.probeType}
+			w.probeManager.prober.httpProbeReqCache.Delete(key)
+		}
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
 		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)

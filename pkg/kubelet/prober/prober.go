@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -49,6 +51,8 @@ type prober struct {
 	runner kubecontainer.CommandRunner
 
 	recorder record.EventRecorder
+
+	httpProbeReqCache sync.Map
 }
 
 // NewProber creates a Prober, it takes a command runner and
@@ -142,9 +146,18 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		return pb.exec.Probe(pb.newExecInContainer(ctx, container, containerID, command, timeout))
 
 	case p.HTTPGet != nil:
-		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
-		if err != nil {
-			return probe.Unknown, "", err
+		var err error
+		key := probeKey{podUID: pod.UID, containerName: container.Name, probeType: probeType}
+		reqAny, found := pb.httpProbeReqCache.Load(key)
+		req, _ := reqAny.(*http.Request)
+		// In case of cache hit, when the Host field of HTTPGet probe is not specified,
+		// the cached request object could stale because of PodIP change
+		if !found || (p.HTTPGet.Host == "" && req.URL.Hostname() != status.PodIP) {
+			req, err = httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
+			if err != nil {
+				return probe.Unknown, "", err
+			}
+			pb.httpProbeReqCache.Store(key, req)
 		}
 		if klogV4 := klog.V(4); klogV4.Enabled() {
 			port := req.URL.Port()
