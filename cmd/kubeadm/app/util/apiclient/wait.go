@@ -250,7 +250,12 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 		healthzEndpoint = fmt.Sprintf("http://%s:%d/healthz", healthzAddress, healthzPort)
 	)
 
-	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet. This can take up to %v\n", w.timeout)
+	if healthzPort == 0 {
+		fmt.Println("[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
+		return nil
+	}
+	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
+		healthzEndpoint, w.timeout)
 
 	formatError := func(cause string) error {
 		return errors.Errorf("The HTTP call equal to 'curl -sSL %s' returned %s\n",
