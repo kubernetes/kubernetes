@@ -660,17 +660,12 @@ func (p *PriorityQueue) existsInActiveQ(pInfo *framework.QueuedPodInfo) bool {
 }
 
 func (p *PriorityQueue) activate(logger klog.Logger, pod *v1.Pod) bool {
-	// Verify if the pod is present in activeQ.
-	if p.existsInActiveQ(newQueuedPodInfoForLookup(pod)) {
-		// No need to activate if it's already present in activeQ.
-		return false
-	}
 	var pInfo *framework.QueuedPodInfo
 	// Verify if the pod is present in unschedulablePods or backoffQ.
 	if pInfo = p.unschedulablePods.get(pod); pInfo == nil {
 		// If the pod doesn't belong to unschedulablePods or backoffQ, don't activate it.
+		// The pod can be already in activeQ.
 		if obj, exists, _ := p.podBackoffQ.Get(newQueuedPodInfoForLookup(pod)); !exists {
-			logger.Error(nil, "To-activate pod does not exist in unschedulablePods or backoffQ", "pod", klog.KObj(pod))
 			return false
 		} else {
 			pInfo = obj.(*framework.QueuedPodInfo)
