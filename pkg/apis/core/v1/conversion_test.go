@@ -638,6 +638,16 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 		{
 			PodCIDR: "ace:cab:deca::/8",
 		},
+		// Both are provided - 4
+		{
+			PodCIDR:  "10.0.1.0/24",
+			PodCIDRs: []string{"10.0.1.0/24"},
+		},
+		// Both are provided - 6
+		{
+			PodCIDR:  "ace:cab:deca::/8",
+			PodCIDRs: []string{"ace:cab:deca::/8"},
+		},
 		// Both are provided 4,6
 		{
 			PodCIDR:  "10.0.1.0/24",
