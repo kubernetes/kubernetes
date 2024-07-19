@@ -67,6 +67,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ImageID = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
 
+	// ImageVolume is used for testing the image volume source feature (https://kep.k8s.io/4639).
+	ImageVolume = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ImageVolume"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletConfigDropInDir = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
 
