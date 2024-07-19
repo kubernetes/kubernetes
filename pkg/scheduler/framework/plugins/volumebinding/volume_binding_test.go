@@ -1402,7 +1402,7 @@ func TestIsSchedulableAfterCSIStorageCapacityChange(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			qhint, err := pl.isSchedulableAfterCSIStorageCapacityChange(logger, item.pod, item.oldCap, item.newCap)
 			if (err != nil) != item.wantErr {
-				t.Errorf("isSchedulableAfterCSIStorageCapacityChange failed - got: %q", err)
+				t.Errorf("error is unexpectedly returned or not returned from isSchedulableAfterCSIStorageCapacityChange. wantErr: %v actual error: %q", item.wantErr, err)
 			}
 			if qhint != item.expect {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, item.expect)
