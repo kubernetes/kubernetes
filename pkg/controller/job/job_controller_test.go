@@ -2756,7 +2756,7 @@ func getCondition(job *batch.Job, condition batch.JobConditionType, status v1.Co
 // reaching the active deadline, at which point it is marked as Failed.
 func TestPastDeadlineJobFinished(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	fakeClock := clocktesting.NewFakeClock(time.Now().Truncate(time.Second))
 	manager, sharedInformerFactory := newControllerFromClientWithClock(ctx, t, clientset, controller.NoResyncPeriodFunc, fakeClock)
 	manager.podStoreSynced = alwaysReady
@@ -6044,7 +6044,7 @@ func TestGetPodsForJob(t *testing.T) {
 			if tc.jobDeleted {
 				job.DeletionTimestamp = &metav1.Time{}
 			}
-			clientSet := fake.NewSimpleClientset(job, otherJob)
+			clientSet := fake.NewClientset(job, otherJob)
 			jm, informer := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)
 			jm.podStoreSynced = alwaysReady
 			jm.jobStoreSynced = alwaysReady
@@ -6416,7 +6416,7 @@ func TestSyncJobExpectations(t *testing.T) {
 
 func TestWatchJobs(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("jobs", core.DefaultWatchReactor(fakeWatch, nil))
 	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -6461,7 +6461,7 @@ func TestWatchJobs(t *testing.T) {
 func TestWatchPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	testJob := newJob(2, 2, 6, batch.NonIndexedCompletion)
-	clientset := fake.NewSimpleClientset(testJob)
+	clientset := fake.NewClientset(testJob)
 	fakeWatch := watch.NewFake()
 	clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
 	manager, sharedInformerFactory := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -6506,7 +6506,7 @@ func TestWatchPods(t *testing.T) {
 
 func TestWatchOrphanPods(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
@@ -6577,7 +6577,7 @@ func TestWatchOrphanPods(t *testing.T) {
 
 func TestSyncOrphanPod(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
@@ -7455,7 +7455,7 @@ func TestEnsureJobConditions(t *testing.T) {
 
 func TestFinalizersRemovedExpectations(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
@@ -7559,7 +7559,7 @@ func TestFinalizerCleanup(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 	manager, err := NewController(ctx, sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	if err != nil {
