@@ -27,23 +27,29 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
-	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
+
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
+
+	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/logs"
+	"k8s.io/component-base/metrics"
+
 	cpconfig "k8s.io/cloud-provider/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cpoptions "k8s.io/cloud-provider/options"
-	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/logs"
-	"k8s.io/component-base/metrics"
+
+	eventv1 "k8s.io/api/events/v1"
+	clientgofeaturegate "k8s.io/client-go/features"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
-	netutils "k8s.io/utils/net"
-
-	clientgofeaturegate "k8s.io/client-go/features"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -70,6 +76,7 @@ import (
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	netutils "k8s.io/utils/net"
 )
 
 var args = []string{
@@ -165,11 +172,7 @@ var args = []string{
 }
 
 func TestAddFlags(t *testing.T) {
-	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
-	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
-		fs.AddFlagSet(f)
-	}
+	fs, s := setupControllerManagerFlagSet(t)
 
 	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -442,9 +445,10 @@ func TestAddFlags(t *testing.T) {
 			AlwaysAllowPaths:             []string{"/healthz", "/readyz", "/livez"}, // note: this does not match /healthz/ or /healthz/*
 			AlwaysAllowGroups:            []string{"system:masters"},
 		},
-		Master:  "192.168.4.20",
-		Metrics: &metrics.Options{},
-		Logs:    logs.NewOptions(),
+		Master:                   "192.168.4.20",
+		Metrics:                  &metrics.Options{},
+		Logs:                     logs.NewOptions(),
+		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 	}
 
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -457,12 +461,7 @@ func TestAddFlags(t *testing.T) {
 }
 
 func TestApplyTo(t *testing.T) {
-	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
-	// flag set to parse the args that are required to start the kube controller manager
-	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
-		fs.AddFlagSet(f)
-	}
+	fs, s := setupControllerManagerFlagSet(t)
 
 	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
@@ -654,6 +653,96 @@ func TestApplyTo(t *testing.T) {
 
 	if !reflect.DeepEqual(expected.ComponentConfig, c.ComponentConfig) {
 		t.Errorf("Got different configuration than expected.\nDifference detected on:\n%s", cmp.Diff(expected.ComponentConfig, c.ComponentConfig))
+	}
+}
+
+func TestEmulatedVersion(t *testing.T) {
+	var cleanupAndSetupFunc = func() featuregate.FeatureGate {
+		componentGlobalsRegistry := utilversion.DefaultComponentGlobalsRegistry
+		componentGlobalsRegistry.Reset() // make sure this test have a clean state
+		t.Cleanup(func() {
+			componentGlobalsRegistry.Reset() // make sure this test doesn't leak a dirty state
+		})
+
+		verKube := utilversion.NewEffectiveVersion("1.32")
+		fg := featuregate.NewVersionedFeatureGate(version.MustParse("1.32"))
+		utilruntime.Must(fg.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+			"kubeA": {
+				{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+				{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+			},
+			"kubeB": {
+				{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+			},
+		}))
+		utilruntime.Must(componentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, verKube, fg))
+		return fg
+	}
+
+	testcases := []struct {
+		name              string
+		flags             []string // not a good place to test flagParse error
+		wantErr           bool     // this won't apply to flagParse, it only apply to KubeControllerManagerOptions.Validate
+		errorSubString    string
+		wantFeaturesGates map[string]bool
+	}{
+		{
+			name:              "default feature gates at binary version",
+			flags:             []string{},
+			wantErr:           false,
+			wantFeaturesGates: map[string]bool{"kubeA": true, "kubeB": false},
+		},
+		{
+			name: "emulating version out of range",
+			flags: []string{
+				"--emulated-version=1.28",
+			},
+			wantErr:           true,
+			errorSubString:    "emulation version 1.28 is not between",
+			wantFeaturesGates: nil,
+		},
+		{
+			name: "default feature gates at emulated version",
+			flags: []string{
+				"--emulated-version=1.31",
+			},
+			wantFeaturesGates: map[string]bool{"kubeA": false, "kubeB": false},
+		},
+		{
+			name: "set feature gates at emulated version",
+			flags: []string{
+				"--emulated-version=1.31",
+				"--feature-gates=kubeA=false,kubeB=true",
+			},
+			wantFeaturesGates: map[string]bool{"kubeA": false, "kubeB": true},
+		},
+		{
+			name: "cannot set locked feature gate",
+			flags: []string{
+				"--emulated-version=1.32",
+				"--feature-gates=kubeA=false,kubeB=true",
+			},
+			errorSubString: "cannot set feature gate kubeA to false, feature is locked to true",
+			wantErr:        true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fg := cleanupAndSetupFunc()
+
+			fs, s := setupControllerManagerFlagSet(t)
+			err := fs.Parse(tc.flags)
+			checkTestError(t, err, false, "")
+			err = s.Validate([]string{""}, []string{""}, nil)
+			checkTestError(t, err, tc.wantErr, tc.errorSubString)
+
+			for feature, expected := range tc.wantFeaturesGates {
+				if fg.Enabled(featuregate.Feature(feature)) != expected {
+					t.Errorf("expected %s to be %v", feature, expected)
+				}
+			}
+		})
 	}
 }
 
@@ -1334,7 +1423,11 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 
 func TestWatchListClientFlagChange(t *testing.T) {
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-	s, _ := NewKubeControllerManagerOptions()
+	s, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
+	}
+
 	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -1344,7 +1437,13 @@ func TestWatchListClientFlagChange(t *testing.T) {
 
 	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
 	if err := fs.Parse(args); err != nil {
-		t.Fatal(err)
+		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
+	}
+
+	// this is needed to Apply parsed flags to GlobalRegistry, so the DefaultFeatureGate values can be set from the flag
+	err = s.ComponentGlobalsRegistry.Set()
+	if err != nil {
+		t.Fatal(fmt.Errorf("ComponentGlobalsRegistry.Set failed with %w", err))
 	}
 
 	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
@@ -1370,6 +1469,39 @@ func assertWatchListCommandLineDefaultValue(t *testing.T, fs *pflag.FlagSet) {
 	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=false)"
 	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
 		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
+	}
+}
+
+func setupControllerManagerFlagSet(t *testing.T) (*pflag.FlagSet, *KubeControllerManagerOptions) {
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	s, err := NewKubeControllerManagerOptions()
+	if err != nil {
+		t.Fatal(fmt.Errorf("NewKubeControllerManagerOptions failed with %w", err))
+	}
+
+	for _, f := range s.Flags([]string{""}, []string{""}, nil).FlagSets {
+		fs.AddFlagSet(f)
+	}
+	return fs, s
+}
+
+// caution: checkTestError use t.Fatal, to simplify caller handling.
+// it also means it may break test code execution flow.
+func checkTestError(t *testing.T, err error, expectingErr bool, expectedErrorSubString string) {
+	if !expectingErr {
+		if err != nil { // not expecting, but got error
+			t.Fatal(fmt.Errorf("expected no error, got %w", err))
+		}
+		return // not expecting, and no error
+	}
+
+	// from this point we do expecting error
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if expectedErrorSubString != "" && !strings.Contains(err.Error(), expectedErrorSubString) {
+		t.Fatalf("expected error to contain %q, but got %q", expectedErrorSubString, err.Error())
 	}
 }
 
