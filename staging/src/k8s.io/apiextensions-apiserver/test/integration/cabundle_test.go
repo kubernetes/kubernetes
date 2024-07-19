@@ -55,6 +55,7 @@ var invalidCert = []byte("Cg==")
 
 // Invalid CABundle should prevent new CRD from being set to Established
 func TestInvalidCABundle(t *testing.T) {
+	ctx := context.Background()
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -75,13 +76,13 @@ func TestInvalidCABundle(t *testing.T) {
 			ConversionReviewVersions: []string{"v1beta1"},
 		},
 	}
-	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Ensure that Established is false with reason InvalidCABundle
-	err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
-		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -101,6 +102,7 @@ func TestInvalidCABundle(t *testing.T) {
 
 // Valid CABundle should set CRD to Established.
 func TestValidCABundle(t *testing.T) {
+	ctx := context.Background()
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -122,13 +124,13 @@ func TestValidCABundle(t *testing.T) {
 		},
 	}
 
-	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// wait until the CRD is established
-	err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
-		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -149,6 +151,7 @@ func TestValidCABundle(t *testing.T) {
 
 // No CABundle should set CRD to Established.
 func TestMissingCABundle(t *testing.T) {
+	ctx := context.Background()
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -156,12 +159,12 @@ func TestMissingCABundle(t *testing.T) {
 	defer tearDown()
 
 	crd := fixtures.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{})
+	crd, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
-		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), crd.Name, metav1.GetOptions{})
+	err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		localCrd, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crd.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
