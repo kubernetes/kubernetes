@@ -6231,7 +6231,7 @@ type SecurityContext struct {
 	// +optional
 	AllowPrivilegeEscalation *bool
 	// ProcMount denotes the type of proc mount to use for the containers.
-	// The default is DefaultProcMount which uses the container runtime defaults for
+	// The default value is Default which uses the container runtime defaults for
 	// readonly paths and masked paths.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
