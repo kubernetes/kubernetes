@@ -6449,6 +6449,7 @@ func TestWatchJobs(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	sharedInformerFactory.Start(stopCh)
+	sharedInformerFactory.WaitForCacheSync(stopCh)
 	go manager.Run(ctx, 1)
 
 	// We're sending new job to see if it reaches syncHandler.
