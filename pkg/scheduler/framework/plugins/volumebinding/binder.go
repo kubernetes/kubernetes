@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1048,12 +1049,16 @@ func (b *volumeBinder) hasEnoughCapacity(logger klog.Logger, provisioner string,
 }
 
 func capacitySufficient(capacity *storagev1.CSIStorageCapacity, sizeInBytes int64) bool {
-	limit := capacity.Capacity
+	limit := volumeLimit(capacity)
+	return limit != nil && limit.Value() >= sizeInBytes
+}
+
+func volumeLimit(capacity *storagev1.CSIStorageCapacity) *resource.Quantity {
 	if capacity.MaximumVolumeSize != nil {
 		// Prefer MaximumVolumeSize if available, it is more precise.
-		limit = capacity.MaximumVolumeSize
+		return capacity.MaximumVolumeSize
 	}
-	return limit != nil && limit.Value() >= sizeInBytes
+	return capacity.Capacity
 }
 
 func (b *volumeBinder) nodeHasAccess(logger klog.Logger, node *v1.Node, capacity *storagev1.CSIStorageCapacity) bool {
