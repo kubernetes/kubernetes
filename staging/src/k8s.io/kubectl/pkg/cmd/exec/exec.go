@@ -147,7 +147,9 @@ func createExecutor(url *url.URL, config *restclient.Config) (remotecommand.Exec
 		if err != nil {
 			return nil, err
 		}
-		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, httpstream.IsUpgradeFailure)
+		exec, err = remotecommand.NewFallbackExecutor(websocketExec, exec, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
 		if err != nil {
 			return nil, err
 		}

@@ -168,3 +168,32 @@ func TestIsUpgradeFailureError(t *testing.T) {
 		})
 	}
 }
+
+func TestIsHTTPSProxyError(t *testing.T) {
+	testCases := map[string]struct {
+		err      error
+		expected bool
+	}{
+		"nil error should return false": {
+			err:      nil,
+			expected: false,
+		},
+		"Not HTTPS proxy error should return false": {
+			err:      errors.New("this is not an upgrade error"),
+			expected: false,
+		},
+		"HTTPS proxy error should return true": {
+			err:      errors.New("proxy: unknown scheme: https"),
+			expected: true,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actual := IsHTTPSProxyError(test.err)
+			if test.expected != actual {
+				t.Errorf("expected HTTPS proxy error %t, got %t", test.expected, actual)
+			}
+		})
+	}
+}
