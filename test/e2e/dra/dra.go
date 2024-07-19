@@ -1197,7 +1197,16 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			})
 
 			// Messages from test-driver/deploy/example/plugin-permissions.yaml
-			matchVAPDeniedError := gomega.MatchError(gomega.ContainSubstring("may only modify resourceslices that belong to the node the pod is running on"))
+			matchVAPDeniedError := func(nodeName string, slice *resourceapi.ResourceSlice) types.GomegaMatcher {
+				subStr := fmt.Sprintf("this user running on node '%s' may not modify ", nodeName)
+				switch {
+				case slice.Spec.NodeName != "":
+					subStr += fmt.Sprintf("resourceslices on node '%s'", slice.Spec.NodeName)
+				default:
+					subStr += "cluster resourceslices"
+				}
+				return gomega.MatchError(gomega.ContainSubstring(subStr))
+			}
 			mustCreate := func(clientSet kubernetes.Interface, clientName string, slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
 				ginkgo.GinkgoHelper()
 				slice, err := clientSet.ResourceV1alpha3().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
@@ -1237,17 +1246,17 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}
 
 			// Create with different clients, keep it in the end.
-			mustFailToCreate(realNodeClient, "real plugin", fictionalNodeSlice, matchVAPDeniedError)
+			mustFailToCreate(realNodeClient, "real plugin", fictionalNodeSlice, matchVAPDeniedError(realNodeName, fictionalNodeSlice))
 			mustCreateAndDelete(fictionalNodeClient, "fictional plugin", fictionalNodeSlice)
 			createdFictionalNodeSlice := mustCreate(f.ClientSet, "admin", fictionalNodeSlice)
 
 			// Update with different clients.
-			mustFailToUpdate(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError)
+			mustFailToUpdate(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError(realNodeName, createdFictionalNodeSlice))
 			createdFictionalNodeSlice = mustUpdate(fictionalNodeClient, "fictional plugin", createdFictionalNodeSlice)
 			createdFictionalNodeSlice = mustUpdate(f.ClientSet, "admin", createdFictionalNodeSlice)
 
 			// Delete with different clients.
-			mustFailToDelete(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError)
+			mustFailToDelete(realNodeClient, "real plugin", createdFictionalNodeSlice, matchVAPDeniedError(realNodeName, createdFictionalNodeSlice))
 			mustDelete(fictionalNodeClient, "fictional plugin", createdFictionalNodeSlice)
 
 			// Now the same for a slice which is not associated with a node.
@@ -1272,18 +1281,18 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			})
 
 			// Create with different clients, keep it in the end.
-			mustFailToCreate(realNodeClient, "real plugin", clusterSlice, matchVAPDeniedError)
-			mustFailToCreate(fictionalNodeClient, "fictional plugin", clusterSlice, matchVAPDeniedError)
+			mustFailToCreate(realNodeClient, "real plugin", clusterSlice, matchVAPDeniedError(realNodeName, clusterSlice))
+			mustFailToCreate(fictionalNodeClient, "fictional plugin", clusterSlice, matchVAPDeniedError(fictionalNodeName, clusterSlice))
 			createdClusterSlice := mustCreate(f.ClientSet, "admin", clusterSlice)
 
 			// Update with different clients.
-			mustFailToUpdate(realNodeClient, "real plugin", createdClusterSlice, matchVAPDeniedError)
-			mustFailToUpdate(fictionalNodeClient, "fictional plugin", createdClusterSlice, matchVAPDeniedError)
+			mustFailToUpdate(realNodeClient, "real plugin", createdClusterSlice, matchVAPDeniedError(realNodeName, createdClusterSlice))
+			mustFailToUpdate(fictionalNodeClient, "fictional plugin", createdClusterSlice, matchVAPDeniedError(fictionalNodeName, createdClusterSlice))
 			createdClusterSlice = mustUpdate(f.ClientSet, "admin", createdClusterSlice)
 
 			// Delete with different clients.
-			mustFailToDelete(realNodeClient, "real plugin", createdClusterSlice, matchVAPDeniedError)
-			mustFailToDelete(fictionalNodeClient, "fictional plugin", createdClusterSlice, matchVAPDeniedError)
+			mustFailToDelete(realNodeClient, "real plugin", createdClusterSlice, matchVAPDeniedError(realNodeName, createdClusterSlice))
+			mustFailToDelete(fictionalNodeClient, "fictional plugin", createdClusterSlice, matchVAPDeniedError(fictionalNodeName, createdClusterSlice))
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
 
