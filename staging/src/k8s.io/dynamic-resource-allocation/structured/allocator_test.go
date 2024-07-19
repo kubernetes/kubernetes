@@ -137,26 +137,6 @@ func classWithConfig(name, driver, attribute string) *resourceapi.DeviceClass {
 	return class
 }
 
-// generate a DeviceClass object with the given name and the node selector
-// that selects nodes with the region label set to either "west" or "east".
-func classWithSuitableNodes(name, driver string) *resourceapi.DeviceClass {
-	class := class(name, driver)
-	class.Spec.SuitableNodes = &v1.NodeSelector{
-		NodeSelectorTerms: []v1.NodeSelectorTerm{
-			{
-				MatchExpressions: []v1.NodeSelectorRequirement{
-					{
-						Key:      regionKey,
-						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{region1, region2},
-					},
-				},
-			},
-		},
-	}
-	return class
-}
-
 // generate a ResourceClaim object with the given name and device requests.
 func claimWithRequests(name string, constraints []resourceapi.DeviceConstraint, requests ...resourceapi.DeviceRequest) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{

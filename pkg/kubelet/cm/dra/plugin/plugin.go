@@ -35,6 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
+// defaultClientCallTimeout is the default amount of time that a DRA driver has
+// to respond to any of the gRPC calls. kubelet uses this value by passing nil
+// to RegisterPlugin. Some tests use a different, usually shorter timeout to
+// speed up testing.
+//
+// This is half of the kubelet retry period (according to
+// https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
+const defaultClientCallTimeout = 45 * time.Second
+
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
 	// backgroundCtx is used for all future activities of the handler.
@@ -144,7 +153,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	var timeout time.Duration
 	if pluginClientTimeout == nil {
-		timeout = PluginClientTimeout
+		timeout = defaultClientCallTimeout
 	} else {
 		timeout = *pluginClientTimeout
 	}
@@ -157,7 +166,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		conn:                    nil,
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
-		clientTimeout:           timeout,
+		clientCallTimeout:       timeout,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
