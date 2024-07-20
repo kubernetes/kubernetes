@@ -381,14 +381,12 @@ func (m *managerImpl) processShutdownEvent() error {
 					}
 					status.Message = nodeShutdownMessage
 					status.Reason = nodeShutdownReason
-					if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-						podutil.UpdatePodCondition(status, &v1.PodCondition{
-							Type:    v1.DisruptionTarget,
-							Status:  v1.ConditionTrue,
-							Reason:  v1.PodReasonTerminationByKubelet,
-							Message: nodeShutdownMessage,
-						})
-					}
+					podutil.UpdatePodCondition(status, &v1.PodCondition{
+						Type:    v1.DisruptionTarget,
+						Status:  v1.ConditionTrue,
+						Reason:  v1.PodReasonTerminationByKubelet,
+						Message: nodeShutdownMessage,
+					})
 				}); err != nil {
 					m.logger.V(1).Info("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {

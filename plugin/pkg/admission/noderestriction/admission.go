@@ -641,8 +641,14 @@ func (p *Plugin) admitCSINode(nodeName string, a admission.Attributes) error {
 
 func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) error {
 	// The create request must come from a node with the same name as the NodeName field.
-	// Other requests gets checked by the node authorizer.
-	if a.GetOperation() == admission.Create {
+	// Same when deleting an object.
+	//
+	// Other requests get checked by the node authorizer. The checks here are necessary
+	// because the node authorizer does not know the object content for a create request
+	// and not each deleted object in a DeleteCollection. DeleteCollection checks each
+	// individual object.
+	switch a.GetOperation() {
+	case admission.Create:
 		slice, ok := a.GetObject().(*resource.ResourceSlice)
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
@@ -650,6 +656,15 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 
 		if slice.NodeName != nodeName {
 			return admission.NewForbidden(a, errors.New("can only create ResourceSlice with the same NodeName as the requesting node"))
+		}
+	case admission.Delete:
+		slice, ok := a.GetOldObject().(*resource.ResourceSlice)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
+		}
+
+		if slice.NodeName != nodeName {
+			return admission.NewForbidden(a, errors.New("can only delete ResourceSlice with the same NodeName as the requesting node"))
 		}
 	}
 

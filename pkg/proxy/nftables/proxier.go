@@ -1364,7 +1364,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Value: []string{
 						fmt.Sprintf("goto %s", fwChain),
 					},
-					Comment: &svcPortNameString,
 				})
 			}
 		}

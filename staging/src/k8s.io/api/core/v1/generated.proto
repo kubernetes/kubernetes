@@ -2125,6 +2125,26 @@ message ISCSIVolumeSource {
   optional string initiatorName = 12;
 }
 
+// ImageVolumeSource represents a image volume resource.
+message ImageVolumeSource {
+  // Required: Image or artifact reference to be used.
+  // Behaves in the same way as pod.spec.containers[*].image.
+  // Pull secrets will be assembled in the same way as for the container image by looking up node credentials, SA image pull secrets, and pod spec image pull secrets.
+  // More info: https://kubernetes.io/docs/concepts/containers/images
+  // This field is optional to allow higher level config management to default or override
+  // container images in workload controllers like Deployments and StatefulSets.
+  // +optional
+  optional string reference = 1;
+
+  // Policy for pulling OCI objects. Possible values are:
+  // Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  // Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
+  // +optional
+  optional string pullPolicy = 2;
+}
+
 // Maps a string key to a path within a volume.
 message KeyToPath {
   // key is the key to project.
@@ -2598,6 +2618,15 @@ message NodeDaemonEndpoints {
   optional DaemonEndpoint kubeletEndpoint = 1;
 }
 
+// NodeFeatures describes the set of features implemented by the CRI implementation.
+// The features contained in the NodeFeatures should depend only on the cri implementation
+// independent of runtime handlers.
+message NodeFeatures {
+  // SupplementalGroupsPolicy is set to true if the runtime supports SupplementalGroupsPolicy and ContainerUser.
+  // +optional
+  optional bool supplementalGroupsPolicy = 1;
+}
+
 // NodeList is the whole list of all Nodes which have been registered with master.
 message NodeList {
   // Standard list metadata.
@@ -2628,12 +2657,17 @@ message NodeRuntimeHandler {
   optional NodeRuntimeHandlerFeatures features = 2;
 }
 
-// NodeRuntimeHandlerFeatures is a set of runtime features.
+// NodeRuntimeHandlerFeatures is a set of features implemented by the runtime handler.
 message NodeRuntimeHandlerFeatures {
   // RecursiveReadOnlyMounts is set to true if the runtime handler supports RecursiveReadOnlyMounts.
   // +featureGate=RecursiveReadOnlyMounts
   // +optional
   optional bool recursiveReadOnlyMounts = 1;
+
+  // UserNamespaces is set to true if the runtime handler supports UserNamespaces, including for volumes.
+  // +featureGate=UserNamespacesSupport
+  // +optional
+  optional bool userNamespaces = 2;
 }
 
 // A node selector represents the union of the results of one or more label queries
@@ -2794,9 +2828,15 @@ message NodeStatus {
 
   // The available runtime handlers.
   // +featureGate=RecursiveReadOnlyMounts
+  // +featureGate=UserNamespacesSupport
   // +optional
   // +listType=atomic
   repeated NodeRuntimeHandler runtimeHandlers = 12;
+
+  // Features describes the set of features implemented by the CRI implementation.
+  // +featureGate=SupplementalGroupsPolicy
+  // +optional
+  optional NodeFeatures features = 13;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -4664,7 +4704,8 @@ message ProbeHandler {
 
 // Represents a projected volume source
 message ProjectedVolumeSource {
-  // sources is the list of volume projections
+  // sources is the list of volume projections. Each entry in this list
+  // handles one source.
   // +optional
   // +listType=atomic
   repeated VolumeProjection sources = 1;
@@ -5458,7 +5499,7 @@ message SecurityContext {
   optional bool allowPrivilegeEscalation = 7;
 
   // procMount denotes the type of proc mount to use for the containers.
-  // The default is DefaultProcMount which uses the container runtime defaults for
+  // The default value is Default which uses the container runtime defaults for
   // readonly paths and masked paths.
   // This requires the ProcMountType feature flag to be enabled.
   // Note that this field cannot be set when spec.os.name is windows.
@@ -6373,7 +6414,8 @@ message VolumeNodeAffinity {
   optional NodeSelector required = 1;
 }
 
-// Projection that may be projected along with other supported volume types
+// Projection that may be projected along with other supported volume types.
+// Exactly one of these fields must be set.
 message VolumeProjection {
   // secret information about the secret data to project
   // +optional
@@ -6590,6 +6632,23 @@ message VolumeSource {
   //
   // +optional
   optional EphemeralVolumeSource ephemeral = 29;
+
+  // image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
+  // The volume is resolved at pod startup depending on which PullPolicy value is provided:
+  //
+  // - Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.
+  // - Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.
+  // - IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.
+  //
+  // The volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.
+  // A failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.
+  // The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
+  // The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
+  // The volume will be mounted read-only (ro) and non-executable files (noexec).
+  // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath).
+  // +featureGate=ImageVolume
+  // +optional
+  optional ImageVolumeSource image = 30;
 }
 
 // Represents a vSphere volume resource.

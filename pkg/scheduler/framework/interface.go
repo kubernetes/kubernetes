@@ -363,7 +363,7 @@ type QueueSortPlugin interface {
 // Failures from other extension points are regarded as temporal errors (e.g., network failure),
 // and the scheduler requeue Pods without this extension point - always requeue Pods to activeQ after backoff.
 // This is because such temporal errors cannot be resolved by specific cluster events,
-// and we have no choise but keep retrying scheduling until the failure is resolved.
+// and we have no choose but keep retrying scheduling until the failure is resolved.
 //
 // Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) should implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
@@ -375,11 +375,13 @@ type EnqueueExtensions interface {
 	// filters out events to reduce useless retry of Pod's scheduling.
 	// The events will be registered when instantiating the internal scheduling queue,
 	// and leveraged to build event handlers dynamically.
-	// Note: the returned list needs to be static (not depend on configuration parameters);
-	// otherwise it would lead to undefined behavior.
+	// When it returns an error, the scheduler fails to start.
+	// Note: the returned list needs to be determined at a startup,
+	// and the scheduler only evaluates it once during start up.
+	// Do not change the result during runtime, for example, based on the cluster's state etc.
 	//
 	// Appropriate implementation of this function will make Pod's re-scheduling accurate and performant.
-	EventsToRegister() []ClusterEventWithHint
+	EventsToRegister(context.Context) ([]ClusterEventWithHint, error)
 }
 
 // PreFilterExtensions is an interface that is included in plugins that allow specifying

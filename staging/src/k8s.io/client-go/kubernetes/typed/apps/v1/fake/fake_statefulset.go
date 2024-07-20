@@ -234,7 +234,7 @@ func (c *FakeStatefulSets) ApplyScale(ctx context.Context, statefulSetName strin
 	}
 	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
+		Invokes(testing.NewPatchSubresourceActionWithOptions(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, opts.ToPatchOptions(), "scale"), emptyResult)
 
 	if obj == nil {
 		return emptyResult, err

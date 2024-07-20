@@ -324,9 +324,17 @@ func New(ctx context.Context,
 
 	preEnqueuePluginMap := make(map[string][]framework.PreEnqueuePlugin)
 	queueingHintsPerProfile := make(internalqueue.QueueingHintMapPerProfile)
+	var returnErr error
 	for profileName, profile := range profiles {
 		preEnqueuePluginMap[profileName] = profile.PreEnqueuePlugins()
-		queueingHintsPerProfile[profileName] = buildQueueingHintMap(profile.EnqueueExtensions())
+		queueingHintsPerProfile[profileName], err = buildQueueingHintMap(ctx, profile.EnqueueExtensions())
+		if err != nil {
+			returnErr = errors.Join(returnErr, err)
+		}
+	}
+
+	if returnErr != nil {
+		return nil, returnErr
 	}
 
 	podQueue := internalqueue.NewSchedulingQueue(
@@ -379,10 +387,14 @@ var defaultQueueingHintFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (fr
 	return framework.Queue, nil
 }
 
-func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.QueueingHintMap {
+func buildQueueingHintMap(ctx context.Context, es []framework.EnqueueExtensions) (internalqueue.QueueingHintMap, error) {
 	queueingHintMap := make(internalqueue.QueueingHintMap)
+	var returnErr error
 	for _, e := range es {
-		events := e.EventsToRegister()
+		events, err := e.EventsToRegister(ctx)
+		if err != nil {
+			returnErr = errors.Join(returnErr, err)
+		}
 
 		// This will happen when plugin registers with empty events, it's usually the case a pod
 		// will become reschedulable only for self-update, e.g. schedulingGates plugin, the pod
@@ -438,7 +450,10 @@ func buildQueueingHintMap(es []framework.EnqueueExtensions) internalqueue.Queuei
 				)
 		}
 	}
-	return queueingHintMap
+	if returnErr != nil {
+		return nil, returnErr
+	}
+	return queueingHintMap, nil
 }
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.

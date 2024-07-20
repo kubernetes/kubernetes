@@ -17,16 +17,19 @@ limitations under the License.
 package state
 
 import (
+	"errors"
 	"os"
 	"path"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	cmerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 )
 
@@ -198,7 +201,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tc.expectedError)
 			} else {
-				assert.NoError(t, err, "unexpected error while creating checkpointState")
+				requireNoCheckpointError(t, err)
 				// compare state after restoration with the one expected
 				assertStateEqual(t, state, tc.expectedState)
 			}
@@ -270,11 +273,21 @@ func TestOldCheckpointRestore(t *testing.T) {
 
 	checkpoint := NewDRAManagerCheckpoint()
 	err = cpm.GetCheckpoint(testingCheckpoint, checkpoint)
-	assert.NoError(t, err, "could not restore checkpoint")
+	requireNoCheckpointError(t, err)
 
 	checkpointData, err := checkpoint.MarshalCheckpoint()
 	assert.NoError(t, err, "could not Marshal Checkpoint")
 
 	expectedData := `{"version":"v1","entries":[{"DriverName":"test-driver.cdi.k8s.io","ClassName":"class-name","ClaimUID":"067798be-454e-4be4-9047-1aa06aea63f7","ClaimName":"example","Namespace":"default","PodUIDs":{"139cdb46-f989-4f17-9561-ca10cfb509a6":{}},"ResourceHandles":null,"CDIDevices":{"test-driver.cdi.k8s.io":["example.com/example=cdi-example"]}}],"checksum":453625682}`
 	assert.Equal(t, expectedData, string(checkpointData), "expected ClaimInfoState does not equal to restored one")
+}
+
+func requireNoCheckpointError(t *testing.T, err error) {
+	t.Helper()
+	var cksumErr *cmerrors.CorruptCheckpointError
+	if errors.As(err, &cksumErr) {
+		t.Fatalf("unexpected corrupt checkpoint, expected checksum %d, got %d", cksumErr.ExpectedCS, cksumErr.ActualCS)
+	} else {
+		require.NoError(t, err, "could not restore checkpoint")
+	}
 }

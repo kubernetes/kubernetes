@@ -45,6 +45,13 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
+	// owner: @aojea
+	// Deprecated: v1.31
+	//
+	// Allow kubelet to request a certificate without any Node IP available, only
+	// with DNS names.
+	AllowDNSOnlyNodeCSR featuregate.Feature = "AllowDNSOnlyNodeCSR"
+
 	// owner: @thockin
 	// deprecated: v1.29
 	//
@@ -66,6 +73,14 @@ const (
 	// owner: @tallclair
 	// beta: v1.30
 	AppArmorFields featuregate.Feature = "AppArmorFields"
+
+	// owner: @liggitt
+	// kep:
+	// alpha: v1.31
+	//
+	// Make the Node authorizer use fine-grained selector authorization.
+	// Requires AuthorizeWithSelectors to be enabled.
+	AuthorizeNodeWithSelectors featuregate.Feature = "AuthorizeNodeWithSelectors"
 
 	// owner: @danwinship
 	// alpha: v1.27
@@ -362,6 +377,7 @@ const (
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	// alpha: v1.28
+	// beta: v1.31
 	//
 	// Enable detection of the kubelet cgroup driver configuration option from
 	// the CRI.  The CRI runtime also needs to support this feature in which
@@ -626,6 +642,7 @@ const (
 
 	// owner: @jessfraz
 	// alpha: v1.12
+	// beta: v1.31
 	//
 	// Enables control over ProcMountType for containers.
 	ProcMountType featuregate.Feature = "ProcMountType"
@@ -957,6 +974,13 @@ const (
 	//
 	// Enable SupplementalGroupsPolicy feature in PodSecurityContext
 	SupplementalGroupsPolicy featuregate.Feature = "SupplementalGroupsPolicy"
+
+	// owner: @saschagrunert
+	// kep: https://kep.k8s.io/4639
+	// alpha: v1.31
+	//
+	// Enables the image volume source.
+	ImageVolume featuregate.Feature = "ImageVolume"
 )
 
 func init() {
@@ -982,6 +1006,8 @@ func init() {
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CrossNamespaceVolumeDataSource: {Default: false, PreRelease: featuregate.Alpha},
 
+	AllowDNSOnlyNodeCSR: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.33
+
 	AllowServiceLBStatusOnNonLB: {Default: false, PreRelease: featuregate.Deprecated}, // remove after 1.29
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
@@ -989,6 +1015,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmor: {Default: true, PreRelease: featuregate.Beta},
 
 	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
+
+	AuthorizeNodeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	CloudDualStackNodeIPs: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 
@@ -1068,7 +1096,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobSuccessPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
-	KubeletCgroupDriverFromCRI: {Default: false, PreRelease: featuregate.Alpha},
+	KubeletCgroupDriverFromCRI: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletInUserNamespace: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1132,7 +1160,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PortForwardWebsockets: {Default: true, PreRelease: featuregate.Beta},
 
-	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
+	ProcMountType: {Default: true, PreRelease: featuregate.Beta},
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1214,6 +1242,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SupplementalGroupsPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
+	ImageVolume: {Default: false, PreRelease: featuregate.Alpha},
+
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
 
@@ -1233,7 +1263,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.APIServingWithRoutine: {Default: true, PreRelease: featuregate.Beta},
 
-	genericfeatures.ConsistentListFromCache: {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
+
+	genericfeatures.ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.31
 
@@ -1281,7 +1313,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.WatchFromStorageWithoutResourceVersion: {Default: false, PreRelease: featuregate.Beta},
 
-	genericfeatures.WatchList: {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.WatchList: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.ZeroLimitedNominalConcurrencyShares: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
 

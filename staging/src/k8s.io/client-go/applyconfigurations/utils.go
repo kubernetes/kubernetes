@@ -754,6 +754,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.HTTPGetActionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("HTTPHeader"):
 		return &applyconfigurationscorev1.HTTPHeaderApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ImageVolumeSource"):
+		return &applyconfigurationscorev1.ImageVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIPersistentVolumeSource"):
 		return &applyconfigurationscorev1.ISCSIPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ISCSIVolumeSource"):
@@ -806,6 +808,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeConfigStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeDaemonEndpoints"):
 		return &applyconfigurationscorev1.NodeDaemonEndpointsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeFeatures"):
+		return &applyconfigurationscorev1.NodeFeaturesApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandler"):
 		return &applyconfigurationscorev1.NodeRuntimeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandlerFeatures"):

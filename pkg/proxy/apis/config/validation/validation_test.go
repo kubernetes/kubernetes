@@ -39,15 +39,17 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		ClusterCIDR:        "192.168.59.0/24",
 		ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
 		IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-			MasqueradeAll: true,
 			SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 			MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 		},
-		Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-			MaxPerCore:            ptr.To[int32](1),
-			Min:                   ptr.To[int32](1),
-			TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-			TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+		Linux: kubeproxyconfig.KubeProxyLinuxConfiguration{
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+				MaxPerCore:            ptr.To[int32](1),
+				Min:                   ptr.To[int32](1),
+				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+			},
+			MasqueradeAll: true,
 		},
 		Logging: logsapi.LoggingConfiguration{
 			Format: "text",
@@ -216,7 +218,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 	}{
 		"valid iptables config": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
@@ -225,7 +226,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 		"valid custom MasqueradeBit": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeBit: ptr.To[int32](5),
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
@@ -233,7 +233,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 		},
 		"SyncPeriod must be > 0": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: -5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
@@ -243,7 +242,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 		"MinSyncPeriod must be > 0": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeBit: ptr.To[int32](5),
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: -1 * time.Second},
 			},
@@ -252,7 +250,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 		"MasqueradeBit cannot be < 0": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeBit: ptr.To[int32](-10),
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
 			},
@@ -261,7 +258,6 @@ func TestValidateKubeProxyIPTablesConfiguration(t *testing.T) {
 		"SyncPeriod must be >= MinSyncPeriod": {
 			config: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeBit: ptr.To[int32](5),
-				MasqueradeAll: true,
 				SyncPeriod:    metav1.Duration{Duration: 1 * time.Second},
 				MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 			},
@@ -369,103 +365,155 @@ func TestValidateKubeProxyIPVSConfiguration(t *testing.T) {
 	}
 }
 
-func TestValidateKubeProxyConntrackConfiguration(t *testing.T) {
+func TestValidateKubeProxyLinuxConfiguration(t *testing.T) {
 	newPath := field.NewPath("KubeProxyConfiguration")
 	for name, testCase := range map[string]struct {
-		config       kubeproxyconfig.KubeProxyConntrackConfiguration
+		config       kubeproxyconfig.KubeProxyLinuxConfiguration
 		expectedErrs field.ErrorList
 	}{
 		"valid 5 second timeouts": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
 			expectedErrs: field.ErrorList{},
 		},
 		"valid duration equal to 0 second timeout": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 0 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 0 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 0 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 0 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 0 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 0 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 0 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 0 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
 			expectedErrs: field.ErrorList{},
 		},
 		"invalid MaxPerCore < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](-1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](-1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.MaxPerCore"), ptr.To[int32](-1), "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.MaxPerCore"), ptr.To[int32](-1), "must be greater than or equal to 0")},
 		},
 		"invalid minimum < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](-1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](-1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.Min"), ptr.To[int32](-1), "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.Min"), ptr.To[int32](-1), "must be greater than or equal to 0")},
 		},
 		"invalid TCPEstablishedTimeout < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: -5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: -5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.TCPEstablishedTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.TCPEstablishedTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid TCPCloseWaitTimeout < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: -5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: -5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](0),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.TCPCloseWaitTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.TCPCloseWaitTimeout"), &metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid UDPTimeout < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: -5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: -5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](999),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.UDPTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.UDPTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
 		},
 		"invalid UDPStreamTimeout < 0": {
-			config: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				MaxPerCore:            ptr.To[int32](1),
-				Min:                   ptr.To[int32](1),
-				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
-				UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
-				UDPStreamTimeout:      metav1.Duration{Duration: -5 * time.Second},
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: -5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](-999),
 			},
-			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeConntrackConfiguration.UDPStreamTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.KubeProxyConntrackConfiguration.UDPStreamTimeout"), metav1.Duration{Duration: -5 * time.Second}, "must be greater than or equal to 0")},
+		},
+		"invalid OOMScoreAdj < -1000": {
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](-1001),
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.OOMScoreAdj"), int32(-1001), "must be within the range [-1000, 1000]")},
+		},
+		"invalid OOMScoreAdj > 1000": {
+			config: kubeproxyconfig.KubeProxyLinuxConfiguration{
+				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+					MaxPerCore:            ptr.To[int32](1),
+					Min:                   ptr.To[int32](1),
+					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+					TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					UDPTimeout:            metav1.Duration{Duration: 5 * time.Second},
+					UDPStreamTimeout:      metav1.Duration{Duration: 5 * time.Second},
+				},
+				OOMScoreAdj: ptr.To[int32](1001),
+			},
+			expectedErrs: field.ErrorList{field.Invalid(newPath.Child("KubeProxyLinuxConfiguration.OOMScoreAdj"), int32(1001), "must be within the range [-1000, 1000]")},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			errs := validateKubeProxyConntrackConfiguration(testCase.config, newPath.Child("KubeConntrackConfiguration"))
+			errs := validateKubeProxyLinuxConfiguration(testCase.config, newPath.Child("KubeProxyLinuxConfiguration"))
 			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
 		})
 	}

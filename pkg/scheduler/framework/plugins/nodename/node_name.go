@@ -41,10 +41,10 @@ const (
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeName) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *NodeName) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.Add | framework.Update}},
-	}
+	}, nil
 }
 
 // Name returns name of the plugin. It is used in logs, etc.

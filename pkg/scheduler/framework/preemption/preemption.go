@@ -28,14 +28,12 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -362,21 +360,19 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			waitingPod.Reject(pluginName, "preempted")
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(pod), "waitingPod", klog.KObj(victim), "node", c.Name())
 		} else {
-			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-				condition := &v1.PodCondition{
-					Type:    v1.DisruptionTarget,
-					Status:  v1.ConditionTrue,
-					Reason:  v1.PodReasonPreemptionByScheduler,
-					Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", pod.Spec.SchedulerName),
-				}
-				newStatus := pod.Status.DeepCopy()
-				updated := apipod.UpdatePodCondition(newStatus, condition)
-				if updated {
-					if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
-						logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-						errCh.SendErrorWithCancel(err, cancel)
-						return
-					}
+			condition := &v1.PodCondition{
+				Type:    v1.DisruptionTarget,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonPreemptionByScheduler,
+				Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", pod.Spec.SchedulerName),
+			}
+			newStatus := pod.Status.DeepCopy()
+			updated := apipod.UpdatePodCondition(newStatus, condition)
+			if updated {
+				if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
+					logger.Error(err, "Could not add DisruptionTarget condition due to preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+					errCh.SendErrorWithCancel(err, cancel)
+					return
 				}
 			}
 			if err := util.DeletePod(ctx, cs, victim); err != nil {

@@ -113,6 +113,9 @@ func runOomKillerTest(f *framework.Framework, testCase testCase, kubeReservedMem
 		}
 
 		ginkgo.BeforeEach(func() {
+			// Precautionary check that kubelet is healthy before running the test.
+			waitForKubeletToStart(context.TODO(), f)
+
 			ginkgo.By("setting up the pod to be used in the test")
 			e2epod.NewPodClient(f).Create(context.TODO(), testCase.podSpec)
 		})
@@ -164,7 +167,8 @@ func getOOMTargetPod(podName string, ctnName string, createContainer func(name s
 			Name: podName,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy: v1.RestartPolicyNever,
+			PriorityClassName: "system-node-critical",
+			RestartPolicy:     v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				createContainer(ctnName),
 			},
@@ -268,7 +272,7 @@ func getOOMTargetContainerWithoutLimit(name string) v1.Container {
 			"sh",
 			"-c",
 			// use the dd tool to attempt to allocate huge block of memory which exceeds the node allocatable
-			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=10G",
+			"sleep 5 && dd if=/dev/zero of=/dev/null iflag=fullblock count=10 bs=1024G",
 		},
 		SecurityContext: &v1.SecurityContext{
 			SeccompProfile: &v1.SeccompProfile{

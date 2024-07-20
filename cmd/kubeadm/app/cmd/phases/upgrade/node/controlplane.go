@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -81,12 +80,6 @@ func runControlPlane() func(c workflow.RunData) error {
 
 		if err := upgrade.PerformAddonsUpgrade(client, cfg, data.PatchesDir(), data.OutputWriter()); err != nil {
 			return errors.Wrap(err, "failed to perform addons upgrade")
-		}
-
-		if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-			if err := upgrade.UpdateKubeletLocalMode(cfg, dryRun); err != nil {
-				return errors.Wrap(err, "failed to update kubelet local mode")
-			}
 		}
 
 		fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")

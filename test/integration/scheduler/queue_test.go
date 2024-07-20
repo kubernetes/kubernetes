@@ -487,10 +487,10 @@ func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
-	}
+	}, nil
 }
 
 // TestCustomResourceEnqueue constructs a fake plugin that registers custom resources
@@ -867,8 +867,8 @@ func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleSta
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 
-func (p *fakePermitPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
-	}
+	}, nil
 }

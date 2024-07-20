@@ -317,11 +317,16 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		}
 	})
 
-	// 1. Run a low priority pod with finalizer which consumes 1/1 of node resources
-	// 2. Schedule a higher priority pod which also consumes 1/1 of node resources
-	// 3. See if the pod with lower priority is preempted and has the pod disruption condition
-	// 4. Remove the finalizer so that the pod can be deleted by GC
-	ginkgo.It("validates pod disruption condition is added to the preempted pod", func(ctx context.Context) {
+	/*
+		Release: v1.31
+		Testname: Verify the DisruptionTarget condition is added to the preempted pod
+		Description:
+		1. Run a low priority pod with finalizer which consumes 1/1 of node resources
+		2. Schedule a higher priority pod which also consumes 1/1 of node resources
+		3. See if the pod with lower priority is preempted and has the pod disruption condition
+		4. Remove the finalizer so that the pod can be deleted by GC
+	*/
+	framework.ConformanceIt("validates pod disruption condition is added to the preempted pod", func(ctx context.Context) {
 		podRes := v1.ResourceList{testExtendedResource: resource.MustParse("1")}
 
 		ginkgo.By("Select a node to run the lower and higher priority pods")

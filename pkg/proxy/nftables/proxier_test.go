@@ -137,6 +137,60 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 	return nft, p
 }
 
+var baseRules = dedent.Dedent(`
+	add table ip kube-proxy { comment "rules for kube-proxy" ; }
+
+	add chain ip kube-proxy cluster-ips-check
+	add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
+	add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
+	add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
+	add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
+	add chain ip kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
+	add chain ip kube-proxy firewall-check
+	add chain ip kube-proxy mark-for-masquerade
+	add chain ip kube-proxy masquerading
+	add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
+	add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
+	add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
+	add chain ip kube-proxy nodeport-endpoints-check
+	add chain ip kube-proxy reject-chain { comment "helper for @no-endpoint-services / @no-endpoint-nodeports" ; }
+	add chain ip kube-proxy services
+	add chain ip kube-proxy service-endpoints-check
+
+	add rule ip kube-proxy cluster-ips-check ip daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
+	add rule ip kube-proxy cluster-ips-check ip daddr { 172.30.0.0/16 } drop comment "Drop traffic to unallocated ClusterIPs"
+	add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
+	add rule ip kube-proxy filter-forward ct state new jump service-endpoints-check
+	add rule ip kube-proxy filter-forward ct state new jump cluster-ips-check
+	add rule ip kube-proxy filter-input ct state new jump nodeport-endpoints-check
+	add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
+	add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
+	add rule ip kube-proxy filter-output ct state new jump firewall-check
+	add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
+	add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
+	add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
+	add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
+	add rule ip kube-proxy masquerading mark set mark xor 0x4000
+	add rule ip kube-proxy masquerading masquerade fully-random
+	add rule ip kube-proxy nat-output jump services
+	add rule ip kube-proxy nat-postrouting jump masquerading
+	add rule ip kube-proxy nat-prerouting jump services
+	add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
+	add rule ip kube-proxy reject-chain reject
+	add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
+	add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
+	add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
+	add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
+	add element ip kube-proxy nodeport-ips { 192.168.0.2 }
+	add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
+
+	add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
+	add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
+	add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
+	add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
+	add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
+	`)
+
 // TestOverallNFTablesRules creates a variety of services and verifies that the generated
 // rules are exactly as expected.
 func TestOverallNFTablesRules(t *testing.T) {
@@ -301,62 +355,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 
 	fp.syncProxyRules()
 
-	expected := dedent.Dedent(`
-		add table ip kube-proxy { comment "rules for kube-proxy" ; }
-
-		add chain ip kube-proxy mark-for-masquerade
-		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
-		add chain ip kube-proxy masquerading
-		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
-		add rule ip kube-proxy masquerading mark set mark xor 0x4000
-		add rule ip kube-proxy masquerading masquerade fully-random
-		add chain ip kube-proxy services
-		add chain ip kube-proxy service-endpoints-check
-		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
-		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
-		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
-		add rule ip kube-proxy filter-forward ct state new jump service-endpoints-check
-		add rule ip kube-proxy filter-forward ct state new jump cluster-ips-check
-		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
-		add rule ip kube-proxy filter-input ct state new jump nodeport-endpoints-check
-		add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
-		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
-		add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
-		add rule ip kube-proxy filter-output ct state new jump firewall-check
-		add chain ip kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
-		add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
-		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
-		add rule ip kube-proxy nat-output jump services
-		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
-		add rule ip kube-proxy nat-postrouting jump masquerading
-		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
-		add rule ip kube-proxy nat-prerouting jump services
-		add chain ip kube-proxy nodeport-endpoints-check
-		add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
-
-		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
-		add chain ip kube-proxy cluster-ips-check
-		add rule ip kube-proxy cluster-ips-check ip daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
-		add rule ip kube-proxy cluster-ips-check ip daddr { 172.30.0.0/16 } drop comment "Drop traffic to unallocated ClusterIPs"
-
-		add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
-		add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
-		add chain ip kube-proxy firewall-check
-		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
-
-		add chain ip kube-proxy reject-chain { comment "helper for @no-endpoint-services / @no-endpoint-nodeports" ; }
-		add rule ip kube-proxy reject-chain reject
-
-		add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
-		add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
-
-		add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
-		add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
-		add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
-		add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
-
+	expected := baseRules + dedent.Dedent(`
 		# svc1
 		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
 		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
@@ -446,7 +445,7 @@ func TestOverallNFTablesRules(t *testing.T) {
 		add element ip kube-proxy service-ips { 172.30.0.45 . tcp . 80 : goto service-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-ips { 5.6.7.8 . tcp . 80 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
 		add element ip kube-proxy service-nodeports { tcp . 3002 : goto external-HVFWP5L3-ns5/svc5/tcp/p80 }
-		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 comment "ns5/svc5:p80" : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
+		add element ip kube-proxy firewall-ips { 5.6.7.8 . tcp . 80 : goto firewall-HVFWP5L3-ns5/svc5/tcp/p80 }
 
 		# svc6
 		add element ip kube-proxy cluster-ips { 172.30.0.46 }
@@ -3942,60 +3941,6 @@ func TestInternalExternalMasquerade(t *testing.T) {
 func TestSyncProxyRulesRepeated(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
 
-	baseRules := dedent.Dedent(`
-		add table ip kube-proxy { comment "rules for kube-proxy" ; }
-
-		add chain ip kube-proxy cluster-ips-check
-		add chain ip kube-proxy filter-prerouting { type filter hook prerouting priority -110 ; }
-		add chain ip kube-proxy filter-forward { type filter hook forward priority -110 ; }
-		add chain ip kube-proxy filter-input { type filter hook input priority -110 ; }
-		add chain ip kube-proxy filter-output { type filter hook output priority -110 ; }
-		add chain ip kube-proxy filter-output-post-dnat { type filter hook output priority -90 ; }
-		add chain ip kube-proxy firewall-check
-		add chain ip kube-proxy mark-for-masquerade
-		add chain ip kube-proxy masquerading
-		add chain ip kube-proxy nat-output { type nat hook output priority -100 ; }
-		add chain ip kube-proxy nat-postrouting { type nat hook postrouting priority 100 ; }
-		add chain ip kube-proxy nat-prerouting { type nat hook prerouting priority -100 ; }
-		add chain ip kube-proxy nodeport-endpoints-check
-		add chain ip kube-proxy reject-chain { comment "helper for @no-endpoint-services / @no-endpoint-nodeports" ; }
-		add chain ip kube-proxy services
-		add chain ip kube-proxy service-endpoints-check
-
-		add rule ip kube-proxy cluster-ips-check ip daddr @cluster-ips reject comment "Reject traffic to invalid ports of ClusterIPs"
-		add rule ip kube-proxy cluster-ips-check ip daddr { 172.30.0.0/16 } drop comment "Drop traffic to unallocated ClusterIPs"
-		add rule ip kube-proxy filter-prerouting ct state new jump firewall-check
-		add rule ip kube-proxy filter-forward ct state new jump service-endpoints-check
-		add rule ip kube-proxy filter-forward ct state new jump cluster-ips-check
-		add rule ip kube-proxy filter-input ct state new jump nodeport-endpoints-check
-		add rule ip kube-proxy filter-input ct state new jump service-endpoints-check
-		add rule ip kube-proxy filter-output ct state new jump service-endpoints-check
-		add rule ip kube-proxy filter-output ct state new jump firewall-check
-		add rule ip kube-proxy filter-output-post-dnat ct state new jump cluster-ips-check
-		add rule ip kube-proxy firewall-check ip daddr . meta l4proto . th dport vmap @firewall-ips
-		add rule ip kube-proxy mark-for-masquerade mark set mark or 0x4000
-		add rule ip kube-proxy masquerading mark and 0x4000 == 0 return
-		add rule ip kube-proxy masquerading mark set mark xor 0x4000
-		add rule ip kube-proxy masquerading masquerade fully-random
-		add rule ip kube-proxy nat-output jump services
-		add rule ip kube-proxy nat-postrouting jump masquerading
-		add rule ip kube-proxy nat-prerouting jump services
-		add rule ip kube-proxy nodeport-endpoints-check ip daddr @nodeport-ips meta l4proto . th dport vmap @no-endpoint-nodeports
-		add rule ip kube-proxy reject-chain reject
-		add rule ip kube-proxy services ip daddr . meta l4proto . th dport vmap @service-ips
-		add rule ip kube-proxy services ip daddr @nodeport-ips meta l4proto . th dport vmap @service-nodeports
-		add set ip kube-proxy cluster-ips { type ipv4_addr ; comment "Active ClusterIPs" ; }
-		add set ip kube-proxy nodeport-ips { type ipv4_addr ; comment "IPs that accept NodePort traffic" ; }
-		add element ip kube-proxy nodeport-ips { 192.168.0.2 }
-		add rule ip kube-proxy service-endpoints-check ip daddr . meta l4proto . th dport vmap @no-endpoint-services
-
-		add map ip kube-proxy firewall-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "destinations that are subject to LoadBalancerSourceRanges" ; }
-		add map ip kube-proxy no-endpoint-nodeports { type inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to service nodeports with no endpoints" ; }
-		add map ip kube-proxy no-endpoint-services { type ipv4_addr . inet_proto . inet_service : verdict ; comment "vmap to drop or reject packets to services with no endpoints" ; }
-		add map ip kube-proxy service-ips { type ipv4_addr . inet_proto . inet_service : verdict ; comment "ClusterIP, ExternalIP and LoadBalancer IP traffic" ; }
-		add map ip kube-proxy service-nodeports { type inet_proto . inet_service : verdict ; comment "NodePort traffic" ; }
-		`)
-
 	// Helper function to make it look like time has passed (from the point of view of
 	// the stale-chain-deletion code).
 	ageStaleChains := func() {
@@ -4889,4 +4834,71 @@ func TestProxier_OnServiceCIDRsChanged(t *testing.T) {
 
 	proxier.OnServiceCIDRsChanged([]string{"172.30.0.0/16", "172.50.0.0/16", "fd00:10:96::/112", "fd00:172:30::/112"})
 	assert.Equal(t, proxier.serviceCIDRs, "fd00:10:96::/112,fd00:172:30::/112")
+}
+
+// TestBadIPs tests that "bad" IPs and CIDRs in Services/Endpoints are rewritten to
+// be "good" in the input provided to nft
+func TestBadIPs(t *testing.T) {
+	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeNFTables)
+
+	makeServiceMap(fp,
+		makeTestService("ns1", "svc1", func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = "172.30.0.041"
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     "p80",
+				Port:     80,
+				Protocol: v1.ProtocolTCP,
+				NodePort: 3001,
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: "1.2.3.004",
+			}}
+			svc.Spec.ExternalIPs = []string{"192.168.099.022"}
+			svc.Spec.LoadBalancerSourceRanges = []string{"203.0.113.000/025"}
+		}),
+	)
+	populateEndpointSlices(fp,
+		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{"10.180.00.001"},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To("p80"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	fp.syncProxyRules()
+
+	expected := baseRules + dedent.Dedent(`
+		# svc1
+		add chain ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 ip daddr 172.30.0.41 tcp dport 80 ip saddr != 10.0.0.0/8 jump mark-for-masquerade
+		add rule ip kube-proxy service-ULMVA6XW-ns1/svc1/tcp/p80 numgen random mod 1 vmap { 0 : goto endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 }
+
+		add chain ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 jump mark-for-masquerade
+		add rule ip kube-proxy external-ULMVA6XW-ns1/svc1/tcp/p80 goto service-ULMVA6XW-ns1/svc1/tcp/p80
+
+		add chain ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80
+		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 ip saddr 10.180.0.1 jump mark-for-masquerade
+		add rule ip kube-proxy endpoint-5OJB2KTY-ns1/svc1/tcp/p80__10.180.0.1/80 meta l4proto tcp dnat to 10.180.0.1:80
+
+		add chain ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80
+		add rule ip kube-proxy firewall-ULMVA6XW-ns1/svc1/tcp/p80 ip saddr != { 203.0.113.0/25 } drop
+
+		add element ip kube-proxy cluster-ips { 172.30.0.41 }
+		add element ip kube-proxy service-ips { 172.30.0.41 . tcp . 80 : goto service-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-ips { 192.168.99.22 . tcp . 80 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-ips { 1.2.3.4 . tcp . 80 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy service-nodeports { tcp . 3001 : goto external-ULMVA6XW-ns1/svc1/tcp/p80 }
+		add element ip kube-proxy firewall-ips { 1.2.3.4 . tcp . 80 : goto firewall-ULMVA6XW-ns1/svc1/tcp/p80 }
+		`)
+
+	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
 }

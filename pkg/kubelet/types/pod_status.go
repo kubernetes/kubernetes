@@ -47,10 +47,5 @@ func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 
 // PodConditionSharedByKubelet returns if the pod condition type is shared by kubelet
 func PodConditionSharedByKubelet(conditionType v1.PodConditionType) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
-		if conditionType == v1.DisruptionTarget {
-			return true
-		}
-	}
-	return false
+	return conditionType == v1.DisruptionTarget
 }

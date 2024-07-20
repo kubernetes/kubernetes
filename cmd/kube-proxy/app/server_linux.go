@@ -180,7 +180,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				exec.New(),
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
@@ -204,7 +204,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				exec.New(),
 				config.IPTables.SyncPeriod.Duration,
 				config.IPTables.MinSyncPeriod.Duration,
-				config.IPTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
@@ -245,7 +245,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.IPVS.TCPTimeout.Duration,
 				config.IPVS.TCPFinTimeout.Duration,
 				config.IPVS.UDPTimeout.Duration,
-				config.IPTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				s.Hostname,
@@ -273,7 +273,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.IPVS.TCPTimeout.Duration,
 				config.IPVS.TCPFinTimeout.Duration,
 				config.IPVS.UDPTimeout.Duration,
-				config.IPTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
 				s.Hostname,
@@ -297,7 +297,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ctx,
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
-				config.NFTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors,
 				s.Hostname,
@@ -315,7 +315,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				s.PrimaryIPFamily,
 				config.NFTables.SyncPeriod.Duration,
 				config.NFTables.MinSyncPeriod.Duration,
-				config.NFTables.MasqueradeAll,
+				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
 				s.Hostname,
@@ -338,7 +338,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 func (s *ProxyServer) setupConntrack(ctx context.Context) error {
 	ct := &realConntracker{}
 
-	max, err := getConntrackMax(ctx, s.Config.Conntrack)
+	max, err := getConntrackMax(ctx, s.Config.Linux.Conntrack)
 	if err != nil {
 		return err
 	}
@@ -361,35 +361,35 @@ func (s *ProxyServer) setupConntrack(ctx context.Context) error {
 		}
 	}
 
-	if s.Config.Conntrack.TCPEstablishedTimeout != nil && s.Config.Conntrack.TCPEstablishedTimeout.Duration > 0 {
-		timeout := int(s.Config.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
+	if s.Config.Linux.Conntrack.TCPEstablishedTimeout != nil && s.Config.Linux.Conntrack.TCPEstablishedTimeout.Duration > 0 {
+		timeout := int(s.Config.Linux.Conntrack.TCPEstablishedTimeout.Duration / time.Second)
 		if err := ct.SetTCPEstablishedTimeout(ctx, timeout); err != nil {
 			return err
 		}
 	}
 
-	if s.Config.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
-		timeout := int(s.Config.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
+	if s.Config.Linux.Conntrack.TCPCloseWaitTimeout != nil && s.Config.Linux.Conntrack.TCPCloseWaitTimeout.Duration > 0 {
+		timeout := int(s.Config.Linux.Conntrack.TCPCloseWaitTimeout.Duration / time.Second)
 		if err := ct.SetTCPCloseWaitTimeout(ctx, timeout); err != nil {
 			return err
 		}
 	}
 
-	if s.Config.Conntrack.TCPBeLiberal {
+	if s.Config.Linux.Conntrack.TCPBeLiberal {
 		if err := ct.SetTCPBeLiberal(ctx, 1); err != nil {
 			return err
 		}
 	}
 
-	if s.Config.Conntrack.UDPTimeout.Duration > 0 {
-		timeout := int(s.Config.Conntrack.UDPTimeout.Duration / time.Second)
+	if s.Config.Linux.Conntrack.UDPTimeout.Duration > 0 {
+		timeout := int(s.Config.Linux.Conntrack.UDPTimeout.Duration / time.Second)
 		if err := ct.SetUDPTimeout(ctx, timeout); err != nil {
 			return err
 		}
 	}
 
-	if s.Config.Conntrack.UDPStreamTimeout.Duration > 0 {
-		timeout := int(s.Config.Conntrack.UDPStreamTimeout.Duration / time.Second)
+	if s.Config.Linux.Conntrack.UDPStreamTimeout.Duration > 0 {
+		timeout := int(s.Config.Linux.Conntrack.UDPStreamTimeout.Duration / time.Second)
 		if err := ct.SetUDPStreamTimeout(ctx, timeout); err != nil {
 			return err
 		}

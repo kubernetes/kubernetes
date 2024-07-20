@@ -56,10 +56,33 @@ type MemoryStatusEx struct {
 	AvailExtendedVirtual uint64
 }
 
+// PerformanceInfo is the same as Windows structure PERFORMANCE_INFORMATION
+// https://learn.microsoft.com/en-us/windows/win32/api/psapi/ns-psapi-performance_information
+type PerformanceInformation struct {
+	cb                     uint32
+	CommitTotalPages       uint64
+	CommitLimitPages       uint64
+	CommitPeakPages        uint64
+	PhysicalTotalPages     uint64
+	PhysicalAvailablePages uint64
+	SystemCachePages       uint64
+	KernelTotalPages       uint64
+	KernelPagesPages       uint64
+	KernelNonpagedPages    uint64
+	PageSize               uint64
+	HandleCount            uint32
+	ProcessCount           uint32
+	ThreadCount            uint32
+}
+
 var (
+	// kernel32.dll system calls
 	modkernel32                 = windows.NewLazySystemDLL("kernel32.dll")
 	procGlobalMemoryStatusEx    = modkernel32.NewProc("GlobalMemoryStatusEx")
 	procGetActiveProcessorCount = modkernel32.NewProc("GetActiveProcessorCount")
+	// psapi.dll system calls
+	modpsapi               = windows.NewLazySystemDLL("psapi.dll")
+	procGetPerformanceInfo = modpsapi.NewProc("GetPerformanceInfo")
 )
 
 const allProcessorGroups = 0xFFFF
@@ -292,6 +315,16 @@ func getPhysicallyInstalledSystemMemoryBytes() (uint64, error) {
 	}
 
 	return statex.TotalPhys, nil
+}
+
+func GetPerformanceInfo() (*PerformanceInformation, error) {
+	var pi PerformanceInformation
+	pi.cb = uint32(unsafe.Sizeof(pi))
+	ret, _, _ := procGetPerformanceInfo.Call(uintptr(unsafe.Pointer(&pi)), uintptr(pi.cb))
+	if ret == 0 {
+		return nil, errors.New("unable to read Windows performance information")
+	}
+	return &pi, nil
 }
 
 func getBootID() (string, error) {

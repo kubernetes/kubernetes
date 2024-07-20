@@ -94,7 +94,10 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition,Priority",
 		"--runtime-config=" + strings.Join(runtimeConfig, ","),
 	}
-	server, err := apiservertesting.StartTestServer(tCtx, apiservertesting.NewDefaultTestServerOptions(), customFlags, framework.SharedEtcd())
+	serverOpts := apiservertesting.NewDefaultTestServerOptions()
+	// Timeout sufficiently long to handle deleting pods of the largest test cases.
+	serverOpts.RequestTimeout = 10 * time.Minute
+	server, err := apiservertesting.StartTestServer(tCtx, serverOpts, customFlags, framework.SharedEtcd())
 	if err != nil {
 		tCtx.Fatalf("start apiserver: %v", err)
 	}

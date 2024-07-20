@@ -56,10 +56,10 @@ func (pl *fooPlugin) Filter(ctx context.Context, state *framework.CycleState, po
 	return framework.NewStatus(framework.Unschedulable)
 }
 
-func (pl *fooPlugin) EventsToRegister() []framework.ClusterEventWithHint {
+func (pl *fooPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}},
-	}
+	}, nil
 }
 
 // newPlugin returns a plugin factory with specified Plugin.

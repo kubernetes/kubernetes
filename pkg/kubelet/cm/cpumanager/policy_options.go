@@ -29,15 +29,17 @@ import (
 
 // Names of the options, as part of the user interface.
 const (
-	FullPCPUsOnlyOption            string = "full-pcpus-only"
-	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
-	AlignBySocketOption            string = "align-by-socket"
+	FullPCPUsOnlyOption             string = "full-pcpus-only"
+	DistributeCPUsAcrossNUMAOption  string = "distribute-cpus-across-numa"
+	AlignBySocketOption             string = "align-by-socket"
+	DistributeCPUsAcrossCoresOption string = "distribute-cpus-across-cores"
 )
 
 var (
 	alphaOptions = sets.New[string](
 		DistributeCPUsAcrossNUMAOption,
 		AlignBySocketOption,
+		DistributeCPUsAcrossCoresOption,
 	)
 	betaOptions = sets.New[string](
 		FullPCPUsOnlyOption,
@@ -80,6 +82,10 @@ type StaticPolicyOptions struct {
 	// Flag to ensure CPUs are considered aligned at socket boundary rather than
 	// NUMA boundary
 	AlignBySocket bool
+	// flag to enable extra allocation restrictions to spread
+	// cpus (HT) on different physical core.
+	// This is a preferred policy so do not throw error if they have to packed in one physical core.
+	DistributeCPUsAcrossCores bool
 }
 
 // NewStaticPolicyOptions creates a StaticPolicyOptions struct from the user configuration.
@@ -109,12 +115,29 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.AlignBySocket = optValue
+		case DistributeCPUsAcrossCoresOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.DistributeCPUsAcrossCores = optValue
+
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
 			return opts, fmt.Errorf("unsupported cpumanager option: %q (%s)", name, value)
 		}
 	}
+
+	if opts.FullPhysicalCPUsOnly && opts.DistributeCPUsAcrossCores {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", FullPCPUsOnlyOption, DistributeCPUsAcrossCoresOption)
+	}
+
+	// TODO(@Jeffwan): Remove this check after more compatibility tests are done.
+	if opts.DistributeCPUsAcrossNUMA && opts.DistributeCPUsAcrossCores {
+		return opts, fmt.Errorf("static policy options %s and %s can not be used at the same time", DistributeCPUsAcrossNUMAOption, DistributeCPUsAcrossCoresOption)
+	}
+
 	return opts, nil
 }
 

@@ -36,6 +36,7 @@ type runtimeState struct {
 	cidr                     string
 	healthChecks             []*healthCheck
 	rtHandlers               []kubecontainer.RuntimeHandler
+	rtFeatures               *kubecontainer.RuntimeFeatures
 }
 
 // A health check function should be efficient and not rely on external
@@ -81,6 +82,18 @@ func (s *runtimeState) runtimeHandlers() []kubecontainer.RuntimeHandler {
 	s.RLock()
 	defer s.RUnlock()
 	return s.rtHandlers
+}
+
+func (s *runtimeState) setRuntimeFeatures(features *kubecontainer.RuntimeFeatures) {
+	s.Lock()
+	defer s.Unlock()
+	s.rtFeatures = features
+}
+
+func (s *runtimeState) runtimeFeatures() *kubecontainer.RuntimeFeatures {
+	s.RLock()
+	defer s.RUnlock()
+	return s.rtFeatures
 }
 
 func (s *runtimeState) setStorageState(err error) {

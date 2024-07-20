@@ -215,21 +215,26 @@ func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
-	podCopy := pod.DeepCopy()
-	for i, c := range pod.Spec.Containers {
-		// We only handle requests in Requests but not Limits because the
-		// PodFitsResources predicate, to which the result pod will be passed,
-		// does not use Limits.
-		podCopy.Spec.Containers[i].Resources.Requests = make(v1.ResourceList)
-		for rName, rQuant := range c.Resources.Requests {
-			if v1helper.IsExtendedResourceName(rName) {
-				if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
-					continue
+	filterExtendedResources := func(containers []v1.Container) {
+		for i, c := range containers {
+			// We only handle requests in Requests but not Limits because the
+			// PodFitsResources predicate, to which the result pod will be passed,
+			// does not use Limits.
+			filteredResources := make(v1.ResourceList)
+			for rName, rQuant := range c.Resources.Requests {
+				if v1helper.IsExtendedResourceName(rName) {
+					if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
+						continue
+					}
 				}
+				filteredResources[rName] = rQuant
 			}
-			podCopy.Spec.Containers[i].Resources.Requests[rName] = rQuant
+			containers[i].Resources.Requests = filteredResources
 		}
 	}
+	podCopy := pod.DeepCopy()
+	filterExtendedResources(podCopy.Spec.Containers)
+	filterExtendedResources(podCopy.Spec.InitContainers)
 	return podCopy
 }
 

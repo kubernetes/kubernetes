@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -132,19 +133,14 @@ func (v *validator) Validate(ctx context.Context, matchedResource schema.GroupVe
 		}
 
 		var messageResult *cel.EvaluationResult
-		var messageError *apiservercel.Error
 		if len(messageResults) > i {
 			messageResult = &messageResults[i]
 		}
-		messageError, _ = err.(*apiservercel.Error)
 		if evalResult.Error != nil {
 			decision.Action = policyDecisionActionForError(f)
 			decision.Evaluation = EvalError
 			decision.Message = evalResult.Error.Error()
-		} else if messageError != nil &&
-			(messageError.Type == apiservercel.ErrorTypeInternal ||
-				(messageError.Type == apiservercel.ErrorTypeInvalid &&
-					strings.HasPrefix(messageError.Detail, "validation failed due to running out of cost budget"))) {
+		} else if errors.Is(err, apiservercel.ErrInternal) || errors.Is(err, apiservercel.ErrOutOfBudget) {
 			decision.Action = policyDecisionActionForError(f)
 			decision.Evaluation = EvalError
 			decision.Message = fmt.Sprintf("failed messageExpression: %s", err)

@@ -175,7 +175,15 @@ type VersionedOptions struct {
 	//
 	// Optional.
 	RemovedVersion *version.Version
-
+	// FeatureEnabled returns true if these options are enabled by feature gates,
+	// and returns false if these options are not enabled due to feature gates.
+	//
+	// This takes priority over IntroducedVersion / RemovedVersion for the NewExpressions environment.
+	//
+	// The StoredExpressions environment ignores this function.
+	//
+	// Optional.
+	FeatureEnabled func() bool
 	// EnvOptions provides CEL EnvOptions. This may be used to add a cel.Variable, a
 	// cel.Library, or to enable other CEL EnvOptions such as language settings.
 	//
@@ -210,7 +218,7 @@ type VersionedOptions struct {
 //     making multiple calls to Extend.
 func (e *EnvSet) Extend(options ...VersionedOptions) (*EnvSet, error) {
 	if len(options) > 0 {
-		newExprOpts, err := e.filterAndBuildOpts(e.newExpressions, e.compatibilityVersion, options)
+		newExprOpts, err := e.filterAndBuildOpts(e.newExpressions, e.compatibilityVersion, true, options)
 		if err != nil {
 			return nil, err
 		}
@@ -218,7 +226,7 @@ func (e *EnvSet) Extend(options ...VersionedOptions) (*EnvSet, error) {
 		if err != nil {
 			return nil, err
 		}
-		storedExprOpt, err := e.filterAndBuildOpts(e.storedExpressions, version.MajorMinor(math.MaxUint, math.MaxUint), options)
+		storedExprOpt, err := e.filterAndBuildOpts(e.storedExpressions, version.MajorMinor(math.MaxUint, math.MaxUint), false, options)
 		if err != nil {
 			return nil, err
 		}
@@ -231,13 +239,26 @@ func (e *EnvSet) Extend(options ...VersionedOptions) (*EnvSet, error) {
 	return e, nil
 }
 
-func (e *EnvSet) filterAndBuildOpts(base *cel.Env, compatVer *version.Version, opts []VersionedOptions) (cel.EnvOption, error) {
+func (e *EnvSet) filterAndBuildOpts(base *cel.Env, compatVer *version.Version, honorFeatureGateEnablement bool, opts []VersionedOptions) (cel.EnvOption, error) {
 	var envOpts []cel.EnvOption
 	var progOpts []cel.ProgramOption
 	var declTypes []*apiservercel.DeclType
 
 	for _, opt := range opts {
+		var allowedByFeatureGate, allowedByVersion bool
+		if opt.FeatureEnabled != nil && honorFeatureGateEnablement {
+			// Feature-gate-enabled libraries must follow compatible default feature enablement.
+			// Enabling alpha features in their first release enables libraries the previous API server is unaware of.
+			allowedByFeatureGate = opt.FeatureEnabled()
+			if !allowedByFeatureGate {
+				continue
+			}
+		}
 		if compatVer.AtLeast(opt.IntroducedVersion) && (opt.RemovedVersion == nil || compatVer.LessThan(opt.RemovedVersion)) {
+			allowedByVersion = true
+		}
+
+		if allowedByFeatureGate || allowedByVersion {
 			envOpts = append(envOpts, opt.EnvOptions...)
 			progOpts = append(progOpts, opt.ProgramOptions...)
 			declTypes = append(declTypes, opt.DeclTypes...)

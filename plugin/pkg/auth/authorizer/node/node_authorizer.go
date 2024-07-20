@@ -24,6 +24,7 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -33,6 +34,7 @@ import (
 	resourceapi "k8s.io/kubernetes/pkg/apis/resource"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -81,6 +83,8 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 var (
 	configMapResource     = api.Resource("configmaps")
 	secretResource        = api.Resource("secrets")
+	podResource           = api.Resource("pods")
+	nodeResource          = api.Resource("nodes")
 	resourceSlice         = resourceapi.Resource("resourceslices")
 	pvcResource           = api.Resource("persistentvolumeclaims")
 	pvResource            = api.Resource("persistentvolumes")
@@ -138,8 +142,15 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 			return r.authorizeCSINode(nodeName, attrs)
 		case resourceSlice:
 			return r.authorizeResourceSlice(nodeName, attrs)
+		case nodeResource:
+			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+				return r.authorizeNode(nodeName, attrs)
+			}
+		case podResource:
+			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+				return r.authorizePod(nodeName, attrs)
+			}
 		}
-
 	}
 
 	// Access to other resources is not subdivided, so just evaluate against the statically defined node rules
@@ -309,30 +320,116 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		return authorizer.DecisionNoOpinion, "cannot authorize ResourceSlice subresources", nil
 	}
 
-	// allowed verbs: get, create, update, patch, delete
+	// allowed verbs: get, create, update, patch, delete, watch, list, deletecollection
 	verb := attrs.GetVerb()
 	switch verb {
-	case "get", "create", "update", "patch", "delete":
-		// Okay, but check individual object permission below.
-	case "watch", "list":
-		// Okay. The kubelet is trusted to use a filter for its own objects.
+	case "create":
+		// The request must come from a node with the same name as the ResourceSlice.NodeName field.
+		//
+		// For create, the noderestriction admission plugin is performing this check.
+		// Here we don't have access to the content of the new object.
 		return authorizer.DecisionAllow, "", nil
+	case "get", "update", "patch", "delete":
+		// Checking the existing object must have established that access
+		// is allowed by recording a graph edge.
+		return r.authorize(nodeName, sliceVertexType, attrs)
+	case "watch", "list", "deletecollection":
+		if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+			// only allow a scoped fieldSelector
+			reqs, _ := attrs.GetFieldSelector()
+			for _, req := range reqs {
+				if req.Field == "nodeName" && req.Operator == selection.Equals && req.Value == nodeName {
+					return authorizer.DecisionAllow, "", nil
+				}
+			}
+			// deny otherwise
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
+		} else {
+			// Allow broad list/watch access if AuthorizeNodeWithSelectors is not enabled.
+			//
+			// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
+			// ensures that the node is not deleting some ResourceSlice belonging to
+			// some other node.
+			return authorizer.DecisionAllow, "", nil
+		}
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a ResourceSlice", nil
+		return authorizer.DecisionNoOpinion, "only the following verbs are allowed for a ResourceSlice: get, watch, list, create, update, patch, delete, deletecollection", nil
+	}
+}
+
+// authorizeNode authorizes node requests to Node API objects
+func (r *NodeAuthorizer) authorizeNode(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	switch attrs.GetSubresource() {
+	case "":
+		switch attrs.GetVerb() {
+		case "create", "update", "patch":
+			// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
+			return authorizer.DecisionAllow, "", nil
+		case "get", "list", "watch":
+			return r.authorize(nodeName, nodeVertexType, attrs)
+		}
+	case "status":
+		switch attrs.GetVerb() {
+		case "update", "patch":
+			// Use the NodeRestriction admission plugin to limit a node to updating its own Node status.
+			return authorizer.DecisionAllow, "", nil
+		}
 	}
 
-	// The request must come from a node with the same name as the ResourceSlice.NodeName field.
-	//
-	// For create, the noderestriction admission plugin is performing this check.
-	// Here we don't have access to the content of the new object.
-	if verb == "create" {
-		return authorizer.DecisionAllow, "", nil
+	klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+	return authorizer.DecisionNoOpinion, "", nil
+}
+
+// authorizePod authorizes node requests to Pod API objects
+func (r *NodeAuthorizer) authorizePod(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	switch attrs.GetSubresource() {
+	case "":
+		switch attrs.GetVerb() {
+		case "get":
+			return r.authorizeGet(nodeName, podVertexType, attrs)
+
+		case "list", "watch":
+			// allow a scoped fieldSelector
+			reqs, _ := attrs.GetFieldSelector()
+			for _, req := range reqs {
+				if req.Field == "spec.nodeName" && req.Operator == selection.Equals && req.Value == nodeName {
+					return authorizer.DecisionAllow, "", nil
+				}
+			}
+			// allow a read of a single pod known to be related to the node
+			if attrs.GetName() != "" {
+				return r.authorize(nodeName, podVertexType, attrs)
+			}
+			// deny otherwise
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "can only list/watch pods with spec.nodeName field selector", nil
+
+		case "create", "delete":
+			// Needed for the node to create/delete mirror pods.
+			// Use the NodeRestriction admission plugin to limit a node to creating/deleting mirror pods bound to itself.
+			return authorizer.DecisionAllow, "", nil
+		}
+
+	case "status":
+		switch attrs.GetVerb() {
+		case "update", "patch":
+			// Needed for the node to report status of pods it is running.
+			// Use the NodeRestriction admission plugin to limit a node to updating status of pods bound to itself.
+			return authorizer.DecisionAllow, "", nil
+		}
+
+	case "eviction":
+		if attrs.GetVerb() == "create" {
+			// Needed for the node to evict pods it is running.
+			// Use the NodeRestriction admission plugin to limit a node to evicting pods bound to itself.
+			return authorizer.DecisionAllow, "", nil
+		}
 	}
 
-	// For any other verb, checking the existing object must have established that access
-	// is allowed by recording a graph edge.
-	return r.authorize(nodeName, sliceVertexType, attrs)
+	klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+	return authorizer.DecisionNoOpinion, "", nil
 }
 
 // hasPathFrom returns true if there is a directed path from the specified type/namespace/name to the specified Node
