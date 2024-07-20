@@ -169,6 +169,67 @@ func TestFallbackClient_SPDYSecondarySucceeds(t *testing.T) {
 	}
 }
 
+func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
+	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
+	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		defer conns.conn.Close()
+		// Loopback the STDIN stream onto the STDOUT stream.
+		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
+		require.NoError(t, err)
+	}))
+	defer websocketServer.Close()
+
+	// Now create the fallback client (executor), and point it to the "websocketServer".
+	// Must add STDIN and STDOUT query params for the client request.
+	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
+	websocketLocation, err := url.Parse(websocketServer.URL)
+	require.NoError(t, err)
+	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", websocketServer.URL)
+	require.NoError(t, err)
+	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketLocation)
+	require.NoError(t, err)
+	// Always fallback to spdyExecutor, but spdyExecutor fails against websocket server.
+	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
+	require.NoError(t, err)
+	// Update the websocket executor to request remote command v4, which is unsupported.
+	fallbackExec, ok := exec.(*FallbackExecutor)
+	assert.True(t, ok, "error casting executor as FallbackExecutor")
+	websocketExec, ok := fallbackExec.primary.(*wsStreamExecutor)
+	assert.True(t, ok, "error casting executor as websocket executor")
+	// Set the attempted subprotocol version to V4; websocket server only accepts V5.
+	websocketExec.protocols = []string{remotecommand.StreamProtocolV4Name}
+
+	// Generate random data, and set it up to stream on STDIN. The data will be
+	// returned on the STDOUT buffer.
+	randomSize := 1024 * 1024
+	randomData := make([]byte, randomSize)
+	if _, err := rand.Read(randomData); err != nil {
+		t.Errorf("unexpected error reading random data: %v", err)
+	}
+	var stdout bytes.Buffer
+	options := &StreamOptions{
+		Stdin:  bytes.NewReader(randomData),
+		Stdout: &stdout,
+	}
+	errorChan := make(chan error)
+	go func() {
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		// Ensure secondary executor returned an error.
+		require.Error(t, err)
+	}
+}
+
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
 //
 //	go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
@@ -338,66 +399,5 @@ func TestFallbackClient_WebSocketHTTPSProxyCausesSPDYFallback(t *testing.T) {
 	// Ensure the proxy was called once
 	if e, a := int64(1), proxyCalled.Load(); e != a {
 		t.Errorf("expected %d proxy call, got %d", e, a)
-	}
-}
-
-func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
-	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
-	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
-		if err != nil {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		defer conns.conn.Close()
-		// Loopback the STDIN stream onto the STDOUT stream.
-		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
-		require.NoError(t, err)
-	}))
-	defer websocketServer.Close()
-
-	// Now create the fallback client (executor), and point it to the "websocketServer".
-	// Must add STDIN and STDOUT query params for the client request.
-	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
-	websocketLocation, err := url.Parse(websocketServer.URL)
-	require.NoError(t, err)
-	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host}, "GET", websocketServer.URL)
-	require.NoError(t, err)
-	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: websocketLocation.Host}, "POST", websocketLocation)
-	require.NoError(t, err)
-	// Always fallback to spdyExecutor, but spdyExecutor fails against websocket server.
-	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(error) bool { return true })
-	require.NoError(t, err)
-	// Update the websocket executor to request remote command v4, which is unsupported.
-	fallbackExec, ok := exec.(*FallbackExecutor)
-	assert.True(t, ok, "error casting executor as FallbackExecutor")
-	websocketExec, ok := fallbackExec.primary.(*wsStreamExecutor)
-	assert.True(t, ok, "error casting executor as websocket executor")
-	// Set the attempted subprotocol version to V4; websocket server only accepts V5.
-	websocketExec.protocols = []string{remotecommand.StreamProtocolV4Name}
-
-	// Generate random data, and set it up to stream on STDIN. The data will be
-	// returned on the STDOUT buffer.
-	randomSize := 1024 * 1024
-	randomData := make([]byte, randomSize)
-	if _, err := rand.Read(randomData); err != nil {
-		t.Errorf("unexpected error reading random data: %v", err)
-	}
-	var stdout bytes.Buffer
-	options := &StreamOptions{
-		Stdin:  bytes.NewReader(randomData),
-		Stdout: &stdout,
-	}
-	errorChan := make(chan error)
-	go func() {
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
-
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		// Ensure secondary executor returned an error.
-		require.Error(t, err)
 	}
 }

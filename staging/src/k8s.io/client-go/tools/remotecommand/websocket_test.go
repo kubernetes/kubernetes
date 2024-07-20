@@ -815,42 +815,6 @@ func TestWebSocketClient_BadHandshake(t *testing.T) {
 	}
 }
 
-// See (https://github.com/kubernetes/kubernetes/issues/126134).
-func TestWebSocketClient_HTTPSProxyErrorExpected(t *testing.T) {
-	urlStr := "http://127.0.0.1/never-used" + "?" + "stdin=true" + "&" + "stdout=true"
-	websocketLocation, err := url.Parse(urlStr)
-	if err != nil {
-		t.Fatalf("Unable to parse WebSocket server URL: %s", urlStr)
-	}
-	// proxy url with https scheme will trigger websocket dialing error.
-	httpsProxyFunc := func(req *http.Request) (*url.URL, error) { return url.Parse("https://127.0.0.1") }
-	exec, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host, Proxy: httpsProxyFunc}, "GET", urlStr)
-	if err != nil {
-		t.Errorf("unexpected error creating websocket executor: %v", err)
-	}
-	var stdout bytes.Buffer
-	options := &StreamOptions{
-		Stdout: &stdout,
-	}
-	errorChan := make(chan error)
-	go func() {
-		// Start the streaming on the WebSocket "exec" client.
-		errorChan <- exec.StreamWithContext(context.Background(), *options)
-	}()
-
-	select {
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("expect stream to be closed after connection is closed.")
-	case err := <-errorChan:
-		if err == nil {
-			t.Errorf("expected error but received none")
-		}
-		if !httpstream.IsHTTPSProxyError(err) {
-			t.Errorf("expected https proxy error, got (%s)", err)
-		}
-	}
-}
-
 // TestWebSocketClient_HeartbeatTimeout tests the heartbeat by forcing a
 // timeout by setting the ping period greater than the deadline.
 func TestWebSocketClient_HeartbeatTimeout(t *testing.T) {
@@ -1376,4 +1340,40 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 	}(streams[remotecommand.StreamErr])
 
 	return wsStreams, nil
+}
+
+// See (https://github.com/kubernetes/kubernetes/issues/126134).
+func TestWebSocketClient_HTTPSProxyErrorExpected(t *testing.T) {
+	urlStr := "http://127.0.0.1/never-used" + "?" + "stdin=true" + "&" + "stdout=true"
+	websocketLocation, err := url.Parse(urlStr)
+	if err != nil {
+		t.Fatalf("Unable to parse WebSocket server URL: %s", urlStr)
+	}
+	// proxy url with https scheme will trigger websocket dialing error.
+	httpsProxyFunc := func(req *http.Request) (*url.URL, error) { return url.Parse("https://127.0.0.1") }
+	exec, err := NewWebSocketExecutor(&rest.Config{Host: websocketLocation.Host, Proxy: httpsProxyFunc}, "GET", urlStr)
+	if err != nil {
+		t.Errorf("unexpected error creating websocket executor: %v", err)
+	}
+	var stdout bytes.Buffer
+	options := &StreamOptions{
+		Stdout: &stdout,
+	}
+	errorChan := make(chan error)
+	go func() {
+		// Start the streaming on the WebSocket "exec" client.
+		errorChan <- exec.StreamWithContext(context.Background(), *options)
+	}()
+
+	select {
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("expect stream to be closed after connection is closed.")
+	case err := <-errorChan:
+		if err == nil {
+			t.Errorf("expected error but received none")
+		}
+		if !httpstream.IsHTTPSProxyError(err) {
+			t.Errorf("expected https proxy error, got (%s)", err)
+		}
+	}
 }
