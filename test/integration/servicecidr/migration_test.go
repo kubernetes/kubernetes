@@ -82,6 +82,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		client1,
 	).Run(tCtx, 5)
 	informers1.Start(tCtx.Done())
+	informers1.WaitForCacheSync(tCtx.Done())
 
 	// the default serviceCIDR should have a finalizer and ready condition set to true
 	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second, time.Minute, false, func(ctx context.Context) (bool, error) {
@@ -220,6 +221,7 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		client2,
 	).Run(tCtx2, 5)
 	informers2.Start(tCtx2.Done())
+	informers2.WaitForCacheSync(tCtx.Done())
 
 	// delete the kubernetes.default service so the old DefaultServiceCIDR can be deleted
 	// and the new apiserver can take over

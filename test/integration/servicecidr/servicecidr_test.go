@@ -68,6 +68,7 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 		client,
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
@@ -169,6 +170,7 @@ func TestServiceCIDRDeletion(t *testing.T) {
 		client,
 	).Run(ctx, 5)
 	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	// /29 = 6 services, kubernetes.default takes the first address
 	// make 5 more services to take up all IPs
