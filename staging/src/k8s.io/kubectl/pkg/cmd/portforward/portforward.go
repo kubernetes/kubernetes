@@ -148,7 +148,9 @@ func createDialer(method string, url *url.URL, opts PortForwardOptions) (httpstr
 			return nil, err
 		}
 		// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
-		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, httpstream.IsUpgradeFailure)
+		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+		})
 	}
 	return dialer, nil
 }
