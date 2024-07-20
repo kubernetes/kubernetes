@@ -516,8 +516,6 @@ type RunContainerOptions struct {
 	PodContainerDir string
 	// The type of container rootfs
 	ReadOnly bool
-	// hostname for pod containers
-	Hostname string
 }
 
 // VolumeInfo contains information about the volume.
