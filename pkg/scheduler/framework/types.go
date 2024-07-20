@@ -66,8 +66,8 @@ const (
 	// It's better to narrow down the scope of the event by using them instead of Update event
 	// for better performance in requeueing.
 	UpdatePodLabel
-	// UpdatePodRequest is a update for pod's resource request calculated by resource.PodRequests() function.
-	UpdatePodRequest
+	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
+	UpdatePodScaleDown
 
 	// updatePodOther is a update for pod's other fields.
 	// It's used only for the internal event handling, and thus unexported.
@@ -76,7 +76,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodRequest | updatePodOther
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | updatePodOther
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.

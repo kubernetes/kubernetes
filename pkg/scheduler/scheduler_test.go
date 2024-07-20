@@ -893,7 +893,7 @@ func Test_UnionedGVKs(t *testing.T) {
 			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodRequest | framework.Delete,
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
 				framework.Node:                  framework.All,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.All - framework.Delete,

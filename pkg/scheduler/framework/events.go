@@ -57,8 +57,8 @@ var (
 	assignedPodOtherUpdate = ClusterEvent{Resource: Pod, ActionType: updatePodOther, Label: "AssignedPodUpdate"}
 	// AssignedPodDelete is the event when an assigned pod is deleted.
 	AssignedPodDelete = ClusterEvent{Resource: Pod, ActionType: Delete, Label: "AssignedPodDelete"}
-	// PodRequestChange is the event when a pod's resource request is changed.
-	PodRequestChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodRequest, Label: "PodRequestChange"}
+	// PodRequestScaledDown is the event when a pod's resource request is scaled down.
+	PodRequestScaledDown = ClusterEvent{Resource: Pod, ActionType: UpdatePodScaleDown, Label: "PodRequestScaledDown"}
 	// PodLabelChange is the event when a pod's label is changed.
 	PodLabelChange = ClusterEvent{Resource: Pod, ActionType: UpdatePodLabel, Label: "PodLabelChange"}
 	// NodeSpecUnschedulableChange is the event when unschedulable node spec is changed.
@@ -108,7 +108,7 @@ var (
 func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []ClusterEvent) {
 	podChangeExtracters := []podChangeExtractor{
 		extractPodLabelsChange,
-		extractPodResourceRequestChange,
+		extractPodScaleDown,
 	}
 
 	for _, fn := range podChangeExtracters {
@@ -128,13 +128,27 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 
 type podChangeExtractor func(newNode *v1.Pod, oldNode *v1.Pod) *ClusterEvent
 
-func extractPodResourceRequestChange(newPod, oldPod *v1.Pod) *ClusterEvent {
+// extractPodScaleDown interprets the update of a pod and returns PodRequestScaledDown event if any pod's resource request(s) is scaled down.
+func extractPodScaleDown(newPod, oldPod *v1.Pod) *ClusterEvent {
 	opt := resource.PodResourcesOptions{
 		InPlacePodVerticalScalingEnabled: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 	}
-	if !equality.Semantic.DeepEqual(resource.PodRequests(newPod, opt), resource.PodRequests(oldPod, opt)) {
-		return &PodRequestChange
+	newPodRequests := resource.PodRequests(newPod, opt)
+	oldPodRequests := resource.PodRequests(oldPod, opt)
+
+	for rName, oldReq := range oldPodRequests {
+		newReq, ok := newPodRequests[rName]
+		if !ok {
+			// The resource request of rName is removed.
+			return &PodRequestScaledDown
+		}
+
+		if oldReq.MilliValue() > newReq.MilliValue() {
+			// The resource request of rName is scaled down.
+			return &PodRequestScaledDown
+		}
 	}
+
 	return nil
 }
 

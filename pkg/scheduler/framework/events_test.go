@@ -291,7 +291,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			},
 		},
 	}
-	podWithBigRequestAndLabel := &v1.Pod{
+	podWithSmallRequestAndLabel := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"foo": "bar"},
 		},
@@ -300,7 +300,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 				{
 					Name: "app",
 					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
 					},
 				},
 			},
@@ -309,7 +309,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			ContainerStatuses: []v1.ContainerStatus{
 				{
 					Name:               "app",
-					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("101m")},
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
 				},
 			},
 		},
@@ -347,16 +347,22 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			want:   []ClusterEvent{PodLabelChange},
 		},
 		{
-			name:   "only pod's resource request is updated",
+			name:   "pod's resource request is scaled down",
+			oldPod: podWithBigRequest,
+			newPod: podWithSmallRequest,
+			want:   []ClusterEvent{PodRequestScaledDown},
+		},
+		{
+			name:   "pod's resource request is scaled up",
 			oldPod: podWithSmallRequest,
 			newPod: podWithBigRequest,
-			want:   []ClusterEvent{PodRequestChange},
+			want:   []ClusterEvent{assignedPodOtherUpdate},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
-			oldPod: podWithSmallRequest,
-			newPod: podWithBigRequestAndLabel,
-			want:   []ClusterEvent{PodLabelChange, PodRequestChange},
+			oldPod: podWithBigRequest,
+			newPod: podWithSmallRequestAndLabel,
+			want:   []ClusterEvent{PodLabelChange, PodRequestScaledDown},
 		},
 		{
 			name:   "untracked properties of pod is updated",
