@@ -199,7 +199,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 			StorageVersionMigrations().
 			UpdateStatus(
 				ctx,
-				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason),
+				setStatusConditions(toBeProcessedSVM, svmv1alpha1.MigrationFailed, migrationFailedStatusReason, "resource does not exist in discovery"),
 				metav1.UpdateOptions{},
 			)
 		if err != nil {

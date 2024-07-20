@@ -66,6 +66,7 @@ type MissingEventsReport struct {
 	LastEventChecked  *auditinternal.Event
 	NumEventsChecked  int
 	MissingEvents     []AuditEvent
+	AllEvents         []AuditEvent
 }
 
 // String returns a human readable string representation of the report
@@ -118,6 +119,7 @@ func CheckAuditLinesFiltered(stream io.Reader, expected []AuditEvent, version sc
 		}
 
 		expectations.Mark(event)
+		missingReport.AllEvents = append(missingReport.AllEvents, event)
 	}
 	if err := scanner.Err(); err != nil {
 		return missingReport, err

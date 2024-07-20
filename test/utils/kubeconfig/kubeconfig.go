@@ -45,6 +45,7 @@ func CreateKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
 
 	cluster := clientcmdapi.NewCluster()
 	cluster.Server = clientCfg.Host
+	cluster.TLSServerName = clientCfg.ServerName
 	cluster.CertificateAuthority = clientCfg.CAFile
 	if len(cluster.CertificateAuthority) == 0 {
 		cluster.CertificateAuthorityData = clientCfg.CAData

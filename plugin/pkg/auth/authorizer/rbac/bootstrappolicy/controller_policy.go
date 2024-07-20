@@ -486,7 +486,10 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				Name: saRolePrefix + "storage-version-migrator-controller",
 			},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("list", "patch").Groups("*").Resources("*").RuleOrDie(),
+				// need list to get current RV for any resource
+				// need patch for SSA of any resource
+				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
+				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
 			},
 		})
