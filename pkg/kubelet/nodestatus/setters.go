@@ -321,7 +321,6 @@ func MachineInfo(nodeName string,
 					node.Status.Capacity[v1.ResourceEphemeralStorage] = v
 				}
 			}
-			//}
 
 			devicePluginCapacity, devicePluginAllocatable, removedDevicePlugins = devicePluginResourceCapacityFunc()
 			for k, v := range devicePluginCapacity {
