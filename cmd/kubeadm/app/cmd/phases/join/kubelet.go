@@ -281,6 +281,14 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		_ = os.Remove(bootstrapKubeConfigFile)
 	}()
 
+	// Apply patches to the in-memory kubelet configuration so that any configuration changes like kubelet healthz
+	// address and port options are respected during the wait below. WriteConfigToDisk already applied patches to
+	// the kubelet.yaml written to disk. This should be done after WriteConfigToDisk because both use the same config
+	// in memory and we don't want patches to be applied two times to the config that is written to disk.
+	if err := kubeletphase.ApplyPatchesToConfig(&initCfg.ClusterConfiguration, data.PatchesDir()); err != nil {
+		return errors.Wrap(err, "could not apply patches to the in-memory kubelet configuration")
+	}
+
 	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
 	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
 	// times out, display a somewhat user-friendly message.
