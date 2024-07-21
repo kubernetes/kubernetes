@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -37,8 +38,6 @@ import (
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func createLockObject(t *testing.T, objectType, namespace, name string, record *rl.LeaderElectionRecord) (obj runtime.Object) {
@@ -325,6 +324,147 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 					}
 				} else {
 					t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
+				}
+			}
+
+			le.observedRecord.AcquireTime = metav1.Time{}
+			le.observedRecord.RenewTime = metav1.Time{}
+			if le.observedRecord.HolderIdentity != test.outHolder {
+				t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", test.outHolder, le.observedRecord.HolderIdentity)
+			}
+			if len(test.reactors) != len(c.Actions()) {
+				t.Errorf("wrong number of api interactions")
+			}
+			if test.transitionLeader && le.observedRecord.LeaderTransitions != 1 {
+				t.Errorf("leader should have transitioned but did not")
+			}
+			if !test.transitionLeader && le.observedRecord.LeaderTransitions != 0 {
+				t.Errorf("leader should not have transitioned but did")
+			}
+
+			le.maybeReportTransition()
+			wg.Wait()
+			if reportedLeader != test.outHolder {
+				t.Errorf("reported leader was not the new leader. expected %q, got %q", test.outHolder, reportedLeader)
+			}
+			assertEqualEvents(t, test.expectedEvents, recorder.Events)
+		})
+	}
+}
+
+func TestTryCoordinatedRenew(t *testing.T) {
+	objectType := "leases"
+	clock := clock.RealClock{}
+	future := clock.Now().Add(1000 * time.Hour)
+
+	tests := []struct {
+		name           string
+		observedRecord rl.LeaderElectionRecord
+		observedTime   time.Time
+		retryAfter     time.Duration
+		reactors       []Reactor
+		expectedEvents []string
+
+		expectSuccess    bool
+		transitionLeader bool
+		outHolder        string
+	}{
+		{
+			name: "don't acquire from led, acked object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "bing"}), nil
+					},
+				},
+			},
+			observedTime: future,
+
+			expectSuccess: false,
+			outHolder:     "bing",
+		},
+		{
+			name: "renew already acquired object",
+			reactors: []Reactor{
+				{
+					verb: "get",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
+					},
+				},
+				{
+					verb: "update",
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, action.(fakeclient.CreateAction).GetObject(), nil
+					},
+				},
+			},
+			observedTime:   future,
+			observedRecord: rl.LeaderElectionRecord{HolderIdentity: "baz"},
+
+			expectSuccess: true,
+			outHolder:     "baz",
+		},
+	}
+
+	for i := range tests {
+		test := &tests[i]
+		t.Run(test.name, func(t *testing.T) {
+			// OnNewLeader is called async so we have to wait for it.
+			var wg sync.WaitGroup
+			wg.Add(1)
+			var reportedLeader string
+			var lock rl.Interface
+
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			recorder := record.NewFakeRecorder(100)
+			resourceLockConfig := rl.ResourceLockConfig{
+				Identity:      "baz",
+				EventRecorder: recorder,
+			}
+			c := &fake.Clientset{}
+			for _, reactor := range test.reactors {
+				c.AddReactor(reactor.verb, objectType, reactor.reaction)
+			}
+			c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+				t.Errorf("unreachable action. testclient called too many times: %+v", action)
+				return true, nil, fmt.Errorf("unreachable action")
+			})
+
+			lock = &rl.LeaseLock{
+				LeaseMeta:  objectMeta,
+				LockConfig: resourceLockConfig,
+				Client:     c.CoordinationV1(),
+			}
+			lec := LeaderElectionConfig{
+				Lock:          lock,
+				LeaseDuration: 10 * time.Second,
+				Callbacks: LeaderCallbacks{
+					OnNewLeader: func(l string) {
+						defer wg.Done()
+						reportedLeader = l
+					},
+				},
+				Coordinated: true,
+			}
+			observedRawRecord := GetRawRecordOrDie(t, objectType, test.observedRecord)
+			le := &LeaderElector{
+				config:            lec,
+				observedRecord:    test.observedRecord,
+				observedRawRecord: observedRawRecord,
+				observedTime:      test.observedTime,
+				clock:             clock,
+				metrics:           globalMetricsFactory.newLeaderMetrics(),
+			}
+			if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+				if test.retryAfter != 0 {
+					time.Sleep(test.retryAfter)
+					if test.expectSuccess != le.tryCoordinatedRenew(context.Background()) {
+						t.Errorf("unexpected result of tryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
+					}
+				} else {
+					t.Errorf("unexpected result of gryCoordinatedRenew: [succeeded=%v]", !test.expectSuccess)
 				}
 			}
 

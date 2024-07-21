@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -41,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/features"
@@ -143,6 +145,27 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	_, publicServicePort, err := c.Generic.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
+		lcInformer := s.VersionedInformers.Coordination().V1alpha1().LeaseCandidates()
+		// Ensure that informers are registered before starting. Coordinated Leader Election leader-elected
+		// and may register informer handlers after they are started.
+		_ = leaseInformer.Informer()
+		_ = lcInformer.Informer()
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			go leaderelection.RunWithLeaderElection(hookContext, s.GenericAPIServer.LoopbackClientConfig, func() (func(ctx context.Context, workers int), error) {
+				controller, err := leaderelection.NewController(
+					leaseInformer,
+					lcInformer,
+					client.CoordinationV1(),
+					client.CoordinationV1alpha1(),
+				)
+				return controller.Run, err
+			})
+			return nil
+		})
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
