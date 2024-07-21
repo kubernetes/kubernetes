@@ -148,6 +148,7 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 		var unknownUserErr user.UnknownUserError
 		if goerrors.As(err, &unknownUserErr) {
 			// if the user is not found, we assume that the user is not configured
+			klog.V(5).InfoS("user namespaces: user not found, using default mappings", "user", kubeletUser)
 			return defaultFirstID, defaultLen, nil
 		}
 		return 0, 0, err
@@ -157,14 +158,14 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 	cmd, err := exec.LookPath(execName)
 	if err != nil {
 		if os.IsNotExist(err) {
-			klog.V(2).InfoS("Could not find executable, default mappings will be used for the user namespaces", "executable", execName, "err", err)
+			klog.V(2).InfoS("user namespaces: executable not found, using default mappings", "executable", execName, "err", err)
 			return defaultFirstID, defaultLen, nil
 		}
 		return 0, 0, err
 	}
 	outUids, err := exec.Command(cmd, kubeletUser).Output()
 	if err != nil {
-		return 0, 0, fmt.Errorf("error retrieving additional ids for user %q", kubeletUser)
+		return 0, 0, fmt.Errorf("error retrieving additional uids for user %q: %w", kubeletUser, err)
 	}
 	outGids, err := exec.Command(cmd, "-g", kubeletUser).Output()
 	if err != nil {
@@ -173,6 +174,7 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 	if string(outUids) != string(outGids) {
 		return 0, 0, fmt.Errorf("mismatched subuids and subgids for user %q", kubeletUser)
 	}
+	klog.V(5).InfoS("user namespaces: user found, using mappings from getsubids", "user", kubeletUser)
 	return parseGetSubIdsOutput(string(outUids))
 }
 

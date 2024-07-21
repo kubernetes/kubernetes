@@ -944,7 +944,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.shutdownManager = shutdownManager
 	klet.usernsManager, err = userns.MakeUserNsManager(klet)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create user namespace manager: %w", err)
 	}
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
 
