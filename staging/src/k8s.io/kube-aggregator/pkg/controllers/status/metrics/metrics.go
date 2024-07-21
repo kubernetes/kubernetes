@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package metrics
 
 import (
 	"sync"
 
 	"k8s.io/component-base/metrics"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 )
 
 /*
@@ -41,14 +43,14 @@ var (
 	)
 )
 
-type availabilityMetrics struct {
+type Metrics struct {
 	unavailableCounter *metrics.CounterVec
 
 	*availabilityCollector
 }
 
-func newAvailabilityMetrics() *availabilityMetrics {
-	return &availabilityMetrics{
+func New() *Metrics {
+	return &Metrics{
 		unavailableCounter: metrics.NewCounterVec(
 			&metrics.CounterOpts{
 				Name:           "aggregator_unavailable_apiservice_total",
@@ -62,7 +64,7 @@ func newAvailabilityMetrics() *availabilityMetrics {
 }
 
 // Register registers apiservice availability metrics.
-func (m *availabilityMetrics) Register(
+func (m *Metrics) Register(
 	registrationFunc func(metrics.Registerable) error,
 	customRegistrationFunc func(metrics.StableCollector) error,
 ) error {
@@ -80,7 +82,7 @@ func (m *availabilityMetrics) Register(
 }
 
 // UnavailableCounter returns a counter to track apiservices marked as unavailable.
-func (m *availabilityMetrics) UnavailableCounter(apiServiceName, reason string) metrics.CounterMetric {
+func (m *Metrics) UnavailableCounter(apiServiceName, reason string) metrics.CounterMetric {
 	return m.unavailableCounter.WithLabelValues(apiServiceName, reason)
 }
 
@@ -89,6 +91,31 @@ type availabilityCollector struct {
 
 	mtx            sync.RWMutex
 	availabilities map[string]bool
+}
+
+// SetUnavailableGauge set the metrics so that it reflect the current state base on availability of the given service
+func (m *Metrics) SetUnavailableGauge(newAPIService *apiregistrationv1.APIService) {
+	if apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available) {
+		m.SetAPIServiceAvailable(newAPIService.Name)
+		return
+	}
+
+	m.SetAPIServiceUnavailable(newAPIService.Name)
+}
+
+// SetUnavailableCounter increases the metrics only if the given service is unavailable and its APIServiceCondition has changed
+func (m *Metrics) SetUnavailableCounter(originalAPIService, newAPIService *apiregistrationv1.APIService) {
+	wasAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(originalAPIService, apiregistrationv1.Available)
+	isAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(newAPIService, apiregistrationv1.Available)
+	statusChanged := isAvailable != wasAvailable
+
+	if statusChanged && !isAvailable {
+		reason := "UnknownReason"
+		if newCondition := apiregistrationv1apihelper.GetAPIServiceConditionByType(newAPIService, apiregistrationv1.Available); newCondition != nil {
+			reason = newCondition.Reason
+		}
+		m.UnavailableCounter(newAPIService.Name, reason).Inc()
+	}
 }
 
 // Check if apiServiceStatusCollector implements necessary interface.
