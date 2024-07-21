@@ -51,8 +51,8 @@ import (
 	openapiaggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	openapiv3controller "k8s.io/kube-aggregator/pkg/controllers/openapiv3"
 	openapiv3aggregator "k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator"
-	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
+	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status/remote"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
