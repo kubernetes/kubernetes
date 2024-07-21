@@ -510,7 +510,7 @@ func (p *PriorityQueue) isPodWorthRequeuing(logger klog.Logger, pInfo *framework
 				}
 				hint = framework.Queue
 			}
-			metrics.QueueingHintExecutionDuration.WithLabelValues(hintfn.PluginName, event.Label, queueingHintToLabel(hint, err)).Observe(metrics.SinceInSeconds(start))
+			p.metricsRecorder.ObserveQueueingHintDurationAsync(hintfn.PluginName, event.Label, queueingHintToLabel(hint, err), metrics.SinceInSeconds(start))
 
 			if hint == framework.QueueSkip {
 				continue

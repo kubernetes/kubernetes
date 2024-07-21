@@ -207,11 +207,11 @@ var (
 		[]string{"plugin", "extension_point", "status"})
 
 	// This is only available when the QHint feature gate is enabled.
-	QueueingHintExecutionDuration = metrics.NewHistogramVec(
+	queueingHintExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "queueing_hint_execution_duration_seconds",
-			Help:      "Duration for running a queueing hint from a plugin.",
+			Help:      "Duration for running a queueing hint function of a plugin.",
 			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
 			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
@@ -291,7 +291,7 @@ func Register() {
 	registerMetrics.Do(func() {
 		RegisterMetrics(metricsList...)
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			RegisterMetrics(QueueingHintExecutionDuration)
+			RegisterMetrics(queueingHintExecutionDuration)
 		}
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 	})
