@@ -28,8 +28,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
-
+	v1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,7 +79,9 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/utils/clock"
 )
 
 func init() {
@@ -288,6 +291,30 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			defer close(leaderMigrator.MigrationReady)
 			return startSATokenControllerInit(ctx, controllerContext, controllerName)
 		}
+	}
+	ver, err := semver.ParseTolerant(version.Get().String())
+	if err != nil {
+		return err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+		// Start component identity lease management
+		leaseCandidate, err := leaderelection.NewCandidate(
+			c.Client,
+			id,
+			"kube-system",
+			"kube-controller-manager",
+			clock.RealClock{},
+			ver.FinalizeVersion(),
+			ver.FinalizeVersion(), // TODO: Use compatibility version when it's available
+			[]v1.CoordinatedLeaseStrategy{"OldestEmulationVersion"},
+		)
+		if err != nil {
+			return err
+		}
+		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(leaseCandidate.InformerFactory))
+
+		go leaseCandidate.Run(ctx)
 	}
 
 	// Start the main lock
@@ -886,6 +913,7 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		Callbacks:     callbacks,
 		WatchDog:      electionChecker,
 		Name:          leaseName,
+		Coordinated:   utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 
 	panic("unreachable")
