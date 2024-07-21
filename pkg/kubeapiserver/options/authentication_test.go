@@ -494,14 +494,11 @@ func TestWithTokenGetterFunction(t *testing.T) {
 			called = true
 			return nil
 		}
-		opts := NewBuiltInAuthenticationOptions().WithTokenGetterFunction(f)
+		opts := NewBuiltInAuthenticationOptions().WithServiceAccounts()
+		opts.ServiceAccounts.OptionalTokenGetter = f
 		err := opts.ApplyTo(context.Background(), &genericapiserver.AuthenticationInfo{}, nil, nil, &openapicommon.Config{}, nil, fakeClientset, versionedInformer, "")
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		if opts.ServiceAccounts.OptionalTokenGetter == nil {
-			t.Fatal("expected token getter function to be set")
 		}
 
 		if !called {
