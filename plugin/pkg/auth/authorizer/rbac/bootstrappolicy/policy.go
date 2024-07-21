@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -551,7 +552,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// This is for leaderlease access
 		// TODO: scope this to the kube-system namespace
 		rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-scheduler").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "update", "list", "watch").Groups(coordinationGroup).Resources("leases").Names("kube-scheduler").RuleOrDie(),
+		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leasecandidates").RuleOrDie(),
 
 		// Fundamental resources
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("nodes").RuleOrDie(),
