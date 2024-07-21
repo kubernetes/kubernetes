@@ -18,7 +18,6 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
@@ -111,6 +110,13 @@ const (
 	// Note: the feature gate can be removed in 1.32
 	// Enables expression validation in Admission Control
 	ValidatingAdmissionPolicy featuregate.Feature = "ValidatingAdmissionPolicy"
+
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/4355
+	// alpha: v1.31
+	//
+	// Enables coordinated leader election in the API server
+	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
 	// alpha: v1.20
 	// beta: v1.21
@@ -359,6 +365,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	ValidatingAdmissionPolicy: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.32
+
+	CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
