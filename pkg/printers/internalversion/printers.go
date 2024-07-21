@@ -34,6 +34,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
@@ -429,6 +431,16 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	_ = h.TableHandler(leaseColumnDefinitions, printLease)
 	_ = h.TableHandler(leaseColumnDefinitions, printLeaseList)
+
+	leaseCandidateColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "LeaseName", Type: "string", Description: coordinationv1alpha1.LeaseCandidateSpec{}.SwaggerDoc()["leaseName"]},
+		{Name: "BinaryVersion", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["binaryVersion"]},
+		{Name: "EmulationVersion", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["emulationVersion"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(leaseCandidateColumnDefinitions, printLeaseCandidate)
+	_ = h.TableHandler(leaseCandidateColumnDefinitions, printLeaseCandidateList)
 
 	storageClassColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -2559,6 +2571,27 @@ func printLeaseList(list *coordination.LeaseList, options printers.GenerateOptio
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printLease(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printLeaseCandidate(obj *coordination.LeaseCandidate, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.LeaseName, obj.Spec.BinaryVersion, obj.Spec.EmulationVersion, translateTimestampSince(obj.CreationTimestamp))
+	return []metav1.TableRow{row}, nil
+}
+
+func printLeaseCandidateList(list *coordination.LeaseCandidateList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printLeaseCandidate(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
