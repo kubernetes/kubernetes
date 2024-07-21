@@ -38,6 +38,7 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+	certapi "k8s.io/kubernetes/pkg/apis/certificates"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -73,8 +74,9 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	expansionRecoveryEnabled         bool
-	dynamicResourceAllocationEnabled bool
+	expansionRecoveryEnabled              bool
+	dynamicResourceAllocationEnabled      bool
+	kubeletCSRAdmissionValidationDisabled bool
 }
 
 var (
@@ -87,6 +89,7 @@ var (
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
 	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
+	p.kubeletCSRAdmissionValidationDisabled = featureGates.Enabled(features.DisableKubeletCSRAdmissionValidation)
 }
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
@@ -117,6 +120,7 @@ var (
 	leaseResource         = coordapi.Resource("leases")
 	csiNodeResource       = storage.Resource("csinodes")
 	resourceSliceResource = resource.Resource("resourceslices")
+	csrResource           = certapi.Resource("certificatesigningrequests")
 )
 
 // Admit checks the admission policy and triggers corresponding actions
@@ -171,6 +175,11 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	case resourceSliceResource:
 		return p.admitResourceSlice(nodeName, a)
 
+	case csrResource:
+		if p.kubeletCSRAdmissionValidationDisabled {
+			return nil
+		}
+		return p.admitCSR(nodeName, a)
 	default:
 		return nil
 	}
@@ -666,6 +675,34 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 		if slice.NodeName != nodeName {
 			return admission.NewForbidden(a, errors.New("can only delete ResourceSlice with the same NodeName as the requesting node"))
 		}
+	}
+
+	return nil
+}
+
+func (p *Plugin) admitCSR(nodeName string, a admission.Attributes) error {
+	// Create requests for Kubelet serving signer and Kube API server client
+	// kubelet signer with a CN that begins with "system:node:" must have a CN
+	// that is exactly the node's name.
+	// Other CSR attributes get checked in CSR validation by the signer.
+	if a.GetOperation() != admission.Create {
+		return nil
+	}
+
+	csr, ok := a.GetObject().(*certapi.CertificateSigningRequest)
+	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+	if csr.Spec.SignerName != certapi.KubeletServingSignerName && csr.Spec.SignerName != certapi.KubeAPIServerClientKubeletSignerName {
+		return nil
+	}
+
+	x509cr, err := certapi.ParseCSR(csr.Spec.Request)
+	if err != nil {
+		return admission.NewForbidden(a, fmt.Errorf("unable to parse csr: %w", err))
+	}
+	if x509cr.Subject.CommonName != fmt.Sprintf("system:node:%s", nodeName) {
+		return admission.NewForbidden(a, fmt.Errorf("can only create a node CSR with CN=system:node:%s", nodeName))
 	}
 
 	return nil
