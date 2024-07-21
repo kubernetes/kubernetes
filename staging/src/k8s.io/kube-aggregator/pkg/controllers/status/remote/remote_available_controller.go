@@ -313,7 +313,7 @@ func (c *AvailableConditionController) sync(key string) error {
 						resp.Body.Close()
 						// we should always been in the 200s or 300s
 						if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-							errCh <- fmt.Errorf("bad status from %v: %v", discoveryURL, resp.StatusCode)
+							errCh <- fmt.Errorf("bad status from %v: %d", discoveryURL, resp.StatusCode)
 							return
 						}
 					}
@@ -324,7 +324,7 @@ func (c *AvailableConditionController) sync(key string) error {
 				select {
 				case err = <-errCh:
 					if err != nil {
-						results <- fmt.Errorf("failing or missing response from %v: %v", discoveryURL, err)
+						results <- fmt.Errorf("failing or missing response from %v: %w", discoveryURL, err)
 						return
 					}
 
