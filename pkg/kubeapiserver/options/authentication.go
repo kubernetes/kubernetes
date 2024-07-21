@@ -676,15 +676,15 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 		authInfo.APIAudiences = authenticator.Audiences(o.ServiceAccounts.Issuers)
 	}
 
-	var nodeLister v1listers.NodeLister
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
-		nodeLister = versionedInformer.Core().V1().Nodes().Lister()
-	}
-
 	// If the optional token getter function is set, use it. Otherwise, use the default token getter.
 	if o.ServiceAccounts != nil && o.ServiceAccounts.OptionalTokenGetter != nil {
 		authenticatorConfig.ServiceAccountTokenGetter = o.ServiceAccounts.OptionalTokenGetter(versionedInformer)
 	} else {
+		var nodeLister v1listers.NodeLister
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenNodeBindingValidation) {
+			nodeLister = versionedInformer.Core().V1().Nodes().Lister()
+		}
+
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
 			extclient,
 			versionedInformer.Core().V1().Secrets().Lister(),
