@@ -152,6 +152,13 @@ const (
 	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
+	// owner: @jefftree
+	// kep: https://kep.k8s.io/4355
+	// alpha: v1.31
+	//
+	// Enables coordinated leader election in the API server
+	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
+
 	// owner: @trierra
 	// kep:  http://kep.k8s.io/2589
 	// alpha: v1.23
@@ -1255,6 +1262,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.AuthorizeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.ConsistentListFromCache: {Default: false, PreRelease: featuregate.Alpha},
+
+	genericfeatures.CoordinatedLeaderElection: {Default: false, PreRelease: featuregate.Alpha},
 
 	genericfeatures.EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
