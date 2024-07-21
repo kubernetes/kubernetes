@@ -70,6 +70,8 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	node0 := &user.DefaultInfo{Name: "system:node:node0", Groups: []string{"system:nodes"}}
 
+	nodeunregistered := &user.DefaultInfo{Name: "system:node:nodeunregistered", Groups: []string{"system:nodes"}}
+
 	selectorAuthzDisabled := utilfeature.DefaultFeatureGate.DeepCopy()
 	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, genericfeatures.AuthorizeWithSelectors, false)
 	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzDisabled, features.AuthorizeNodeWithSelectors, false)
@@ -585,6 +587,11 @@ func TestNodeAuthorizer(t *testing.T) {
 
 		// nodes
 		// get nodes
+		{
+			name:   "get related unregistered node",
+			attrs:  authorizer.AttributesRecord{User: nodeunregistered, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "nodeunregistered"},
+			expect: authorizer.DecisionAllow,
+		},
 		{
 			name:   "get related node",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node0"},

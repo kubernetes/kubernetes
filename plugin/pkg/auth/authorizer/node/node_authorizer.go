@@ -368,7 +368,18 @@ func (r *NodeAuthorizer) authorizeNode(nodeName string, attrs authorizer.Attribu
 			// Use the NodeRestriction admission plugin to limit a node to creating/updating its own API object.
 			return authorizer.DecisionAllow, "", nil
 		case "get", "list", "watch":
-			return r.authorize(nodeName, nodeVertexType, attrs)
+			// Compare the name directly, rather than using the graph,
+			// so kubelets can attempt a read of their Node API object prior to creation.
+			switch attrs.GetName() {
+			case nodeName:
+				return authorizer.DecisionAllow, "", nil
+			case "":
+				klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+				return authorizer.DecisionNoOpinion, fmt.Sprintf("node '%s' cannot read all nodes, only its own Node object", nodeName), nil
+			default:
+				klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+				return authorizer.DecisionNoOpinion, fmt.Sprintf("node '%s' cannot read '%s', only its own Node object", nodeName, attrs.GetName()), nil
+			}
 		}
 	case "status":
 		switch attrs.GetVerb() {
