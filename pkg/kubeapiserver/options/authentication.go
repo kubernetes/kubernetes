@@ -218,15 +218,6 @@ func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticat
 	return o
 }
 
-// WithTokenGetterFunction set optional service account token getter function
-func (o *BuiltInAuthenticationOptions) WithTokenGetterFunction(f func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter) *BuiltInAuthenticationOptions {
-	if o.ServiceAccounts == nil {
-		o.ServiceAccounts = &ServiceAccountAuthenticationOptions{}
-	}
-	o.ServiceAccounts.OptionalTokenGetter = f
-	return o
-}
-
 // WithTokenFile set default value for token file authentication
 func (o *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOptions {
 	o.TokenFile = &TokenFileAuthenticationOptions{}
