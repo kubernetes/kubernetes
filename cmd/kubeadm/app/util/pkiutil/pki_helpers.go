@@ -49,14 +49,10 @@ import (
 )
 
 const (
-	// PrivateKeyBlockType is a possible value for pem.Block.Type.
-	PrivateKeyBlockType = "PRIVATE KEY"
 	// PublicKeyBlockType is a possible value for pem.Block.Type.
 	PublicKeyBlockType = "PUBLIC KEY"
 	// CertificateBlockType is a possible value for pem.Block.Type.
 	CertificateBlockType = "CERTIFICATE"
-	// RSAPrivateKeyBlockType is a possible value for pem.Block.Type.
-	RSAPrivateKeyBlockType = "RSA PRIVATE KEY"
 )
 
 // CertConfig is a wrapper around certutil.Config extending it with EncryptionAlgorithm.
