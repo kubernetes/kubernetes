@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -47,6 +48,14 @@ type GetContextsOptions struct {
 	noHeaders    bool
 
 	genericiooptions.IOStreams
+}
+
+type ConfigJson struct {
+	Prefix string `json:"prefix"`
+	Name string `json:"name"`
+	Cluster string `json:"cluster"`
+	AuthInfo string `json:"authInfo"`
+	Namespace string `json:"namespace"`
 }
 
 var (
@@ -89,7 +98,7 @@ func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess cl
 
 // Complete assigns GetContextsOptions from the args.
 func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
-	supportedOutputTypes := sets.NewString("", "name")
+	supportedOutputTypes := sets.NewString("", "name", "json")
 	if !supportedOutputTypes.Has(o.outputFormat) {
 		return fmt.Errorf("--output %v is not available in kubectl config get-contexts; resetting to default output format", o.outputFormat)
 	}
@@ -142,6 +151,18 @@ func (o GetContextsOptions) RunGetContexts() error {
 			}
 		}
 	}
+
+	sort.Strings(toPrint)
+
+	if o.outputFormat == "json" {
+		configList := []ConfigJson{}
+		for _, name := range toPrint {
+			configList = append(configList, *createJsonContext(name, config.Contexts[name], o.nameOnly))
+		}
+		err = printJson(out, configList)
+		allErrs = append(allErrs, err)
+		return utilerrors.NewAggregate(allErrs)
+	}
 	if o.showHeaders {
 		err = printContextHeaders(out, o.nameOnly)
 		if err != nil {
@@ -149,7 +170,6 @@ func (o GetContextsOptions) RunGetContexts() error {
 		}
 	}
 
-	sort.Strings(toPrint)
 	for _, name := range toPrint {
 		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
 		if err != nil {
@@ -179,5 +199,26 @@ func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameO
 		prefix = "*"
 	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", prefix, name, context.Cluster, context.AuthInfo, context.Namespace)
+	return err
+}
+
+func createJsonContext(name string, context *clientcmdapi.Context, current bool) (*ConfigJson) {
+	prefix := " "
+	if current {
+		prefix = "*"
+	}
+	config := &ConfigJson{
+		Prefix: prefix,
+		Name: name,
+		Cluster: context.Cluster,
+		AuthInfo: context.AuthInfo,
+		Namespace: context.Namespace,
+	}
+	return config
+}
+
+func printJson(w io.Writer, configs []ConfigJson) error{
+	jsonText, err := json.Marshal(configs)
+  	fmt.Fprintf(w, "%s\n", string(jsonText))
 	return err
 }
