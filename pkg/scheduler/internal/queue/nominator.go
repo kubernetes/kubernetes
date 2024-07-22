@@ -46,7 +46,7 @@ type nominator struct {
 	// nominatedPods is a map keyed by a node name and the value is a list of
 	// pods which are nominated to run on the node. These are pods which can be in
 	// the activeQ or unschedulablePods.
-	nominatedPods map[string][]PodRef
+	nominatedPods map[string][]podRef
 	// nominatedPodToNode is map keyed by a Pod UID to the node name where it is
 	// nominated.
 	nominatedPodToNode map[types.UID]string
@@ -55,7 +55,7 @@ type nominator struct {
 func newPodNominator(podLister listersv1.PodLister) *nominator {
 	return &nominator{
 		podLister:          podLister,
-		nominatedPods:      make(map[string][]PodRef),
+		nominatedPods:      make(map[string][]podRef),
 		nominatedPodToNode: make(map[types.UID]string),
 	}
 }
@@ -100,12 +100,12 @@ func (npm *nominator) addNominatedPodUnlocked(logger klog.Logger, pi *framework.
 
 	npm.nominatedPodToNode[pi.Pod.UID] = nodeName
 	for _, np := range npm.nominatedPods[nodeName] {
-		if np.UID == pi.Pod.UID {
-			logger.V(4).Info("Pod already exists in the nominator", "pod", np.UID)
+		if np.uid == pi.Pod.UID {
+			logger.V(4).Info("Pod already exists in the nominator", "pod", np.uid)
 			return
 		}
 	}
-	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], PodToRef(pi.Pod))
+	npm.nominatedPods[nodeName] = append(npm.nominatedPods[nodeName], podToRef(pi.Pod))
 }
 
 // UpdateNominatedPod updates the <oldPod> with <newPod>.
@@ -148,7 +148,7 @@ func (npm *nominator) deleteUnlocked(p *v1.Pod) {
 		return
 	}
 	for i, np := range npm.nominatedPods[nnn] {
-		if np.UID == p.UID {
+		if np.uid == p.UID {
 			npm.nominatedPods[nnn] = append(npm.nominatedPods[nnn][:i], npm.nominatedPods[nnn][i+1:]...)
 			if len(npm.nominatedPods[nnn]) == 0 {
 				delete(npm.nominatedPods, nnn)
@@ -159,7 +159,7 @@ func (npm *nominator) deleteUnlocked(p *v1.Pod) {
 	delete(npm.nominatedPodToNode, p.UID)
 }
 
-func (npm *nominator) nominatedPodsForNode(nodeName string) []PodRef {
+func (npm *nominator) nominatedPodsForNode(nodeName string) []podRef {
 	npm.nLock.RLock()
 	defer npm.nLock.RUnlock()
 	return slices.Clone(npm.nominatedPods[nodeName])
@@ -170,26 +170,26 @@ func nominatedNodeName(pod *v1.Pod) string {
 	return pod.Status.NominatedNodeName
 }
 
-type PodRef struct {
-	Name      string
-	Namespace string
-	UID       types.UID
+type podRef struct {
+	name      string
+	namespace string
+	uid       types.UID
 }
 
-func PodToRef(pod *v1.Pod) PodRef {
-	return PodRef{
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-		UID:       pod.UID,
+func podToRef(pod *v1.Pod) podRef {
+	return podRef{
+		name:      pod.Name,
+		namespace: pod.Namespace,
+		uid:       pod.UID,
 	}
 }
 
-func (np PodRef) ToPod() *v1.Pod {
+func (np podRef) toPod() *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      np.Name,
-			Namespace: np.Namespace,
-			UID:       np.UID,
+			Name:      np.name,
+			Namespace: np.namespace,
+			UID:       np.uid,
 		},
 	}
 }
