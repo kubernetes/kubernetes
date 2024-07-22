@@ -1181,6 +1181,11 @@ status:
   containerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
@@ -1238,6 +1243,11 @@ status:
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
@@ -1298,6 +1308,11 @@ status:
   initContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
+    allocatedResourcesStatus:
+    - name: nameValue
+      resources:
+      - health: healthValue
+        resourceID: resourceIDValue
     containerID: containerIDValue
     image: imageValue
     imageID: imageIDValue
