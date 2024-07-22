@@ -595,7 +595,7 @@
           {
             "group": "resource.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha2"
+            "version": "v1alpha3"
           },
           {
             "group": "scheduling.k8s.io",
@@ -928,11 +928,6 @@
             "group": "",
             "kind": "Status",
             "version": "v1"
-          },
-          {
-            "group": "resource.k8s.io",
-            "kind": "Status",
-            "version": "v1alpha2"
           }
         ]
       },
@@ -1279,7 +1274,7 @@
           {
             "group": "resource.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha2"
+            "version": "v1alpha3"
           },
           {
             "group": "scheduling.k8s.io",

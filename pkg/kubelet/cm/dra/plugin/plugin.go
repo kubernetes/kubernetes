@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +34,15 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
+
+// defaultClientCallTimeout is the default amount of time that a DRA driver has
+// to respond to any of the gRPC calls. kubelet uses this value by passing nil
+// to RegisterPlugin. Some tests use a different, usually shorter timeout to
+// speed up testing.
+//
+// This is half of the kubelet retry period (according to
+// https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
+const defaultClientCallTimeout = 45 * time.Second
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
@@ -72,7 +82,7 @@ func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1
 }
 
 // wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
-func (h *RegistrationHandler) wipeResourceSlices(pluginName string) {
+func (h *RegistrationHandler) wipeResourceSlices(driver string) {
 	if h.kubeClient == nil {
 		return
 	}
@@ -97,12 +107,12 @@ func (h *RegistrationHandler) wipeResourceSlices(pluginName string) {
 			logger.Error(err, "Unexpected error checking for node")
 			return false, nil
 		}
-		fieldSelector := fields.Set{"nodeName": node.Name}
-		if pluginName != "" {
-			fieldSelector["driverName"] = pluginName
+		fieldSelector := fields.Set{resourceapi.ResourceSliceSelectorNodeName: node.Name}
+		if driver != "" {
+			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = h.kubeClient.ResourceV1alpha2().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = h.kubeClient.ResourceV1alpha3().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
@@ -143,7 +153,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	var timeout time.Duration
 	if pluginClientTimeout == nil {
-		timeout = PluginClientTimeout
+		timeout = defaultClientCallTimeout
 	} else {
 		timeout = *pluginClientTimeout
 	}
@@ -156,7 +166,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		conn:                    nil,
 		endpoint:                endpoint,
 		highestSupportedVersion: highestSupportedVersion,
-		clientTimeout:           timeout,
+		clientCallTimeout:       timeout,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key

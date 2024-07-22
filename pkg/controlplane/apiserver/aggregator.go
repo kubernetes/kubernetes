@@ -292,7 +292,7 @@ func DefaultGenericAPIServicePriorities() map[schema.GroupVersion]APIServicePrio
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"}:  {Group: 16100, Version: 12},
 		{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"}: {Group: 16100, Version: 9},
 		{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"}:    {Group: 16000, Version: 9},
-		{Group: "resource.k8s.io", Version: "v1alpha2"}:              {Group: 15900, Version: 9},
+		{Group: "resource.k8s.io", Version: "v1alpha3"}:              {Group: 15900, Version: 9},
 		{Group: "storagemigration.k8s.io", Version: "v1alpha1"}:      {Group: 15800, Version: 9},
 		// Append a new group to the end of the list if unsure.
 		// You can use min(existing group)-100 as the initial value for a group.

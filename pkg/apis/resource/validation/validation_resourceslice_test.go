@@ -32,10 +32,13 @@ func testResourceSlice(name, nodeName, driverName string) *resource.ResourceSlic
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		NodeName:   nodeName,
-		DriverName: driverName,
-		ResourceModel: resource.ResourceModel{
-			NamedResources: &resource.NamedResourcesResources{},
+		Spec: resource.ResourceSliceSpec{
+			NodeName: nodeName,
+			Driver:   driverName,
+			Pool: resource.ResourcePool{
+				Name:               nodeName,
+				ResourceSliceCount: 1,
+			},
 		},
 	}
 }
@@ -180,21 +183,23 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-nodename": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("nodeName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
-			slice:        testResourceSlice(goodName, badName, driverName),
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "nodeName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+			slice: testResourceSlice(goodName, badName, driverName),
+		},
+		"bad-multi-pool-name": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "pool", "name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Invalid(field.NewPath("spec", "nodeName"), badName+"/"+badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+			slice: testResourceSlice(goodName, badName+"/"+badName, driverName),
 		},
 		"bad-drivername": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("driverName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			slice:        testResourceSlice(goodName, goodName, badName),
-		},
-
-		"empty-model": {
-			wantFailures: field.ErrorList{field.Required(nil, "exactly one structured model field must be set")},
-			slice: func() *resource.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, driverName)
-				slice.ResourceModel = resource.ResourceModel{}
-				return slice
-			}(),
 		},
 	}
 
@@ -228,18 +233,26 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("metadata", "name"), name+"-update", "field is immutable")},
 		},
 		"invalid-update-nodename": {
-			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("nodeName"), name+"-updated", "field is immutable")},
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "nodeName"), name+"-updated", "field is immutable")},
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
-				slice.NodeName += "-updated"
+				slice.Spec.NodeName += "-updated"
 				return slice
 			},
 		},
 		"invalid-update-drivername": {
-			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("driverName"), name+"-updated", "field is immutable")},
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "driver"), name+"-updated", "field is immutable")},
 			oldResourceSlice: validResourceSlice,
 			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
-				slice.DriverName += "-updated"
+				slice.Spec.Driver += "-updated"
+				return slice
+			},
+		},
+		"invalid-update-pool": {
+			wantFailures:     field.ErrorList{field.Invalid(field.NewPath("spec", "pool", "name"), validResourceSlice.Spec.Pool.Name+"-updated", "field is immutable")},
+			oldResourceSlice: validResourceSlice,
+			update: func(slice *resource.ResourceSlice) *resource.ResourceSlice {
+				slice.Spec.Pool.Name += "-updated"
 				return slice
 			},
 		},

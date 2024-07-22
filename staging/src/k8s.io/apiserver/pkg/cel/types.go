@@ -28,6 +28,7 @@ import (
 
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"google.golang.org/protobuf/proto"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -575,6 +576,10 @@ var (
 	// Note that both the OpenAPI date and date-time types map onto TimestampType, so not all types
 	// labeled as Timestamp will necessarily have the same MinSerializedSize.
 	TimestampType = NewSimpleTypeWithMinSize("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}}, JSONDateSize)
+
+	// QuantityDeclType wraps a [QuantityType] and makes it usable with functions that expect
+	// a [DeclType].
+	QuantityDeclType = NewSimpleTypeWithMinSize("quantity", QuantityType, Quantity{Quantity: resource.NewQuantity(0, resource.DecimalSI)}, 8)
 
 	// UintType is equivalent to the CEL 'uint' type.
 	UintType = NewSimpleTypeWithMinSize("uint", cel.UintType, types.Uint(0), 1)

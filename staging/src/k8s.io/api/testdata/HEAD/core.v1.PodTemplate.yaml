@@ -327,6 +327,7 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:
@@ -542,6 +543,7 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:
@@ -759,6 +761,7 @@ template:
       resources:
         claims:
         - name: nameValue
+          request: requestValue
         limits:
           limitsKey: "0"
         requests:

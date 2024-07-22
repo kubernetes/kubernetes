@@ -338,7 +338,7 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 			// only allow a scoped fieldSelector
 			reqs, _ := attrs.GetFieldSelector()
 			for _, req := range reqs {
-				if req.Field == "nodeName" && req.Operator == selection.Equals && req.Value == nodeName {
+				if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
 					return authorizer.DecisionAllow, "", nil
 				}
 			}

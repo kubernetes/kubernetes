@@ -26,7 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -232,11 +232,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 		{
 			name: "DRA events disabled",
 			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext:    framework.Add,
-				framework.ResourceClaim:           framework.Add,
-				framework.ResourceClass:           framework.Add,
-				framework.ResourceClaimParameters: framework.Add,
-				framework.ResourceClassParameters: framework.Add,
+				framework.PodSchedulingContext: framework.Add,
+				framework.ResourceClaim:        framework.Add,
+				framework.DeviceClass:          framework.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -248,22 +246,18 @@ func TestAddAllEventHandlers(t *testing.T) {
 		{
 			name: "DRA events enabled",
 			gvkMap: map[framework.GVK]framework.ActionType{
-				framework.PodSchedulingContext:    framework.Add,
-				framework.ResourceClaim:           framework.Add,
-				framework.ResourceClass:           framework.Add,
-				framework.ResourceClaimParameters: framework.Add,
-				framework.ResourceClassParameters: framework.Add,
+				framework.PodSchedulingContext: framework.Add,
+				framework.ResourceClaim:        framework.Add,
+				framework.DeviceClass:          framework.Add,
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                                   true,
-				reflect.TypeOf(&v1.Node{}):                                  true,
-				reflect.TypeOf(&v1.Namespace{}):                             true,
-				reflect.TypeOf(&resourcev1alpha2.PodSchedulingContext{}):    true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClaim{}):           true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClaimParameters{}): true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClass{}):           true,
-				reflect.TypeOf(&resourcev1alpha2.ResourceClassParameters{}): true,
+				reflect.TypeOf(&v1.Pod{}):                           true,
+				reflect.TypeOf(&v1.Node{}):                          true,
+				reflect.TypeOf(&v1.Namespace{}):                     true,
+				reflect.TypeOf(&resourceapi.PodSchedulingContext{}): true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -342,7 +336,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				resourceClaimInformer := informerFactory.Resource().V1alpha2().ResourceClaims().Informer()
+				resourceClaimInformer := informerFactory.Resource().V1alpha3().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 			}
 

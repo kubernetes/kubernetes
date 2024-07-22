@@ -55,7 +55,7 @@ kubelet<->dynamic resource allocation plugin interaction.
 
 To try out the feature, build Kubernetes, then in one console run:
 ```console
-RUNTIME_CONFIG="resource.k8s.io/v1alpha2" FEATURE_GATES=DynamicResourceAllocation=true ALLOW_PRIVILEGED=1 ./hack/local-up-cluster.sh -O
+RUNTIME_CONFIG="resource.k8s.io/v1alpha3" FEATURE_GATES=DynamicResourceAllocation=true ALLOW_PRIVILEGED=1 ./hack/local-up-cluster.sh -O
 ```
 
 In another:
@@ -78,8 +78,8 @@ configmap/pause-claim-parameters created
 pod/pause created
 
 $ kubectl get resourceclaims
-NAME             CLASSNAME   ALLOCATIONMODE         STATE                AGE
-pause-resource   example     WaitForFirstConsumer   allocated,reserved   19s
+NAME             CLASSNAME   STATE                AGE
+pause-resource   example     allocated,reserved   19s
 
 $ kubectl get pods
 NAME    READY   STATUS    RESTARTS   AGE

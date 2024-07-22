@@ -47,32 +47,28 @@ spec:
   matchConstraints:
     resourceRules:
     - apiGroups:   ["resource.k8s.io"]
-      apiVersions: ["v1alpha2"]
+      apiVersions: ["v1alpha3"]
       operations:  ["CREATE", "UPDATE", "DELETE"]
       resources:   ["resourceslices"]
-  variables:
-  - name: hasNodeName
-    expression: >-
-      "authentication.kubernetes.io/node-name" in request.userInfo.extra
-  - name: isKubeletPlugin
+  matchConditions:
+  - name: isRestrictedUser
     expression: >-
       request.userInfo.username == "system:serviceaccount:dra-kubelet-plugin-namespace:dra-kubelet-plugin-service-account"
+  variables:
+  - name: userNodeName
+    expression: >-
+      request.userInfo.extra[?'authentication.kubernetes.io/node-name'][0].orValue('')
   - name: objectNodeName
     expression: >-
-      (request.operation == "DELETE" ? oldObject : object).?nodeName.orValue("")
+      (request.operation == "DELETE" ? oldObject : object).spec.?nodeName.orValue("")
   validations:
-  - expression: >-
-      !variables.isKubeletPlugin || variables.hasNodeName
-    message: This user must have a "authentication.kubernetes.io/node-name" claim. ServiceAccountTokenNodeBindingValidation must be enabled in the cluster.
-  - expression: >-
-      !variables.isKubeletPlugin || !variables.hasNodeName ||
-      variables.objectNodeName == request.userInfo.extra["authentication.kubernetes.io/node-name"][0]
-    message: This DRA kubelet plugin may only modify resourceslices that belong to the node the pod is running on.
-    # This is useful for debugging. Can be dropped in a production deployment.
+  - expression: variables.userNodeName != ""
+    message: >-
+      no node association found for user, this user must run in a pod on a node and ServiceAccountTokenPodNodeInfo must be enabled
+  - expression: variables.userNodeName == variables.objectNodeName
     messageExpression: >-
-      "The DRA kubelet plugin on node " + request.userInfo.extra["authentication.kubernetes.io/node-name"][0] +
-      " may only modify resourceslices that belong to the node the pod is running on, not " +
-      (variables.objectNodeName == "" ? variables.objectNodeName : "a cluster-scoped slice") + "."
+      "this user running on node '"+variables.userNodeName+"' may not modify " +
+      (variables.objectNodeName == "" ?"cluster resourceslices" : "resourceslices on node '"+variables.objectNodeName+"'")
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

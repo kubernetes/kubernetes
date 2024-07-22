@@ -5001,6 +5001,13 @@ message ResourceClaim {
   // the Pod where this field is used. It makes that resource available
   // inside a container.
   optional string name = 1;
+
+  // Request is the name chosen for a request in the referenced claim.
+  // If empty, everything from the claim is made available, otherwise
+  // only the result of this request.
+  //
+  // +optional
+  optional string request = 2;
 }
 
 // ResourceFieldSelector represents container resources (cpu, memory) and their output format

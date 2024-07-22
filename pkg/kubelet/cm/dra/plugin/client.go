@@ -33,8 +33,6 @@ import (
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 )
 
-const PluginClientTimeout = 45 * time.Second
-
 // NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
 // driver kubelet plugin which need to be called by kubelet. The wrapper
 // handles gRPC connection management and logging. Connections are reused
@@ -60,7 +58,7 @@ type Plugin struct {
 	conn                    *grpc.ClientConn
 	endpoint                string
 	highestSupportedVersion *utilversion.Version
-	clientTimeout           time.Duration
+	clientCallTimeout       time.Duration
 }
 
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
@@ -116,7 +114,7 @@ func (p *Plugin) NodePrepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
 	nodeClient := drapb.NewNodeClient(conn)
@@ -138,7 +136,7 @@ func (p *Plugin) NodeUnprepareResources(
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, p.clientTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
 	defer cancel()
 
 	nodeClient := drapb.NewNodeClient(conn)

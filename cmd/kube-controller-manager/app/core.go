@@ -467,9 +467,9 @@ func startResourceClaimController(ctx context.Context, controllerContext Control
 		klog.FromContext(ctx),
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1alpha2().PodSchedulingContexts(),
-		controllerContext.InformerFactory.Resource().V1alpha2().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1alpha2().ResourceClaimTemplates())
+		controllerContext.InformerFactory.Resource().V1alpha3().PodSchedulingContexts(),
+		controllerContext.InformerFactory.Resource().V1alpha3().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1alpha3().ResourceClaimTemplates())
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start resource claim controller: %v", err)
 	}

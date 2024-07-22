@@ -745,6 +745,7 @@
 # and dynamically created ResourceClaim instances for each pod.
 - name: SchedulingWithResourceClaimTemplate
   featureGates:
+    DRAControlPlaneController: true
     DynamicResourceAllocation: true
     # SchedulerQueueingHints: true
   workloadTemplate:
@@ -758,7 +759,7 @@
     nodes: scheduler-perf-dra-*
     maxClaimsPerNodeParam: $maxClaimsPerNode
   - opcode: createAny
-    templatePath: config/dra/resourceclass.yaml
+    templatePath: config/dra/deviceclass.yaml
   - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: init
@@ -812,6 +813,7 @@
 # scheduling via PodSchedulingContext.
 - name: SchedulingWithMultipleResourceClaims
   featureGates:
+    DRAControlPlaneController: true
     DynamicResourceAllocation: true
     # SchedulerQueueingHints: true
   workloadTemplate:
@@ -829,9 +831,7 @@
     nodes: scheduler-perf-dra-*
     maxClaimsPerNodeParam: $maxClaimsPerNode
   - opcode: createAny
-    templatePath: config/dra/resourceclass.yaml
-  - opcode: createAny
-    templatePath: config/dra/another-resourceclass.yaml
+    templatePath: config/dra/deviceclass.yaml
   - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate.yaml
     namespace: init
@@ -855,6 +855,7 @@
     collectMetrics: true
   workloads:
   - name: fast
+    labels: [integration-test, fast]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.
@@ -883,7 +884,7 @@
       measurePods: 1000
       maxClaimsPerNode: 20
 
-# SchedulingWithResourceClaimTemplate uses a ResourceClaimTemplate
+# SchedulingWithResourceClaimTemplateStructured uses a ResourceClaimTemplate
 # and dynamically creates ResourceClaim instances for each pod.
 # The driver uses structured parameters.
 - name: SchedulingWithResourceClaimTemplateStructured
@@ -902,10 +903,7 @@
     maxClaimsPerNodeParam: $maxClaimsPerNode
     structuredParameters: true
   - opcode: createAny
-    templatePath: config/dra/resourceclass-structured.yaml
-  - opcode: createAny
-    templatePath: config/dra/resourceclaimparameters.yaml
-    namespace: init
+    templatePath: config/dra/deviceclass-structured.yaml
   - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate-structured.yaml
     namespace: init
@@ -913,9 +911,6 @@
     namespace: init
     countParam: $initPods
     podTemplatePath: config/dra/pod-with-claim-template.yaml
-  - opcode: createAny
-    templatePath: config/dra/resourceclaimparameters.yaml
-    namespace: test
   - opcode: createAny
     templatePath: config/dra/resourceclaimtemplate-structured.yaml
     namespace: test
@@ -979,10 +974,7 @@
     maxClaimsPerNodeParam: $maxClaimsPerNode
     structuredParameters: true
   - opcode: createAny
-    templatePath: config/dra/resourceclass-structured.yaml
-  - opcode: createAny
-    templatePath: config/dra/resourceclaimparameters.yaml
-    namespace: init
+    templatePath: config/dra/deviceclass-structured.yaml
   - opcode: createAny
     templatePath: config/dra/resourceclaim-structured.yaml
     namespace: init
@@ -991,9 +983,6 @@
     namespace: init
     countParam: $initPods
     podTemplatePath: config/dra/pod-with-claim-ref.yaml
-  - opcode: createAny
-    templatePath: config/dra/resourceclaimparameters.yaml
-    namespace: test
   - opcode: createAny
     templatePath: config/dra/resourceclaim-structured.yaml
     namespace: test

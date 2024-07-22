@@ -14,12 +14,13 @@ nodes:
     scheduler:
         extraArgs:
           v: "5"
+          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           v: "5"
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha2=true"
+          runtime-config: "resource.k8s.io/v1alpha3=true"
   - |
     kind: InitConfiguration
     nodeRegistration:

@@ -646,13 +646,7 @@ func Test_buildQueueingHintMap(t *testing.T) {
 				{Resource: framework.ResourceClaim, ActionType: framework.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
-				{Resource: framework.ResourceClass, ActionType: framework.All}: {
-					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
-				},
-				{Resource: framework.ResourceClaimParameters, ActionType: framework.All}: {
-					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
-				},
-				{Resource: framework.ResourceClassParameters, ActionType: framework.All}: {
+				{Resource: framework.DeviceClass, ActionType: framework.All}: {
 					{PluginName: filterWithoutEnqueueExtensions, QueueingHintFn: defaultQueueingHintFn},
 				},
 			},
@@ -803,19 +797,17 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Pod:                     framework.All,
-				framework.Node:                    framework.All,
-				framework.CSINode:                 framework.All,
-				framework.CSIDriver:               framework.All,
-				framework.CSIStorageCapacity:      framework.All,
-				framework.PersistentVolume:        framework.All,
-				framework.PersistentVolumeClaim:   framework.All,
-				framework.StorageClass:            framework.All,
-				framework.PodSchedulingContext:    framework.All,
-				framework.ResourceClaim:           framework.All,
-				framework.ResourceClass:           framework.All,
-				framework.ResourceClaimParameters: framework.All,
-				framework.ResourceClassParameters: framework.All,
+				framework.Pod:                   framework.All,
+				framework.Node:                  framework.All,
+				framework.CSINode:               framework.All,
+				framework.CSIDriver:             framework.All,
+				framework.CSIStorageCapacity:    framework.All,
+				framework.PersistentVolume:      framework.All,
+				framework.PersistentVolumeClaim: framework.All,
+				framework.StorageClass:          framework.All,
+				framework.PodSchedulingContext:  framework.All,
+				framework.ResourceClaim:         framework.All,
+				framework.DeviceClass:           framework.All,
 			},
 		},
 		{

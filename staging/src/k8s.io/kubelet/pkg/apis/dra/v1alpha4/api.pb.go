@@ -145,9 +145,10 @@ func (m *NodePrepareResourcesResponse) GetClaims() map[string]*NodePrepareResour
 
 type NodePrepareResourceResponse struct {
 	// These are the additional devices that kubelet must
-	// make available via the container runtime. A resource
+	// make available via the container runtime. A claim
+	// may have zero or more requests and each request
 	// may have zero or more devices.
-	CDIDevices []string `protobuf:"bytes,1,rep,name=cdi_devices,json=cdiDevices,proto3" json:"cdi_devices,omitempty"`
+	Devices []*Device `protobuf:"bytes,1,rep,name=devices,proto3" json:"devices,omitempty"`
 	// If non-empty, preparing the ResourceClaim failed.
 	// cdi_devices is ignored in that case.
 	Error                string   `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
@@ -187,9 +188,9 @@ func (m *NodePrepareResourceResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_NodePrepareResourceResponse proto.InternalMessageInfo
 
-func (m *NodePrepareResourceResponse) GetCDIDevices() []string {
+func (m *NodePrepareResourceResponse) GetDevices() []*Device {
 	if m != nil {
-		return m.CDIDevices
+		return m.Devices
 	}
 	return nil
 }
@@ -199,6 +200,81 @@ func (m *NodePrepareResourceResponse) GetError() string {
 		return m.Error
 	}
 	return ""
+}
+
+type Device struct {
+	// The requests in the claim that this device is associated with.
+	// Optional. If empty, the device is associated with all requests.
+	RequestNames []string `protobuf:"bytes,1,rep,name=request_names,json=requestNames,proto3" json:"request_names,omitempty"`
+	// The pool which contains the device. Required.
+	PoolName string `protobuf:"bytes,2,opt,name=pool_name,json=poolName,proto3" json:"pool_name,omitempty"`
+	// The device itself. Required.
+	DeviceName string `protobuf:"bytes,3,opt,name=device_name,json=deviceName,proto3" json:"device_name,omitempty"`
+	// A single device instance may map to several CDI device IDs.
+	// None is also valid.
+	CDIDeviceIDs         []string `protobuf:"bytes,4,rep,name=cdi_device_ids,json=cdiDeviceIds,proto3" json:"cdi_device_ids,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Device) Reset()      { *m = Device{} }
+func (*Device) ProtoMessage() {}
+func (*Device) Descriptor() ([]byte, []int) {
+	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
+}
+func (m *Device) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Device) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Device.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Device) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Device.Merge(m, src)
+}
+func (m *Device) XXX_Size() int {
+	return m.Size()
+}
+func (m *Device) XXX_DiscardUnknown() {
+	xxx_messageInfo_Device.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Device proto.InternalMessageInfo
+
+func (m *Device) GetRequestNames() []string {
+	if m != nil {
+		return m.RequestNames
+	}
+	return nil
+}
+
+func (m *Device) GetPoolName() string {
+	if m != nil {
+		return m.PoolName
+	}
+	return ""
+}
+
+func (m *Device) GetDeviceName() string {
+	if m != nil {
+		return m.DeviceName
+	}
+	return ""
+}
+
+func (m *Device) GetCDIDeviceIDs() []string {
+	if m != nil {
+		return m.CDIDeviceIDs
+	}
+	return nil
 }
 
 type NodeUnprepareResourcesRequest struct {
@@ -211,7 +287,7 @@ type NodeUnprepareResourcesRequest struct {
 func (m *NodeUnprepareResourcesRequest) Reset()      { *m = NodeUnprepareResourcesRequest{} }
 func (*NodeUnprepareResourcesRequest) ProtoMessage() {}
 func (*NodeUnprepareResourcesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{3}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
 }
 func (m *NodeUnprepareResourcesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -259,7 +335,7 @@ type NodeUnprepareResourcesResponse struct {
 func (m *NodeUnprepareResourcesResponse) Reset()      { *m = NodeUnprepareResourcesResponse{} }
 func (*NodeUnprepareResourcesResponse) ProtoMessage() {}
 func (*NodeUnprepareResourcesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{4}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
 }
 func (m *NodeUnprepareResourcesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -305,7 +381,7 @@ type NodeUnprepareResourceResponse struct {
 func (m *NodeUnprepareResourceResponse) Reset()      { *m = NodeUnprepareResourceResponse{} }
 func (*NodeUnprepareResourceResponse) ProtoMessage() {}
 func (*NodeUnprepareResourceResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{5}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
 }
 func (m *NodeUnprepareResourceResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -347,7 +423,7 @@ type Claim struct {
 	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	// The UID of the Resource claim (ResourceClaim.meta.UUID).
 	// This field is REQUIRED.
-	Uid string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
+	UID string `protobuf:"bytes,2,opt,name=uid,proto3" json:"uid,omitempty"`
 	// The name of the Resource claim (ResourceClaim.meta.Name)
 	// This field is REQUIRED.
 	Name                 string   `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
@@ -358,7 +434,7 @@ type Claim struct {
 func (m *Claim) Reset()      { *m = Claim{} }
 func (*Claim) ProtoMessage() {}
 func (*Claim) Descriptor() ([]byte, []int) {
-	return fileDescriptor_00212fb1f9d3bf1c, []int{6}
+	return fileDescriptor_00212fb1f9d3bf1c, []int{7}
 }
 func (m *Claim) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -394,9 +470,9 @@ func (m *Claim) GetNamespace() string {
 	return ""
 }
 
-func (m *Claim) GetUid() string {
+func (m *Claim) GetUID() string {
 	if m != nil {
-		return m.Uid
+		return m.UID
 	}
 	return ""
 }
@@ -413,6 +489,7 @@ func init() {
 	proto.RegisterType((*NodePrepareResourcesResponse)(nil), "v1alpha3.NodePrepareResourcesResponse")
 	proto.RegisterMapType((map[string]*NodePrepareResourceResponse)(nil), "v1alpha3.NodePrepareResourcesResponse.ClaimsEntry")
 	proto.RegisterType((*NodePrepareResourceResponse)(nil), "v1alpha3.NodePrepareResourceResponse")
+	proto.RegisterType((*Device)(nil), "v1alpha3.Device")
 	proto.RegisterType((*NodeUnprepareResourcesRequest)(nil), "v1alpha3.NodeUnprepareResourcesRequest")
 	proto.RegisterType((*NodeUnprepareResourcesResponse)(nil), "v1alpha3.NodeUnprepareResourcesResponse")
 	proto.RegisterMapType((map[string]*NodeUnprepareResourceResponse)(nil), "v1alpha3.NodeUnprepareResourcesResponse.ClaimsEntry")
@@ -423,38 +500,43 @@ func init() {
 func init() { proto.RegisterFile("api.proto", fileDescriptor_00212fb1f9d3bf1c) }
 
 var fileDescriptor_00212fb1f9d3bf1c = []byte{
-	// 481 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0x4d, 0x6f, 0xd3, 0x40,
-	0x10, 0xcd, 0x36, 0x4d, 0x85, 0x27, 0x12, 0xa0, 0x55, 0x85, 0xa2, 0x50, 0x4c, 0x64, 0x51, 0x92,
-	0x0b, 0xb6, 0x48, 0x8b, 0x54, 0x81, 0xb8, 0xa4, 0x05, 0xf1, 0x25, 0x84, 0x2c, 0x71, 0xe1, 0x02,
-	0x6b, 0x7b, 0x70, 0x57, 0xf9, 0xd8, 0x65, 0xd7, 0x8e, 0xd4, 0x1b, 0x3f, 0x81, 0x9f, 0xd5, 0x03,
-	0x07, 0xc4, 0x89, 0x53, 0x45, 0xcd, 0x1f, 0x41, 0x5e, 0x3b, 0xe9, 0x87, 0x9c, 0x26, 0x52, 0x6f,
-	0x33, 0xe3, 0x9d, 0x79, 0x6f, 0xde, 0x1b, 0x19, 0x2c, 0x26, 0xb9, 0x2b, 0x95, 0x48, 0x04, 0xbd,
-	0x31, 0x7d, 0xcc, 0x46, 0xf2, 0x90, 0xed, 0xb4, 0x1f, 0xc5, 0x3c, 0x39, 0x4c, 0x03, 0x37, 0x14,
-	0x63, 0x2f, 0x16, 0xb1, 0xf0, 0xcc, 0x83, 0x20, 0xfd, 0x6a, 0x32, 0x93, 0x98, 0xa8, 0x68, 0x74,
-	0x5e, 0xc2, 0xdd, 0xf7, 0x22, 0xc2, 0x0f, 0x0a, 0x25, 0x53, 0xe8, 0xa3, 0x16, 0xa9, 0x0a, 0x51,
-	0xfb, 0xf8, 0x2d, 0x45, 0x9d, 0xd0, 0x2e, 0x6c, 0x84, 0x23, 0xc6, 0xc7, 0xba, 0x45, 0x3a, 0xf5,
-	0x5e, 0xb3, 0x7f, 0xcb, 0x9d, 0x01, 0xb9, 0xfb, 0x79, 0xdd, 0x2f, 0x3f, 0x3b, 0x3f, 0x09, 0x6c,
-	0x55, 0x0f, 0xd2, 0x52, 0x4c, 0x34, 0xd2, 0x37, 0x97, 0x26, 0xf5, 0xcf, 0x26, 0x5d, 0xd5, 0x57,
-	0xc0, 0xe8, 0x17, 0x93, 0x44, 0x1d, 0xcd, 0xc0, 0xda, 0x5f, 0xa0, 0x79, 0xae, 0x4c, 0x6f, 0x43,
-	0x7d, 0x88, 0x47, 0x2d, 0xd2, 0x21, 0x3d, 0xcb, 0xcf, 0x43, 0xfa, 0x0c, 0x1a, 0x53, 0x36, 0x4a,
-	0xb1, 0xb5, 0xd6, 0x21, 0xbd, 0x66, 0x7f, 0xfb, 0x4a, 0xac, 0x19, 0x94, 0x5f, 0xf4, 0x3c, 0x5d,
-	0xdb, 0x23, 0x4e, 0x54, 0x29, 0xcb, 0x7c, 0x19, 0x0f, 0x9a, 0x61, 0xc4, 0x3f, 0x47, 0x38, 0xe5,
-	0x21, 0x16, 0x1b, 0x59, 0x83, 0x9b, 0xd9, 0xc9, 0x7d, 0xd8, 0x3f, 0x78, 0x7d, 0x50, 0x54, 0x7d,
-	0x08, 0x23, 0x5e, 0xc6, 0x74, 0x13, 0x1a, 0xa8, 0x94, 0x50, 0x86, 0x90, 0xe5, 0x17, 0x89, 0xf3,
-	0x0a, 0xee, 0xe5, 0x28, 0x1f, 0x27, 0xf2, 0xba, 0xf2, 0xff, 0x26, 0x60, 0x2f, 0x1a, 0x55, 0x72,
-	0x7e, 0x77, 0x69, 0xd6, 0xee, 0x45, 0x51, 0x16, 0x77, 0x56, 0x5a, 0x10, 0x2c, 0xb3, 0xe0, 0xf9,
-	0x45, 0x0b, 0xba, 0x4b, 0xd0, 0xaa, 0x4c, 0x78, 0xb2, 0x40, 0x9e, 0xf9, 0x4a, 0x73, 0x55, 0xc9,
-	0x79, 0x55, 0xdf, 0x42, 0xc3, 0x50, 0xa3, 0x5b, 0x60, 0x4d, 0xd8, 0x18, 0xb5, 0x64, 0x21, 0x96,
-	0x4f, 0xce, 0x0a, 0x39, 0xe5, 0x94, 0x47, 0xa5, 0x21, 0x79, 0x48, 0x29, 0xac, 0xe7, 0x9f, 0x5b,
-	0x75, 0x53, 0x32, 0x71, 0xff, 0x84, 0xc0, 0x7a, 0x4e, 0x82, 0xc6, 0xb0, 0x59, 0x75, 0xa7, 0x74,
-	0x7b, 0xd9, 0x1d, 0x1b, 0x27, 0xdb, 0x0f, 0x57, 0x3b, 0x77, 0xa7, 0x46, 0xc7, 0x70, 0xa7, 0xda,
-	0x0f, 0xda, 0x5d, 0xee, 0x58, 0x01, 0xd6, 0x5b, 0xd5, 0x5a, 0xa7, 0x36, 0x18, 0x1c, 0x9f, 0xda,
-	0xe4, 0xcf, 0xa9, 0x5d, 0xfb, 0x9e, 0xd9, 0xe4, 0x38, 0xb3, 0xc9, 0xaf, 0xcc, 0x26, 0x7f, 0x33,
-	0x9b, 0xfc, 0xf8, 0x67, 0xd7, 0x3e, 0x3d, 0x18, 0xee, 0x69, 0x97, 0x0b, 0x6f, 0x98, 0x06, 0x38,
-	0xc2, 0xc4, 0x93, 0xc3, 0xd8, 0x63, 0x92, 0x6b, 0x2f, 0x52, 0xcc, 0x2b, 0x41, 0x76, 0x83, 0x0d,
-	0xf3, 0x2f, 0xd9, 0xf9, 0x1f, 0x00, 0x00, 0xff, 0xff, 0x65, 0xc5, 0xc2, 0x0e, 0x91, 0x04, 0x00,
-	0x00,
+	// 566 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x54, 0xcb, 0x6e, 0xd3, 0x4c,
+	0x14, 0xce, 0x34, 0x97, 0xd6, 0x27, 0xf9, 0x7f, 0xa2, 0x51, 0x85, 0x42, 0x5a, 0x9c, 0xc8, 0x50,
+	0x12, 0x21, 0x11, 0x8b, 0xb4, 0xa0, 0x0a, 0xc4, 0x26, 0x0d, 0x88, 0x20, 0x54, 0x21, 0x8b, 0x6e,
+	0xd8, 0x04, 0xc7, 0x1e, 0x52, 0x2b, 0x97, 0x19, 0x66, 0xe2, 0x48, 0xdd, 0xf1, 0x08, 0xbc, 0x03,
+	0x2f, 0xd3, 0x05, 0x0b, 0xc4, 0x8a, 0x55, 0x44, 0xcd, 0x8b, 0x20, 0xcf, 0xd8, 0x49, 0x5a, 0x39,
+	0x4d, 0x25, 0x76, 0x73, 0xbe, 0x73, 0xf9, 0xce, 0x9c, 0xef, 0xcc, 0x80, 0x66, 0x33, 0xaf, 0xc1,
+	0x38, 0x9d, 0x50, 0xbc, 0x35, 0x7d, 0x6c, 0x0f, 0xd9, 0xa9, 0xbd, 0x5f, 0x7e, 0xd4, 0xf7, 0x26,
+	0xa7, 0x7e, 0xaf, 0xe1, 0xd0, 0x91, 0xd9, 0xa7, 0x7d, 0x6a, 0xca, 0x80, 0x9e, 0xff, 0x49, 0x5a,
+	0xd2, 0x90, 0x27, 0x95, 0x68, 0xbc, 0x82, 0x9d, 0x63, 0xea, 0x92, 0x77, 0x9c, 0x30, 0x9b, 0x13,
+	0x8b, 0x08, 0xea, 0x73, 0x87, 0x08, 0x8b, 0x7c, 0xf6, 0x89, 0x98, 0xe0, 0x1a, 0xe4, 0x9c, 0xa1,
+	0xed, 0x8d, 0x44, 0x09, 0x55, 0xd3, 0xf5, 0x7c, 0xf3, 0x56, 0x23, 0x26, 0x6a, 0x1c, 0x85, 0xb8,
+	0x15, 0xb9, 0x8d, 0xef, 0x08, 0x76, 0x93, 0x0b, 0x09, 0x46, 0xc7, 0x82, 0xe0, 0x37, 0x57, 0x2a,
+	0x35, 0x17, 0x95, 0xae, 0xcb, 0x53, 0x34, 0xe2, 0xe5, 0x78, 0xc2, 0xcf, 0x62, 0xb2, 0xf2, 0x47,
+	0xc8, 0x2f, 0xc1, 0xb8, 0x08, 0xe9, 0x01, 0x39, 0x2b, 0xa1, 0x2a, 0xaa, 0x6b, 0x56, 0x78, 0xc4,
+	0xcf, 0x21, 0x3b, 0xb5, 0x87, 0x3e, 0x29, 0x6d, 0x54, 0x51, 0x3d, 0xdf, 0xdc, 0xbb, 0x96, 0x2b,
+	0xa6, 0xb2, 0x54, 0xce, 0xb3, 0x8d, 0x43, 0x64, 0x74, 0x13, 0xc7, 0x32, 0xbf, 0xcc, 0x43, 0xd8,
+	0x74, 0xc9, 0xd4, 0x73, 0x48, 0x7c, 0x9b, 0xe2, 0x82, 0xa1, 0x2d, 0x1d, 0x56, 0x1c, 0x80, 0xb7,
+	0x21, 0x4b, 0x38, 0xa7, 0x5c, 0xf6, 0xa2, 0x59, 0xca, 0x30, 0xbe, 0x21, 0xc8, 0xa9, 0x48, 0x7c,
+	0x0f, 0xfe, 0xe3, 0x6a, 0xdc, 0xdd, 0xb1, 0x3d, 0x8a, 0x4a, 0x6a, 0x56, 0x21, 0x02, 0x8f, 0x43,
+	0x0c, 0xef, 0x80, 0xc6, 0x28, 0x1d, 0xca, 0x88, 0xa8, 0xd2, 0x56, 0x08, 0x84, 0x5e, 0x5c, 0x81,
+	0xbc, 0x62, 0x53, 0xee, 0xb4, 0x74, 0x83, 0x82, 0x64, 0xc0, 0x53, 0xf8, 0xdf, 0x71, 0xbd, 0x6e,
+	0x14, 0xe4, 0xb9, 0xa2, 0x94, 0x09, 0x39, 0x5a, 0xc5, 0x60, 0x56, 0x29, 0x1c, 0xb5, 0x3b, 0xaa,
+	0x93, 0x4e, 0x5b, 0x58, 0x05, 0xc7, 0xf5, 0x22, 0xcb, 0x15, 0xc6, 0x6b, 0xb8, 0x1b, 0x8e, 0xe1,
+	0x64, 0xcc, 0xfe, 0x75, 0x3f, 0x7e, 0x22, 0xd0, 0x57, 0x95, 0x8a, 0x86, 0xfa, 0xf6, 0x4a, 0xad,
+	0x83, 0xcb, 0xaa, 0xad, 0xce, 0x4c, 0xdc, 0x91, 0xde, 0xba, 0x1d, 0x79, 0x71, 0x79, 0x47, 0x6a,
+	0x6b, 0xd8, 0x92, 0xb6, 0xe4, 0xc9, 0x8a, 0xf1, 0xcc, 0xaf, 0x34, 0xd7, 0x1e, 0x2d, 0x6b, 0xff,
+	0x1e, 0xb2, 0xb2, 0x35, 0xbc, 0x0b, 0x9a, 0x54, 0x9c, 0xd9, 0x0e, 0x89, 0x42, 0x16, 0x00, 0xbe,
+	0x03, 0x69, 0xdf, 0x73, 0x95, 0xd8, 0xad, 0xcd, 0x60, 0x56, 0x49, 0x9f, 0x74, 0xda, 0x56, 0x88,
+	0x61, 0x0c, 0x99, 0x25, 0xa5, 0xe5, 0xb9, 0x39, 0x43, 0x90, 0x09, 0xbb, 0xc1, 0x7d, 0xd8, 0x4e,
+	0x7a, 0x51, 0x78, 0x6f, 0xdd, 0x8b, 0x93, 0x92, 0x96, 0x1f, 0xdc, 0xec, 0x61, 0x1a, 0x29, 0x3c,
+	0x82, 0xdb, 0xc9, 0xc2, 0xe0, 0xda, 0x7a, 0xe9, 0x14, 0x59, 0xfd, 0xa6, 0x1a, 0x1b, 0xa9, 0x56,
+	0xeb, 0xfc, 0x42, 0x47, 0xbf, 0x2e, 0xf4, 0xd4, 0x97, 0x40, 0x47, 0xe7, 0x81, 0x8e, 0x7e, 0x04,
+	0x3a, 0xfa, 0x1d, 0xe8, 0xe8, 0xeb, 0x1f, 0x3d, 0xf5, 0xe1, 0xfe, 0xe0, 0x50, 0x34, 0x3c, 0x6a,
+	0x0e, 0xfc, 0x1e, 0x19, 0x92, 0x89, 0xc9, 0x06, 0x7d, 0xd3, 0x66, 0x9e, 0x30, 0x5d, 0x6e, 0x9b,
+	0x11, 0xc9, 0x41, 0x2f, 0x27, 0x7f, 0xbd, 0xfd, 0xbf, 0x01, 0x00, 0x00, 0xff, 0xff, 0x91, 0xf3,
+	0x7a, 0xa9, 0x3b, 0x05, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -698,11 +780,71 @@ func (m *NodePrepareResourceResponse) MarshalToSizedBuffer(dAtA []byte) (int, er
 		i--
 		dAtA[i] = 0x12
 	}
-	if len(m.CDIDevices) > 0 {
-		for iNdEx := len(m.CDIDevices) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.CDIDevices[iNdEx])
-			copy(dAtA[i:], m.CDIDevices[iNdEx])
-			i = encodeVarintApi(dAtA, i, uint64(len(m.CDIDevices[iNdEx])))
+	if len(m.Devices) > 0 {
+		for iNdEx := len(m.Devices) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Devices[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintApi(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *Device) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Device) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Device) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.CDIDeviceIDs) > 0 {
+		for iNdEx := len(m.CDIDeviceIDs) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CDIDeviceIDs[iNdEx])
+			copy(dAtA[i:], m.CDIDeviceIDs[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.CDIDeviceIDs[iNdEx])))
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if len(m.DeviceName) > 0 {
+		i -= len(m.DeviceName)
+		copy(dAtA[i:], m.DeviceName)
+		i = encodeVarintApi(dAtA, i, uint64(len(m.DeviceName)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.PoolName) > 0 {
+		i -= len(m.PoolName)
+		copy(dAtA[i:], m.PoolName)
+		i = encodeVarintApi(dAtA, i, uint64(len(m.PoolName)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.RequestNames) > 0 {
+		for iNdEx := len(m.RequestNames) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RequestNames[iNdEx])
+			copy(dAtA[i:], m.RequestNames[iNdEx])
+			i = encodeVarintApi(dAtA, i, uint64(len(m.RequestNames[iNdEx])))
 			i--
 			dAtA[i] = 0xa
 		}
@@ -853,10 +995,10 @@ func (m *Claim) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.Uid) > 0 {
-		i -= len(m.Uid)
-		copy(dAtA[i:], m.Uid)
-		i = encodeVarintApi(dAtA, i, uint64(len(m.Uid)))
+	if len(m.UID) > 0 {
+		i -= len(m.UID)
+		copy(dAtA[i:], m.UID)
+		i = encodeVarintApi(dAtA, i, uint64(len(m.UID)))
 		i--
 		dAtA[i] = 0x12
 	}
@@ -924,15 +1066,44 @@ func (m *NodePrepareResourceResponse) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if len(m.CDIDevices) > 0 {
-		for _, s := range m.CDIDevices {
-			l = len(s)
+	if len(m.Devices) > 0 {
+		for _, e := range m.Devices {
+			l = e.Size()
 			n += 1 + l + sovApi(uint64(l))
 		}
 	}
 	l = len(m.Error)
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
+	}
+	return n
+}
+
+func (m *Device) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.RequestNames) > 0 {
+		for _, s := range m.RequestNames {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
+	}
+	l = len(m.PoolName)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	l = len(m.DeviceName)
+	if l > 0 {
+		n += 1 + l + sovApi(uint64(l))
+	}
+	if len(m.CDIDeviceIDs) > 0 {
+		for _, s := range m.CDIDeviceIDs {
+			l = len(s)
+			n += 1 + l + sovApi(uint64(l))
+		}
 	}
 	return n
 }
@@ -997,7 +1168,7 @@ func (m *Claim) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
 	}
-	l = len(m.Uid)
+	l = len(m.UID)
 	if l > 0 {
 		n += 1 + l + sovApi(uint64(l))
 	}
@@ -1053,9 +1224,27 @@ func (this *NodePrepareResourceResponse) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForDevices := "[]*Device{"
+	for _, f := range this.Devices {
+		repeatedStringForDevices += strings.Replace(f.String(), "Device", "Device", 1) + ","
+	}
+	repeatedStringForDevices += "}"
 	s := strings.Join([]string{`&NodePrepareResourceResponse{`,
-		`CDIDevices:` + fmt.Sprintf("%v", this.CDIDevices) + `,`,
+		`Devices:` + repeatedStringForDevices + `,`,
 		`Error:` + fmt.Sprintf("%v", this.Error) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *Device) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&Device{`,
+		`RequestNames:` + fmt.Sprintf("%v", this.RequestNames) + `,`,
+		`PoolName:` + fmt.Sprintf("%v", this.PoolName) + `,`,
+		`DeviceName:` + fmt.Sprintf("%v", this.DeviceName) + `,`,
+		`CDIDeviceIDs:` + fmt.Sprintf("%v", this.CDIDeviceIDs) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1111,7 +1300,7 @@ func (this *Claim) String() string {
 	}
 	s := strings.Join([]string{`&Claim{`,
 		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
-		`Uid:` + fmt.Sprintf("%v", this.Uid) + `,`,
+		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`}`,
 	}, "")
@@ -1419,9 +1608,9 @@ func (m *NodePrepareResourceResponse) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CDIDevices", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Devices", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowApi
@@ -1431,23 +1620,25 @@ func (m *NodePrepareResourceResponse) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthApi
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthApi
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.CDIDevices = append(m.CDIDevices, string(dAtA[iNdEx:postIndex]))
+			m.Devices = append(m.Devices, &Device{})
+			if err := m.Devices[len(m.Devices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1480,6 +1671,184 @@ func (m *NodePrepareResourceResponse) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Error = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipApi(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthApi
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Device) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowApi
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Device: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Device: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequestNames", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RequestNames = append(m.RequestNames, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PoolName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PoolName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeviceName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DeviceName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CDIDeviceIDs", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthApi
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthApi
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CDIDeviceIDs = append(m.CDIDeviceIDs, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1910,7 +2279,7 @@ func (m *Claim) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Uid", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field UID", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1938,7 +2307,7 @@ func (m *Claim) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Uid = string(dAtA[iNdEx:postIndex])
+			m.UID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {

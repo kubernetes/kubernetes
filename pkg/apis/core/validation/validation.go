@@ -6757,9 +6757,35 @@ func validateResourceClaimNames(claims []core.ResourceClaim, podClaimNames sets.
 			allErrs = append(allErrs, field.Required(fldPath.Index(i), ""))
 		} else {
 			if names.Has(name) {
+				// All requests of that claim already referenced.
 				allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), name))
 			} else {
-				names.Insert(name)
+				key := name
+				if claim.Request != "" {
+					allErrs = append(allErrs, ValidateDNS1123Label(claim.Request, fldPath.Index(i).Child("request"))...)
+					key += "/" + claim.Request
+				}
+				if names.Has(key) {
+					// The exact same entry was already referenced.
+					allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), key))
+				} else if claim.Request == "" {
+					// When referencing a claim, there's an
+					// overlap when previously some request
+					// in the claim was referenced. This
+					// cannot be checked with a map lookup,
+					// we need to iterate.
+					for key := range names {
+						index := strings.Index(key, "/")
+						if index < 0 {
+							continue
+						}
+						if key[0:index] == name {
+							allErrs = append(allErrs, field.Duplicate(fldPath.Index(i), name))
+						}
+					}
+				}
+
+				names.Insert(key)
 			}
 			if !podClaimNames.Has(name) {
 				// field.NotFound doesn't accept an

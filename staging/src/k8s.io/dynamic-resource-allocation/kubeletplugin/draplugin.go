@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	resourceapi "k8s.io/api/resource/v1alpha2"
+	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -54,13 +54,19 @@ type DRAPlugin interface {
 	// after it returns before all information is actually written
 	// to the API server.
 	//
-	// The caller must not modify the content of the slice.
-	PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel)
+	// The caller must not modify the content after the call.
+	PublishResources(ctx context.Context, resources Resources)
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
+}
+
+// Resources currently only supports devices. Might get extended in the
+// future.
+type Resources struct {
+	Devices []resourceapi.Device
 }
 
 // Option implements the functional options pattern for Start.
@@ -360,7 +366,7 @@ func (d *draPlugin) Stop() {
 }
 
 // PublishResources implements [DRAPlugin.PublishResources].
-func (d *draPlugin) PublishResources(ctx context.Context, nodeResources []*resourceapi.ResourceModel) {
+func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
@@ -370,7 +376,13 @@ func (d *draPlugin) PublishResources(ctx context.Context, nodeResources []*resou
 		Name:       d.nodeName,
 		UID:        d.nodeUID, // Optional, will be determined by controller if empty.
 	}
-	resources := &resourceslice.Resources{NodeResources: nodeResources}
+	driverResources := &resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{
+			d.nodeName: {
+				Devices: resources.Devices,
+			},
+		},
+	}
 	if d.resourceSliceController == nil {
 		// Start publishing the information. The controller is using
 		// our background context, not the one passed into this
@@ -380,12 +392,12 @@ func (d *draPlugin) PublishResources(ctx context.Context, nodeResources []*resou
 		controllerLogger := klog.FromContext(controllerCtx)
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")
 		controllerCtx = klog.NewContext(controllerCtx, controllerLogger)
-		d.resourceSliceController = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, resources)
+		d.resourceSliceController = resourceslice.StartController(controllerCtx, d.kubeClient, d.driverName, owner, driverResources)
 		return
 	}
 
 	// Inform running controller about new information.
-	d.resourceSliceController.Update(resources)
+	d.resourceSliceController.Update(driverResources)
 }
 
 // RegistrationStatus implements [DRAPlugin.RegistrationStatus].

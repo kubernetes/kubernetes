@@ -18,15 +18,9 @@ package state
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
-	"hash/fnv"
-	"strings"
 
-	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
-	cmerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
 var _ checkpointmanager.Checkpoint = &DRAManagerCheckpoint{}
@@ -40,19 +34,8 @@ type DRAManagerCheckpoint struct {
 	Checksum checksum.Checksum  `json:"checksum"`
 }
 
-// DraManagerCheckpoint struct is an old implementation of the DraManagerCheckpoint
-type DRAManagerCheckpointWithoutResourceHandles struct {
-	Version  string                                   `json:"version"`
-	Entries  ClaimInfoStateListWithoutResourceHandles `json:"entries,omitempty"`
-	Checksum checksum.Checksum                        `json:"checksum"`
-}
-
 // List of claim info to store in checkpoint
 type ClaimInfoStateList []ClaimInfoState
-
-// List of claim info to store in checkpoint
-// TODO: remove in Beta
-type ClaimInfoStateListWithoutResourceHandles []ClaimInfoStateWithoutResourceHandles
 
 // NewDRAManagerCheckpoint returns an instance of Checkpoint
 func NewDRAManagerCheckpoint() *DRAManagerCheckpoint {
@@ -80,48 +63,6 @@ func (dc *DRAManagerCheckpoint) VerifyChecksum() error {
 	ck := dc.Checksum
 	dc.Checksum = 0
 	err := ck.Verify(dc)
-	if errors.Is(err, cmerrors.CorruptCheckpointError{}) {
-		// Verify with old structs without ResourceHandles field
-		// TODO: remove in Beta
-		err = verifyChecksumWithoutResourceHandles(dc, ck)
-	}
 	dc.Checksum = ck
 	return err
-}
-
-// verifyChecksumWithoutResourceHandles is a helper function that verifies checksum of the
-// checkpoint in the old format, without ResourceHandles field.
-// TODO: remove in Beta.
-func verifyChecksumWithoutResourceHandles(dc *DRAManagerCheckpoint, checkSum checksum.Checksum) error {
-	entries := ClaimInfoStateListWithoutResourceHandles{}
-	for _, entry := range dc.Entries {
-		entries = append(entries, ClaimInfoStateWithoutResourceHandles{
-			DriverName: entry.DriverName,
-			ClassName:  entry.ClassName,
-			ClaimUID:   entry.ClaimUID,
-			ClaimName:  entry.ClaimName,
-			Namespace:  entry.Namespace,
-			PodUIDs:    entry.PodUIDs,
-			CDIDevices: entry.CDIDevices,
-		})
-	}
-	oldcheckpoint := &DRAManagerCheckpointWithoutResourceHandles{
-		Version:  checkpointVersion,
-		Entries:  entries,
-		Checksum: 0,
-	}
-	// Calculate checksum for old checkpoint
-	object := dump.ForHash(oldcheckpoint)
-	object = strings.Replace(object, "DRAManagerCheckpointWithoutResourceHandles", "DRAManagerCheckpoint", 1)
-	object = strings.Replace(object, "ClaimInfoStateListWithoutResourceHandles", "ClaimInfoStateList", 1)
-	hash := fnv.New32a()
-	fmt.Fprintf(hash, "%v", object)
-	actualCS := checksum.Checksum(hash.Sum32())
-	if checkSum != actualCS {
-		return &cmerrors.CorruptCheckpointError{
-			ActualCS:   uint64(actualCS),
-			ExpectedCS: uint64(checkSum),
-		}
-	}
-	return nil
 }

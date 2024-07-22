@@ -62,12 +62,29 @@ message NodePrepareResourcesResponse {
 
 message NodePrepareResourceResponse {
     // These are the additional devices that kubelet must
-    // make available via the container runtime. A resource
+    // make available via the container runtime. A claim
+    // may have zero or more requests and each request
     // may have zero or more devices.
-    repeated string cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
+    repeated Device devices = 1;
     // If non-empty, preparing the ResourceClaim failed.
     // cdi_devices is ignored in that case.
     string error = 2;
+}
+
+message Device {
+    // The requests in the claim that this device is associated with.
+    // Optional. If empty, the device is associated with all requests.
+    repeated string request_names = 1;
+
+    // The pool which contains the device. Required.
+    string pool_name = 2;
+
+    // The device itself. Required.
+    string device_name = 3;
+
+    // A single device instance may map to several CDI device IDs.
+    // None is also valid.
+    repeated string cdi_device_ids = 4 [(gogoproto.customname) = "CDIDeviceIDs"];
 }
 
 message NodeUnprepareResourcesRequest {
@@ -93,7 +110,7 @@ message Claim {
     string namespace = 1;
     // The UID of the Resource claim (ResourceClaim.meta.UUID).
     // This field is REQUIRED.
-    string uid = 2;
+    string uid = 2 [(gogoproto.customname) = "UID"];
     // The name of the Resource claim (ResourceClaim.meta.Name)
     // This field is REQUIRED.
     string name = 3;
