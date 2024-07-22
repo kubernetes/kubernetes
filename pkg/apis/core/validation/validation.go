@@ -5378,6 +5378,11 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.OS)...)
 	allErrs = append(allErrs, validateContainerStatusUsers(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), newPod.Spec.OS)...)
 
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), newPod.Spec.Containers)...)
+	allErrs = append(allErrs, validateContainerStatusAllocatedResourcesStatus(newPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), newPod.Spec.InitContainers)...)
+	// ephemeral containers are not allowed to have resources allocated
+	allErrs = append(allErrs, validateContainerStatusNoAllocatedResourcesStatus(newPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
+
 	return allErrs
 }
 
@@ -8197,6 +8202,80 @@ func validateContainerStatusUsers(containerStatuses []core.ContainerStatus, fldP
 			allErrors = append(allErrors, validateLinuxContainerUser(containerUser.Linux, fldPath.Index(i).Child("linux"))...)
 		}
 	}
+	return allErrors
+}
+
+func validateContainerStatusNoAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	for i, containerStatus := range containerStatuses {
+		if containerStatus.AllocatedResourcesStatus == nil {
+			continue
+		} else {
+			allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("allocatedResourcesStatus"), "cannot be set for a container status"))
+		}
+	}
+
+	return allErrors
+}
+
+// validateContainerStatusAllocatedResourcesStatus iterate the allocated resources health and validate:
+// - resourceName matches one of resources in container's resource requirements
+// - resourceID is not empty and unique
+func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.ContainerStatus, fldPath *field.Path, containers []core.Container) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	for i, containerStatus := range containerStatuses {
+		if containerStatus.AllocatedResourcesStatus == nil {
+			continue
+		}
+
+		allocatedResources := containerStatus.AllocatedResourcesStatus
+		for j, allocatedResource := range allocatedResources {
+			var container core.Container
+			containerFound := false
+			// get container by name
+			for _, c := range containers {
+				if c.Name == containerStatus.Name {
+					containerFound = true
+					container = c
+					break
+				}
+			}
+
+			// ignore missing container, see https://github.com/kubernetes/kubernetes/issues/124915
+			if containerFound {
+				found := false
+
+				// get container resources from the spec
+				containerResources := container.Resources
+				for resourceName := range containerResources.Requests {
+					if resourceName == allocatedResource.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("name"), allocatedResource.Name, "must match one of the container's resource requirements"))
+				}
+			}
+
+			uniqueResources := sets.New[core.ResourceID]()
+			// check resource IDs are unique
+			for k, r := range allocatedResource.Resources {
+				if r.Health != core.ResourceHealthStatusHealthy && r.Health != core.ResourceHealthStatusUnhealthy && r.Health != core.ResourceHealthStatusUnknown {
+					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("health"), r.Health, "must be one of Healthy, Unhealthy, Unknown"))
+				}
+
+				if uniqueResources.Has(r.ResourceID) {
+					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("resourceID"), r.ResourceID, "must be unique"))
+				} else {
+					uniqueResources.Insert(r.ResourceID)
+				}
+			}
+		}
+	}
+
 	return allErrors
 }
 

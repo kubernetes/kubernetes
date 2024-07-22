@@ -24423,3 +24423,209 @@ func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
 		}
 	}
 }
+func TestValidateContainerStatusNoAllocatedResourcesStatus(t *testing.T) {
+	containerStatuses := []core.ContainerStatus{
+		{
+			Name: "container-1",
+		},
+		{
+			Name: "container-2",
+			AllocatedResourcesStatus: []core.ResourceStatus{
+				{
+					Name:      "test.device/test",
+					Resources: nil,
+				},
+			},
+		},
+		{
+			Name: "container-3",
+			AllocatedResourcesStatus: []core.ResourceStatus{
+				{
+					Name: "test.device/test",
+					Resources: []core.ResourceHealth{
+						{
+							ResourceID: "resource-1",
+							Health:     core.ResourceHealthStatusHealthy,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fldPath := field.NewPath("spec", "containers")
+
+	errs := validateContainerStatusNoAllocatedResourcesStatus(containerStatuses, fldPath)
+
+	assert.Equal(t, 2, len(errs))
+	assert.Equal(t, "spec.containers[1].allocatedResourcesStatus", errs[0].Field)
+	assert.Equal(t, "cannot be set for a container status", errs[0].Detail)
+	assert.Equal(t, "spec.containers[2].allocatedResourcesStatus", errs[1].Field)
+	assert.Equal(t, "cannot be set for a container status", errs[1].Detail)
+}
+
+func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
+	fldPath := field.NewPath("spec", "containers")
+
+	testCases := map[string]struct {
+		containers        []core.Container
+		containerStatuses []core.ContainerStatus
+		wantFieldErrors   field.ErrorList
+	}{
+		"basic correct status": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"ignoring the missing container (see https://github.com/kubernetes/kubernetes/issues/124915)": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"allow nil": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		"don't allow non-unique IDs": {
+			containers: []core.Container{
+				{
+					Name: "container-2",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusUnhealthy,
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(1).Child("resourceID"), core.ResourceID("resource-1"), "must be unique"),
+			},
+		},
+
+		"don't allow resources that are not in spec": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     core.ResourceHealthStatusHealthy,
+								},
+							},
+						},
+						{
+							Name:      "test.device/test2",
+							Resources: []core.ResourceHealth{},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(1).Child("name"), core.ResourceName("test.device/test2"), "must match one of the container's resource requirements"),
+			},
+		},
+	}
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := validateContainerStatusAllocatedResourcesStatus(tt.containerStatuses, fldPath, tt.containers)
+			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
