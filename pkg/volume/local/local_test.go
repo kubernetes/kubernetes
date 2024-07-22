@@ -720,11 +720,6 @@ func TestUnsupportedPlugins(t *testing.T) {
 		t.Errorf("Attachable plugin found, expected none")
 	}
 
-	createPlug, err := plugMgr.FindCreatablePluginBySpec(spec)
-	if err == nil && createPlug != nil {
-		t.Errorf("Creatable plugin found, expected none")
-	}
-
 	provisionPlug, err := plugMgr.FindProvisionablePluginByName(localVolumePluginName)
 	if err == nil && provisionPlug != nil {
 		t.Errorf("Provisionable plugin found, expected none")
