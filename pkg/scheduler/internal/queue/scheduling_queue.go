@@ -349,7 +349,7 @@ func NewPriorityQueue(
 	}
 	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 	pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
-	pq.nominator = newPodNominator(options.podLister, pq.nominatedPodsToInfo)
+	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
 }
@@ -1203,18 +1203,6 @@ func (p *PriorityQueue) nominatedPodToInfo(np PodRef) *framework.PodInfo {
 	return &framework.PodInfo{Pod: pod}
 }
 
-func (p *PriorityQueue) nominatedPodsToInfo(nominatedPods []PodRef) []*framework.PodInfo {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	p.activeQ.getLock().RLock()
-	defer p.activeQ.getLock().RUnlock()
-	pods := make([]*framework.PodInfo, len(nominatedPods))
-	for i, np := range nominatedPods {
-		pods[i] = p.nominatedPodToInfo(np).DeepCopy()
-	}
-	return pods
-}
-
 // Close closes the priority queue.
 func (p *PriorityQueue) Close() {
 	p.lock.Lock()
@@ -1241,15 +1229,27 @@ func (npm *nominator) AddNominatedPod(logger klog.Logger, pi *framework.PodInfo,
 	npm.nLock.Unlock()
 }
 
+func (npm *nominator) nominatedPodsForNode(nodeName string) []PodRef {
+	npm.nLock.RLock()
+	defer npm.nLock.RUnlock()
+	return slices.Clone(npm.nominatedPods[nodeName])
+}
+
 // NominatedPodsForNode returns a copy of pods that are nominated to run on the given node,
 // but they are waiting for other pods to be removed from the node.
-// CAUTION: Make sure you don't call this function while taking any lock in any scenario.
-func (npm *nominator) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
-	npm.nLock.RLock()
-	nominatedPods := slices.Clone(npm.nominatedPods[nodeName])
-	npm.nLock.RUnlock()
-	// Note that nominatedPodsToInfo takes SchedulingQueue.lock inside.
-	return npm.nominatedPodsToInfo(nominatedPods)
+// CAUTION: Make sure you don't call this function while taking any queue's lock in any scenario.
+func (p *PriorityQueue) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	nominatedPods := p.nominator.nominatedPodsForNode(nodeName)
+
+	p.activeQ.getLock().RLock()
+	defer p.activeQ.getLock().RUnlock()
+	pods := make([]*framework.PodInfo, len(nominatedPods))
+	for i, np := range nominatedPods {
+		pods[i] = p.nominatedPodToInfo(np).DeepCopy()
+	}
+	return pods
 }
 
 func (p *PriorityQueue) podsCompareBackoffCompleted(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
@@ -1495,12 +1495,11 @@ func (npm *nominator) UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, new
 	npm.addNominatedPodUnlocked(logger, newPodInfo, nominatingInfo)
 }
 
-func newPodNominator(podLister listersv1.PodLister, nominatedPodsToInfo func([]PodRef) []*framework.PodInfo) *nominator {
+func newPodNominator(podLister listersv1.PodLister) *nominator {
 	return &nominator{
-		podLister:           podLister,
-		nominatedPods:       make(map[string][]PodRef),
-		nominatedPodToNode:  make(map[types.UID]string),
-		nominatedPodsToInfo: nominatedPodsToInfo,
+		podLister:          podLister,
+		nominatedPods:      make(map[string][]PodRef),
+		nominatedPodToNode: make(map[types.UID]string),
 	}
 }
 
