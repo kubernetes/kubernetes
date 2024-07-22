@@ -84,6 +84,19 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 			ginkgo.Entry("QOS Burstable with memory request equals to limit", v1.PodQOSBurstable, true),
 			ginkgo.Entry("QOS Guaranteed", v1.PodQOSGuaranteed, false),
 		)
+
+		ginkgo.It("with a critical pod - should avoid swap", func() {
+			ginkgo.By("Creating a critical pod")
+			const memoryRequestEqualLimit = false
+			pod := getSwapTestPod(f, v1.PodQOSBurstable, memoryRequestEqualLimit)
+			pod.Spec.PriorityClassName = "system-node-critical"
+
+			pod = runPodAndWaitUntilScheduled(f, pod)
+			gomega.Expect(types.IsCriticalPod(pod)).To(gomega.BeTrueBecause("pod should be critical"))
+
+			ginkgo.By("expecting pod to not have swap access")
+			expectNoSwap(f, pod)
+		})
 	})
 
 	f.Context(framework.WithSerial(), func() {
