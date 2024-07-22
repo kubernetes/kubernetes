@@ -2009,6 +2009,9 @@ func (og *operationGenerator) expandVolumeDuringMount(volumeToMount VolumeToMoun
 				actualStateOfWorld: actualStateOfWorld,
 			}
 			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
+				// if recovery feature is enabled, we can use allocated size from PVC status as new size
+				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
+				resizeOp.pluginResizeOpts = rsOpts
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
@@ -2072,6 +2075,9 @@ func (og *operationGenerator) nodeExpandVolume(
 			}
 
 			if og.checkForRecoveryFromExpansion(pvc, volumeToMount) {
+				// if recovery feature is enabled, we can use allocated size from PVC status as new size
+				rsOpts.NewSize = pvc.Status.AllocatedResources[v1.ResourceStorage]
+				resizeOp.pluginResizeOpts = rsOpts
 				nodeExpander := newNodeExpander(resizeOp, og.kubeClient, og.recorder)
 				resizeFinished, err, _ := nodeExpander.expandOnPlugin()
 				return resizeFinished, err
