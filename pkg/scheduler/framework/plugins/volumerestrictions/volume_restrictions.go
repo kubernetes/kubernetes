@@ -362,7 +362,6 @@ func (pl *VolumeRestrictions) isSchedulableAfterPersistentVolumeClaimAdded(logge
 
 // isSchedulableAfterPodDeleted is invoked whenever a pod deleted,
 // It checks whether the deleted pod will conflict with volumes of other pods on the same node
-// TODO If we observe good throughput, we will add a check for conflicts between the deleted Pod and the readWriteOncePodPVC of the current Pod.
 func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
@@ -375,9 +374,30 @@ func (pl *VolumeRestrictions) isSchedulableAfterPodDeleted(logger klog.Logger, p
 
 	nodeInfo := framework.NewNodeInfo(deletedPod)
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
+		logger.V(5).Info("Pod with the volume that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return framework.Queue, nil
 	}
 
+	// Return Queue if a deleted pod uses the same PVC since the pod may be unschedulable due to the ReadWriteOncePod access mode of the PVC.
+	//
+	// For now, we don't actually fetch PVC and check the access mode because that operation could be expensive.
+	// Once the observability around QHint is established,
+	// we may want to do that depending on how much the operation would impact the QHint latency negatively.
+	// https://github.com/kubernetes/kubernetes/issues/124566
+	claims := sets.New[string]()
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			claims.Insert(volume.PersistentVolumeClaim.ClaimName)
+		}
+	}
+	for _, volume := range deletedPod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && claims.Has(volume.PersistentVolumeClaim.ClaimName) {
+			logger.V(5).Info("Pod with the same PVC that the target pod requires was deleted, which might make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("An irrelevant Pod was deleted, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 	return framework.QueueSkip, nil
 }
 

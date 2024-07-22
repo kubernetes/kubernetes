@@ -640,6 +640,22 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			expectedHint: framework.QueueSkip,
 			expectedErr:  false,
 		},
+		"queue-has-same-claim": {
+			pod:          st.MakePod().Name("pod1").PVC("claim-rwop").Obj(),
+			oldObj:       st.MakePod().Name("pod2").PVC("claim-rwop").Obj(),
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.Queue,
+			expectedErr:  false,
+		},
+		"skip-no-same-claim": {
+			pod:          st.MakePod().Name("pod1").PVC("claim-1-rwop").Obj(),
+			oldObj:       st.MakePod().Name("pod2").PVC("claim-2-rwop").Obj(),
+			existingPods: []*v1.Pod{},
+			existingPVC:  &v1.PersistentVolumeClaim{},
+			expectedHint: framework.QueueSkip,
+			expectedErr:  false,
+		},
 	}
 
 	for name, tc := range testcases {
