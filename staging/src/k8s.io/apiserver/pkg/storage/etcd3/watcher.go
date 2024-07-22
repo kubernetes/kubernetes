@@ -46,8 +46,9 @@ import (
 
 const (
 	// We have set a buffer in order to reduce times of context switches.
-	incomingBufSize = 100
-	outgoingBufSize = 100
+	incomingBufSize         = 100
+	outgoingBufSize         = 100
+	processEventConcurrency = 10
 )
 
 // defaultWatcherMaxLimit is used to facilitate construction tests
@@ -80,17 +81,18 @@ type watcher struct {
 
 // watchChan implements watch.Interface.
 type watchChan struct {
-	watcher           *watcher
-	key               string
-	initialRev        int64
-	recursive         bool
-	progressNotify    bool
-	internalPred      storage.SelectionPredicate
-	ctx               context.Context
-	cancel            context.CancelFunc
-	incomingEventChan chan *event
-	resultChan        chan watch.Event
-	errChan           chan error
+	watcher                *watcher
+	key                    string
+	initialRev             int64
+	recursive              bool
+	progressNotify         bool
+	internalPred           storage.SelectionPredicate
+	ctx                    context.Context
+	cancel                 context.CancelFunc
+	incomingEventChan      chan *event
+	resultChan             chan watch.Event
+	errChan                chan error
+	processEventWorkerPool chan struct{}
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -126,15 +128,16 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 
 func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
-		watcher:           w,
-		key:               key,
-		initialRev:        rev,
-		recursive:         recursive,
-		progressNotify:    progressNotify,
-		internalPred:      pred,
-		incomingEventChan: make(chan *event, incomingBufSize),
-		resultChan:        make(chan watch.Event, outgoingBufSize),
-		errChan:           make(chan error, 1),
+		watcher:                w,
+		key:                    key,
+		initialRev:             rev,
+		recursive:              recursive,
+		progressNotify:         progressNotify,
+		internalPred:           pred,
+		incomingEventChan:      make(chan *event, incomingBufSize),
+		resultChan:             make(chan watch.Event, outgoingBufSize),
+		errChan:                make(chan error, 1),
+		processEventWorkerPool: make(chan struct{}, processEventConcurrency),
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
@@ -231,7 +234,7 @@ func (wc *watchChan) run(initialEventsEndBookmarkRequired, forceInitialEvents bo
 
 	var resultChanWG sync.WaitGroup
 	resultChanWG.Add(1)
-	go wc.processEvent(&resultChanWG)
+	go wc.processEvents(&resultChanWG)
 
 	select {
 	case err := <-wc.errChan:
@@ -424,31 +427,72 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 	close(watchClosedCh)
 }
 
-// processEvent processes events from etcd watcher and sends results to resultChan.
-func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
+// processEvents processes events from etcd watcher and sends results to resultChan.
+func (wc *watchChan) processEvents(wg *sync.WaitGroup) {
 	defer wg.Done()
-
+	previousDone := make(chan struct{})
+	close(previousDone)
+	var newDone chan struct{}
 	for {
 		select {
 		case e := <-wc.incomingEventChan:
-			res := wc.transform(e)
-			if res == nil {
-				continue
-			}
-			if len(wc.resultChan) == outgoingBufSize {
-				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
-			}
-			// If user couldn't receive results fast enough, we also block incoming events from watcher.
-			// Because storing events in local will cause more memory usage.
-			// The worst case would be closing the fast watcher.
-			select {
-			case wc.resultChan <- *res:
-			case <-wc.ctx.Done():
-				return
-			}
+			newDone = make(chan struct{})
+			wc.processEventOnWorkerPool(wg, e, previousDone, newDone)
+			previousDone = newDone
 		case <-wc.ctx.Done():
 			return
 		}
+	}
+}
+
+func (wc *watchChan) processEventOnWorkerPool(wg *sync.WaitGroup, e *event, previousDone, newDone chan struct{}) {
+	// Reserve slot in worker pool
+	select {
+	case wc.processEventWorkerPool <- struct{}{}:
+	case <-wc.ctx.Done():
+		return
+	}
+	wg.Add(1)
+	go func(e *event, previousDone, done chan struct{}) {
+		defer wg.Done()
+		wc.processEventOrdered(e, previousDone, done)
+		// Return slot in worker pool
+		select {
+		case <-wc.processEventWorkerPool:
+		case <-wc.ctx.Done():
+			return
+		}
+	}(e, previousDone, newDone)
+}
+
+func (wc *watchChan) processEventOrdered(e *event, previousDone, done chan struct{}) {
+	defer close(done)
+	wc.processEvent(e, func() {
+		select {
+		case <-previousDone:
+		case <-wc.ctx.Done():
+			return
+		}
+	})
+}
+
+func (wc *watchChan) processEvent(e *event, waitPreviousDone func()) {
+	res := wc.transform(e)
+	if res == nil {
+		return
+	}
+	// wait for previous goroutine to be done.
+	waitPreviousDone()
+	// If user couldn't receive results fast enough, we also block incoming events from watcher.
+	// Because storing events in local will cause more memory usage.
+	// The worst case would be closing the fast watcher.
+	if len(wc.resultChan) == outgoingBufSize {
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
+	}
+	select {
+	case wc.resultChan <- *res:
+	case <-wc.ctx.Done():
+		return
 	}
 }
 
