@@ -51,11 +51,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -65,6 +67,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -3007,8 +3010,9 @@ func TestEmulatedStorageVersion(t *testing.T) {
 
 	for emulatedVersion, cases := range groupedCases {
 		t.Run(emulatedVersion, func(t *testing.T) {
-			server := kubeapiservertesting.StartTestServerOrDie(
-				t, &kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: emulatedVersion},
+			setKubeApiserverBinaryVersion(t, emulatedVersion)
+
+			server := kubeapiservertesting.StartTestServerOrDie(t, &kubeapiservertesting.TestServerInstanceOptions{},
 				[]string{"--emulated-version=kube=" + emulatedVersion, `--storage-media-type=application/json`}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
@@ -3147,8 +3151,8 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+	setKubeApiserverBinaryVersion(t, "1.32")
+	server := kubeapiservertesting.StartTestServerOrDie(t, &kubeapiservertesting.TestServerInstanceOptions{},
 		[]string{"--emulated-version=kube=1.31"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -3208,9 +3212,9 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
-		[]string{}, framework.SharedEtcd())
+	setKubeApiserverBinaryVersion(t, "1.32")
+
+	server := kubeapiservertesting.StartTestServerOrDie(t, &kubeapiservertesting.TestServerInstanceOptions{}, []string{}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3351,4 +3355,14 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+func setKubeApiserverBinaryVersion(t *testing.T, binaryVersion string) {
+	featureGate := utilfeature.DefaultMutableFeatureGate
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion = utilversion.NewEffectiveVersion(binaryVersion)
+	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
+	utilversion.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 }
