@@ -133,6 +133,12 @@ func TestEtcdWatchSemantics(t *testing.T) {
 	storagetesting.RunWatchSemantics(ctx, t, store)
 }
 
+func TestEtcdWatchSemanticsWithConcurrentDecode(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConcurrentWatchObjectDecode, true)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchSemantics(ctx, t, store)
+}
+
 func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
