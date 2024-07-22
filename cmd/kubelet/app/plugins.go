@@ -22,6 +22,7 @@ import (
 	"k8s.io/utils/exec"
 
 	// Volume plugins
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/git_repo"
 	"k8s.io/kubernetes/pkg/volume/hostpath"
+	"k8s.io/kubernetes/pkg/volume/image"
 	"k8s.io/kubernetes/pkg/volume/iscsi"
 	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
@@ -65,6 +67,9 @@ func ProbeVolumePlugins(featureGate featuregate.FeatureGate) ([]volume.VolumePlu
 	allPlugins = append(allPlugins, projected.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
+	if featureGate.Enabled(features.ImageVolume) {
+		allPlugins = append(allPlugins, image.ProbeVolumePlugins()...)
+	}
 	return allPlugins, nil
 }
 

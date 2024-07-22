@@ -135,6 +135,8 @@ type Runtime interface {
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
 	// ListPodSandboxMetrics retrieves the metrics for all pod sandboxes.
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
+	// GetContainerStatus returns the status for the container.
+	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
@@ -374,6 +376,8 @@ type Status struct {
 	Resources *ContainerResources
 	// User identity information of the first process of this container
 	User *ContainerUser
+	// Mounts are the volume mounts of the container
+	Mounts []Mount
 }
 
 // ContainerUser represents user identity information
@@ -466,7 +470,12 @@ type Mount struct {
 	SELinuxRelabel bool
 	// Requested propagation mode
 	Propagation runtimeapi.MountPropagation
+	// Image is set if an OCI volume as image ID or digest should get mounted (special case).
+	Image *runtimeapi.ImageSpec
 }
+
+// ImageVolumes is a map of image specs by volume name.
+type ImageVolumes = map[string]*runtimeapi.ImageSpec
 
 // PortMapping contains information about the port mapping.
 type PortMapping struct {
