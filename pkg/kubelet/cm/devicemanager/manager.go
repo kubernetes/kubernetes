@@ -33,12 +33,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -108,6 +111,9 @@ type ManagerImpl struct {
 	// was reported running by the container runtime when `containerMap` was computed.
 	// Used to detect pods running across a restart
 	containerRunningSet sets.Set[string]
+
+	// update channel for device health updates
+	update chan resourceupdates.Update
 }
 
 type endpointInfo struct {
@@ -151,6 +157,7 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 		numaNodes:             numaNodes,
 		topologyAffinityStore: topologyAffinityStore,
 		devicesToReuse:        make(PodReusableDevices),
+		update:                make(chan resourceupdates.Update),
 	}
 
 	server, err := plugin.NewServer(socketPath, manager, manager)
@@ -172,6 +179,10 @@ func newManagerImpl(socketPath string, topology []cadvisorapi.Node, topologyAffi
 	manager.checkpointManager = checkpointManager
 
 	return manager, nil
+}
+
+func (m *ManagerImpl) Updates() <-chan resourceupdates.Update {
+	return m.update
 }
 
 // CleanupPluginDirectory is to remove all existing unix sockets
@@ -259,8 +270,26 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.New[string]()
 	m.unhealthyDevices[resourceName] = sets.New[string]()
+	oldDevices := m.allDevices[resourceName]
+	podsToUpdate := sets.New[string]()
 	m.allDevices[resourceName] = make(map[string]pluginapi.Device)
 	for _, dev := range devices {
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+			// compare with old device's health and send update to the channel if needed
+			if oldDev, ok := oldDevices[dev.ID]; ok {
+				if oldDev.Health != dev.Health {
+					podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
+					podsToUpdate.Insert(podUID)
+				}
+			} else {
+				// if this is a new device, it might have existed before and disappeared for a while
+				// but still be assigned to a Pod. In this case, we need to send an update to the channel
+				podUID, _ := m.podDevices.getPodAndContainerForDevice(dev.ID)
+				podsToUpdate.Insert(podUID)
+			}
+		}
+
 		m.allDevices[resourceName][dev.ID] = dev
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
@@ -270,6 +299,15 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 		}
 	}
 	m.mutex.Unlock()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+		if len(podsToUpdate) > 0 {
+			m.update <- resourceupdates.Update{
+				PodUIDs: podsToUpdate.UnsortedList(),
+			}
+		}
+	}
+
 	if err := m.writeCheckpoint(); err != nil {
 		klog.ErrorS(err, "Writing checkpoint encountered")
 	}
@@ -1046,6 +1084,70 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 // GetDevices returns the devices used by the specified container
 func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceInstances {
 	return m.podDevices.getContainerDevices(podUID, containerName)
+}
+
+func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Today we ignore edge cases that are not likely to happen:
+	//  - update statuses for containers that are in spec, but not in status
+	//  - update statuses for resources requested in spec, but with no information in podDevices
+	for i, containerStatus := range status.ContainerStatuses {
+		devices := m.podDevices.getContainerDevices(string(pod.UID), containerStatus.Name)
+
+		for resourceName, deviceInstances := range devices {
+			for id, d := range deviceInstances {
+				health := pluginapi.Healthy
+				// this is unlikely, but check for existence here anyways
+				if r, ok := m.allDevices[resourceName]; ok {
+					if _, ok := r[id]; ok {
+						health = m.allDevices[resourceName][id].Health
+					}
+				}
+
+				d.Health = health
+
+				deviceInstances[id] = d
+			}
+		}
+
+		for resourceName, dI := range devices {
+			resourceStatus := v1.ResourceStatus{
+				Name:      v1.ResourceName(resourceName),
+				Resources: []v1.ResourceHealth{},
+			}
+
+			for id, d := range dI {
+				health := v1.ResourceHealthStatusHealthy
+				if d.Health != pluginapi.Healthy {
+					health = v1.ResourceHealthStatusUnhealthy
+				}
+				resourceStatus.Resources = append(resourceStatus.Resources, v1.ResourceHealth{
+					ResourceID: v1.ResourceID(id),
+					Health:     health,
+				})
+			}
+
+			if status.ContainerStatuses[i].AllocatedResourcesStatus == nil {
+				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
+			}
+
+			// look up the resource status by name and update it
+			found := false
+			for j, rs := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+				if rs.Name == resourceStatus.Name {
+					status.ContainerStatuses[i].AllocatedResourcesStatus[j] = resourceStatus
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
+			}
+		}
+	}
 }
 
 // ShouldResetExtendedResourceCapacity returns whether the extended resources should be zeroed or not,

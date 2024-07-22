@@ -6817,6 +6817,7 @@
         "properties": {
           "name": {
             "default": "",
+            "description": "Name of the resource. Must be unique within the pod and match one of the resources from the pod spec.",
             "type": "string"
           },
           "resources": {

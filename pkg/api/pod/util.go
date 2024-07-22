@@ -1172,22 +1172,6 @@ func rroInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-func allocatedResourcesStatusInUse(podSpec *api.PodStatus) bool {
-	if podSpec == nil {
-		return false
-	}
-	inUse := func(csl []api.ContainerStatus) bool {
-		for _, cs := range csl {
-			if len(cs.AllocatedResourcesStatus) > 0 {
-				return true
-			}
-		}
-		return false
-	}
-
-	return inUse(podSpec.ContainerStatuses) || inUse(podSpec.InitContainerStatuses) || inUse(podSpec.EphemeralContainerStatuses)
-}
-
 func dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec *api.PodSpec) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
 		return

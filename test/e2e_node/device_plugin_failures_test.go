@@ -36,15 +36,14 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
 
-type ResourceValue struct {
-	Allocatable int
-	Capacity    int
-}
-
-// Serial because the test restarts Kubelet
 var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("device-plugin-failures")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	type ResourceValue struct {
+		Allocatable int
+		Capacity    int
+	}
 
 	var getNodeResourceValues = func(ctx context.Context, resourceName string) ResourceValue {
 		ginkgo.GinkgoHelper()

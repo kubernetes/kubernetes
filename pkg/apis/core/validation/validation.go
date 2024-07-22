@@ -8209,11 +8209,10 @@ func validateContainerStatusNoAllocatedResourcesStatus(containerStatuses []core.
 	allErrors := field.ErrorList{}
 
 	for i, containerStatus := range containerStatuses {
-		if containerStatus.AllocatedResourcesStatus == nil {
+		if len(containerStatus.AllocatedResourcesStatus) == 0 {
 			continue
-		} else {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("allocatedResourcesStatus"), "cannot be set for a container status"))
 		}
+		allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("allocatedResourcesStatus"), "must not be specified in container status"))
 	}
 
 	return allErrors
@@ -8263,12 +8262,18 @@ func validateContainerStatusAllocatedResourcesStatus(containerStatuses []core.Co
 			uniqueResources := sets.New[core.ResourceID]()
 			// check resource IDs are unique
 			for k, r := range allocatedResource.Resources {
-				if r.Health != core.ResourceHealthStatusHealthy && r.Health != core.ResourceHealthStatusUnhealthy && r.Health != core.ResourceHealthStatusUnknown {
-					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("health"), r.Health, "must be one of Healthy, Unhealthy, Unknown"))
+
+				var supportedResourceHealthValues = sets.New(
+					core.ResourceHealthStatusHealthy,
+					core.ResourceHealthStatusUnhealthy,
+					core.ResourceHealthStatusUnknown)
+
+				if !supportedResourceHealthValues.Has(r.Health) {
+					allErrors = append(allErrors, field.NotSupported(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("health"), r.Health, sets.List(supportedResourceHealthValues)))
 				}
 
 				if uniqueResources.Has(r.ResourceID) {
-					allErrors = append(allErrors, field.Invalid(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("resourceID"), r.ResourceID, "must be unique"))
+					allErrors = append(allErrors, field.Duplicate(fldPath.Index(i).Child("allocatedResourcesStatus").Index(j).Child("resources").Index(k).Child("resourceID"), r.ResourceID))
 				} else {
 					uniqueResources.Insert(r.ResourceID)
 				}

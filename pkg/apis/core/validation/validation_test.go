@@ -24457,11 +24457,11 @@ func TestValidateContainerStatusNoAllocatedResourcesStatus(t *testing.T) {
 
 	errs := validateContainerStatusNoAllocatedResourcesStatus(containerStatuses, fldPath)
 
-	assert.Equal(t, 2, len(errs))
+	assert.Len(t, errs, 2)
 	assert.Equal(t, "spec.containers[1].allocatedResourcesStatus", errs[0].Field)
-	assert.Equal(t, "cannot be set for a container status", errs[0].Detail)
+	assert.Equal(t, "must not be specified in container status", errs[0].Detail)
 	assert.Equal(t, "spec.containers[2].allocatedResourcesStatus", errs[1].Field)
-	assert.Equal(t, "cannot be set for a container status", errs[1].Detail)
+	assert.Equal(t, "must not be specified in container status", errs[1].Detail)
 }
 
 func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
@@ -24580,7 +24580,7 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 				},
 			},
 			wantFieldErrors: field.ErrorList{
-				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(1).Child("resourceID"), core.ResourceID("resource-1"), "must be unique"),
+				field.Duplicate(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(1).Child("resourceID"), core.ResourceID("resource-1")),
 			},
 		},
 
@@ -24617,6 +24617,38 @@ func TestValidateContainerStatusAllocatedResourcesStatus(t *testing.T) {
 			},
 			wantFieldErrors: field.ErrorList{
 				field.Invalid(fldPath.Index(0).Child("allocatedResourcesStatus").Index(1).Child("name"), core.ResourceName("test.device/test2"), "must match one of the container's resource requirements"),
+			},
+		},
+
+		"don't allow health status outside the known values": {
+			containers: []core.Container{
+				{
+					Name: "container-1",
+					Resources: core.ResourceRequirements{
+						Requests: core.ResourceList{
+							"test.device/test": resource.MustParse("1"),
+						},
+					},
+				},
+			},
+			containerStatuses: []core.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResourcesStatus: []core.ResourceStatus{
+						{
+							Name: "test.device/test",
+							Resources: []core.ResourceHealth{
+								{
+									ResourceID: "resource-1",
+									Health:     "invalid-health-value",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFieldErrors: field.ErrorList{
+				field.NotSupported(fldPath.Index(0).Child("allocatedResourcesStatus").Index(0).Child("resources").Index(0).Child("health"), core.ResourceHealthStatus("invalid-health-value"), []string{"Healthy", "Unhealthy", "Unknown"}),
 			},
 		},
 	}
