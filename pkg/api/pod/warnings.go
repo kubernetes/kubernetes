@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -380,119 +379,149 @@ func warningsForWeightedPodAffinityTerms(terms []api.WeightedPodAffinityTerm, fi
 func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 	var warnings []string
 
+	mkWarn := func(volName, volDesc, body string) string {
+		return fmt.Sprintf("volume %q (%s): overlapping paths: %s", volName, volDesc, body)
+	}
+
 	for _, v := range volumes {
 		if v.ConfigMap != nil && v.ConfigMap.Items != nil {
-			warnings = append(warnings, checkVolumeMappingForOverlap(extractPaths(v.ConfigMap.Items), fmt.Sprintf("volume %q (ConfigMap %q): overlapping paths", v.Name, v.ConfigMap.Name))...)
+			overlaps := checkVolumeMappingForOverlap(extractPaths(v.ConfigMap.Items, ""))
+			for _, ol := range overlaps {
+				warnings = append(warnings, mkWarn(v.Name, fmt.Sprintf("ConfigMap %q", v.ConfigMap.Name), ol))
+			}
 		}
 
 		if v.Secret != nil && v.Secret.Items != nil {
-			warnings = append(warnings, checkVolumeMappingForOverlap(extractPaths(v.Secret.Items), fmt.Sprintf("volume %q (Secret %q): overlapping paths", v.Name, v.Secret.SecretName))...)
+			overlaps := checkVolumeMappingForOverlap(extractPaths(v.Secret.Items, ""))
+			for _, ol := range overlaps {
+				warnings = append(warnings, mkWarn(v.Name, fmt.Sprintf("Secret %q", v.Secret.SecretName), ol))
+			}
 		}
 
 		if v.DownwardAPI != nil && v.DownwardAPI.Items != nil {
-			warnings = append(warnings, checkVolumeMappingForOverlap(extractPathsDownwardAPI(v.DownwardAPI.Items), fmt.Sprintf("volume %q (DownwardAPI): overlapping paths", v.Name))...)
+			overlaps := checkVolumeMappingForOverlap(extractPathsDownwardAPI(v.DownwardAPI.Items, ""))
+			for _, ol := range overlaps {
+				warnings = append(warnings, mkWarn(v.Name, "DownwardAPI", ol))
+			}
 		}
 
 		if v.Projected != nil {
-			var sourcePaths []string
-			var errorMessage string
-			allPaths := sets.New[string]()
+			var sourcePaths []pathAndSource
+			var allPaths []pathAndSource
 
 			for _, source := range v.Projected.Sources {
 				if source == (api.VolumeProjection{}) {
 					warnings = append(warnings, fmt.Sprintf("volume %q (Projected) has no sources provided", v.Name))
 					continue
 				}
+
 				switch {
 				case source.ConfigMap != nil && source.ConfigMap.Items != nil:
-					sourcePaths = extractPaths(source.ConfigMap.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected ConfigMap %q): overlapping paths", v.Name, source.ConfigMap.Name)
+					sourcePaths = extractPaths(source.ConfigMap.Items, fmt.Sprintf("ConfigMap %q", source.ConfigMap.Name))
 				case source.Secret != nil && source.Secret.Items != nil:
-					sourcePaths = extractPaths(source.Secret.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected Secret %q): overlapping paths", v.Name, source.Secret.Name)
+					sourcePaths = extractPaths(source.Secret.Items, fmt.Sprintf("Secret %q", source.Secret.Name))
 				case source.DownwardAPI != nil && source.DownwardAPI.Items != nil:
-					sourcePaths = extractPathsDownwardAPI(source.DownwardAPI.Items)
-					errorMessage = fmt.Sprintf("volume %q (Projected DownwardAPI): overlapping paths", v.Name)
+					sourcePaths = extractPathsDownwardAPI(source.DownwardAPI.Items, "DownwardAPI")
 				case source.ServiceAccountToken != nil:
-					sourcePaths = []string{source.ServiceAccountToken.Path}
-					errorMessage = fmt.Sprintf("volume %q (Projected ServiceAccountToken): overlapping paths", v.Name)
+					sourcePaths = []pathAndSource{{source.ServiceAccountToken.Path, "ServiceAccountToken"}}
 				case source.ClusterTrustBundle != nil:
-					sourcePaths = []string{source.ClusterTrustBundle.Path}
+					name := ""
 					if source.ClusterTrustBundle.Name != nil {
-						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping paths", v.Name, *source.ClusterTrustBundle.Name)
+						name = *source.ClusterTrustBundle.Name
 					} else {
-						errorMessage = fmt.Sprintf("volume %q (Projected ClusterTrustBundle %q): overlapping paths", v.Name, *source.ClusterTrustBundle.SignerName)
+						name = *source.ClusterTrustBundle.SignerName
 					}
+					sourcePaths = []pathAndSource{{source.ClusterTrustBundle.Path, fmt.Sprintf("ClusterTrustBundle %q", name)}}
 				}
 
 				if len(sourcePaths) == 0 {
 					continue
 				}
 
-				warnings = append(warnings, checkVolumeMappingForOverlap(sourcePaths, errorMessage)...)
-
-				// remove duplicates path and sort the new array, so we can get predetermined result
-				uniqueSourcePaths := sets.New[string](sourcePaths...).UnsortedList()
-				orderedSourcePaths := append(uniqueSourcePaths, allPaths.UnsortedList()...)
-				sort.Strings(orderedSourcePaths)
-				warnings = append(warnings, checkVolumeMappingForOverlap(orderedSourcePaths, errorMessage)...)
-				allPaths.Insert(uniqueSourcePaths...)
+				for _, ps := range sourcePaths {
+					ps.path = strings.TrimRight(ps.path, string(os.PathSeparator))
+					if collisions := checkForOverlap(allPaths, ps); len(collisions) > 0 {
+						for _, c := range collisions {
+							warnings = append(warnings, mkWarn(v.Name, "Projected", fmt.Sprintf("%s with %s", ps.String(), c.String())))
+						}
+					}
+					allPaths = append(allPaths, ps)
+				}
 			}
 		}
-
 	}
 	return warnings
 }
 
-func extractPaths(mapping []api.KeyToPath) []string {
-	result := make([]string, 0, len(mapping))
+// this lets us track a path and where it came from, for better errors
+type pathAndSource struct {
+	path   string
+	source string
+}
+
+func (ps pathAndSource) String() string {
+	if ps.source != "" {
+		return fmt.Sprintf("%q (%s)", ps.path, ps.source)
+	}
+	return fmt.Sprintf("%q", ps.path)
+}
+
+func extractPaths(mapping []api.KeyToPath, source string) []pathAndSource {
+	result := make([]pathAndSource, 0, len(mapping))
 
 	for _, v := range mapping {
-		result = append(result, v.Path)
+		result = append(result, pathAndSource{v.Path, source})
 	}
 	return result
 }
 
-func extractPathsDownwardAPI(mapping []api.DownwardAPIVolumeFile) []string {
-	result := make([]string, 0, len(mapping))
+func extractPathsDownwardAPI(mapping []api.DownwardAPIVolumeFile, source string) []pathAndSource {
+	result := make([]pathAndSource, 0, len(mapping))
 
 	for _, v := range mapping {
-		result = append(result, v.Path)
+		result = append(result, pathAndSource{v.Path, source})
 	}
 	return result
 }
 
-func checkVolumeMappingForOverlap(paths []string, warningMessage string) []string {
+func checkVolumeMappingForOverlap(paths []pathAndSource) []string {
+	pathSeparator := string(os.PathSeparator)
 	var warnings []string
-	pathSeparator := string(os.PathSeparator)
-	uniquePaths := sets.New[string]()
+	var allPaths []pathAndSource
 
-	for _, path := range paths {
-		normalizedPath := strings.TrimRight(path, pathSeparator)
-		if collision := checkForOverlap(uniquePaths, normalizedPath); collision != "" {
-			warnings = append(warnings, fmt.Sprintf("%s: %q with %q", warningMessage, normalizedPath, collision))
+	for _, ps := range paths {
+		ps.path = strings.TrimRight(ps.path, pathSeparator)
+		if collisions := checkForOverlap(allPaths, ps); len(collisions) > 0 {
+			for _, c := range collisions {
+				warnings = append(warnings, fmt.Sprintf("%s with %s", ps.String(), c.String()))
+			}
 		}
-		uniquePaths.Insert(normalizedPath)
+		allPaths = append(allPaths, ps)
 	}
 
 	return warnings
 }
 
-func checkForOverlap(paths sets.Set[string], path string) string {
+func checkForOverlap(haystack []pathAndSource, needle pathAndSource) []pathAndSource {
 	pathSeparator := string(os.PathSeparator)
 
-	for item := range paths {
+	if needle.path == "" {
+		return nil
+	}
+
+	var result []pathAndSource
+	for _, item := range haystack {
 		switch {
-		case item == "" || path == "":
-			return ""
-		case item == path:
-			return item
-		case strings.HasPrefix(item+pathSeparator, path):
-			return item
-		case strings.HasPrefix(path+pathSeparator, item):
-			return item
+		case item.path == "":
+			continue
+		case item == needle:
+			result = append(result, item)
+		case strings.HasPrefix(item.path+pathSeparator, needle.path+pathSeparator):
+			result = append(result, item)
+		case strings.HasPrefix(needle.path+pathSeparator, item.path+pathSeparator):
+			result = append(result, item)
 		}
 	}
 
-	return ""
+	return result
 }
