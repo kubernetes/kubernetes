@@ -93,10 +93,10 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 		"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition,Priority",
 		"--runtime-config=" + strings.Join(runtimeConfig, ","),
+		// Timeout sufficiently long to handle deleting pods of the largest test cases.
+		"--request-timeout=10m",
 	}
 	serverOpts := apiservertesting.NewDefaultTestServerOptions()
-	// Timeout sufficiently long to handle deleting pods of the largest test cases.
-	serverOpts.RequestTimeout = 10 * time.Minute
 	server, err := apiservertesting.StartTestServer(tCtx, serverOpts, customFlags, framework.SharedEtcd())
 	if err != nil {
 		tCtx.Fatalf("start apiserver: %v", err)

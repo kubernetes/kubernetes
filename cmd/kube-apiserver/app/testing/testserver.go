@@ -104,8 +104,6 @@ type TestServerInstanceOptions struct {
 	// Set the BinaryVersion of server effective version.
 	// Default to 1.31
 	BinaryVersion string
-	// Set non-default request timeout in the server.
-	RequestTimeout time.Duration
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -196,9 +194,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
-	if instanceOptions.RequestTimeout > 0 {
-		s.GenericServerRunOptions.RequestTimeout = instanceOptions.RequestTimeout
-	}
 
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
