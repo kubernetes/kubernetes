@@ -84,7 +84,7 @@ var (
 
 	nominatorCmpOpts = []cmp.Option{
 		cmp.AllowUnexported(nominator{}),
-		cmpopts.IgnoreFields(nominator{}, "podLister", "nLock", "nominatedPodsToInfo"),
+		cmpopts.IgnoreFields(nominator{}, "podLister", "nLock"),
 	}
 
 	queueHintReturnQueue = func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
