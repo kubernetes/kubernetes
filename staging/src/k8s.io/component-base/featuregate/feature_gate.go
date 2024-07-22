@@ -30,6 +30,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/naming"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	featuremetrics "k8s.io/component-base/metrics/prometheus/feature"
 	baseversion "k8s.io/component-base/version"
@@ -265,7 +266,7 @@ func NewVersionedFeatureGate(emulationVersion *version.Version) *featureGate {
 	f.enabled.Store(map[Feature]bool{})
 	f.enabledRaw.Store(map[string]bool{})
 	f.emulationVersion.Store(emulationVersion)
-	f.queriedFeatures.Store(map[Feature]struct{}{})
+	f.queriedFeatures.Store(sets.Set[Feature]{})
 	klog.V(1).Infof("new feature gate with emulationVersion=%s", f.emulationVersion.Load().String())
 	return f
 }
@@ -530,7 +531,7 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 	enabled := map[Feature]bool{}
 	errs := f.unsafeSetFromMap(enabled, enabledRaw, emulationVersion)
 
-	queriedFeatures := f.queriedFeatures.Load().(map[Feature]struct{})
+	queriedFeatures := f.queriedFeatures.Load().(sets.Set[Feature])
 	known := f.known.Load().(map[Feature]VersionedSpecs)
 	for feature := range queriedFeatures {
 		newVal := featureEnabled(feature, enabled, known, emulationVersion)
@@ -544,7 +545,7 @@ func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) err
 		// Persist changes
 		f.enabled.Store(enabled)
 		f.emulationVersion.Store(emulationVersion)
-		f.queriedFeatures.Store(map[Feature]struct{}{})
+		f.queriedFeatures.Store(sets.Set[Feature]{})
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -564,15 +565,14 @@ func (f *featureGate) featureSpec(key Feature) (FeatureSpec, error) {
 }
 
 func (f *featureGate) unsafeRecordQueried(key Feature) {
-	queriedFeatures := map[Feature]struct{}{}
-	for k := range f.queriedFeatures.Load().(map[Feature]struct{}) {
-		queriedFeatures[k] = struct{}{}
-	}
+	queriedFeatures := f.queriedFeatures.Load().(sets.Set[Feature])
 	if _, ok := queriedFeatures[key]; ok {
 		return
 	}
-	queriedFeatures[key] = struct{}{}
-	f.queriedFeatures.Store(queriedFeatures)
+	// Clone items from queriedFeatures before mutating it
+	newQueriedFeatures := queriedFeatures.Clone()
+	newQueriedFeatures.Insert(key)
+	f.queriedFeatures.Store(newQueriedFeatures)
 }
 
 func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]VersionedSpecs, emulationVersion *version.Version) bool {
@@ -700,7 +700,7 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	fg.known.Store(known)
 	fg.enabled.Store(enabled)
 	fg.enabledRaw.Store(enabledRaw)
-	fg.queriedFeatures.Store(map[Feature]struct{}{})
+	fg.queriedFeatures.Store(sets.Set[Feature]{})
 	return fg
 }
 
