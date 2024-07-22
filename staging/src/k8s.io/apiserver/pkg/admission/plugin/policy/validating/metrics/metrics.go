@@ -63,7 +63,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 			Subsystem:      metricsSubsystem,
 			Name:           "check_total",
 			Help:           "Validation admission policy check total, labeled by policy and further identified by binding and enforcement action taken.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"policy", "policy_binding", "error_type", "enforcement_action"},
 	)
@@ -81,7 +81,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 		// around 760ms, so that bucket should only ever have the slowest CEL expressions
 		// in it
 		Buckets:        []float64{0.0000005, 0.001, 0.01, 0.1, 1.0},
-		StabilityLevel: metrics.ALPHA,
+		StabilityLevel: metrics.BETA,
 	},
 		[]string{"policy", "policy_binding", "error_type", "enforcement_action"},
 	)
