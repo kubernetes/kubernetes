@@ -121,7 +121,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 		}
 
 		if isInfeasibleError(err) {
-			infeasibleError := fmt.Errorf("Expander.NodeExpand failed to expand the volume: %w", volumetypes.NewInfeasibleError(err.Error()))
+			infeasibleError := volumetypes.NewInfeasibleError(fmt.Sprintf("Expander.NodeExpand failed to expand the volume %s", err.Error()))
 			return false, infeasibleError
 		}
 		return false, fmt.Errorf("Expander.NodeExpand failed to expand the volume : %w", err)

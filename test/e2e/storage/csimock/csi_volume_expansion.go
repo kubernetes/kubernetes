@@ -556,7 +556,7 @@ func waitForResizeStatus(ctx context.Context, pvc *v1.PersistentVolumeClaim, c c
 		return (actualResizeStatus == expectedState), nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %v", expectedState, actualResizeStatus, waitErr)
+		return fmt.Errorf("error while waiting for resize status to sync to %v, actualStatus %s: %w", expectedState, actualResizeStatus, waitErr)
 	}
 	return nil
 }

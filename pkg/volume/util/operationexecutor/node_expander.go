@@ -39,9 +39,9 @@ type NodeExpander struct {
 	pvCap        resource.Quantity
 	resizeStatus v1.ClaimResourceStatus
 
-	// indicates that pvc spec size has actually changed since last we observed size
-	// on the kubelet
-	markExpansionInfeasible bool
+	// indicates that if volume expansion failed on the node, then current expansion should be marked
+	// as infeasible so as controller can reconcile the resizing operation by using new user requested size.
+	markExpansionInfeasibleOnFailure bool
 
 	// pvcAlreadyUpdated if true indicates that although we are calling NodeExpandVolume on the kubelet
 	// PVC has already been updated - possibly because expansion already succeeded on different node.
@@ -84,12 +84,14 @@ func (ne *NodeExpander) runPreCheck() bool {
 	}
 
 	pvcSpecCap := ne.pvc.Spec.Resources.Requests[v1.ResourceStorage]
+
 	// usually when are performing node expansion, we expect pv size and pvc spec size
 	// to be the same, but if user has edited pvc since then and volume expansion failed
-	// with final error, then we should let controller reconcile this state.
+	// with final error, then we should let controller reconcile this state, by marking entire
+	// node expansion as infeasible.
 	if pvcSpecCap.Cmp(ne.pluginResizeOpts.NewSize) != 0 &&
 		ne.actualStateOfWorld.CheckVolumeInFailedExpansionWithFinalErrors(ne.vmt.VolumeName) {
-		ne.markExpansionInfeasible = true
+		ne.markExpansionInfeasibleOnFailure = true
 	}
 
 	// PVC is already expanded but we are still trying to expand the volume because
@@ -138,7 +140,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 		if volumetypes.IsOperationFinishedError(resizeErr) {
 			var markFailedError error
 			ne.actualStateOfWorld.MarkVolumeExpansionFailedWithFinalError(ne.vmt.VolumeName)
-			if volumetypes.IsInfeasibleError(resizeErr) || ne.markExpansionInfeasible {
+			if volumetypes.IsInfeasibleError(resizeErr) || ne.markExpansionInfeasibleOnFailure {
 				ne.pvc, markFailedError = util.MarkNodeExpansionInfeasible(ne.pvc, ne.kubeClient, resizeErr)
 				if markFailedError != nil {
 					klog.Errorf(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
