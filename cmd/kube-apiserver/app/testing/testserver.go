@@ -51,12 +51,11 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
-
-	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 func init() {
@@ -170,8 +169,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		}
 	}()
 
-	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
-
 	featureGate := utilfeature.DefaultMutableFeatureGate
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
@@ -183,7 +180,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
-
+	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 	for _, f := range s.Flags().FlagSets {
 		fs.AddFlagSet(f)
 	}
