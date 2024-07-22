@@ -18,16 +18,9 @@ package testing
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math"
-	"math/big"
 	"net"
 	"os"
 	"path/filepath"
@@ -54,7 +47,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
@@ -98,9 +90,6 @@ type TestServerInstanceOptions struct {
 	// to version skew
 	// 2. kube-apiserver and aggregated apiserver
 
-	// We specify this as on option to pass a common proxyCA to multiple apiservers to simulate
-	// an apiserver version skew scenario where all apiservers use the same proxyCA to verify client connections.
-	ProxyCA *ProxyCA
 	// Set the BinaryVersion of server effective version.
 	// Default to 1.31
 	BinaryVersion string
@@ -209,94 +198,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		// set up default headers for request header auth
 		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
 		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
-
-		var proxySigningKey *rsa.PrivateKey
-		var proxySigningCert *x509.Certificate
-
-		if instanceOptions.ProxyCA != nil {
-			// use provided proxyCA
-			proxySigningKey = instanceOptions.ProxyCA.ProxySigningKey
-			proxySigningCert = instanceOptions.ProxyCA.ProxySigningCert
-
-		} else {
-			// create certificates for aggregation and client-cert auth
-			proxySigningKey, err = testutil.NewPrivateKey()
-			if err != nil {
-				return result, err
-			}
-			proxySigningCert, err = cert.NewSelfSignedCACert(cert.Config{CommonName: "front-proxy-ca"}, proxySigningKey)
-			if err != nil {
-				return result, err
-			}
-		}
-		proxyCACertFile := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
-		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
-			return result, err
-		}
-		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
-
-		// give the kube api server an "identity" it can use to for request header auth
-		// so that aggregated api servers can understand who the calling user is
-		s.Authentication.RequestHeader.AllowedNames = []string{"ash", "misty", "brock"}
-
-		// create private key
-		signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		if err != nil {
-			return result, err
-		}
-
-		// make a client certificate for the api server - common name has to match one of our defined names above
-		serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64-1))
-		if err != nil {
-			return result, err
-		}
-		serial = new(big.Int).Add(serial, big.NewInt(1))
-		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
-		certTmpl := x509.Certificate{
-			Subject: pkix.Name{
-				CommonName: "misty",
-			},
-			SerialNumber: serial,
-			NotBefore:    proxySigningCert.NotBefore,
-			NotAfter:     tenThousandHoursLater,
-			KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-			ExtKeyUsage: []x509.ExtKeyUsage{
-				x509.ExtKeyUsageClientAuth,
-			},
-			BasicConstraintsValid: true,
-		}
-		certDERBytes, err := x509.CreateCertificate(rand.Reader, &certTmpl, proxySigningCert, signer.Public(), proxySigningKey)
-		if err != nil {
-			return result, err
-		}
-		clientCrtOfAPIServer, err := x509.ParseCertificate(certDERBytes)
-		if err != nil {
-			return result, err
-		}
-
-		// write the cert to disk
-		certificatePath := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
-		certBlock := pem.Block{
-			Type:  "CERTIFICATE",
-			Bytes: clientCrtOfAPIServer.Raw,
-		}
-		certBytes := pem.EncodeToMemory(&certBlock)
-		if err := cert.WriteCert(certificatePath, certBytes); err != nil {
-			return result, err
-		}
-
-		// write the key to disk
-		privateKeyPath := filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
-		encodedPrivateKey, err := keyutil.MarshalPrivateKeyToPEM(signer)
-		if err != nil {
-			return result, err
-		}
-		if err := keyutil.WriteKey(privateKeyPath, encodedPrivateKey); err != nil {
-			return result, err
-		}
-
-		s.ProxyClientKeyFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
-		s.ProxyClientCertFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
 
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
