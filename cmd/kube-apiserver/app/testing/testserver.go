@@ -92,6 +92,14 @@ type TestServerInstanceOptions struct {
 	// Set the BinaryVersion of server effective version.
 	// Default to 1.31
 	BinaryVersion string
+
+	///////////////////////////////////////////////////
+	// DO NOT ADD TEST FIXTURE CODE HERE. USE FLAGS. //
+	//                                               //
+	// Adding new fields here is nearly always the   //
+	// wrong approach. This is an integration test   //
+	// helper that must be considered a black box.   //
+	///////////////////////////////////////////////////
 }
 
 // TestServer return values supplied by kube-test-ApiServer
