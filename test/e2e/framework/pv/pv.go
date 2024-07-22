@@ -104,6 +104,10 @@ type PersistentVolumeConfig struct {
 	// [Optiona] ReclaimPolicy defaults to "Reclaim" if unset
 	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
 	StorageClassName string
+	// [Optional] VolumeAttributesClassName specifies name of VolumeAttributesClass to which this PV belongs.
+	// When this field is not set, it indicates that this volume does not belong to any VAC.
+	// This is an alpha field and requires enabling VolumeAttributesClass feature.
+	VolumeAttributesClassName *string
 	// [Optional] NodeAffinity defines constraints that limit what nodes this
 	// volume can be accessed from.
 	NodeAffinity *v1.VolumeNodeAffinity
