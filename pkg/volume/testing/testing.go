@@ -88,7 +88,8 @@ const (
 
 	FailVolumeExpansion = "fail-expansion-test"
 
-	AlwaysFailNodeExpansion = "always-fail-node-expansion"
+	InfeasibleNodeExpansion      = "infeasible-fail-node-expansion"
+	OtherFinalNodeExpansionError = "other-final-node-expansion-error"
 
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
@@ -179,6 +180,7 @@ type FakeVolumePlugin struct {
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
 	LastProvisionerOptions volume.VolumeOptions
+	LastResizeOptions      volume.NodeResizeOptions
 	NewAttacherCallCount   int
 	NewDetacherCallCount   int
 	NodeExpandCallCount    int
@@ -493,6 +495,7 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
 	plugin.NodeExpandCallCount++
+	plugin.LastResizeOptions = resizeOptions
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
 	}
@@ -500,8 +503,12 @@ func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOption
 		return false, volumetypes.NewOperationNotSupportedError("volume-unsupported")
 	}
 
-	if resizeOptions.VolumeSpec.Name() == AlwaysFailNodeExpansion {
-		return false, fmt.Errorf("test failure: NodeExpand")
+	if resizeOptions.VolumeSpec.Name() == InfeasibleNodeExpansion {
+		return false, volumetypes.NewInfeasibleError("infeasible-expansion")
+	}
+
+	if resizeOptions.VolumeSpec.Name() == OtherFinalNodeExpansionError {
+		return false, fmt.Errorf("other-final-node-expansion-error")
 	}
 
 	if resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {

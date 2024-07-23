@@ -68,6 +68,8 @@ type CSINameTranslator interface {
 	GetCSINameFromInTreeName(pluginName string) (string, error)
 }
 
+// Deprecated: This controller is deprecated and for now exists for the sole purpose of adding
+// necessary annotations if necessary, so as volume can be expanded externally in the control-plane
 type expandController struct {
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.

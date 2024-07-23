@@ -2491,10 +2491,10 @@ func validatePersistentVolumeClaimResourceKey(value string, fldPath *field.Path)
 }
 
 var resizeStatusSet = sets.New(core.PersistentVolumeClaimControllerResizeInProgress,
-	core.PersistentVolumeClaimControllerResizeFailed,
+	core.PersistentVolumeClaimControllerResizeInfeasible,
 	core.PersistentVolumeClaimNodeResizePending,
 	core.PersistentVolumeClaimNodeResizeInProgress,
-	core.PersistentVolumeClaimNodeResizeFailed)
+	core.PersistentVolumeClaimNodeResizeInfeasible)
 
 // ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PersistentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVolumeClaim, validationOpts PersistentVolumeClaimSpecValidationOptions) field.ErrorList {

@@ -1496,7 +1496,7 @@ func TestAdmitPVCStatus(t *testing.T) {
 	noExistingPods := corev1lister.NewPodLister(noExistingPodsIndex)
 	mynode := &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 
-	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeFailed
+	nodeExpansionFailed := api.PersistentVolumeClaimNodeResizeInfeasible
 
 	tests := []struct {
 		name                    string

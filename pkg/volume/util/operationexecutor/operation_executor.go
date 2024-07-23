@@ -233,6 +233,18 @@ type ActualStateOfWorldMounterUpdater interface {
 	// IsVolumeDeviceReconstructed returns true if volume device identified by volumeName has been
 	// found during reconstruction.
 	IsVolumeDeviceReconstructed(volumeName v1.UniqueVolumeName) bool
+
+	// MarkVolumeExpansionFailedWithFinalError marks volume as failed with a final error, so as
+	// this state doesn't have to be recorded in the API server
+	MarkVolumeExpansionFailedWithFinalError(volumeName v1.UniqueVolumeName)
+
+	// RemoveVolumeFromFailedWithFinalErrors removes volume from list that indicates that volume
+	// has failed expansion with a final error
+	RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName)
+
+	// CheckVolumeInFailedExpansionWithFinalErrors verifies if volume expansion has failed with a final
+	// error
+	CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool
 }
 
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the

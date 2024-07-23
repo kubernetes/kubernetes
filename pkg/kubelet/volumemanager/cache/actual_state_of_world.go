@@ -27,6 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -211,10 +212,11 @@ func NewActualStateOfWorld(
 	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
-		nodeName:                  nodeName,
-		attachedVolumes:           make(map[v1.UniqueVolumeName]attachedVolume),
-		foundDuringReconstruction: make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
-		volumePluginMgr:           volumePluginMgr,
+		nodeName:                        nodeName,
+		attachedVolumes:                 make(map[v1.UniqueVolumeName]attachedVolume),
+		foundDuringReconstruction:       make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
+		volumePluginMgr:                 volumePluginMgr,
+		volumesWithFinalExpansionErrors: sets.New[v1.UniqueVolumeName](),
 	}
 }
 
@@ -246,6 +248,8 @@ type actualStateOfWorld struct {
 	// foundDuringReconstruction is a map of volumes which were discovered
 	// from kubelet root directory when kubelet was restarted.
 	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
+
+	volumesWithFinalExpansionErrors sets.Set[v1.UniqueVolumeName]
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -394,6 +398,27 @@ func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)
+}
+
+func (asw *actualStateOfWorld) MarkVolumeExpansionFailedWithFinalError(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	asw.volumesWithFinalExpansionErrors.Insert(volumeName)
+}
+
+func (asw *actualStateOfWorld) RemoveVolumeFromFailedWithFinalErrors(volumeName v1.UniqueVolumeName) {
+	asw.Lock()
+	defer asw.Unlock()
+
+	asw.volumesWithFinalExpansionErrors.Delete(volumeName)
+}
+
+func (asw *actualStateOfWorld) CheckVolumeInFailedExpansionWithFinalErrors(volumeName v1.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	return asw.volumesWithFinalExpansionErrors.Has(volumeName)
 }
 
 func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
