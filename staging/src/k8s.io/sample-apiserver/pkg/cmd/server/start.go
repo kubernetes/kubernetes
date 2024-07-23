@@ -67,7 +67,11 @@ func wardleEmulationVersionToKubeEmulationVersion(ver *version.Version) *version
 	kubeVer := utilversion.DefaultKubeEffectiveVersion().BinaryVersion()
 	// "1.2" maps to kubeVer
 	offset := int(ver.Minor()) - 2
-	return kubeVer.OffsetMinor(offset)
+	mappedVer := kubeVer.OffsetMinor(offset)
+	if mappedVer.GreaterThan(kubeVer) {
+		return kubeVer
+	}
+	return mappedVer
 }
 
 // NewWardleServerOptions returns a new WardleServerOptions

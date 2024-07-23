@@ -49,6 +49,11 @@ func TestWardleEmulationVersionToKubeEmulationVersion(t *testing.T) {
 			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().OffsetMinor(-2),
 		},
 		{
+			desc:                     "capped at kube binary",
+			wardleEmulationVer:       version.MajorMinor(1, 3),
+			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion(),
+		},
+		{
 			desc:               "no mapping",
 			wardleEmulationVer: version.MajorMinor(2, 10),
 		},
