@@ -118,7 +118,7 @@ func validateTerminatedPodsTrackingFinalizerMetric(ctx context.Context, t *testi
 // Note: this scenario requires the use of finalizers. Without finalizers there is no guarantee a failed pod would be
 // checked against the pod failure policy rules before its removal by PodGC.
 func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testing.T) {
-	count := 3
+	count := int32(3)
 	job := batchv1.Job{
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
@@ -133,8 +133,8 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 					},
 				},
 			},
-			Parallelism: ptr.To(int32(count)),
-			Completions: ptr.To(int32(count)),
+			Parallelism: &count,
+			Completions: &count,
 			PodFailurePolicy: &batchv1.PodFailurePolicy{
 				Rules: []batchv1.PodFailurePolicyRule{
 					{
@@ -181,7 +181,7 @@ func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testi
 		t.Fatalf("Failed to create Job: %v", err)
 	}
 	validateJobPodsStatus(ctx, t, cs, jobObj, podsByStatus{
-		Active:      count,
+		Active:      int(count),
 		Ready:       ptr.To[int32](0),
 		Terminating: ptr.To[int32](0),
 	})
@@ -541,7 +541,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "0",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
@@ -576,7 +576,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "0",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobComplete},
@@ -643,7 +643,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantActiveIndexes: sets.New(0, 1),
 					wantFailed:        0,
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -654,7 +654,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(1)),
+					wantTerminating:      ptr.To[int32](1),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
@@ -690,7 +690,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantActiveIndexes: sets.New(0, 1),
 					wantFailed:        0,
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -701,7 +701,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:           0,
 					wantSucceeded:        1,
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(1)),
+					wantTerminating:      ptr.To[int32](1),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobSuccessCriteriaMet, batchv1.JobComplete},
@@ -740,7 +740,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantFailed:        1,
 					wantFailedIndexes: ptr.To("0"),
 					wantSucceeded:     0,
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -752,7 +752,7 @@ func TestSuccessPolicy(t *testing.T) {
 					wantSucceeded:        1,
 					wantFailedIndexes:    ptr.To("0"),
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobFailed},
@@ -1611,7 +1611,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobComplete,
@@ -1642,7 +1642,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 				{
 					status: v1.PodStatus{
@@ -1653,7 +1653,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActiveIndexes:              sets.New(0, 1),
 					wantFailedIndexes:              ptr.To(""),
 					wantReplacementPodFailureCount: ptr.To(2),
-					wantTerminating:                ptr.To(int32(0)),
+					wantTerminating:                ptr.To[int32](0),
 				},
 				{
 					status: v1.PodStatus{
@@ -1663,7 +1663,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        3,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1699,7 +1699,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(0, 1, 2),
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1710,7 +1710,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        2,
 					wantActiveIndexes: sets.New(0, 1, 2),
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 2,
@@ -1719,7 +1719,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					},
 					wantFailed:        5,
 					wantFailedIndexes: ptr.To(""),
-					wantTerminating:   ptr.To(int32(2)),
+					wantTerminating:   ptr.To[int32](2),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1754,7 +1754,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1765,7 +1765,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantSucceeded:        1,
 					wantFailedIndexes:    ptr.To("0"),
 					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To(int32(0)),
+					wantTerminating:      ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1801,7 +1801,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1, 2),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1811,7 +1811,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantActive:        0,
 					wantFailed:        3,
 					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To(int32(1)),
+					wantTerminating:   ptr.To[int32](1),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
@@ -1871,7 +1871,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					wantFailed:        1,
 					wantActiveIndexes: sets.New(1),
 					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 				{
 					index: 1,
@@ -1886,7 +1886,7 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 					},
 					wantFailed:        2,
 					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To(int32(0)),
+					wantTerminating:   ptr.To[int32](0),
 				},
 			},
 			wantJobConditionType: batchv1.JobFailed,
