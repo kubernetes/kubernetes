@@ -127,6 +127,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 					}
 					return false, nil
 				})
+				framework.ExpectNoError(err, "while waiting for all CSI calls")
 				// try to use ```csi.NewMetricsCsi(pv.handler).GetMetrics()``` to get metrics from csimock driver but failed.
 				// the mocked csidriver register doesn't regist itself to normal csidriver.
 				if test.nodeVolumeConditionRequired {
@@ -150,7 +151,6 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", feature.CSIVolumeHealth
 					})
 					framework.ExpectNoError(waitErr, "call metrics should not have any error")
 				}
-				framework.ExpectNoError(err, "while waiting for all CSI calls")
 			})
 		}
 
