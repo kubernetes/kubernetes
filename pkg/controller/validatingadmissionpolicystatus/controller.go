@@ -28,10 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	admissionregistrationv1apply "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
-	informerv1 "k8s.io/client-go/informers/admissionregistration/v1"
-	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	kcpinformerv1 "github.com/kcp-dev/client-go/informers/admissionregistration/v1"
+	kcpadmissionregistrationv1 "github.com/kcp-dev/client-go/kubernetes/typed/admissionregistration/v1"
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 // ControllerName has "Status" in it to differentiate this controller with the other that runs in API server.
@@ -40,15 +43,16 @@ const ControllerName = "validatingadmissionpolicy-status"
 // Controller is the ValidatingAdmissionPolicy Status controller that reconciles the Status field of each policy object.
 // This controller runs type checks against referred types for each policy definition.
 type Controller struct {
-	policyInformer informerv1.ValidatingAdmissionPolicyInformer
+	policyInformer kcpinformerv1.ValidatingAdmissionPolicyClusterInformer
 	policyQueue    workqueue.TypedRateLimitingInterface[string]
-	policySynced   cache.InformerSynced
-	policyClient   admissionregistrationv1.ValidatingAdmissionPolicyInterface
+
+	policySynced cache.InformerSynced
+	policyClient kcpadmissionregistrationv1.ValidatingAdmissionPolicyClusterInterface
 
 	// typeChecker checks the policy's expressions for type errors.
 	// Type of params is defined in policy.Spec.ParamsKind
 	// Types of object are calculated from policy.Spec.MatchingConstraints
-	typeChecker *validatingadmissionpolicy.TypeChecker
+	typeCheckerFn func(clusterName logicalcluster.Path) (*validatingadmissionpolicy.TypeChecker, error)
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
@@ -66,15 +70,15 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, policyClient admissionregistrationv1.ValidatingAdmissionPolicyInterface, typeChecker *validatingadmissionpolicy.TypeChecker) (*Controller, error) {
+func NewController(policyInformer kcpinformerv1.ValidatingAdmissionPolicyClusterInformer, policyClient kcpadmissionregistrationv1.ValidatingAdmissionPolicyClusterInterface, typeCheckerFn func(clusterName logicalcluster.Path) (*validatingadmissionpolicy.TypeChecker, error)) (*Controller, error) {
 	c := &Controller{
 		policyInformer: policyInformer,
 		policyQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: ControllerName},
 		),
-		policyClient: policyClient,
-		typeChecker:  typeChecker,
+		policyClient:  policyClient,
+		typeCheckerFn: typeCheckerFn,
 	}
 	reg, err := policyInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -94,7 +98,10 @@ func NewController(policyInformer informerv1.ValidatingAdmissionPolicyInformer, 
 func (c *Controller) enqueuePolicy(policy any) {
 	if policy, ok := policy.(*v1.ValidatingAdmissionPolicy); ok {
 		// policy objects are cluster-scoped, no point include its namespace.
-		key := policy.ObjectMeta.Name
+		key, err := kcpcache.MetaClusterNamespaceKeyFunc(policy)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("cannot get cluster namespace key from policy: %w", err))
+		}
 		if key == "" {
 			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
 		}
@@ -115,7 +122,12 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer c.policyQueue.Done(key)
 
 	err := func() error {
-		policy, err := c.policyInformer.Lister().Get(key)
+		clusterName, _, policyName, err := kcpcache.SplitMetaClusterNamespaceKey(key)
+		if err != nil {
+			return fmt.Errorf("failed to split key: %w", err)
+		}
+
+		policy, err := c.policyInformer.Lister().Cluster(clusterName).Get(policyName)
 		if err != nil {
 			if kerrors.IsNotFound(err) {
 				// If not found, the policy is being deleting, do nothing.
@@ -144,7 +156,14 @@ func (c *Controller) reconcile(ctx context.Context, policy *v1.ValidatingAdmissi
 	if policy.Generation <= policy.Status.ObservedGeneration {
 		return nil
 	}
-	warnings := c.typeChecker.Check(policy)
+
+	cluster := logicalcluster.From(policy)
+	typeChecker, err := c.typeCheckerFn(cluster.Path())
+	if err != nil {
+		return err
+	}
+
+	warnings := typeChecker.Check(policy)
 	warningsConfig := make([]*admissionregistrationv1apply.ExpressionWarningApplyConfiguration, 0, len(warnings))
 	for _, warning := range warnings {
 		warningsConfig = append(warningsConfig, admissionregistrationv1apply.ExpressionWarning().
@@ -156,6 +175,6 @@ func (c *Controller) reconcile(ctx context.Context, policy *v1.ValidatingAdmissi
 			WithObservedGeneration(policy.Generation).
 			WithTypeChecking(admissionregistrationv1apply.TypeChecking().
 				WithExpressionWarnings(warningsConfig...)))
-	_, err := c.policyClient.ApplyStatus(ctx, applyConfig, metav1.ApplyOptions{FieldManager: ControllerName, Force: true})
+	_, err = c.policyClient.Cluster(cluster.Path()).ApplyStatus(ctx, applyConfig, metav1.ApplyOptions{FieldManager: ControllerName, Force: true})
 	return err
 }
