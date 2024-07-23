@@ -27,6 +27,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -57,8 +58,6 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/clock"
-
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -221,21 +220,20 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			return err
 		}
 
-		// Start component identity lease management
-		leaseCandidate, err := leaderelection.NewCandidate(
+		// Start lease candidate controller for coordinated leader election
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
 			cc.Client,
 			cc.LeaderElection.Lock.Identity(),
-			"kube-system",
+			metav1.NamespaceSystem,
 			"kube-scheduler",
-			clock.RealClock{},
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
-			[]coordinationv1.CoordinatedLeaseStrategy{"OldestEmulationVersion"},
+			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
 		)
 		if err != nil {
 			return err
 		}
-		readyzChecks = append(readyzChecks, healthz.NewInformerSyncHealthz(leaseCandidate.InformerFactory))
+		readyzChecks = append(readyzChecks, healthz.NewInformerSyncHealthz(waitForSync))
 		go leaseCandidate.Run(ctx)
 	}
 
