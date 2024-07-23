@@ -347,7 +347,6 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 			"vmodule":             true,
 			"log-flush-frequency": true,
 			"provider-id":         true,
-			"fail-cgroupv1":       true,
 		}
 		fs.VisitAll(func(f *pflag.Flag) {
 			if notDeprecated[f.Name] {
@@ -370,7 +369,6 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.Var(&utilflag.IPVar{Val: &c.Address}, "address", "The IP address for the Kubelet to serve on (set to '0.0.0.0' or '::' for listening on all interfaces and IP address families)")
 	fs.Int32Var(&c.Port, "port", c.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&c.ReadOnlyPort, "read-only-port", c.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
-	fs.BoolVar(&c.FailCgroupV1, "fail-cgroupv1", c.FailCgroupV1, "Prevent the kubelet from starting on the host using cgroup v1.")
 
 	// runtime flags
 	fs.StringVar(&c.ContainerRuntimeEndpoint, "container-runtime-endpoint", c.ContainerRuntimeEndpoint, "The endpoint of container runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")

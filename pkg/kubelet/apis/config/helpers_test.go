@@ -300,6 +300,5 @@ var (
 		"Tracing.Endpoint",
 		"Tracing.SamplingRatePerMillion",
 		"LocalStorageCapacityIsolation",
-		"FailCgroupV1",
 	)
 )

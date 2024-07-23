@@ -851,14 +851,6 @@ type KubeletConfiguration struct {
 	// If not specified, the value in containerRuntimeEndpoint is used.
 	// +optional
 	ImageServiceEndpoint string `json:"imageServiceEndpoint,omitempty"`
-
-	// FailCgroupV1 prevents the kubelet from starting on hosts
-	// that use cgroup v1. By default, this is set to 'false', meaning
-	// the kubelet is allowed to start on cgroup v1 hosts unless this
-	// option is explicitly enabled.
-	// Default: false
-	// +optional
-	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 }
 
 type KubeletAuthorizationMode string

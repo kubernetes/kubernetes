@@ -268,9 +268,6 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.SeccompDefault == nil {
 		obj.SeccompDefault = utilpointer.Bool(false)
 	}
-	if obj.FailCgroupV1 == nil {
-		obj.FailCgroupV1 = utilpointer.Bool(false)
-	}
 	if obj.MemoryThrottlingFactor == nil {
 		obj.MemoryThrottlingFactor = utilpointer.Float64(DefaultMemoryThrottlingFactor)
 	}
