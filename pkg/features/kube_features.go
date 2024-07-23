@@ -219,6 +219,13 @@ const (
 	// Remove in v1.33
 	AllowInsecureKubeletCertificateSigningRequests featuregate.Feature = "AllowInsecureKubeletCertificateSigningRequests"
 
+	// owner: @hoskeri
+	// Deprecated: v1.32
+	//
+	// Restores previous behavior where Kubelet fails self registration if node create returns 403 Forbidden.
+	// Remove in v1.34
+	KubeletRegistrationGetOnExistsOnly featuregate.Feature = "KubeletRegistrationGetOnExistsOnly"
+
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	// Deprecated: v1.29 (default off)

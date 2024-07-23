@@ -362,6 +362,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: KubeletRegistrationGetOnExistsOnly
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.32"
 - name: KubeletSeparateDiskGC
   versionedSpecs:
   - default: false
