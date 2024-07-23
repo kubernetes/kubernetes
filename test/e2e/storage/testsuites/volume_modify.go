@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -98,7 +98,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		config *storageframework.PerTestConfig
 
 		resource *storageframework.VolumeResource
-		vac      *storagev1alpha1.VolumeAttributesClass
+		vac      *storagev1beta1.VolumeAttributesClass
 	}
 	var l local
 
@@ -119,7 +119,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		ginkgo.By("Creating VolumeAttributesClass")
-		_, err := f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating VolumeAttributesClass")
 
 		ginkgo.By("Creating volume")
@@ -206,7 +206,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		vacDriver, _ := driver.(storageframework.VolumeAttributesClassTestDriver)
 		newVAC := vacDriver.GetVolumeAttributesClass(ctx, l.config)
 		gomega.Expect(newVAC).NotTo(gomega.BeNil())
-		_, err := f.ClientSet.StorageV1alpha1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
 		ginkgo.DeferCleanup(CleanupVAC, newVAC, f.ClientSet, vacCleanupWaitPeriod)
 
@@ -266,9 +266,9 @@ func WaitForVolumeModification(ctx context.Context, pvc *v1.PersistentVolumeClai
 	}, timeout, modifyPollInterval).Should(gomega.Succeed())
 }
 
-func CleanupVAC(ctx context.Context, vac *storagev1alpha1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
+func CleanupVAC(ctx context.Context, vac *storagev1beta1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
 	gomega.Eventually(ctx, func() error {
-		return c.StorageV1alpha1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
+		return c.StorageV1beta1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
 	}, timeout, modifyPollInterval).Should(gomega.BeNil())
 }
 
