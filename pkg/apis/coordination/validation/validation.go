@@ -124,11 +124,17 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 		allErrs = append(allErrs, field.Invalid(fld, spec.BinaryVersion, "must be greater than or equal to `emulationVersion`"))
 	}
 
-	if len(spec.PreferredStrategies) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("preferredStrategies"), "must contain at least one strategy"))
-	} else {
+	if len(spec.PreferredStrategies) > 0 {
 		for i, strategy := range spec.PreferredStrategies {
 			fld := fldPath.Child("preferredStrategies").Index(i)
+
+			strategySeen := make(map[coordination.CoordinatedLeaseStrategy]bool)
+			if _, ok := strategySeen[strategy]; ok {
+				allErrs = append(allErrs, field.Duplicate(fld, strategy))
+			} else {
+				strategySeen[strategy] = true
+			}
+
 			if strategy == coordination.OldestEmulationVersion {
 				zeroVersion := semver.Version{}
 				if bv.EQ(zeroVersion) {
@@ -142,10 +148,8 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 			allErrs = append(allErrs, ValidateCoordinatedLeaseStrategy(strategy, fld)...)
 		}
 	}
-
 	// spec.PingTime is a MicroTime and doesn't need further validation
 	// spec.RenewTime is a MicroTime and doesn't need further validation
-
 	return allErrs
 }
 
