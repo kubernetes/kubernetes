@@ -28,7 +28,7 @@ package v1alpha1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_LeaseCandidate = map[string]string{
-	"":         "LeaseCandidate defines a candidate for a lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
+	"":         "LeaseCandidate defines a candidate for a Lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
 	"metadata": "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
@@ -48,13 +48,13 @@ func (LeaseCandidateList) SwaggerDoc() map[string]string {
 }
 
 var map_LeaseCandidateSpec = map[string]string{
-	"":                    "LeaseSpec is a specification of a Lease.",
+	"":                    "LeaseCandidateSpec is a specification of a Lease.",
 	"leaseName":           "LeaseName is the name of the lease for which this candidate is contending. This field is immutable.",
 	"pingTime":            "PingTime is the last time that the server has requested the LeaseCandidate to renew. It is only done during leader election to check if any LeaseCandidates have become ineligible. When PingTime is updated, the LeaseCandidate will respond by updating RenewTime.",
-	"renewTime":           "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew.",
-	"binaryVersion":       "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when Strategy is \"OldestEmulationVersion\"",
-	"emulationVersion":    "EmulationVersion is the emulation version. It must be in a semver format without leading `v`. EmulationVersion must be less than or equal to BinaryVersion. This field is required when Strategy is \"OldestEmulationVersion\"",
-	"preferredStrategies": "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y\n  will be used\n- If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+	"renewTime":           "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew. The PingTime field is updated regularly to prevent garbage collection for still active LeaseCandidates.",
+	"binaryVersion":       "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when strategy is \"OldestEmulationVersion\"",
+	"emulationVersion":    "EmulationVersion is the emulation version. It must be in a semver format without leading `v`. EmulationVersion must be less than or equal to BinaryVersion. This field is required when strategy is \"OldestEmulationVersion\"",
+	"preferredStrategies": "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has [X] and another candidate has [Y, X], Y supersedes X and strategy Y\n  will be used.\n- If a candidate has [X, Y] and another candidate has [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n- In general: [A1, A2, ..., An] > [B1, B2, ..., Bm] if the latter is a sub-sequence of the former, and hence\n  A1 is chosen. For more than two candidates, one must be the maximum of all candidates. Otherwise, this is a user\n  error and leader election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
 }
 
 func (LeaseCandidateSpec) SwaggerDoc() map[string]string {
