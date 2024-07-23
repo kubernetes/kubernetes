@@ -19,6 +19,7 @@ package leaderelection
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
@@ -44,9 +45,9 @@ const (
 
 	// Requeue interval is the interval at which a Lease is requeued to verify that it is
 	// being renewed properly.
-	defaultRequeueInterval            = 5 * time.Second
-	noRequeue                         = 0
-	
+	defaultRequeueInterval = 5 * time.Second
+	noRequeue              = 0
+
 	defaultLeaseDurationSeconds int32 = 5
 
 	electionDuration = 5 * time.Second
@@ -322,73 +323,89 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return noRequeue, err
 	}
 
-	if strategy != v1.OldestEmulationVersion {
-		klog.V(2).Infof("strategy %s is not recognized by CLE.", strategy)
-		return noRequeue, nil
-	}
-	electee := pickBestLeaderOldestEmulationVersion(ackedCandidates)
-
-	if electee == nil {
-		return noRequeue, fmt.Errorf("should not happen, could not find suitable electee")
-	}
-
-	electeeName := electee.Name
-	// create the leader election lease
 	leaderLease := &v1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: leaseNN.Namespace,
 			Name:      leaseNN.Name,
 		},
 		Spec: v1.LeaseSpec{
-			HolderIdentity:       &electeeName,
 			Strategy:             &strategy,
 			LeaseDurationSeconds: ptr.To(defaultLeaseDurationSeconds),
 			RenewTime:            &metav1.MicroTime{Time: time.Now()},
 		},
 	}
-	_, err = c.leaseClient.Leases(leaseNN.Namespace).Create(ctx, leaderLease, metav1.CreateOptions{})
-	// If the create was successful, then we can return here.
-	if err == nil {
-		klog.Infof("Created lease %s for %q", leaseNN, electee.Name)
-		return defaultRequeueInterval, nil
+
+	switch strategy {
+	case v1.OldestEmulationVersion:
+		electee := pickBestLeaderOldestEmulationVersion(ackedCandidates)
+		if electee == nil {
+			return noRequeue, fmt.Errorf("should not happen, could not find suitable electee")
+		}
+		leaderLease.Spec.HolderIdentity = &electee.Name
+	default:
+		// do not set the holder identity, but leave it to some other controller. But fall
+		// through to create the lease (without holder).
+		klog.V(2).Infof("Election for strategy %q is not handled by %s", strategy, controllerName)
 	}
 
-	// If there was an error, return
-	if !apierrors.IsAlreadyExists(err) {
+	// create the leader election lease
+	_, err = c.leaseClient.Leases(leaseNN.Namespace).Create(ctx, leaderLease, metav1.CreateOptions{})
+	if err == nil {
+		if leaderLease.Spec.HolderIdentity != nil {
+			klog.Infof("Created lease %s for %q", leaseNN, *leaderLease.Spec.HolderIdentity)
+		} else {
+			klog.Infof("Created lease %s without leader", leaseNN)
+		}
+		return defaultRequeueInterval, nil
+	} else if !apierrors.IsAlreadyExists(err) {
 		return noRequeue, err
 	}
 
-	existingLease, err := c.leaseClient.Leases(leaseNN.Namespace).Get(ctx, leaseNN.Name, metav1.GetOptions{})
+	// Get existing lease
+	existing, err := c.leaseClient.Leases(leaseNN.Namespace).Get(ctx, leaseNN.Name, metav1.GetOptions{})
 	if err != nil {
 		return noRequeue, err
 	}
-	leaseClone := existingLease.DeepCopy()
+	orig := existing.DeepCopy()
 
-	// Update the Lease if it either does not have a holder or is expired
-	isExpired := isLeaseExpired(existingLease)
-	if leaseClone.Spec.HolderIdentity == nil || *leaseClone.Spec.HolderIdentity == "" || (isExpired && *leaseClone.Spec.HolderIdentity != electeeName) {
-		klog.Infof("lease %s is expired, resetting it and setting holder to %q", leaseNN, electee.Name)
-		leaseClone.Spec.Strategy = &strategy
-		leaseClone.Spec.PreferredHolder = nil
-		leaseClone.Spec.HolderIdentity = &electeeName
+	isExpired := isLeaseExpired(existing)
+	noHolderIdentity := leaderLease.Spec.HolderIdentity != nil && existing.Spec.HolderIdentity == nil || *existing.Spec.HolderIdentity == ""
+	expiredAndNewHolder := isExpired && leaderLease.Spec.HolderIdentity != nil && *existing.Spec.HolderIdentity != *leaderLease.Spec.HolderIdentity
+	strategyChanged := existing.Spec.Strategy == nil || *existing.Spec.Strategy != strategy
+	differentHolder := leaderLease.Spec.HolderIdentity != nil && *leaderLease.Spec.HolderIdentity != *existing.Spec.HolderIdentity
 
-		leaseClone.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
-		leaseClone.Spec.LeaseDurationSeconds = ptr.To(defaultLeaseDurationSeconds)
-		leaseClone.Spec.AcquireTime = nil
-		_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, leaseClone, metav1.UpdateOptions{})
-		if err != nil {
-			return time.Until(leaseClone.Spec.RenewTime.Time), err
-		}
-	} else if leaseClone.Spec.HolderIdentity != nil && *leaseClone.Spec.HolderIdentity != electeeName {
-		klog.Infof("lease %s already exists for holder %q but should be held by %q, marking preferredHolder", leaseNN, *leaseClone.Spec.HolderIdentity, electee.Name)
-		leaseClone.Spec.PreferredHolder = &electeeName
-		leaseClone.Spec.Strategy = &strategy
-		_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, leaseClone, metav1.UpdateOptions{})
-		if err != nil {
-			return noRequeue, err
-		}
-		return time.Until(leaseClone.Spec.RenewTime.Time), nil
+	// Update lease
+	if strategyChanged {
+		klog.Infof("Lease %s strategy changed to %q", leaseNN, strategy)
+		existing.Spec.Strategy = &strategy
 	}
+	if noHolderIdentity || expiredAndNewHolder {
+		if noHolderIdentity {
+			klog.Infof("Lease %s had no holder, setting holder to %q", leaseNN, *leaderLease.Spec.HolderIdentity)
+		} else {
+			klog.Infof("Lease %s expired, resetting it and setting holder to %q", leaseNN, *leaderLease.Spec.HolderIdentity)
+		}
+
+		existing.Spec.PreferredHolder = nil
+		existing.Spec.HolderIdentity = leaderLease.Spec.HolderIdentity
+		existing.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+		existing.Spec.LeaseDurationSeconds = ptr.To(defaultLeaseDurationSeconds)
+		existing.Spec.AcquireTime = nil
+	} else if differentHolder {
+		klog.Infof("Lease %s holder changed from %q to %q", leaseNN, *existing.Spec.HolderIdentity, *leaderLease.Spec.HolderIdentity)
+		existing.Spec.PreferredHolder = leaderLease.Spec.HolderIdentity
+	}
+
+	if reflect.DeepEqual(existing, orig) {
+		klog.V(5).Infof("Lease %s already has the most optimal leader %q", leaseNN, *existing.Spec.HolderIdentity)
+		return noRequeue, nil
+	}
+
+	_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
+	if err != nil {
+		return noRequeue, err
+	}
+
 	return defaultRequeueInterval, nil
 }
 
