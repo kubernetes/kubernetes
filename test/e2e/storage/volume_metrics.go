@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/features"
 	"strings"
 	"time"
 
@@ -33,7 +32,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/component-helpers/storage/ephemeral"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -633,8 +634,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 
 		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
 		ginkgo.It("should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only",
-			func(ctx context.Context) {
-				framework.WithFeatureGate(features.VolumeAttributesClass)
+			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
 				var err error
 				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
 				pvcConfigWithVAC := pvcConfig
@@ -651,8 +651,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 
 		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
 		ginkgo.It("should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc",
-			func(ctx context.Context) {
-				framework.WithFeatureGate(features.VolumeAttributesClass)
+			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
 				var err error
 				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
 				pvcConfigWithVAC := pvcConfig

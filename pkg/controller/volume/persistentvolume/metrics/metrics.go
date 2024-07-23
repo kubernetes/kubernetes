@@ -23,8 +23,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -93,21 +95,10 @@ type pvcBindingMetricDimensions struct {
 }
 
 func getPVCMetricDimensions(pvc *v1.PersistentVolumeClaim) pvcBindingMetricDimensions {
-	var storageClassName, volumeAttributesClassName string
-	namespace := pvc.Namespace
-
-	if pvc.Spec.StorageClassName != nil {
-		storageClassName = *pvc.Spec.StorageClassName
-	}
-
-	if pvc.Spec.VolumeAttributesClassName != nil {
-		volumeAttributesClassName = *pvc.Spec.VolumeAttributesClassName
-	}
-
 	return pvcBindingMetricDimensions{
-		namespace:                 namespace,
-		storageClassName:          storageClassName,
-		volumeAttributesClassName: volumeAttributesClassName,
+		namespace:                 pvc.Namespace,
+		storageClassName:          storagehelpers.GetPersistentVolumeClaimClass(pvc),
+		volumeAttributesClassName: ptr.Deref(pvc.Spec.VolumeAttributesClassName, ""),
 	}
 }
 

@@ -621,12 +621,13 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Capacity: v1.ResourceList{
 				v1.ResourceStorage: resource.MustParse(pvConfig.Capacity),
 			},
-			PersistentVolumeSource: pvConfig.PVSource,
-			AccessModes:            pvConfig.AccessModes,
-			ClaimRef:               claimRef,
-			StorageClassName:       pvConfig.StorageClassName,
-			NodeAffinity:           pvConfig.NodeAffinity,
-			VolumeMode:             pvConfig.VolumeMode,
+			PersistentVolumeSource:    pvConfig.PVSource,
+			AccessModes:               pvConfig.AccessModes,
+			ClaimRef:                  claimRef,
+			StorageClassName:          pvConfig.StorageClassName,
+			VolumeAttributesClassName: pvConfig.VolumeAttributesClassName,
+			NodeAffinity:              pvConfig.NodeAffinity,
+			VolumeMode:                pvConfig.VolumeMode,
 		},
 	}
 }
