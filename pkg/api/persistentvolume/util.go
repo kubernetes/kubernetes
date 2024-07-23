@@ -27,10 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-const (
-	deprecatedStorageClassAnnotationsMsg = `deprecated since v1.8; use "storageClassName" attribute instead`
-)
-
 // DropDisabledSpecFields removes disabled fields from the pv spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pv spec.
 func DropDisabledSpecFields(pvSpec *api.PersistentVolumeSpec, oldPVSpec *api.PersistentVolumeSpec) {
@@ -48,17 +44,28 @@ func GetWarningsForPersistentVolume(pv *api.PersistentVolume) []string {
 	return warningsForPersistentVolumeSpecAndMeta(nil, &pv.Spec, &pv.ObjectMeta)
 }
 
+var deprecatedAnnotations = []struct {
+	key     string
+	message string
+}{
+	{
+		key:     `volume.beta.kubernetes.io/storage-class`,
+		message: `deprecated since v1.8; use "storageClassName" attribute instead`,
+	},
+	{
+		key:     `volume.beta.kubernetes.io/mount-options`,
+		message: `deprecated since v1.31; use "mountOptions" attribute instead`,
+	},
+}
+
 func warningsForPersistentVolumeSpecAndMeta(fieldPath *field.Path, pvSpec *api.PersistentVolumeSpec, pvMeta *metav1.ObjectMeta) []string {
 	var warnings []string
 
-	if _, ok := pvMeta.Annotations[api.BetaStorageClassAnnotation]; ok {
-		warnings = append(warnings,
-			fmt.Sprintf(
-				"%s: %s",
-				fieldPath.Child("metadata", "annotations").Key(api.BetaStorageClassAnnotation),
-				deprecatedStorageClassAnnotationsMsg,
-			),
-		)
+	// use of deprecated annotations
+	for _, deprecated := range deprecatedAnnotations {
+		if _, exists := pvMeta.Annotations[deprecated.key]; exists {
+			warnings = append(warnings, fmt.Sprintf("%s: %s", fieldPath.Child("metadata", "annotations").Key(deprecated.key), deprecated.message))
+		}
 	}
 
 	if pvSpec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
