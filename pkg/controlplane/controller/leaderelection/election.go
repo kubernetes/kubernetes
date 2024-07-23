@@ -44,15 +44,6 @@ func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha1.LeaseCandidate)
 	return electee
 }
 
-func shouldReelect(candidates []*v1alpha1.LeaseCandidate, currentLeader *v1alpha1.LeaseCandidate) bool {
-	klog.Infof("shouldReelect for candidates: %+v", candidates)
-	pickedLeader := pickBestLeaderOldestEmulationVersion(candidates)
-	if pickedLeader == nil {
-		return false
-	}
-	return compare(currentLeader, pickedLeader) > 0
-}
-
 // topologicalSortWithOneRoot has a caveat that there may only be one root (indegree=0) node in a valid ordering.
 func topologicalSortWithOneRoot(graph map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy) []v1.CoordinatedLeaseStrategy {
 	inDegree := make(map[v1.CoordinatedLeaseStrategy]int)
@@ -128,7 +119,7 @@ func validLeaseCandidateForOldestEmulationVersion(l *v1alpha1.LeaseCandidate) bo
 	return err == nil
 }
 
-func getEmulationVersion(l *v1alpha1.LeaseCandidate) semver.Version {
+func getEmulationVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
 	value := l.Spec.EmulationVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -137,7 +128,7 @@ func getEmulationVersion(l *v1alpha1.LeaseCandidate) semver.Version {
 	return v
 }
 
-func getBinaryVersion(l *v1alpha1.LeaseCandidate) semver.Version {
+func getBinaryVersionOrZero(l *v1alpha1.LeaseCandidate) semver.Version {
 	value := l.Spec.BinaryVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -148,13 +139,13 @@ func getBinaryVersion(l *v1alpha1.LeaseCandidate) semver.Version {
 
 // -1: lhs better, 1: rhs better
 func compare(lhs, rhs *v1alpha1.LeaseCandidate) int {
-	lhsVersion := getEmulationVersion(lhs)
-	rhsVersion := getEmulationVersion(rhs)
-	result := lhsVersion.Compare(rhsVersion)
+	l := getEmulationVersionOrZero(lhs)
+	r := getEmulationVersionOrZero(rhs)
+	result := l.Compare(r)
 	if result == 0 {
-		lhsVersion := getBinaryVersion(lhs)
-		rhsVersion := getBinaryVersion(rhs)
-		result = lhsVersion.Compare(rhsVersion)
+		l := getBinaryVersionOrZero(lhs)
+		r := getBinaryVersionOrZero(rhs)
+		result = l.Compare(r)
 	}
 	if result == 0 {
 		if lhs.CreationTimestamp.After(rhs.CreationTimestamp.Time) {
