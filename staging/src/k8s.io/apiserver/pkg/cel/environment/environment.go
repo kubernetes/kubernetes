@@ -267,7 +267,10 @@ func (e *EnvSet) filterAndBuildOpts(base *cel.Env, compatVer *version.Version, h
 
 	if len(declTypes) > 0 {
 		provider := apiservercel.NewDeclTypeProvider(declTypes...)
-		providerOpts, err := provider.EnvOptions(base.TypeProvider())
+		if compatVer.AtLeast(version.MajorMinor(1, 31)) {
+			provider.SetRecognizeKeywordAsFieldName(true)
+		}
+		providerOpts, err := provider.EnvOptions(base.CELTypeProvider())
 		if err != nil {
 			return nil, err
 		}

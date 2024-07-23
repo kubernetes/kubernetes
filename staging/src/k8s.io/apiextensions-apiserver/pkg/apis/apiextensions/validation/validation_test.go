@@ -9013,6 +9013,189 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "invalid x-kubernetes-validations for escaping (keywords are invalid field names before v1.30)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					XValidations: apiextensions.ValidationRules{
+						{
+							Rule: "self.__if__ > 0",
+						},
+						{
+							Rule: "self.__namespace__ > 0",
+						},
+						{
+							Rule: "self.if > 0",
+						},
+						{
+							Rule: "self.namespace > 0",
+						},
+						{
+							Rule: "self.as > 0",
+						},
+						{
+							Rule: "self.break > 0",
+						},
+						{
+							Rule: "self.const > 0",
+						},
+						{
+							Rule: "self.continue > 0",
+						},
+						{
+							Rule: "self.else > 0",
+						},
+						{
+							Rule: "self.for > 0",
+						},
+						{
+							Rule: "self.function > 0",
+						},
+						{
+							Rule: "self.import > 0",
+						},
+						{
+							Rule: "self.let > 0",
+						},
+						{
+							Rule: "self.loop > 0",
+						},
+						{
+							Rule: "self.package > 0",
+						},
+						{
+							Rule: "self.return > 0",
+						},
+						{
+							Rule: "self.var > 0",
+						},
+						{
+							Rule: "self.void > 0",
+						},
+						{
+							Rule: "self.while > 0",
+						},
+						{
+							Rule: "self.self > 0",
+						},
+						{
+							Rule: "self.int > 0",
+						},
+						{
+							Rule: "self.true > 0",
+						},
+						{
+							Rule: "self.false > 0",
+						},
+						{
+							Rule: "self.null > 0",
+						},
+						{
+							Rule: "self.in > 0",
+						},
+					},
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"if": {
+							Type: "integer",
+						},
+						"namespace": {
+							Type: "integer",
+						},
+						"as": {
+							Type: "integer",
+						},
+						"break": {
+							Type: "integer",
+						},
+						"const": {
+							Type: "integer",
+						},
+						"continue": {
+							Type: "integer",
+						},
+						"else": {
+							Type: "integer",
+						},
+						"for": {
+							Type: "integer",
+						},
+						"function": {
+							Type: "integer",
+						},
+						"import": {
+							Type: "integer",
+						},
+						"let": {
+							Type: "integer",
+						},
+						"loop": {
+							Type: "integer",
+						},
+						"package": {
+							Type: "integer",
+						},
+						"return": {
+							Type: "integer",
+						},
+						"var": {
+							Type: "integer",
+						},
+						"void": {
+							Type: "integer",
+						},
+						"while": {
+							Type: "integer",
+						},
+						"self": {
+							Type: "integer",
+						},
+						"int": {
+							Type: "integer",
+						},
+						"true": {
+							Type: "integer",
+						},
+						"false": {
+							Type: "integer",
+						},
+						"null": {
+							Type: "integer",
+						},
+						"in": {
+							Type: "integer",
+						},
+					},
+				},
+			},
+			opts: validationOptions{
+				requireStructuralSchema: true,
+				celEnvironmentSet:       environment.MustBaseEnvSet(version.MajorMinor(1, 30), true),
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[3].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[4].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[5].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[6].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[7].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[8].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[9].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[10].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[11].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[12].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[13].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[14].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[15].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[16].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[17].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[18].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[21].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[22].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[23].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[24].rule"),
+			},
+		},
+		{
 			name: "valid x-kubernetes-validations for escaping",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
@@ -9025,10 +9208,74 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Rule: "self.__namespace__ > 0",
 						},
 						{
+							Rule: "self.if > 0",
+						},
+						{
+							Rule: "self.namespace > 0",
+						},
+						{
+							Rule: "self.as > 0",
+						},
+						{
+							Rule: "self.break > 0",
+						},
+						{
+							Rule: "self.const > 0",
+						},
+						{
+							Rule: "self.continue > 0",
+						},
+						{
+							Rule: "self.else > 0",
+						},
+						{
+							Rule: "self.for > 0",
+						},
+						{
+							Rule: "self.function > 0",
+						},
+						{
+							Rule: "self.import > 0",
+						},
+						{
+							Rule: "self.let > 0",
+						},
+						{
+							Rule: "self.loop > 0",
+						},
+						{
+							Rule: "self.package > 0",
+						},
+						{
+							Rule: "self.return > 0",
+						},
+						{
+							Rule: "self.var > 0",
+						},
+						{
+							Rule: "self.void > 0",
+						},
+						{
+							Rule: "self.while > 0",
+						},
+						{
 							Rule: "self.self > 0",
 						},
 						{
 							Rule: "self.int > 0",
+						},
+						// reserved keywords `true`, `false`, `null` and `in` are not supported
+						{
+							Rule: "self.true > 0",
+						},
+						{
+							Rule: "self.false > 0",
+						},
+						{
+							Rule: "self.null > 0",
+						},
+						{
+							Rule: "self.in > 0",
 						},
 					},
 					Properties: map[string]apiextensions.JSONSchemaProps{
@@ -9036,6 +9283,51 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 							Type: "integer",
 						},
 						"namespace": {
+							Type: "integer",
+						},
+						"as": {
+							Type: "integer",
+						},
+						"break": {
+							Type: "integer",
+						},
+						"const": {
+							Type: "integer",
+						},
+						"continue": {
+							Type: "integer",
+						},
+						"else": {
+							Type: "integer",
+						},
+						"for": {
+							Type: "integer",
+						},
+						"function": {
+							Type: "integer",
+						},
+						"import": {
+							Type: "integer",
+						},
+						"let": {
+							Type: "integer",
+						},
+						"loop": {
+							Type: "integer",
+						},
+						"package": {
+							Type: "integer",
+						},
+						"return": {
+							Type: "integer",
+						},
+						"var": {
+							Type: "integer",
+						},
+						"void": {
+							Type: "integer",
+						},
+						"while": {
 							Type: "integer",
 						},
 						"self": {
@@ -9044,43 +9336,46 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 						"int": {
 							Type: "integer",
 						},
+						"true": {
+							Type: "integer",
+						},
+						"false": {
+							Type: "integer",
+						},
+						"null": {
+							Type: "integer",
+						},
+						"in": {
+							Type: "integer",
+						},
 					},
 				},
 			},
 			opts: validationOptions{
 				requireStructuralSchema: true,
+				celEnvironmentSet:       environment.MustBaseEnvSet(version.MajorMinor(1, 31), true),
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[21].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[22].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[23].rule"),
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[24].rule"),
 			},
 		},
 		{
-			name: "invalid x-kubernetes-validations for escaping",
+			name: "invalid x-kubernetes-validations for unknown property",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
 					XValidations: apiextensions.ValidationRules{
 						{
-							Rule: "self.if > 0",
-						},
-						{
-							Rule: "self.namespace > 0",
-						},
-						{
 							Rule: "self.unknownProp > 0",
-						},
-					},
-					Properties: map[string]apiextensions.JSONSchemaProps{
-						"if": {
-							Type: "integer",
-						},
-						"namespace": {
-							Type: "integer",
 						},
 					},
 				},
 			},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[1].rule"),
-				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
 			},
 			opts: validationOptions{
 				requireStructuralSchema: true,
