@@ -92,13 +92,10 @@ message LeaseCandidateSpec {
   // The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated
   // leader election to make a decision about the final election strategy. This follows as
   // - If all clients have strategy X as the first element in this list, strategy X will be used.
-  // - If a candidate has [X] and another candidate has [Y, X], Y supersedes X and strategy Y
+  // - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y
   //   will be used.
-  // - If a candidate has [X, Y] and another candidate has [Y, X], this is a user error and leader
+  // - If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader
   //   election will not operate the Lease until resolved.
-  // - In general: [A1, A2, ..., An] > [B1, B2, ..., Bm] if the latter is a sub-sequence of the former, and hence
-  //   A1 is chosen. For more than two candidates, one must be the maximum of all candidates. Otherwise, this is a user
-  //   error and leader election will not operate the Lease until resolved.
   // (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
   // +featureGate=CoordinatedLeaderElection
   // +listType=atomic
