@@ -334,6 +334,7 @@ var (
 			`\[sig-cli\] Kubectl client Kubectl taint \[Serial\] should remove all the taints with the same key off a node`,
 			`\[sig-network\] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes`,
 			`\[sig-network\] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes`,
+			`\[sig-architecture\] Conformance Tests should have at least two untainted nodes`,
 		},
 
 		// Tests which can't be run/don't make sense to run against a cluster with all optional capabilities disabled

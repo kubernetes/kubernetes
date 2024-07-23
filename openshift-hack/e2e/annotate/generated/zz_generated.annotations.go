@@ -575,7 +575,7 @@ var Annotations = map[string]string{
 
 	"[sig-apps] stateful Upgrade [Feature:StatefulUpgrade] stateful upgrade should maintain a functioning cluster": " [Disabled:Unimplemented] [Suite:k8s]",
 
-	"[sig-architecture] Conformance Tests should have at least two untainted nodes [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[sig-architecture] Conformance Tests should have at least two untainted nodes [Conformance]": " [Skipped:SingleReplicaTopology] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[sig-auth] Certificates API [Privileged:ClusterAdmin] should support CSR API operations [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
