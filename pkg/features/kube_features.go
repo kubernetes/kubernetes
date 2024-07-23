@@ -1139,7 +1139,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PortForwardWebsockets: {Default: true, PreRelease: featuregate.Beta},
 
-	ProcMountType: {Default: true, PreRelease: featuregate.Beta},
+	ProcMountType: {Default: false, PreRelease: featuregate.Beta},
 
 	QOSReserved: {Default: false, PreRelease: featuregate.Alpha},
 
