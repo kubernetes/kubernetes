@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/clock"
 )
 
 type testcase struct {
@@ -47,12 +46,11 @@ func TestLeaseCandidateCreation(t *testing.T) {
 	defer cancel()
 
 	client := fake.NewSimpleClientset()
-	candidate, err := NewCandidate(
+	candidate, _, err := NewCandidate(
 		client,
 		tc.candidateName,
 		tc.candidateNamespace,
 		tc.leaseName,
-		clock.RealClock{},
 		tc.binaryVersion,
 		tc.emulationVersion,
 		[]v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
@@ -82,12 +80,11 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 	client := fake.NewSimpleClientset()
 
-	candidate, err := NewCandidate(
+	candidate, _, err := NewCandidate(
 		client,
 		tc.candidateName,
 		tc.candidateNamespace,
 		tc.leaseName,
-		clock.RealClock{},
 		tc.binaryVersion,
 		tc.emulationVersion,
 		[]v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},

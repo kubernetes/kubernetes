@@ -124,11 +124,11 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 		allErrs = append(allErrs, field.Invalid(fld, spec.BinaryVersion, "must be greater than or equal to `emulationVersion`"))
 	}
 
-	strategySeen := make(map[coordination.CoordinatedLeaseStrategy]bool)
-
 	if len(spec.PreferredStrategies) > 0 {
 		for i, strategy := range spec.PreferredStrategies {
 			fld := fldPath.Child("preferredStrategies").Index(i)
+
+			strategySeen := make(map[coordination.CoordinatedLeaseStrategy]bool)
 			if _, ok := strategySeen[strategy]; ok {
 				allErrs = append(allErrs, field.Duplicate(fld, strategy))
 			} else {
@@ -153,7 +153,7 @@ func ValidateLeaseCandidateSpec(spec *coordination.LeaseCandidateSpec, fldPath *
 	return allErrs
 }
 
-// ValidateLeaseStrategy validates the Strategy field in both the Lease and LeaseCandidate
+// ValidateCoordinatedLeaseStrategy validates the Strategy field in both the Lease and LeaseCandidate
 func ValidateCoordinatedLeaseStrategy(strategy coordination.CoordinatedLeaseStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

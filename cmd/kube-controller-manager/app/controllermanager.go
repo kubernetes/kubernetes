@@ -30,7 +30,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/coordination/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -81,7 +81,6 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/clock"
 )
 
 func init() {
@@ -292,27 +291,27 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			return startSATokenControllerInit(ctx, controllerContext, controllerName)
 		}
 	}
-	ver, err := semver.ParseTolerant(version.Get().String())
-	if err != nil {
-		return err
-	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		// Start component identity lease management
-		leaseCandidate, err := leaderelection.NewCandidate(
+		ver, err := semver.ParseTolerant(version.Get().String())
+		if err != nil {
+			return err
+		}
+
+		// Start lease candidate controller for coordinated leader election
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
 			c.Client,
 			id,
 			"kube-system",
 			"kube-controller-manager",
-			clock.RealClock{},
 			ver.FinalizeVersion(),
-			ver.FinalizeVersion(), // TODO: Use compatibility version when it's available
-			[]v1.CoordinatedLeaseStrategy{"OldestEmulationVersion"},
+			ver.FinalizeVersion(), // TODO(Jefftree): Use compatibility version when it's available
+			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
 		)
 		if err != nil {
 			return err
 		}
-		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(leaseCandidate.InformerFactory))
+		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
 
 		go leaseCandidate.Run(ctx)
 	}

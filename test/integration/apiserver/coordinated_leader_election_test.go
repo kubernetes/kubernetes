@@ -35,8 +35,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/clock"
-
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -199,12 +197,11 @@ func (t cleTest) createAndRunFakeLegacyController(name string, namespace string,
 
 }
 func (t cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string) {
-	identityLease, err := leaderelection.NewCandidate(
+	identityLease, _, err := leaderelection.NewCandidate(
 		t.clientset,
 		name,
 		namespace,
 		targetLease,
-		clock.RealClock{},
 		binaryVersion,
 		compatibilityVersion,
 		[]v1.CoordinatedLeaseStrategy{"OldestEmulationVersion"},
