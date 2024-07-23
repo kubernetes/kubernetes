@@ -42,9 +42,11 @@ import (
 const (
 	controllerName = "leader-election-controller"
 
-	// Requeue interval is the interval at which a Lease is requeued to verify that it is being renewed properly.
+	// Requeue interval is the interval at which a Lease is requeued to verify that it is
+	// being renewed properly.
 	defaultRequeueInterval            = 5 * time.Second
 	noRequeue                         = 0
+	
 	defaultLeaseDurationSeconds int32 = 5
 
 	electionDuration = 5 * time.Second
@@ -92,7 +94,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 		return
 	}
 	for _, lc := range lcs {
-		c.processCandidate(lc)
+		c.enqueueCandidate(lc)
 	}
 
 	klog.Infof("Workers: %d", workers)
@@ -114,13 +116,13 @@ func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCan
 	}
 	leaseSynced, err := leaseInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			c.processLease(obj)
+			c.enqueueLease(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			c.processLease(newObj)
+			c.enqueueLease(newObj)
 		},
 		DeleteFunc: func(oldObj interface{}) {
-			c.processLease(oldObj)
+			c.enqueueLease(oldObj)
 		},
 	})
 
@@ -129,13 +131,13 @@ func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCan
 	}
 	leaseCandidateSynced, err := leaseCandidateInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			c.processCandidate(obj)
+			c.enqueueCandidate(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			c.processCandidate(newObj)
+			c.enqueueCandidate(newObj)
 		},
 		DeleteFunc: func(oldObj interface{}) {
-			c.processCandidate(oldObj)
+			c.enqueueCandidate(oldObj)
 		},
 	})
 
@@ -167,7 +169,7 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) processCandidate(obj any) {
+func (c *Controller) enqueueCandidate(obj any) {
 	lc, ok := obj.(*v1alpha1.LeaseCandidate)
 	if !ok {
 		return
@@ -182,7 +184,7 @@ func (c *Controller) processCandidate(obj any) {
 	c.queue.Add(types.NamespacedName{Namespace: lc.Namespace, Name: lc.Spec.LeaseName})
 }
 
-func (c *Controller) processLease(obj any) {
+func (c *Controller) enqueueLease(obj any) {
 	lease, ok := obj.(*v1.Lease)
 	if !ok {
 		return
@@ -193,7 +195,7 @@ func (c *Controller) processLease(obj any) {
 func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, leaseNN types.NamespacedName) (bool, error) {
 	lease, err := c.leaseInformer.Lister().Leases(leaseNN.Namespace).Get(leaseNN.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
-		return false, fmt.Errorf("error reading lease")
+		return false, fmt.Errorf("error reading lease: %w", err)
 	} else if apierrors.IsNotFound(err) {
 		return true, nil
 	}
@@ -213,7 +215,7 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 		return false, err
 	}
 	if prelimStrategy != v1.OldestEmulationVersion {
-		klog.V(2).Infof("strategy %s is not recognized by CLE.", prelimStrategy)
+		klog.V(5).Infof("Strategy %q is ignored by CLE", prelimStrategy)
 		return false, nil
 	}
 
@@ -221,7 +223,7 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 	if prelimElectee == nil {
 		return false, nil
 	} else if lease != nil && lease.Spec.HolderIdentity != nil && prelimElectee.Name == *lease.Spec.HolderIdentity {
-		klog.V(2).Infof("Leader %s is already most optimal for lease %s %s", prelimElectee.Name, lease.Namespace, lease.Name)
+		klog.V(5).Infof("Leader %s is already most optimal for lease %s", prelimElectee.Name, leaseNN)
 		return false, nil
 	}
 	return true, nil
@@ -246,10 +248,9 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	} else if len(candidates) == 0 {
 		return noRequeue, nil
 	}
-	klog.V(4).Infof("reconcileElectionStep %s, candidates: %d", leaseNN, len(candidates))
+	klog.V(6).Infof("Reconciling election for %s, candidates: %d", leaseNN, len(candidates))
 
-	// Check if an election is really needed by looking at the current lease
-	// and set of candidates
+	// Check if an election is really needed by looking at the current lease and candidates
 	needElection, err := c.electionNeeded(candidates, leaseNN)
 	if !needElection {
 		return noRequeue, err
@@ -258,33 +259,35 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return defaultRequeueInterval, err
 	}
 
-	fastTrackElection := false
-
+	// election is ongoing as long as unexpired PingTimes exist
+	atLeastOnePingExpired := false
 	for _, candidate := range candidates {
+		if candidate.Spec.PingTime == nil {
+			continue
+		}
+
 		// If a candidate has a PingTime within the election duration, they have not acked
 		// and we should wait until we receive their response
-		if candidate.Spec.PingTime != nil {
-			if candidate.Spec.PingTime.Add(electionDuration).After(now) {
-				// continue waiting for the election to timeout
-				return noRequeue, nil
-			} else {
-				// election timed out without ack. Clear and start election.
-				fastTrackElection = true
-				clone := candidate.DeepCopy()
-				clone.Spec.PingTime = nil
-				_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
-				if err != nil {
-					return noRequeue, err
-				}
-				break
-			}
+		if candidate.Spec.PingTime.Add(electionDuration).After(now) {
+			// continue waiting for the election to timeout
+			return noRequeue, nil
 		}
+
+		// election timed out without ack (for one of the candidate). Clear and start election.
+		// TODO(sttts): this seems to be wrong. One candidate might get a lot more time to vote, while others are starving because they got a late ping. We have to give all of them a chance.
+		atLeastOnePingExpired = true
+		clone := candidate.DeepCopy()
+		clone.Spec.PingTime = nil
+		if _, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{}); err != nil {
+			return noRequeue, err
+		}
+		break
 	}
 
-	if !fastTrackElection {
+	if !atLeastOnePingExpired {
 		continueElection := true
 		for _, candidate := range candidates {
-			// if renewTime of a candidate is longer than electionDuration old, we have to ping.
+			// if renewTime of a candidate is longer ago than electionDuration old, we have to ping.
 			if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).Before(now) {
 				continueElection = false
 				break

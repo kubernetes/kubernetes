@@ -254,7 +254,7 @@ func TestGetEmulationVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getEmulationVersion(tt.candidate)
+			got := getEmulationVersionOrZero(tt.candidate)
 			if got.FinalizeVersion() != tt.want.FinalizeVersion() {
 				t.Errorf("getEmulationVersion() = %v, want %v", got, tt.want)
 			}
@@ -280,7 +280,7 @@ func TestGetBinaryVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getBinaryVersion(tt.candidate)
+			got := getBinaryVersionOrZero(tt.candidate)
 			if got.FinalizeVersion() != tt.want.FinalizeVersion() {
 				t.Errorf("getBinaryVersion() = %v, want %v", got, tt.want)
 			}
@@ -747,4 +747,12 @@ func equalStrategies(s1, s2 []v1.CoordinatedLeaseStrategy) bool {
 		}
 	}
 	return true
+}
+
+func shouldReelect(candidates []*v1alpha1.LeaseCandidate, currentLeader *v1alpha1.LeaseCandidate) bool {
+	pickedLeader := pickBestLeaderOldestEmulationVersion(candidates)
+	if pickedLeader == nil {
+		return false
+	}
+	return compare(currentLeader, pickedLeader) > 0
 }
