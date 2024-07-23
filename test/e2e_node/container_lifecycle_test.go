@@ -3118,6 +3118,107 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, "Containers Lifecycle", func(
 		// should delete quickly and not try to start/wait on any sidecars since they never started
 		gomega.Expect(deleteTime).To(gomega.BeNumerically("<", grace+buffer), fmt.Sprintf("should delete in < %d seconds, took %f", grace+buffer, deleteTime))
 	})
+
+	f.It("should terminate restartable init containers gracefully if there is a non-started restartable init container", func(ctx context.Context) {
+		init1 := "init-1"
+		restartableInit2 := "restartable-init-2"
+		restartableInit3 := "restartable-init-3"
+		regular1 := "regular-1"
+
+		podTerminationGracePeriodSeconds := int64(180)
+		containerTerminationSeconds := 1
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "terminate-restartable-init-gracefully",
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: &podTerminationGracePeriodSeconds,
+				RestartPolicy:                 v1.RestartPolicyNever,
+				InitContainers: []v1.Container{
+					{
+						Name:  init1,
+						Image: busyboxImage,
+						Command: ExecCommand(init1, execCommand{
+							Delay:              1,
+							TerminationSeconds: 5,
+							ExitCode:           0,
+						}),
+					},
+					{
+						Name:  restartableInit2,
+						Image: busyboxImage,
+						Command: ExecCommand(restartableInit2, execCommand{
+							Delay:              600,
+							TerminationSeconds: containerTerminationSeconds,
+							ExitCode:           0,
+						}),
+						StartupProbe: &v1.Probe{
+							FailureThreshold: 600,
+							ProbeHandler: v1.ProbeHandler{
+								Exec: &v1.ExecAction{
+									Command: []string{"false"},
+								},
+							},
+						},
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+					{
+						Name:  restartableInit3,
+						Image: busyboxImage,
+						Command: ExecCommand(restartableInit3, execCommand{
+							Delay:              600,
+							TerminationSeconds: 1,
+							ExitCode:           0,
+						}),
+						RestartPolicy: &containerRestartPolicyAlways,
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name:  regular1,
+						Image: busyboxImage,
+						Command: ExecCommand(regular1, execCommand{
+							Delay:              600,
+							TerminationSeconds: 1,
+							ExitCode:           0,
+						}),
+					},
+				},
+			},
+		}
+
+		preparePod(pod)
+
+		client := e2epod.NewPodClient(f)
+		pod = client.Create(ctx, pod)
+
+		err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "the second init container is running but not started", 2*time.Minute, func(pod *v1.Pod) (bool, error) {
+			if pod.Status.Phase != v1.PodPending {
+				return false, fmt.Errorf("pod should be in pending phase")
+			}
+			if len(pod.Status.InitContainerStatuses) != 3 {
+				return false, fmt.Errorf("pod should have the same number of statuses as init containers")
+			}
+			containerStatus := pod.Status.InitContainerStatuses[1]
+			return containerStatus.State.Running != nil &&
+				(containerStatus.Started == nil || *containerStatus.Started == false), nil
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting the pod")
+		err = client.Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriodSeconds})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the pod to terminate gracefully before its terminationGracePeriodSeconds")
+		err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace,
+			// The duration should be less than the pod's
+			// terminationGracePeriodSeconds while adding a buffer(60s) to the
+			// container termination seconds(1s) to account for the time it
+			// takes to delete the pod.
+			time.Duration(containerTerminationSeconds+60)*time.Second)
+		framework.ExpectNoError(err, "the pod should be deleted before its terminationGracePeriodSeconds if the restartalbe init containers get termination signal correctly")
+	})
 })
 
 var _ = SIGDescribe(nodefeature.SidecarContainers, framework.WithSerial(), "Containers Lifecycle", func() {
