@@ -144,7 +144,8 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 			BinaryVersion:       "0.1.0",
 			EmulationVersion:    "0.1.0",
 			PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
-			RenewTime:           &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
+			RenewTime:           &metav1.MicroTime{Time: time.Now().Add(-2 * time.Hour)},
+			PingTime:            &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
 		},
 	}
 	ctx := context.Background()
@@ -266,7 +267,7 @@ func leaderElectAndRun(ctx context.Context, kubeconfig *rest.Config, lockIdentit
 }
 
 func (t cleTest) pollForLease(name, namespace, holder string) {
-	err := wait.PollUntilContextTimeout(t.ctxList["main"].ctx, 1000*time.Millisecond, 15*time.Second, true, func(ctx context.Context) (done bool, err error) {
+	err := wait.PollUntilContextTimeout(t.ctxList["main"].ctx, 1000*time.Millisecond, 25*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		lease, err := t.clientset.CoordinationV1().Leases(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			fmt.Println(err)
@@ -286,7 +287,7 @@ func (t cleTest) cancelController(name, namespace string) {
 
 func (t cleTest) cleanup() {
 	err := t.clientset.CoordinationV1().Leases("kube-system").Delete(context.TODO(), "leader-election-controller", metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		t.t.Error(err)
 	}
 	for _, c := range t.ctxList {

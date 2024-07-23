@@ -160,7 +160,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
 						PingTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * electionDuration))),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * electionDuration))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-4 * electionDuration))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -173,6 +173,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
+						PingTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
@@ -221,44 +222,6 @@ func TestReconcileElectionStep(t *testing.T) {
 			expectedError:          false,
 		},
 		{
-			name:    "candidates exist, lease exists, lease expired, 3rdparty strategy",
-			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha1.LeaseCandidate{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "default",
-						Name:      "component-identity-1",
-					},
-					Spec: v1alpha1.LeaseCandidateSpec{
-						LeaseName:           "component-A",
-						EmulationVersion:    "1.19.0",
-						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
-						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
-					},
-				},
-			},
-			existingLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "default",
-					Name:      "component-A",
-					Annotations: map[string]string{
-						electedByAnnotationName: controllerName,
-					},
-				},
-				Spec: v1.LeaseSpec{
-					HolderIdentity:       ptr.To("component-identity-expired"),
-					LeaseDurationSeconds: ptr.To(int32(10)),
-					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
-				},
-			},
-			expectLease:            true,
-			expectedHolderIdentity: ptr.To("component-identity-expired"),
-			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("foo.com/bar"),
-			expectedRequeue:        true,
-			expectedError:          false,
-		},
-		{
 			name:    "candidates exist, no acked candidates should return error",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
 			candidates: []*v1alpha1.LeaseCandidate{
@@ -272,7 +235,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
 						PingTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * time.Minute))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -310,7 +273,7 @@ func TestReconcileElectionStep(t *testing.T) {
 			candidatesPinged:       true,
 		},
 		{
-			name:    "candidates exist, ping within electionDuration should cause no state change",
+			name:    "candidate exist, pinged candidate should have until electionDuration until election decision is made",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
 			candidates: []*v1alpha1.LeaseCandidate{
 				{
@@ -323,7 +286,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
 						PingTime:            ptr.To(metav1.NewMicroTime(time.Now())),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * electionDuration))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -331,8 +294,42 @@ func TestReconcileElectionStep(t *testing.T) {
 			existingLease:          nil,
 			expectLease:            false,
 			expectedHolderIdentity: nil,
-			expectedStrategy:       nil,
-			expectedRequeue:        false,
+			expectedRequeue:        true,
+			expectedError:          false,
+		},
+		{
+			name:    "candidates exist, lease exists, lease expired, 3rdparty strategy",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						EmulationVersion:    "1.19.0",
+						BinaryVersion:       "1.19.0",
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			existingLease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component-A",
+				},
+				Spec: v1.LeaseSpec{
+					HolderIdentity:       ptr.To("component-identity-expired"),
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+				},
+			},
+			expectLease:            true,
+			expectedHolderIdentity: ptr.To("component-identity-expired"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("foo.com/bar"),
+			expectedRequeue:        true,
 			expectedError:          false,
 		},
 	}
@@ -683,7 +680,6 @@ func TestController(t *testing.T) {
 							if err == nil {
 								if lease.Spec.PingTime != nil {
 									c := lease.DeepCopy()
-									c.Spec.PingTime = nil
 									c.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
 									_, err = client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Update(ctx, c, metav1.UpdateOptions{})
 									if err != nil {

@@ -169,7 +169,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				)
 				return func(ctx context.Context, workers int) {
 					go controller.Run(ctx, workers)
-					go gccontroller.Run(ctx.Done())
+					go gccontroller.Run(ctx)
 				}, err
 			})
 			return nil

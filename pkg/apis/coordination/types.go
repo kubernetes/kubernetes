@@ -117,13 +117,12 @@ type LeaseCandidateSpec struct {
 	// LeaseCandidate will respond by updating RenewTime.
 	// +optional
 	PingTime *metav1.MicroTime
-	// RenewTime is the time that the LeaseCandidate was last updated.
-	// Any time a Lease needs to do leader election, the PingTime field
-	// is updated to signal to the LeaseCandidate that they should update
-	// the RenewTime.
-	// Old LeaseCandidate objects are also garbage collected if it has been hours
-	// since the last renew. The PingTime field is updated regularly to prevent
-	// garbage collection for still active LeaseCandidates.
+	// RenewTime is the time that the LeaseCandidate was last updated. Any time
+	// a Lease needs to do leader election, the PingTime field is updated to
+	// signal to the LeaseCandidate that they should update the RenewTime. The
+	// PingTime field is also updated regularly and LeaseCandidates must update
+	// RenewTime to prevent garbage collection for still active LeaseCandidates.
+	// Old LeaseCandidate objects are periodically garbage collected.
 	// +optional
 	RenewTime *metav1.MicroTime
 	// BinaryVersion is the binary version. It must be in a semver format without leading `v`.

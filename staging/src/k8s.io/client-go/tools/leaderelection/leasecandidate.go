@@ -103,7 +103,7 @@ func NewCandidate(clientset kubernetes.Interface,
 	h, err := leaseCandidateInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			if leasecandidate, ok := newObj.(*v1alpha1.LeaseCandidate); ok {
-				if leasecandidate.Spec.PingTime != nil {
+				if leasecandidate.Spec.PingTime != nil && leasecandidate.Spec.PingTime.After(leasecandidate.Spec.RenewTime.Time) {
 					lc.enqueueLease()
 				}
 			}
@@ -177,7 +177,6 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	klog.V(2).Infof("lease candidate exists. Renewing.")
 	clone := lease.DeepCopy()
 	clone.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-	clone.Spec.PingTime = nil
 	_, err = c.leaseClient.Update(ctx, clone, metav1.UpdateOptions{})
 	if err != nil {
 		return err

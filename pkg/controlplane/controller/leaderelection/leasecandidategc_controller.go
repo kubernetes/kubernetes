@@ -83,7 +83,7 @@ func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 		if !isLeaseCandidateExpired(leaseCandidate) {
 			continue
 		}
-		lc, err := c.kubeclientset.CoordinationV1alpha1().LeaseCandidates(leaseCandidate.Namespace).Get(context.TODO(), leaseCandidate.Name, metav1.GetOptions{})
+		lc, err := c.kubeclientset.CoordinationV1alpha1().LeaseCandidates(leaseCandidate.Namespace).Get(ctx, leaseCandidate.Name, metav1.GetOptions{})
 		if err != nil {
 			klog.ErrorS(err, "Error getting lc")
 			continue

@@ -130,7 +130,6 @@ func pollForLease(ctx context.Context, tc testcase, client *fake.Clientset, t *m
 		if lc.Spec.BinaryVersion == tc.binaryVersion &&
 			lc.Spec.EmulationVersion == tc.emulationVersion &&
 			lc.Spec.LeaseName == tc.leaseName &&
-			lc.Spec.PingTime == nil &&
 			lc.Spec.RenewTime != nil {
 			// Ensure that if a time is provided, the renewTime occurred after the provided time.
 			if t != nil && t.After(lc.Spec.RenewTime.Time) {

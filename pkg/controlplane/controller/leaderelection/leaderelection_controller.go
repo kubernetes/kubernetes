@@ -126,7 +126,6 @@ func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCan
 			c.enqueueLease(oldObj)
 		},
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +140,6 @@ func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCan
 			c.enqueueCandidate(oldObj)
 		},
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +177,7 @@ func (c *Controller) enqueueCandidate(obj any) {
 		return
 	}
 	// Ignore candidates that transitioned to Pending because reelection is already in progress
-	if lc.Spec.PingTime != nil {
+	if lc.Spec.PingTime != nil && lc.Spec.RenewTime.Before(lc.Spec.PingTime) {
 		return
 	}
 	c.queue.Add(types.NamespacedName{Namespace: lc.Namespace, Name: lc.Spec.LeaseName})
@@ -205,6 +203,7 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 		return true, nil
 	}
 
+	// every 15min enforce an election to update all candidates. Every 30min we garbage collect.
 	for _, candidate := range candidates {
 		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(leaseCandidateValidDuration/2).Before(time.Now()) {
 			return true, nil
@@ -241,7 +240,6 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 // PingTime + electionDuration < time.Now: Candidate has not responded within the appropriate PingTime. Continue the election.
 // RenewTime + 5 seconds > time.Now: All candidates acked in the last 5 seconds, continue the election.
 func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.NamespacedName) (requeue time.Duration, err error) {
-	now := time.Now()
 
 	candidates, err := c.listAdmissableCandidates(leaseNN)
 	if err != nil {
@@ -254,17 +252,52 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	// Check if an election is really needed by looking at the current lease and candidates
 	needElection, err := c.electionNeeded(candidates, leaseNN)
 	if !needElection {
-		return noRequeue, err
+		return defaultRequeueInterval, err
 	}
 	if err != nil {
 		return defaultRequeueInterval, err
 	}
 
+	now := time.Now()
+	canVoteYet := true
+	for _, candidate := range candidates {
+		if candidate.Spec.PingTime != nil && candidate.Spec.PingTime.Add(electionDuration).After(now) &&
+			candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Before(candidate.Spec.PingTime) {
+
+			// continue waiting for the election to timeout
+			canVoteYet = false
+			continue
+		}
+		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).After(now) {
+			continue
+		}
+
+		if candidate.Spec.PingTime == nil ||
+			// If PingTime is outdated, send another PingTime only if it already acked the first one.
+			(candidate.Spec.PingTime.Add(electionDuration).Before(now) && candidate.Spec.PingTime.Before(candidate.Spec.RenewTime)) {
+			// TODO(jefftree): We should randomize the order of sending pings and do them in parallel
+			// so that all candidates have equal opportunity to ack.
+			clone := candidate.DeepCopy()
+			clone.Spec.PingTime = &metav1.MicroTime{Time: now}
+			_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
+			if err != nil {
+				return defaultRequeueInterval, err
+			}
+			canVoteYet = false
+		}
+	}
+	if !canVoteYet {
+		return defaultRequeueInterval, nil
+	}
+
 	// election is ongoing as long as unexpired PingTimes exist
-	atLeastOnePingExpired := false
 	for _, candidate := range candidates {
 		if candidate.Spec.PingTime == nil {
-			continue
+			continue // shouldn't be the case after the above
+		}
+
+		if candidate.Spec.RenewTime != nil && candidate.Spec.PingTime.Before(candidate.Spec.RenewTime) {
+			continue // this has renewed already
 		}
 
 		// If a candidate has a PingTime within the election duration, they have not acked
@@ -272,39 +305,6 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		if candidate.Spec.PingTime.Add(electionDuration).After(now) {
 			// continue waiting for the election to timeout
 			return noRequeue, nil
-		}
-
-		// election timed out without ack (for one of the candidate). Clear and start election.
-		// TODO(sttts): this seems to be wrong. One candidate might get a lot more time to vote, while others are starving because they got a late ping. We have to give all of them a chance.
-		atLeastOnePingExpired = true
-		clone := candidate.DeepCopy()
-		clone.Spec.PingTime = nil
-		if _, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{}); err != nil {
-			return noRequeue, err
-		}
-		break
-	}
-
-	if !atLeastOnePingExpired {
-		continueElection := true
-		for _, candidate := range candidates {
-			// if renewTime of a candidate is longer ago than electionDuration old, we have to ping.
-			if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(electionDuration).Before(now) {
-				continueElection = false
-				break
-			}
-		}
-		if !continueElection {
-			// Send an "are you alive" signal to all candidates
-			for _, candidate := range candidates {
-				clone := candidate.DeepCopy()
-				clone.Spec.PingTime = &metav1.MicroTime{Time: time.Now()}
-				_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
-				if err != nil {
-					return noRequeue, err
-				}
-			}
-			return defaultRequeueInterval, nil
 		}
 	}
 
@@ -398,7 +398,8 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 
 	if reflect.DeepEqual(existing, orig) {
 		klog.V(5).Infof("Lease %s already has the most optimal leader %q", leaseNN, *existing.Spec.HolderIdentity)
-		return noRequeue, nil
+		// We need to requeue to ensure that we are aware of an expired lease
+		return defaultRequeueInterval, nil
 	}
 
 	_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
