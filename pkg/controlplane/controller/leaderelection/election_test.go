@@ -509,7 +509,6 @@ func TestShouldReelect(t *testing.T) {
 			},
 			expectResult: false,
 		},
-		// TODO: Add test cases where candidates have invalid version numbers
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -519,4 +518,233 @@ func TestShouldReelect(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTopologicalSortWithOneRoot(t *testing.T) {
+	tests := []struct {
+		name  string
+		graph map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy
+		want  []v1.CoordinatedLeaseStrategy
+	}{
+		{
+			name: "simple DAG",
+			graph: map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy{
+				v1.OldestEmulationVersion: {"foo"},
+				"foo":                     {"bar"},
+				"bar":                     {},
+			},
+			want: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion, "foo", "bar"},
+		},
+		{
+			name: "cycle",
+			graph: map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy{
+				v1.OldestEmulationVersion: {"foo"},
+				"foo":                     {v1.OldestEmulationVersion},
+			},
+			want: nil,
+		},
+		{
+			name: "multiple",
+			graph: map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy{
+				v1.OldestEmulationVersion: {"foo", "baz"},
+				"foo":                     {"baz"},
+				"baz":                     {},
+			},
+			want: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion, "foo", "baz"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := topologicalSortWithOneRoot(tc.graph)
+			if !equalStrategies(got, tc.want) {
+				t.Errorf("topologicalSortWithOneRoot() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPickBestStrategy(t *testing.T) {
+	tests := []struct {
+		name         string
+		candidates   []*v1alpha1.LeaseCandidate
+		wantStrategy v1.CoordinatedLeaseStrategy
+		wantError    bool
+	}{
+		{
+			name: "single candidate, single preferred strategy",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+			},
+			wantStrategy: v1.OldestEmulationVersion,
+			wantError:    false,
+		},
+		{
+			name: "multiple candidates, different preferred strategies should fail",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate2",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "multiple candidates, multiple resolved preferred strategy",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion, "foo.com/bar"},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate2",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			wantStrategy: v1.OldestEmulationVersion,
+			wantError:    false,
+		},
+		{
+			name: "multiple candidates, same preferred strategy",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate2",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+			},
+			wantStrategy: v1.OldestEmulationVersion,
+			wantError:    false,
+		},
+		{
+			name: "multiple candidates, conflicting preferred strategy",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate2",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			wantStrategy: "",
+			wantError:    true,
+		},
+		{
+			name: "multiple candidates, cycle in preferred strategies",
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate1",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar", v1.OldestEmulationVersion},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "candidate2",
+						Namespace: "default",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion, "foo.com/bar"},
+					},
+				},
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotStrategy, err := pickBestStrategy(tc.candidates)
+			gotError := err != nil
+			if gotError != tc.wantError {
+				t.Errorf("pickBestStrategy() error = %v,:%v want %v", gotError, err, tc.wantError)
+			}
+			if !gotError && gotStrategy != tc.wantStrategy {
+				t.Errorf("pickBestStrategy() = %v, want %v", gotStrategy, tc.wantStrategy)
+			}
+		})
+	}
+}
+
+func equalStrategies(s1, s2 []v1.CoordinatedLeaseStrategy) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i := range s1 {
+		if s1[i] != s2[i] {
+			return false
+		}
+	}
+	return true
 }

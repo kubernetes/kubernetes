@@ -49,7 +49,7 @@ const (
 
 	electionDuration = 5 * time.Second
 
-	leaseCandidateValidDuration = 5 * time.Minute
+	leaseCandidateValidDuration = 30 * time.Minute
 )
 
 // Controller is the leader election controller, which observes component identity leases for
@@ -202,7 +202,16 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 		return true, nil
 	}
 
-	prelimStrategy := pickBestStrategy(candidates)
+	for _, candidate := range candidates {
+		if candidate.Spec.RenewTime != nil && candidate.Spec.RenewTime.Add(leaseCandidateValidDuration/2).Before(time.Now()) {
+			return true, nil
+		}
+	}
+
+	prelimStrategy, err := pickBestStrategy(candidates)
+	if err != nil {
+		return false, err
+	}
 	if prelimStrategy != v1.OldestEmulationVersion {
 		klog.V(2).Infof("strategy %s is not recognized by CLE.", prelimStrategy)
 		return false, nil
@@ -302,7 +311,11 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		return false, fmt.Errorf("no available candidates")
 	}
 
-	strategy := pickBestStrategy(ackedCandidates)
+	strategy, err := pickBestStrategy(ackedCandidates)
+	if err != nil {
+		return false, err
+	}
+
 	if strategy != v1.OldestEmulationVersion {
 		klog.V(2).Infof("strategy %s is not recognized by CLE.", strategy)
 		return false, nil

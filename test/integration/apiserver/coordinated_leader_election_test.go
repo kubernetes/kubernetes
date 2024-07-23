@@ -23,6 +23,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
+	v1alpha1 "k8s.io/api/coordination/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
@@ -77,28 +79,6 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 	cletest.pollForLease("foo", "default", "foo3")
 }
 
-func TestLeaderDisappear(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer server.TearDownFn()
-	config := server.ClientConfig
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cletest := setupCLE(config, ctx, cancel, t)
-	defer cletest.cleanup()
-
-	go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20.0", "1.20.0")
-	go cletest.createAndRunFakeController("foo2", "default", "foo", "1.20.0", "1.19.0")
-	cletest.pollForLease("foo", "default", "foo2")
-	cletest.cancelController("foo2", "default")
-	cletest.deleteLC("foo2", "default")
-	cletest.pollForLease("foo", "default", "foo1")
-}
-
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
@@ -143,6 +123,51 @@ func TestUpgradeSkew(t *testing.T) {
 	cletest.pollForLease("foo", "default", "foo1-131")
 }
 
+func TestLeaseCandidateCleanup(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expiredLC := &v1alpha1.LeaseCandidate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "expired",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.LeaseCandidateSpec{
+			LeaseName:           "foobar",
+			BinaryVersion:       "0.1.0",
+			EmulationVersion:    "0.1.0",
+			PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+			RenewTime:           &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
+		},
+	}
+	ctx := context.Background()
+	_, err = clientset.CoordinationV1alpha1().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollUntilContextTimeout(ctx, 1000*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
+		_, err = clientset.CoordinationV1alpha1().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("Timieout waiting for lease gc")
+	}
+
+}
+
 type ctxCancelPair struct {
 	ctx    context.Context
 	cancel func()
@@ -169,7 +194,6 @@ func (t cleTest) createAndRunFakeLegacyController(name string, namespace string,
 			},
 			OnStoppedLeading: func() {
 				klog.Errorf("%s Lost leadership, stopping", name)
-				// klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
 		})
 
@@ -270,13 +294,6 @@ func (t cleTest) cleanup() {
 	}
 	for _, c := range t.ctxList {
 		c.cancel()
-	}
-}
-
-func (t cleTest) deleteLC(name, namespace string) {
-	err := t.clientset.CoordinationV1alpha1().LeaseCandidates(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
-	if err != nil {
-		t.t.Error(err)
 	}
 }
 
