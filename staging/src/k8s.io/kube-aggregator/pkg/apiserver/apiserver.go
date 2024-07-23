@@ -297,25 +297,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		}
 		// We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
 		// context is not used at all. So passing a empty context shouldn't be a problem
-		ctx := context.TODO()
-		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
+		if err := aggregatorProxyCerts.RunOnce(context.Background()); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
 		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
 
 		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(postStartHookContext genericapiserver.PostStartHookContext) error {
-			// generate a context  from stopCh. This is to avoid modifying files which are relying on apiserver
-			// TODO: See if we can pass ctx to the current method
-			ctx, cancel := context.WithCancel(context.Background())
-			go func() {
-				select {
-				case <-postStartHookContext.StopCh:
-					cancel() // stopCh closed, so cancel our context
-				case <-ctx.Done():
-				}
-			}()
-			go aggregatorProxyCerts.Run(ctx, 1)
+			go aggregatorProxyCerts.Run(postStartHookContext, 1)
 			return nil
 		})
 	}
@@ -373,9 +362,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	}
 
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		go apiserviceRegistrationController.Run(context.StopCh, apiServiceRegistrationControllerInitiated)
+		go apiserviceRegistrationController.Run(context.Done(), apiServiceRegistrationControllerInitiated)
 		select {
-		case <-context.StopCh:
+		case <-context.Done():
 		case <-apiServiceRegistrationControllerInitiated:
 		}
 
@@ -394,7 +383,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			// Discovery aggregation depends on the apiservice registration controller
 			// having the full list of APIServices already synced
 			select {
-			case <-context.StopCh:
+			case <-context.Done():
 				return nil
 			// Context cancelled, should abort/clean goroutines
 			case <-apiServiceRegistrationControllerInitiated:
@@ -405,10 +394,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			// When discovery is ready, all APIServices will be present, with APIServices
 			// that have not successfully synced discovery to be present but marked as Stale.
 			discoverySyncedCh := make(chan struct{})
-			go s.discoveryAggregationController.Run(context.StopCh, discoverySyncedCh)
+			go s.discoveryAggregationController.Run(context.Done(), discoverySyncedCh)
 
 			select {
-			case <-context.StopCh:
+			case <-context.Done():
 				return nil
 			// Context cancelled, should abort/clean goroutines
 			case <-discoverySyncedCh:
@@ -440,7 +429,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 					return false, err
 				}
 				return true, nil
-			}, hookContext.StopCh); err != nil {
+			}, hookContext.Done()); err != nil {
 				return fmt.Errorf("failed to wait for apiserver-identity lease %s to be created: %v",
 					s.GenericAPIServer.APIServerID, err)
 			}
@@ -456,14 +445,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 				// to register all built-in resources when the generic apiservers install APIs.
 				s.GenericAPIServer.StorageVersionManager.UpdateStorageVersions(hookContext.LoopbackClientConfig, s.GenericAPIServer.APIServerID)
 				return false, nil
-			}, hookContext.StopCh)
+			}, hookContext.Done())
 			// Once the storage version updater finishes the first round of update,
 			// the PostStartHook will return to unblock /healthz. The handler chain
 			// won't block write requests anymore. Check every second since it's not
 			// expensive.
 			wait.PollImmediateUntil(1*time.Second, func() (bool, error) {
 				return s.GenericAPIServer.StorageVersionManager.Completed(), nil
-			}, hookContext.StopCh)
+			}, hookContext.Done())
 			return nil
 		})
 	}
@@ -477,14 +466,14 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
 	if s.openAPIConfig != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
-			go s.openAPIAggregationController.Run(context.StopCh)
+			go s.openAPIAggregationController.Run(context.Done())
 			return nil
 		})
 	}
 
 	if s.openAPIV3Config != nil {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
-			go s.openAPIV3AggregationController.Run(context.StopCh)
+			go s.openAPIV3AggregationController.Run(context.Done())
 			return nil
 		})
 	}

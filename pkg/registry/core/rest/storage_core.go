@@ -514,7 +514,7 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		runner.Start()
 		go func() {
 			defer runner.Stop()
-			<-context.StopCh
+			<-context.Done()
 		}()
 
 		// For backward compatibility, we ensure that if we never are able
