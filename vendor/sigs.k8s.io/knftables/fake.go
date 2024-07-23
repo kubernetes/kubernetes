@@ -34,6 +34,10 @@ type Fake struct {
 	// Table contains the Interface's table. This will be `nil` until you `tx.Add()`
 	// the table.
 	Table *FakeTable
+
+	// LastTransaction is the last transaction passed to Run(). It will remain set until the
+	// next time Run() is called. (It is not affected by Check().)
+	LastTransaction *Transaction
 }
 
 // FakeTable wraps Table for the Fake implementation
@@ -120,13 +124,23 @@ func (fake *Fake) List(_ context.Context, objectType string) ([]string, error) {
 // ListRules is part of Interface
 func (fake *Fake) ListRules(_ context.Context, chain string) ([]*Rule, error) {
 	if fake.Table == nil {
-		return nil, notFoundError("no such chain %q", chain)
+		return nil, notFoundError("no such table %q", fake.table)
 	}
-	ch := fake.Table.Chains[chain]
-	if ch == nil {
-		return nil, notFoundError("no such chain %q", chain)
+
+	rules := []*Rule{}
+	if chain == "" {
+		// Include all rules across all chains.
+		for _, ch := range fake.Table.Chains {
+			rules = append(rules, ch.Rules...)
+		}
+	} else {
+		ch := fake.Table.Chains[chain]
+		if ch == nil {
+			return nil, notFoundError("no such chain %q", chain)
+		}
+		rules = append(rules, ch.Rules...)
 	}
-	return ch.Rules, nil
+	return rules, nil
 }
 
 // ListElements is part of Interface
@@ -155,6 +169,7 @@ func (fake *Fake) NewTransaction() *Transaction {
 
 // Run is part of Interface
 func (fake *Fake) Run(_ context.Context, tx *Transaction) error {
+	fake.LastTransaction = tx
 	updatedTable, err := fake.run(tx)
 	if err == nil {
 		fake.Table = updatedTable
@@ -341,7 +356,7 @@ func (fake *Fake) run(tx *Transaction) (*FakeTable, error) {
 				return nil, fmt.Errorf("unhandled operation %q", op.verb)
 			}
 		case *Element:
-			if len(obj.Value) == 0 {
+			if obj.Set != "" {
 				existingSet := updatedTable.Sets[obj.Set]
 				if existingSet == nil {
 					return nil, notFoundError("no such set %q", obj.Set)
