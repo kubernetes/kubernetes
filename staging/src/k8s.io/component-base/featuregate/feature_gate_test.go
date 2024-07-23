@@ -600,12 +600,25 @@ func TestFeatureGateOverrideDefault(t *testing.T) {
 		f := NewFeatureGate()
 		require.NoError(t, f.Add(map[Feature]FeatureSpec{"TestFeature": {Default: false}}))
 		require.NoError(t, f.OverrideDefault("TestFeature", true))
-		fcopy := f.CopyKnownFeatures()
+		fcopy := f.DeepCopyAndReset()
 		if !f.Enabled("TestFeature") {
 			t.Error("TestFeature should be enabled by override")
 		}
 		if !fcopy.Enabled("TestFeature") {
 			t.Error("default override was not preserved by CopyKnownFeatures")
+		}
+	})
+
+	t.Run("overrides are not passed over after CopyKnownFeatures", func(t *testing.T) {
+		f := NewFeatureGate()
+		require.NoError(t, f.Add(map[Feature]FeatureSpec{"TestFeature": {Default: false}}))
+		fcopy := f.DeepCopyAndReset()
+		require.NoError(t, f.OverrideDefault("TestFeature", true))
+		if !f.Enabled("TestFeature") {
+			t.Error("TestFeature should be enabled by override")
+		}
+		if fcopy.Enabled("TestFeature") {
+			t.Error("default override should not be passed over after CopyKnownFeatures")
 		}
 	})
 
@@ -1351,6 +1364,34 @@ func TestVersionedFeatureGateOverrideDefault(t *testing.T) {
 		}
 	})
 
+	t.Run("overrides are not passed over after deep copies", func(t *testing.T) {
+		f := NewVersionedFeatureGate(version.MustParse("1.29"))
+		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
+		if err := f.AddVersioned(map[Feature]VersionedSpecs{
+			"TestFeature": {
+				{Version: version.MustParse("1.28"), Default: false},
+				{Version: version.MustParse("1.29"), Default: true},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		assert.False(t, f.Enabled("TestFeature"))
+
+		fcopy := f.DeepCopy()
+		require.NoError(t, f.OverrideDefault("TestFeature", true))
+		require.NoError(t, f.OverrideDefaultAtVersion("TestFeature", false, version.MustParse("1.29")))
+		assert.True(t, f.Enabled("TestFeature"))
+		assert.False(t, fcopy.Enabled("TestFeature"))
+
+		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.29")))
+		assert.False(t, f.Enabled("TestFeature"))
+		assert.False(t, fcopy.Enabled("TestFeature"))
+
+		require.NoError(t, fcopy.SetEmulationVersion(version.MustParse("1.29")))
+		assert.False(t, f.Enabled("TestFeature"))
+		assert.True(t, fcopy.Enabled("TestFeature"))
+	})
+
 	t.Run("reflected in known features", func(t *testing.T) {
 		f := NewVersionedFeatureGate(version.MustParse("1.29"))
 		require.NoError(t, f.SetEmulationVersion(version.MustParse("1.28")))
@@ -1536,7 +1577,7 @@ func TestCopyKnownFeatures(t *testing.T) {
 	require.NoError(t, f.Add(map[Feature]FeatureSpec{"FeatureA": {Default: false}, "FeatureB": {Default: false}}))
 	require.NoError(t, f.Set("FeatureA=true"))
 	require.NoError(t, f.OverrideDefault("FeatureB", true))
-	fcopy := f.CopyKnownFeatures()
+	fcopy := f.DeepCopyAndReset()
 	require.NoError(t, f.Add(map[Feature]FeatureSpec{"FeatureC": {Default: false}}))
 
 	assert.True(t, f.Enabled("FeatureA"))
