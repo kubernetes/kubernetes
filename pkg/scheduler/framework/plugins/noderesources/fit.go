@@ -250,7 +250,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodRequestUpdate event should be registered
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
 		podActionType |= framework.UpdatePodScaleDown
 	}
