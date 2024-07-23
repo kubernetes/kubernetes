@@ -18,6 +18,7 @@ package leaderelection
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -41,10 +42,12 @@ func TestReconcileElectionStep(t *testing.T) {
 		leaseNN                 types.NamespacedName
 		candidates              []*v1alpha1.LeaseCandidate
 		existingLease           *v1.Lease
+		expectLease             bool
 		expectedHolderIdentity  *string
-		expectedPreferredHolder string
+		expectedPreferredHolder *string
 		expectedRequeue         bool
 		expectedError           bool
+		expectedStrategy        *v1.CoordinatedLeaseStrategy
 		candidatesPinged        bool
 	}{
 		{
@@ -52,7 +55,9 @@ func TestReconcileElectionStep(t *testing.T) {
 			leaseNN:                types.NamespacedName{Namespace: "default", Name: "component-A"},
 			candidates:             []*v1alpha1.LeaseCandidate{},
 			existingLease:          nil,
+			expectLease:            false,
 			expectedHolderIdentity: nil,
+			expectedStrategy:       nil,
 			expectedRequeue:        false,
 			expectedError:          false,
 		},
@@ -61,7 +66,9 @@ func TestReconcileElectionStep(t *testing.T) {
 			leaseNN:                types.NamespacedName{Namespace: "default", Name: "component-A"},
 			candidates:             []*v1alpha1.LeaseCandidate{},
 			existingLease:          &v1.Lease{},
+			expectLease:            false,
 			expectedHolderIdentity: nil,
+			expectedStrategy:       nil,
 			expectedRequeue:        false,
 			expectedError:          false,
 		},
@@ -84,7 +91,9 @@ func TestReconcileElectionStep(t *testing.T) {
 				},
 			},
 			existingLease:          nil,
+			expectLease:            true,
 			expectedHolderIdentity: ptr.To("component-identity-1"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
 			expectedRequeue:        true,
 			expectedError:          false,
 		},
@@ -130,8 +139,10 @@ func TestReconcileElectionStep(t *testing.T) {
 					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
 				},
 			},
+			expectLease:             true,
 			expectedHolderIdentity:  ptr.To("component-identity-1"),
-			expectedPreferredHolder: "component-identity-2",
+			expectedPreferredHolder: ptr.To("component-identity-2"),
+			expectedStrategy:        ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
 			expectedRequeue:         true,
 			expectedError:           false,
 		},
@@ -168,7 +179,9 @@ func TestReconcileElectionStep(t *testing.T) {
 				},
 			},
 			existingLease:          nil,
+			expectLease:            true,
 			expectedHolderIdentity: ptr.To("component-identity-2"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
 			expectedRequeue:        true,
 			expectedError:          false,
 		},
@@ -201,7 +214,69 @@ func TestReconcileElectionStep(t *testing.T) {
 					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
 				},
 			},
+			expectLease:            true,
 			expectedHolderIdentity: ptr.To("component-identity-1"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
+			expectedRequeue:        true,
+			expectedError:          false,
+		},
+		{
+			name:    "candidates exist, lease exists, lease expired, 3rdparty strategy",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						EmulationVersion:    "1.19.0",
+						BinaryVersion:       "1.19.0",
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			existingLease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "component-A",
+				},
+				Spec: v1.LeaseSpec{
+					HolderIdentity:       ptr.To("component-identity-expired"),
+					LeaseDurationSeconds: ptr.To(int32(10)),
+					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+				},
+			},
+			expectLease:            true,
+			expectedHolderIdentity: ptr.To("component-identity-expired"),
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("foo.com/bar"),
+			expectedRequeue:        true,
+			expectedError:          false,
+		},
+		{
+			name:    "candidates exist, lease does not,, 3rdparty strategy",
+			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "default",
+						Name:      "component-identity-1",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						EmulationVersion:    "1.19.0",
+						BinaryVersion:       "1.19.0",
+						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
+					},
+				},
+			},
+			existingLease:          nil,
+			expectLease:            true,
+			expectedHolderIdentity: nil,
+			expectedStrategy:       ptr.To[v1.CoordinatedLeaseStrategy]("foo.com/bar"),
 			expectedRequeue:        true,
 			expectedError:          false,
 		},
@@ -225,6 +300,7 @@ func TestReconcileElectionStep(t *testing.T) {
 				},
 			},
 			existingLease:          nil,
+			expectLease:            false,
 			expectedHolderIdentity: nil,
 			expectedRequeue:        false,
 			expectedError:          true,
@@ -248,7 +324,9 @@ func TestReconcileElectionStep(t *testing.T) {
 				},
 			},
 			existingLease:          nil,
+			expectLease:            false,
 			expectedHolderIdentity: nil,
+			expectedStrategy:       nil,
 			expectedRequeue:        true,
 			expectedError:          false,
 			candidatesPinged:       true,
@@ -273,7 +351,9 @@ func TestReconcileElectionStep(t *testing.T) {
 				},
 			},
 			existingLease:          nil,
+			expectLease:            false,
 			expectedHolderIdentity: nil,
+			expectedStrategy:       nil,
 			expectedRequeue:        false,
 			expectedError:          false,
 		},
@@ -323,20 +403,32 @@ func TestReconcileElectionStep(t *testing.T) {
 				t.Errorf("reconcileElectionStep() error = %v, want nil", err)
 			}
 
-			// Check the lease holder identity
-			if tc.expectedHolderIdentity != nil {
-				lease, err := client.CoordinationV1().Leases(tc.leaseNN.Namespace).Get(ctx, tc.leaseNN.Name, metav1.GetOptions{})
+			lease, err := client.CoordinationV1().Leases(tc.leaseNN.Namespace).Get(ctx, tc.leaseNN.Name, metav1.GetOptions{})
+			if tc.expectLease {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if lease.Spec.HolderIdentity == nil || *lease.Spec.HolderIdentity != *tc.expectedHolderIdentity {
-					t.Errorf("reconcileElectionStep() holderIdentity = %v, want %v", *lease.Spec.HolderIdentity, *tc.expectedHolderIdentity)
+
+				// Check the lease holder identity
+				if tc.expectedHolderIdentity != nil && (lease.Spec.HolderIdentity == nil || *lease.Spec.HolderIdentity != *tc.expectedHolderIdentity) {
+					t.Errorf("reconcileElectionStep() holderIdentity = %s, want %s", strOrNil(lease.Spec.HolderIdentity), *tc.expectedHolderIdentity)
+				} else if tc.expectedHolderIdentity == nil && lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity != "" {
+					t.Errorf("reconcileElectionStep() holderIdentity = %s, want nil", *lease.Spec.HolderIdentity)
 				}
-				if tc.expectedPreferredHolder != "" {
-					if lease.Spec.PreferredHolder == nil || *lease.Spec.PreferredHolder != tc.expectedPreferredHolder {
-						t.Errorf("reconcileElectionStep() preferredHolder = %v, want %v", lease.Spec.PreferredHolder, tc.expectedPreferredHolder)
-					}
+				if tc.expectedPreferredHolder != nil && (lease.Spec.PreferredHolder == nil || *lease.Spec.PreferredHolder != *tc.expectedPreferredHolder) {
+					t.Errorf("reconcileElectionStep() preferredHolder = %s, want %s", strOrNil(lease.Spec.PreferredHolder), *tc.expectedPreferredHolder)
+				} else if tc.expectedPreferredHolder == nil && lease.Spec.PreferredHolder != nil && *lease.Spec.PreferredHolder != "" {
+					t.Errorf("reconcileElectionStep() preferredHolder = %s, want nil", *lease.Spec.PreferredHolder)
 				}
+
+				// Check chosen strategy in the Lease
+				if tc.expectedStrategy != nil && (lease.Spec.Strategy == nil || *lease.Spec.Strategy != *tc.expectedStrategy) {
+					t.Errorf("reconcileElectionStep() strategy = %s, want %s", strOrNil(lease.Spec.Strategy), *tc.expectedStrategy)
+				} else if tc.expectedStrategy == nil && lease.Spec.Strategy != nil && *lease.Spec.Strategy != "" {
+					t.Errorf("reconcileElectionStep() strategy = %s, want nil", *lease.Spec.Strategy)
+				}
+			} else if err == nil {
+				t.Errorf("reconcileElectionStep() expected no lease to be created")
 			}
 
 			// Verify that ping to candidate was issued
@@ -671,4 +763,11 @@ func TestController(t *testing.T) {
 			}
 		})
 	}
+}
+
+func strOrNil[T any](s *T) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%v", *s)
 }
