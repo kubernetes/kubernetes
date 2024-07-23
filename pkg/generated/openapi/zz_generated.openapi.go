@@ -18901,7 +18901,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidate(ref common.ReferenceC
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "LeaseCandidate defines a candidate for a lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
+				Description: "LeaseCandidate defines a candidate for a Lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -18995,7 +18995,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "LeaseSpec is a specification of a Lease.",
+				Description: "LeaseCandidateSpec is a specification of a Lease.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"leaseName": {
@@ -19014,20 +19014,20 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 					},
 					"renewTime": {
 						SchemaProps: spec.SchemaProps{
-							Description: "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew.",
+							Description: "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew. The PingTime field is updated regularly to prevent garbage collection for still active LeaseCandidates.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"),
 						},
 					},
 					"binaryVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when Strategy is \"OldestEmulationVersion\"",
+							Description: "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required when strategy is \"OldestEmulationVersion\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"emulationVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "EmulationVersion is the emulation version. It must be in a semver format without leading `v`. EmulationVersion must be less than or equal to BinaryVersion. This field is required when Strategy is \"OldestEmulationVersion\"",
+							Description: "EmulationVersion is the emulation version. It must be in a semver format without leading `v`. EmulationVersion must be less than or equal to BinaryVersion. This field is required when strategy is \"OldestEmulationVersion\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19039,7 +19039,7 @@ func schema_k8sio_api_coordination_v1alpha1_LeaseCandidateSpec(ref common.Refere
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has strategy [X] and another candidate has strategy [Y, X], Y supersedes X and strategy Y\n  will be used\n- If a candidate has strategy [X, Y] and another candidate has strategy [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
+							Description: "PreferredStrategies indicates the list of strategies for picking the leader for coordinated leader election. The list is ordered, and the first strategy supersedes all other strategies. The list is used by coordinated leader election to make a decision about the final election strategy. This follows as - If all clients have strategy X as the first element in this list, strategy X will be used. - If a candidate has [X] and another candidate has [Y, X], Y supersedes X and strategy Y\n  will be used.\n- If a candidate has [X, Y] and another candidate has [Y, X], this is a user error and leader\n  election will not operate the Lease until resolved.\n- In general: [A1, A2, ..., An] > [B1, B2, ..., Bm] if the latter is a sub-sequence of the former, and hence\n  A1 is chosen. For more than two candidates, one must be the maximum of all candidates. Otherwise, this is a user\n  error and leader election will not operate the Lease until resolved.\n(Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
