@@ -255,6 +255,9 @@ func TestValidateLeaseCandidateUpdate(t *testing.T) {
 					BinaryVersion:    "1.30.0",
 					EmulationVersion: "1.30.0",
 					LeaseName:        "test",
+					PreferredStrategies: []coordination.CoordinatedLeaseStrategy{
+						coordination.OldestEmulationVersion,
+					},
 				},
 			},
 			update: coordination.LeaseCandidate{
@@ -262,6 +265,9 @@ func TestValidateLeaseCandidateUpdate(t *testing.T) {
 					BinaryVersion:    "1.30.0",
 					EmulationVersion: "1.30.0",
 					LeaseName:        "test",
+					PreferredStrategies: []coordination.CoordinatedLeaseStrategy{
+						coordination.OldestEmulationVersion,
+					},
 				},
 			},
 			err: false,
@@ -273,6 +279,9 @@ func TestValidateLeaseCandidateUpdate(t *testing.T) {
 					BinaryVersion:    "1.30.0",
 					EmulationVersion: "1.30.0",
 					LeaseName:        "test",
+					PreferredStrategies: []coordination.CoordinatedLeaseStrategy{
+						coordination.OldestEmulationVersion,
+					},
 				},
 			},
 			update: coordination.LeaseCandidate{
@@ -280,6 +289,9 @@ func TestValidateLeaseCandidateUpdate(t *testing.T) {
 					BinaryVersion:    "1.30.0",
 					EmulationVersion: "1.30.0",
 					LeaseName:        "test-update",
+					PreferredStrategies: []coordination.CoordinatedLeaseStrategy{
+						coordination.OldestEmulationVersion,
+					},
 				},
 			},
 			err: true,
