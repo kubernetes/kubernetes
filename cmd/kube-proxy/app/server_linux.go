@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"github.com/google/cadvisor/machine"
@@ -178,8 +177,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ipt,
 				utilsysctl.New(),
 				exec.New(),
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
@@ -202,8 +201,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				iptInterface,
 				utilsysctl.New(),
 				exec.New(),
-				config.IPTables.SyncPeriod.Duration,
-				config.IPTables.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
@@ -238,8 +237,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ipsetInterface,
 				utilsysctl.New(),
 				execer,
-				config.IPVS.SyncPeriod.Duration,
-				config.IPVS.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
 				config.IPVS.StrictARP,
 				config.IPVS.TCPTimeout.Duration,
@@ -266,8 +265,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ipsetInterface,
 				utilsysctl.New(),
 				execer,
-				config.IPVS.SyncPeriod.Duration,
-				config.IPVS.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
 				config.IPVS.StrictARP,
 				config.IPVS.TCPTimeout.Duration,
@@ -295,8 +294,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
 				ctx,
-				config.NFTables.SyncPeriod.Duration,
-				config.NFTables.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors,
@@ -313,8 +312,8 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			proxier, err = nftables.NewProxier(
 				ctx,
 				s.PrimaryIPFamily,
-				config.NFTables.SyncPeriod.Duration,
-				config.NFTables.MinSyncPeriod.Duration,
+				config.SyncPeriod.Duration,
+				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
@@ -477,12 +476,11 @@ func getLocalDetectors(logger klog.Logger, primaryIPFamily v1.IPFamily, config *
 
 	switch config.DetectLocalMode {
 	case proxyconfigapi.LocalModeClusterCIDR:
-		clusterCIDRs := strings.Split(strings.TrimSpace(config.ClusterCIDR), ",")
-		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(clusterCIDRs) {
+		for family, cidrs := range proxyutil.MapCIDRsByIPFamily(config.DetectLocal.ClusterCIDRs) {
 			localDetectors[family] = proxyutil.NewDetectLocalByCIDR(cidrs[0].String())
 		}
 		if !localDetectors[primaryIPFamily].IsImplemented() {
-			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDR", config.ClusterCIDR)
+			logger.Info("Detect-local-mode set to ClusterCIDR, but no cluster CIDR specified for primary IP family", "ipFamily", primaryIPFamily, "clusterCIDRs", config.DetectLocal.ClusterCIDRs)
 		}
 
 	case proxyconfigapi.LocalModeNodeCIDR:

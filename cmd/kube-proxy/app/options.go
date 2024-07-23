@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
@@ -79,6 +80,14 @@ type Options struct {
 	hostnameOverride string
 
 	logger klog.Logger
+
+	// The fields below here are placeholders for flags that can't be directly mapped into
+	// config.KubeProxyConfiguration.
+	iptablesSyncPeriod    time.Duration
+	iptablesMinSyncPeriod time.Duration
+	ipvsSyncPeriod        time.Duration
+	ipvsMinSyncPeriod     time.Duration
+	clusterCIDRs          string
 }
 
 // AddFlags adds flags to fs and binds them to options.
@@ -120,11 +129,11 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", ptr.Deref(o.config.IPTables.MasqueradeBit, 14), "If using the iptables or ipvs proxy mode, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.BoolVar(&o.config.Linux.MasqueradeAll, "masquerade-all", o.config.Linux.MasqueradeAll, "SNAT all traffic sent via Service cluster IPs. This may be required with some CNI plugins. Only supported on Linux.")
 	fs.BoolVar(o.config.IPTables.LocalhostNodePorts, "iptables-localhost-nodeports", ptr.Deref(o.config.IPTables.LocalhostNodePorts, true), "If false, kube-proxy will disable the legacy behavior of allowing NodePort services to be accessed via localhost. (Applies only to iptables mode and IPv4; localhost NodePorts are never allowed with other proxy modes or with IPv6.)")
-	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
-	fs.DurationVar(&o.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.")
+	fs.DurationVar(&o.iptablesSyncPeriod, "iptables-sync-period", o.config.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
+	fs.DurationVar(&o.iptablesMinSyncPeriod, "iptables-min-sync-period", o.config.MinSyncPeriod.Duration, "The minimum period between iptables rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate iptables resync.")
 
-	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
-	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum period between IPVS rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate IPVS resync.")
+	fs.DurationVar(&o.ipvsSyncPeriod, "ipvs-sync-period", o.config.SyncPeriod.Duration, "An interval (e.g. '5s', '1m', '2h22m') indicating how frequently various re-synchronizing and cleanup operations are performed. Must be greater than 0.")
+	fs.DurationVar(&o.ipvsMinSyncPeriod, "ipvs-min-sync-period", o.config.MinSyncPeriod.Duration, "The minimum period between IPVS rule resyncs (e.g. '5s', '1m', '2h22m'). A value of 0 means every Service or EndpointSlice change will result in an immediate IPVS resync.")
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDRs which the ipvs proxier should not touch when cleaning up IPVS rules.")
 	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
@@ -135,7 +144,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic. This parameter is ignored if a config file is specified by --config.")
 	fs.StringVar(&o.config.DetectLocal.BridgeInterface, "pod-bridge-interface", o.config.DetectLocal.BridgeInterface, "A bridge interface name. When --detect-local-mode is set to BridgeInterface, kube-proxy will consider traffic to be local if it originates from this bridge.")
 	fs.StringVar(&o.config.DetectLocal.InterfaceNamePrefix, "pod-interface-name-prefix", o.config.DetectLocal.InterfaceNamePrefix, "An interface name prefix. When --detect-local-mode is set to InterfaceNamePrefix, kube-proxy will consider traffic to be local if it originates from any interface whose name begins with this prefix.")
-	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of the pods in the cluster. (For dual-stack clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When --detect-local-mode is set to ClusterCIDR, kube-proxy will consider traffic to be local if its source IP is in this range. (Otherwise it is not used.) "+
+	fs.StringVar(&o.clusterCIDRs, "cluster-cidr", strings.Join(o.config.DetectLocal.ClusterCIDRs, ","), "The CIDR range of the pods in the cluster. (For dual-stack clusters, this can be a comma-separated dual-stack pair of CIDR ranges.). When --detect-local-mode is set to ClusterCIDR, kube-proxy will consider traffic to be local if its source IP is in this range. (Otherwise it is not used.) "+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
@@ -161,8 +170,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	_ = fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
 	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
 	_ = fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "This was previously used to configure the userspace proxy, but is now unused.")
-	_ = fs.MarkDeprecated("proxy-port-range", "This flag has no effect and will be removed in a future release.")
 
 	logsapi.AddFlags(&o.config.Logging, fs)
 }
@@ -216,6 +223,8 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		if err := o.initWatcher(); err != nil {
 			return err
 		}
+	} else {
+		o.processV1Alpha1Flags(fs)
 	}
 
 	o.platformApplyDefaults(o.config)
@@ -300,6 +309,25 @@ func (o *Options) processHostnameOverrideFlag() error {
 	}
 
 	return nil
+}
+
+// processV1Alpha1Flags processes v1alpha1 flags which can't be directly mapped to internal config.
+func (o *Options) processV1Alpha1Flags(fs *pflag.FlagSet) {
+	if fs.Changed("iptables-sync-period") && o.config.Mode != kubeproxyconfig.ProxyModeIPVS {
+		o.config.SyncPeriod.Duration = o.iptablesSyncPeriod
+	}
+	if fs.Changed("iptables-min-sync-period") && o.config.Mode != kubeproxyconfig.ProxyModeIPVS {
+		o.config.MinSyncPeriod.Duration = o.iptablesMinSyncPeriod
+	}
+	if fs.Changed("ipvs-sync-period") && o.config.Mode == kubeproxyconfig.ProxyModeIPVS {
+		o.config.SyncPeriod.Duration = o.ipvsSyncPeriod
+	}
+	if fs.Changed("ipvs-min-sync-period") && o.config.Mode == kubeproxyconfig.ProxyModeIPVS {
+		o.config.MinSyncPeriod.Duration = o.ipvsMinSyncPeriod
+	}
+	if fs.Changed("cluster-cidr") {
+		o.config.DetectLocal.ClusterCIDRs = strings.Split(o.clusterCIDRs, ",")
+	}
 }
 
 // Validate validates all the required options.

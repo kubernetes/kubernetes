@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -222,7 +221,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup(ctx)
@@ -271,8 +270,7 @@ func checkBadConfig(s *ProxyServer) error {
 	// we can at least take note of whether there is any explicitly-dual-stack
 	// configuration.
 	anyDualStackConfig := false
-	clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
-	for _, config := range [][]string{clusterCIDRs, s.Config.NodePortAddresses, s.Config.IPVS.ExcludeCIDRs, s.podCIDRs} {
+	for _, config := range [][]string{s.Config.DetectLocal.ClusterCIDRs, s.Config.NodePortAddresses, s.Config.IPVS.ExcludeCIDRs, s.podCIDRs} {
 		if dual, _ := netutils.IsDualStackCIDRStrings(config); dual {
 			anyDualStackConfig = true
 			break
@@ -314,14 +312,11 @@ func checkBadIPConfig(s *ProxyServer, dualStackSupported bool) (err error, fatal
 		clusterType = fmt.Sprintf("%s-only", s.PrimaryIPFamily)
 	}
 
-	if s.Config.ClusterCIDR != "" {
-		clusterCIDRs := strings.Split(s.Config.ClusterCIDR, ",")
-		if badCIDRs(clusterCIDRs, badFamily) {
-			errors = append(errors, fmt.Errorf("cluster is %s but clusterCIDRs contains only IPv%s addresses", clusterType, badFamily))
-			if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR && !dualStackSupported {
-				// This has always been a fatal error
-				fatal = true
-			}
+	if badCIDRs(s.Config.DetectLocal.ClusterCIDRs, badFamily) {
+		errors = append(errors, fmt.Errorf("cluster is %s but clusterCIDRs contains only IPv%s addresses", clusterType, badFamily))
+		if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeClusterCIDR && !dualStackSupported {
+			// This has always been a fatal error
+			fatal = true
 		}
 	}
 
