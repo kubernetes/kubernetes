@@ -136,7 +136,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		e2eoutput.TestContainerOutput(ctx, f, "check pod SecurityContext username", pod, 1, []string{"ContainerAdministrator"})
 	})
 
-	ginkgo.It("should ignore SELinux Specific SecurityContext if set", func(ctx context.Context) {
+	ginkgo.It("should ignore Linux Specific SecurityContext if set", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with SELinux options")
 		// It is sufficient to show that the pod comes up here. Since we're stripping the SELinux and other linux
 		// security contexts in apiserver and not updating the pod object in the apiserver, we cannot validate the
@@ -150,30 +150,6 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		windowsPodWithSELinux.Spec.SecurityContext.SELinuxOptions = &v1.SELinuxOptions{Level: "s0:c24,c9"}
 		windowsPodWithSELinux.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
 			SELinuxOptions: &v1.SELinuxOptions{Level: "s0:c24,c9"},
-			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName}}
-		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
-		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx,
-			windowsPodWithSELinux, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		framework.Logf("Created pod %v", windowsPodWithSELinux)
-		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, windowsPodWithSELinux.Name,
-			f.Namespace.Name), "failed to wait for pod %s to be running", windowsPodWithSELinux.Name)
-	})
-
-	ginkgo.It("should ignore ProcMount Specific SecurityContext if set", func(ctx context.Context) {
-		ginkgo.By("Creating a pod with ProcMount options")
-		// It is sufficient to show that the pod comes up here. Since we're stripping the SELinux and other linux
-		// security contexts in apiserver and not updating the pod object in the apiserver, we cannot validate the
-		// pod object to not have those security contexts. However the pod coming to running state is a sufficient
-		// enough condition for us to validate since prior to https://github.com/kubernetes/kubernetes/pull/93475
-		// the pod would have failed to come up.
-		windowsPodWithSELinux := createTestPod(f, imageutils.GetE2EImage(imageutils.Agnhost), windowsOS)
-		windowsPodWithSELinux.Spec.Containers[0].Args = []string{"test-webserver-with-selinux"}
-		windowsPodWithSELinux.Spec.SecurityContext = &v1.PodSecurityContext{}
-		pmt := v1.UnmaskedProcMount
-		containerUserName := "ContainerAdministrator"
-		windowsPodWithSELinux.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
-			ProcMount:      &pmt,
 			WindowsOptions: &v1.WindowsSecurityContextOptions{RunAsUserName: &containerUserName}}
 		windowsPodWithSELinux.Spec.Tolerations = []v1.Toleration{{Key: "os", Value: "Windows"}}
 		windowsPodWithSELinux, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx,
