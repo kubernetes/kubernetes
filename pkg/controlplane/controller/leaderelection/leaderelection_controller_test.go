@@ -123,9 +123,6 @@ func TestReconcileElectionStep(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "component-A",
-					Annotations: map[string]string{
-						ElectedByAnnotationName: controllerName,
-					},
 				},
 				Spec: v1.LeaseSpec{
 					HolderIdentity:       ptr.To("component-identity-1"),
@@ -197,9 +194,6 @@ func TestReconcileElectionStep(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 					Name:      "component-A",
-					Annotations: map[string]string{
-						ElectedByAnnotationName: controllerName,
-					},
 				},
 				Spec: v1.LeaseSpec{
 					HolderIdentity:       ptr.To("component-identity-expired"),
@@ -320,7 +314,7 @@ func TestReconcileElectionStep(t *testing.T) {
 			cache.WaitForCacheSync(ctx.Done(), controller.leaseCandidateInformer.Informer().HasSynced)
 			requeue, err := controller.reconcileElectionStep(ctx, tc.leaseNN)
 
-			if requeue != tc.expectedRequeue {
+			if (requeue != 0) != tc.expectedRequeue {
 				t.Errorf("reconcileElectionStep() requeue = %v, want %v", requeue, tc.expectedRequeue)
 			}
 			if tc.expectedError && err == nil {
@@ -404,9 +398,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity: ptr.To("component-identity-1"),
@@ -463,9 +454,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity: ptr.To("component-identity-1"),
@@ -482,9 +470,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1alpha1.LeaseCandidateSpec{},
 				},
@@ -510,9 +495,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity: ptr.To("component-identity-1"),
@@ -529,9 +511,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1alpha1.LeaseCandidateSpec{},
 				},
@@ -567,9 +546,6 @@ func TestController(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
-						Annotations: map[string]string{
-							ElectedByAnnotationName: controllerName,
-						},
 					},
 					Spec: v1.LeaseSpec{
 						HolderIdentity: ptr.To("component-identity-2"),
