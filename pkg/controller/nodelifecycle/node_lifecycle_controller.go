@@ -284,7 +284,11 @@ type Controller struct {
 	//    be less than the node health signal update frequency, since there will
 	//    only be fresh values from Kubelet at an interval of node health signal
 	//    update frequency.
-	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger
+	// 2. nodeMonitorGracePeriod should be greater than the sum of HTTP2_PING_TIMEOUT_SECONDS (30s)
+	// 	  and HTTP2_READ_IDLE_TIMEOUT_SECONDS (15s) from the http2 health check
+	// 	  to ensure that the server has adequate time to handle slow or idle connections
+	//    properly before marking a node as unhealthy.
+	// 3. nodeMonitorGracePeriod can't be too large for user experience - larger
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
 
