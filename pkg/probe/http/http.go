@@ -90,7 +90,7 @@ type GetHTTPInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(req *http.Request, client GetHTTPInterface) (probe.Result, string, error) {
+var DoHTTPProbe = func(req *http.Request, client GetHTTPInterface) (probe.Result, string, error) {
 	url := req.URL
 	headers := req.Header
 	res, err := client.Do(req)

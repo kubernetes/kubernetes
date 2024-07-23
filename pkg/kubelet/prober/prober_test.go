@@ -21,8 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
 func TestGetURLParts(t *testing.T) {
@@ -331,5 +334,86 @@ func TestNewExecInContainer(t *testing.T) {
 		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {
 			t.Errorf("%s: error: expected %s, got %s", test.name, e, a)
 		}
+	}
+}
+
+func mockProbe(req *http.Request, client httpprobe.GetHTTPInterface) (probe.Result, string, error) {
+	return probe.Success, "", nil
+}
+
+func runParallelProbes() {
+	const nPods = 110
+	const epoch = 5 * 60
+	const followNonLocalRedirects = true
+	ctx := context.Background()
+	httpprobe.DoHTTPProbe = mockProbe
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "foobar"}
+	httpProbe := &v1.Probe{
+		ProbeHandler: v1.ProbeHandler{
+			HTTPGet: &v1.HTTPGetAction{Port: intstr.FromInt(80)},
+		},
+	}
+	prober := &prober{
+		http:     httpprobe.New(followNonLocalRedirects),
+		recorder: &record.FakeRecorder{},
+	}
+	var testPods = make([]v1.Pod, nPods)
+	var testContainers = make([]v1.Container, nPods*2)
+	for i := 0; i < nPods; i++ {
+		testContainers[2*i] = v1.Container{Name: fmt.Sprintf("pod-%d-container-1", i)}
+		testContainers[2*i+1] = v1.Container{Name: fmt.Sprintf("pod-%d-container-2", i)}
+		testPods[i] = v1.Pod{}
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(nPods * 2)
+	for i := 0; i < nPods*2; i++ {
+		pod := testPods[i/2]
+		container := testContainers[i]
+		go func() {
+			defer wg.Done()
+			for j := 0; j < epoch; j++ {
+				for _, probeType := range [...]probeType{liveness, readiness, startup} {
+					switch probeType {
+					case liveness:
+						container.LivenessProbe = httpProbe
+					case readiness:
+						container.ReadinessProbe = httpProbe
+					case startup:
+						container.StartupProbe = httpProbe
+					}
+					_, err := prober.probe(ctx, probeType, &pod, v1.PodStatus{PodIP: "10.0.0.1"}, container, containerID)
+					if err != nil {
+						continue
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// Benchmark result:
+// goos: linux
+// goarch: amd64
+// pkg: k8s.io/kubernetes/pkg/kubelet/prober
+// cpu: Intel(R) Xeon(R) Gold 5220R CPU @ 2.20GHz
+//
+//	│    old.txt    │               new.txt               │
+//	│    sec/op     │   sec/op     vs base                │
+//
+// HTTPProbe-8   142.71m ± 10%   33.33m ± 5%  -76.65% (p=0.000 n=10)
+//
+//	│    old.txt    │               new.txt                │
+//	│     B/op      │     B/op      vs base                │
+//
+// HTTPProbe-8   251.43Mi ± 0%   35.01Mi ± 0%  -86.08% (p=0.000 n=10)
+//
+//	│   old.txt    │               new.txt               │
+//	│  allocs/op   │  allocs/op   vs base                │
+//
+// HTTPProbe-8   3367.7k ± 0%   607.0k ± 0%  -81.98% (p=0.000 n=10)
+func BenchmarkHTTPProbe(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		runParallelProbes()
 	}
 }
