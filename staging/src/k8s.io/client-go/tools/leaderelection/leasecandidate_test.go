@@ -82,8 +82,8 @@ func TestLeaseCandidateAck(t *testing.T) {
 
 	candidate, _, err := NewCandidate(
 		client,
-		tc.candidateName,
 		tc.candidateNamespace,
+		tc.candidateName,
 		tc.leaseName,
 		tc.binaryVersion,
 		tc.emulationVersion,
