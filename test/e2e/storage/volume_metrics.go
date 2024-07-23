@@ -518,17 +518,17 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 			pv  *v1.PersistentVolume
 			pvc *v1.PersistentVolumeClaim
 
-			storageClassName          = "bound-unbound-count-test-sc"
-			volumeAttributesClassName = "bound-unbound-count-test-vac"
-			// TODO: Insert volumeAttributesClassName into pvConfig/pvcConfig when "VolumeAttributesClass" is GA
-			pvConfig = e2epv.PersistentVolumeConfig{
+			storageClassName = "bound-unbound-count-test-sc"
+			pvConfig         = e2epv.PersistentVolumeConfig{
 				PVSource: v1.PersistentVolumeSource{
 					HostPath: &v1.HostPathVolumeSource{Path: "/data"},
 				},
 				NamePrefix:       "pv-test-",
 				StorageClassName: storageClassName,
 			}
-			pvcConfig = e2epv.PersistentVolumeClaimConfig{StorageClassName: &storageClassName}
+			// TODO: Insert volumeAttributesClassName into pvcConfig when "VolumeAttributesClass" is GA
+			volumeAttributesClassName = "bound-unbound-count-test-vac"
+			pvcConfig                 = e2epv.PersistentVolumeClaimConfig{StorageClassName: &storageClassName}
 
 			e2emetrics = []struct {
 				name      string
@@ -656,9 +656,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
 				pvcConfigWithVAC := pvcConfig
 				pvcConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
-				pvConfigWithVAC := pvConfig
-				pvConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
-				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfigWithVAC, pvcConfigWithVAC, ns, true)
+				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfigWithVAC, ns, true)
 				framework.ExpectNoError(err, "Error creating pv pvc: %v", err)
 				waitForPVControllerSync(ctx, metricsGrabber, boundPVKey, storageClassKey)
 				waitForPVControllerSync(ctx, metricsGrabber, boundPVCKey, volumeAttributeClassKey)

@@ -104,10 +104,6 @@ type PersistentVolumeConfig struct {
 	// [Optiona] ReclaimPolicy defaults to "Reclaim" if unset
 	ReclaimPolicy    v1.PersistentVolumeReclaimPolicy
 	StorageClassName string
-	// [Optional] VolumeAttributesClassName specifies name of VolumeAttributesClass to which this PV belongs.
-	// When this field is not set, it indicates that this volume does not belong to any VAC.
-	// This is an alpha field and requires enabling VolumeAttributesClass feature.
-	VolumeAttributesClassName *string
 	// [Optional] NodeAffinity defines constraints that limit what nodes this
 	// volume can be accessed from.
 	NodeAffinity *v1.VolumeNodeAffinity
@@ -621,13 +617,12 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 			Capacity: v1.ResourceList{
 				v1.ResourceStorage: resource.MustParse(pvConfig.Capacity),
 			},
-			PersistentVolumeSource:    pvConfig.PVSource,
-			AccessModes:               pvConfig.AccessModes,
-			ClaimRef:                  claimRef,
-			StorageClassName:          pvConfig.StorageClassName,
-			VolumeAttributesClassName: pvConfig.VolumeAttributesClassName,
-			NodeAffinity:              pvConfig.NodeAffinity,
-			VolumeMode:                pvConfig.VolumeMode,
+			PersistentVolumeSource: pvConfig.PVSource,
+			AccessModes:            pvConfig.AccessModes,
+			ClaimRef:               claimRef,
+			StorageClassName:       pvConfig.StorageClassName,
+			NodeAffinity:           pvConfig.NodeAffinity,
+			VolumeMode:             pvConfig.VolumeMode,
 		},
 	}
 }
