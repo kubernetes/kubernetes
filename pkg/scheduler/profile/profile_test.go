@@ -251,6 +251,16 @@ func TestNewMap(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			m, err := NewMap(ctx, tc.cfgs, fakeRegistry, nilRecorderFactory)
+			defer func() {
+				if m != nil {
+					// to close all frameworks registered in this map.
+					err := m.Close()
+					if err != nil {
+						t.Errorf("error closing map: %v", err)
+					}
+				}
+			}()
+
 			if err := checkErr(err, tc.wantErr); err != nil {
 				t.Fatal(err)
 			}
