@@ -17,7 +17,7 @@ limitations under the License.
 package leaderelection
 
 import (
-	"slices"
+	"fmt"
 	"time"
 
 	"github.com/blang/semver/v4"
@@ -53,26 +53,70 @@ func shouldReelect(candidates []*v1alpha1.LeaseCandidate, currentLeader *v1alpha
 	return compare(currentLeader, pickedLeader) > 0
 }
 
-func pickBestStrategy(candidates []*v1alpha1.LeaseCandidate) v1.CoordinatedLeaseStrategy {
-	// TODO: This doesn't account for cycles within the preference graph
-	// We may have to do a topological sort to verify that the preference ordering is valid
-	var bestStrategy *v1.CoordinatedLeaseStrategy
-	for _, c := range candidates {
-		if len(c.Spec.PreferredStrategies) > 0 {
-			if bestStrategy == nil {
-				bestStrategy = &c.Spec.PreferredStrategies[0]
-				continue
-			}
-			if *bestStrategy != c.Spec.PreferredStrategies[0] {
-				if idx := slices.Index(c.Spec.PreferredStrategies, *bestStrategy); idx > 0 {
-					bestStrategy = &c.Spec.PreferredStrategies[0]
-				} else {
-					klog.Infof("Error: bad strategy ordering")
-				}
+// topologicalSortWithOneRoot has a caveat that there may only be one root (indegree=0) node in a valid ordering.
+func topologicalSortWithOneRoot(graph map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy) []v1.CoordinatedLeaseStrategy {
+	inDegree := make(map[v1.CoordinatedLeaseStrategy]int)
+	for node := range graph {
+		inDegree[node] = 0
+	}
+	for _, neighbors := range graph {
+		for _, neighbor := range neighbors {
+			inDegree[neighbor]++
+		}
+	}
+
+	var queue []v1.CoordinatedLeaseStrategy
+	for vertex, degree := range inDegree {
+		if degree == 0 {
+			queue = append(queue, vertex)
+		}
+	}
+
+	// If multiple nodes have indegree of 0, multiple strategies are non-superceding and is a conflict.
+	if len(queue) > 1 {
+		return nil
+	}
+
+	var sorted []v1.CoordinatedLeaseStrategy
+	for len(queue) > 0 {
+		vertex := queue[0]
+		queue = queue[1:]
+		sorted = append(sorted, vertex)
+
+		for _, neighbor := range graph[vertex] {
+			inDegree[neighbor]--
+			if inDegree[neighbor] == 0 {
+				queue = append(queue, neighbor)
 			}
 		}
 	}
-	return (*bestStrategy)
+
+	if len(sorted) != len(graph) {
+		fmt.Printf("%s", (sorted))
+		return nil // Cycle detected
+	}
+
+	return sorted
+}
+
+func pickBestStrategy(candidates []*v1alpha1.LeaseCandidate) (v1.CoordinatedLeaseStrategy, error) {
+	graph := make(map[v1.CoordinatedLeaseStrategy][]v1.CoordinatedLeaseStrategy)
+	nilStrategy := v1.CoordinatedLeaseStrategy("")
+	for _, c := range candidates {
+		for i := range len(c.Spec.PreferredStrategies) - 1 {
+			graph[c.Spec.PreferredStrategies[i]] = append(graph[c.Spec.PreferredStrategies[i]], c.Spec.PreferredStrategies[i+1])
+		}
+		if _, ok := graph[c.Spec.PreferredStrategies[len(c.Spec.PreferredStrategies)-1]]; !ok {
+			graph[c.Spec.PreferredStrategies[len(c.Spec.PreferredStrategies)-1]] = []v1.CoordinatedLeaseStrategy{}
+		}
+	}
+
+	sorted := topologicalSortWithOneRoot(graph)
+	if sorted == nil {
+		return nilStrategy, fmt.Errorf("Invalid strategy")
+	}
+
+	return sorted[0], nil
 }
 
 func validLeaseCandidateForOldestEmulationVersion(l *v1alpha1.LeaseCandidate) bool {

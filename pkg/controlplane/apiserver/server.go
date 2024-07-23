@@ -162,7 +162,15 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 					client.CoordinationV1(),
 					client.CoordinationV1alpha1(),
 				)
-				return controller.Run, err
+				gccontroller := leaderelection.NewLeaseCandidateGC(
+					client,
+					1*time.Hour,
+					lcInformer,
+				)
+				return func(ctx context.Context, workers int) {
+					go controller.Run(ctx, workers)
+					go gccontroller.Run(ctx.Done())
+				}, err
 			})
 			return nil
 		})
