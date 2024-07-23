@@ -40,7 +40,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
-	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
 const (

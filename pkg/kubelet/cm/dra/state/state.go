@@ -21,10 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-const (
-	Version = "v1"
-)
-
 type ClaimInfoStateList []ClaimInfoState
 
 // +k8s:deepcopy-gen=true

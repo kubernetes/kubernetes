@@ -46,6 +46,7 @@ func NewCheckpointer(stateDir, checkpointName string) (Checkpointer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager: %w", err)
 	}
+
 	checkpointer := &checkpointer{
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
@@ -55,7 +56,7 @@ func NewCheckpointer(stateDir, checkpointName string) (Checkpointer, error) {
 }
 
 // GetOrCreate gets list of claim info states from a checkpoint
-// or creates empty list it checkpoint doesn't exist yet
+// or creates empty list if checkpoint doesn't exist
 func (sc *checkpointer) GetOrCreate() (*Checkpoint, error) {
 	sc.Lock()
 	defer sc.Unlock()

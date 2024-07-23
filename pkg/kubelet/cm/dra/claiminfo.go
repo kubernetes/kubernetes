@@ -25,7 +25,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -40,8 +40,8 @@ type ClaimInfo struct {
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
 	sync.RWMutex
-	state     state.Checkpointer
-	claimInfo map[string]*ClaimInfo
+	checkpointer state.Checkpointer
+	claimInfo    map[string]*ClaimInfo
 }
 
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
@@ -124,11 +124,11 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 	}
 
 	cache := &claimInfoCache{
-		state:     checkpointer,
-		claimInfo: make(map[string]*ClaimInfo),
+		checkpointer: checkpointer,
+		claimInfo:    make(map[string]*ClaimInfo),
 	}
 
-	entries, err := checkpoint.GetEntries()
+	entries, err := checkpoint.GetClaimInfoStateList()
 	if err != nil {
 		return nil, fmt.Errorf("error calling GetEntries() on checkpoint: %w", err)
 
@@ -201,7 +201,7 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 	if err != nil {
 		return err
 	}
-	return cache.state.Store(checkpoint)
+	return cache.checkpointer.Store(checkpoint)
 }
 
 // cdiDevicesAsList returns a list of CDIDevices from the provided claim info.

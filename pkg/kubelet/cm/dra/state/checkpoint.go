@@ -27,7 +27,7 @@ import (
 const (
 	CheckpointAPIGroup   = "checkpoint.dra.kubelet.k8s.io"
 	CheckpointKind       = "DRACheckpoint"
-	CheckpointAPIVersion = CheckpointAPIGroup + "/" + Version
+	CheckpointAPIVersion = CheckpointAPIGroup + "/v1"
 )
 
 // Checkpoint represents a structure to store DRA checkpoint data
@@ -40,7 +40,7 @@ type Checkpoint struct {
 
 type CheckpointData struct {
 	metav1.TypeMeta
-	Entries ClaimInfoStateList
+	ClaimInfoStateList ClaimInfoStateList
 }
 
 // NewCheckpoint creates a new checkpoint from a list of claim info states
@@ -50,7 +50,7 @@ func NewCheckpoint(data ClaimInfoStateList) (*Checkpoint, error) {
 			Kind:       CheckpointKind,
 			APIVersion: CheckpointAPIVersion,
 		},
-		Entries: data,
+		ClaimInfoStateList: data,
 	}
 
 	cpDataBytes, err := json.Marshal(cpData)
@@ -58,10 +58,12 @@ func NewCheckpoint(data ClaimInfoStateList) (*Checkpoint, error) {
 		return nil, err
 	}
 
-	return &Checkpoint{
+	cp := &Checkpoint{
 		Data:     string(cpDataBytes),
 		Checksum: crc32.ChecksumIEEE(cpDataBytes),
-	}, nil
+	}
+
+	return cp, nil
 }
 
 // MarshalCheckpoint marshals checkpoint to JSON
@@ -94,12 +96,12 @@ func (cp *Checkpoint) VerifyChecksum() error {
 	return nil
 }
 
-// GetEntries returns list of claim info states from checkpoint
-func (cp *Checkpoint) GetEntries() (ClaimInfoStateList, error) {
-	var cpData CheckpointData
-	if err := json.Unmarshal([]byte(cp.Data), &cpData); err != nil {
+// GetClaimInfoStateList returns list of claim info states from checkpoint
+func (cp *Checkpoint) GetClaimInfoStateList() (ClaimInfoStateList, error) {
+	var data CheckpointData
+	if err := json.Unmarshal([]byte(cp.Data), &data); err != nil {
 		return nil, err
 	}
 
-	return cpData.Entries, nil
+	return data.ClaimInfoStateList, nil
 }
