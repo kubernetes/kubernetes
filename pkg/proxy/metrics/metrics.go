@@ -316,6 +316,8 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
+			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
+			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
 
