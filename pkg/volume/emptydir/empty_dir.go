@@ -34,6 +34,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota"
@@ -294,12 +295,19 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 	if mounterSize != nil {
 		// Deliberately shadow the outer use of err as noted
 		// above.
-		hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir)
+		// hostUsers field is interpreted as true by default, so a pod is by default
+		// not confined by a user namespace.
+		userNamespacesEnabled := false
+		if usernamespacefeature.EnabledUserNamespacesSupport() {
+			userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
+		}
+		hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir, userNamespacesEnabled)
+		klog.V(3).Infof("assignQuota called, hasQuotas = %t userNamespacesEnabled = %t", hasQuotas, userNamespacesEnabled)
 		if err != nil {
 			klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
 		} else if hasQuotas {
-			klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterSize, dir)
-			if err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize); err != nil {
+			klog.V(3).Infof("emptydir trying to assign quota %v on %s", mounterSize, dir)
+			if err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize, userNamespacesEnabled); err != nil {
 				klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
 				return err
 			}
@@ -514,7 +522,11 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 func (ed *emptyDir) teardownDefault(dir string) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring) {
 		// Remove any quota
-		err := fsquota.ClearQuota(ed.mounter, dir)
+		userNamespacesEnabled := false
+		if usernamespacefeature.EnabledUserNamespacesSupport() {
+			userNamespacesEnabled = ed.pod.Spec.HostUsers != nil && !*ed.pod.Spec.HostUsers
+		}
+		err := fsquota.ClearQuota(ed.mounter, dir, userNamespacesEnabled)
 		if err != nil {
 			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
 		}
