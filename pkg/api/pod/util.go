@@ -628,25 +628,6 @@ func dropDisabledFields(
 		podSpec = &api.PodSpec{}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) && !appArmorAnnotationsInUse(oldPodAnnotations) {
-		for k := range podAnnotations {
-			if strings.HasPrefix(k, api.DeprecatedAppArmorAnnotationKeyPrefix) {
-				delete(podAnnotations, k)
-			}
-		}
-	}
-	if (!utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) || !utilfeature.DefaultFeatureGate.Enabled(features.AppArmorFields)) && !appArmorFieldsInUse(oldPodSpec) {
-		if podSpec.SecurityContext != nil {
-			podSpec.SecurityContext.AppArmorProfile = nil
-		}
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, _ ContainerType) bool {
-			if c.SecurityContext != nil {
-				c.SecurityContext.AppArmorProfile = nil
-			}
-			return true
-		})
-	}
-
 	// If the feature is disabled and not in use, drop the hostUsers field.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) && !hostUsersInUse(oldPodSpec) {
 		// Drop the field in podSpec only if SecurityContext is not nil.

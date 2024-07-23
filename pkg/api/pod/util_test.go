@@ -769,45 +769,36 @@ func TestDropAppArmor(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		for _, enabled := range []bool{true, false} {
-			for _, fieldsEnabled := range []bool{true, false} {
-				t.Run(fmt.Sprintf("%v/enabled=%v/fields=%v", test.description, enabled, fieldsEnabled), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmorFields, fieldsEnabled)
 
-					newPod := test.pod.DeepCopy()
+		t.Run(fmt.Sprintf("%v", test.description), func(t *testing.T) {
+			newPod := test.pod.DeepCopy()
 
-					if hasAnnotations := appArmorAnnotationsInUse(newPod.Annotations); hasAnnotations != test.hasAnnotations {
-						t.Errorf("appArmorAnnotationsInUse does not match expectation: %t != %t", hasAnnotations, test.hasAnnotations)
-					}
-					if hasFields := appArmorFieldsInUse(&newPod.Spec); hasFields != test.hasFields {
-						t.Errorf("appArmorFieldsInUse does not match expectation: %t != %t", hasFields, test.hasFields)
-					}
-
-					DropDisabledPodFields(newPod, newPod)
-					require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
-
-					DropDisabledPodFields(newPod, nil)
-
-					if enabled && fieldsEnabled {
-						assert.Equal(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
-						return
-					}
-
-					expectAnnotations := test.hasAnnotations && enabled
-					assert.Equal(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
-					if expectAnnotations == test.hasAnnotations {
-						assert.Equal(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
-					}
-
-					expectFields := test.hasFields && enabled && fieldsEnabled
-					assert.Equal(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
-					if expectFields == test.hasFields {
-						assert.Equal(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
-					}
-				})
+			if hasAnnotations := appArmorAnnotationsInUse(newPod.Annotations); hasAnnotations != test.hasAnnotations {
+				t.Errorf("appArmorAnnotationsInUse does not match expectation: %t != %t", hasAnnotations, test.hasAnnotations)
 			}
-		}
+			if hasFields := appArmorFieldsInUse(&newPod.Spec); hasFields != test.hasFields {
+				t.Errorf("appArmorFieldsInUse does not match expectation: %t != %t", hasFields, test.hasFields)
+			}
+
+			DropDisabledPodFields(newPod, newPod)
+			require.Equal(t, &test.pod, newPod, "unchanged pod should never be mutated")
+
+			DropDisabledPodFields(newPod, nil)
+			assert.Equal(t, &test.pod, newPod, "pod should not be mutated when both feature gates are enabled")
+
+			expectAnnotations := test.hasAnnotations
+			assert.Equal(t, expectAnnotations, appArmorAnnotationsInUse(newPod.Annotations), "AppArmor annotations expectation")
+			if expectAnnotations == test.hasAnnotations {
+				assert.Equal(t, test.pod.Annotations, newPod.Annotations, "annotations should not be mutated")
+			}
+
+			expectFields := test.hasFields
+			assert.Equal(t, expectFields, appArmorFieldsInUse(&newPod.Spec), "AppArmor fields expectation")
+			if expectFields == test.hasFields {
+				assert.Equal(t, &test.pod.Spec, &newPod.Spec, "PodSpec should not be mutated")
+			}
+		})
+
 	}
 }
 

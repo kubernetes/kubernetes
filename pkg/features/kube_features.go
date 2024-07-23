@@ -68,10 +68,12 @@ const (
 
 	// owner: @tallclair
 	// beta: v1.4
+	// GA: v1.31
 	AppArmor featuregate.Feature = "AppArmor"
 
 	// owner: @tallclair
 	// beta: v1.30
+	// GA: v1.31
 	AppArmorFields featuregate.Feature = "AppArmorFields"
 
 	// owner: @liggitt
@@ -995,9 +997,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AnyVolumeDataSource: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.24
 
-	AppArmor: {Default: true, PreRelease: featuregate.Beta},
+	AppArmor: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
-	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
+	AppArmorFields: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 
 	AuthorizeNodeWithSelectors: {Default: false, PreRelease: featuregate.Alpha},
 

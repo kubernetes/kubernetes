@@ -54,7 +54,6 @@ func TestPodSecurity(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)
 	// Start server
 	server := startPodSecurityServer(t)
 	opts := podsecuritytest.Options{
@@ -101,7 +100,6 @@ func TestPodSecurityWebhook(t *testing.T) {
 	// Enable all feature gates needed to allow all fields to be exercised
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UserNamespacesSupport, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, true)
 
 	// Start test API server.
 	capabilities.SetForTests(capabilities.Capabilities{AllowPrivileged: true})
