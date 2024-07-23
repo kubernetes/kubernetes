@@ -199,8 +199,8 @@ func (t cleTest) createAndRunFakeLegacyController(name string, namespace string,
 func (t cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string) {
 	identityLease, _, err := leaderelection.NewCandidate(
 		t.clientset,
-		name,
 		namespace,
+		name,
 		targetLease,
 		binaryVersion,
 		compatibilityVersion,

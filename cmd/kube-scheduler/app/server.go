@@ -223,8 +223,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
 			cc.Client,
-			cc.LeaderElection.Lock.Identity(),
 			metav1.NamespaceSystem,
+			cc.LeaderElection.Lock.Identity(),
 			"kube-scheduler",
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),

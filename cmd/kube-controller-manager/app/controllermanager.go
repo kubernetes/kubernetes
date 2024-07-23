@@ -301,8 +301,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
 			c.Client,
-			id,
 			"kube-system",
+			id,
 			"kube-controller-manager",
 			ver.FinalizeVersion(),
 			ver.FinalizeVersion(), // TODO(Jefftree): Use compatibility version when it's available

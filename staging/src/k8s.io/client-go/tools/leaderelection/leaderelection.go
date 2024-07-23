@@ -161,6 +161,7 @@ type LeaderElectionConfig struct {
 	Name string
 
 	// Coordinated will use the Coordinated Leader Election feature
+	// WARNING: Coordinated leader election is ALPHA.
 	Coordinated bool
 }
 
@@ -293,6 +294,7 @@ func (le *LeaderElector) renew(ctx context.Context) {
 			return
 		}
 		le.metrics.leaderOff(le.config.Name)
+		klog.Infof("failed to renew lease %v: %v", desc, err)
 		cancel()
 	}, le.config.RetryPeriod, ctx.Done())
 
@@ -354,15 +356,15 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 
 		le.observedRawRecord = oldLeaderElectionRawRecord
 	}
-	hasExpired := le.observedTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).Before(now.Time)
 
+	hasExpired := le.observedTime.Add(time.Second * time.Duration(oldLeaderElectionRecord.LeaseDurationSeconds)).Before(now.Time)
 	if hasExpired {
 		klog.Infof("lock has expired: %v", le.config.Lock.Describe())
 		return false
 	}
 
 	if !le.IsLeader() {
-		klog.V(4).Infof("lock is held by %v and has not yet expired: %v", oldLeaderElectionRecord.HolderIdentity, le.config.Lock.Describe())
+		klog.V(6).Infof("lock is held by %v and has not yet expired: %v", oldLeaderElectionRecord.HolderIdentity, le.config.Lock.Describe())
 		return false
 	}
 
@@ -370,7 +372,7 @@ func (le *LeaderElector) tryCoordinatedRenew(ctx context.Context) bool {
 	if le.IsLeader() && oldLeaderElectionRecord.PreferredHolder != "" {
 		klog.V(4).Infof("lock is marked as 'end of term': %v", le.config.Lock.Describe())
 		// TODO: Instead of letting lease expire, the holder may deleted it directly
-		// This will not be compatible with all controllers, so it needs to be opt-in behavior..
+		// This will not be compatible with all controllers, so it needs to be opt-in behavior.
 		// We must ensure all code guarded by this lease has successfully completed
 		// prior to releasing or there may be two processes
 		// simultaneously acting on the critical path.
