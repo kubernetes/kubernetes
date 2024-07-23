@@ -48,8 +48,8 @@ func TestLeaseCandidateCreation(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	candidate, _, err := NewCandidate(
 		client,
-		tc.candidateName,
 		tc.candidateNamespace,
+		tc.candidateName,
 		tc.leaseName,
 		tc.binaryVersion,
 		tc.emulationVersion,

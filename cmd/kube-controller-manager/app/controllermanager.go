@@ -293,7 +293,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		ver, err := semver.ParseTolerant(version.Get().String())
+		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		if err != nil {
+			return err
+		}
+		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
 		if err != nil {
 			return err
 		}
@@ -301,11 +305,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
 			c.Client,
-			id,
 			"kube-system",
+			id,
 			"kube-controller-manager",
-			ver.FinalizeVersion(),
-			ver.FinalizeVersion(), // TODO(Jefftree): Use compatibility version when it's available
+			binaryVersion.FinalizeVersion(),
+			emulationVersion.FinalizeVersion(),
 			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
 		)
 		if err != nil {

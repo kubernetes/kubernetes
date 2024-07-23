@@ -63,9 +63,14 @@ type LeaseCandidate struct {
 	preferredStrategies             []v1.CoordinatedLeaseStrategy
 }
 
+// NewCandidate creates new LeaseCandidate controller that creates a
+// LeaseCandidate object if it does not exist and watches changes
+// to the corresponding object and renews if PingTime is set.
+// WARNING: This is an ALPHA feature. Ensure that the CoordinatedLeaderElection
+// feature gate is on.
 func NewCandidate(clientset kubernetes.Interface,
-	candidateName string,
 	candidateNamespace string,
+	candidateName string,
 	targetLease string,
 	binaryVersion, emulationVersion string,
 	preferredStrategies []v1.CoordinatedLeaseStrategy,
@@ -144,7 +149,6 @@ func (c *LeaseCandidate) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	utilruntime.HandleError(err)
-	klog.Infof("processNextWorkItem.AddRateLimited: %v", key)
 	c.queue.AddRateLimited(key)
 
 	return true
@@ -161,9 +165,8 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	if apierrors.IsNotFound(err) {
 		klog.V(2).Infof("Creating lease candidate")
 		// lease does not exist, create it.
-		leaseToCreate := c.newLease()
-		_, err := c.leaseClient.Create(ctx, leaseToCreate, metav1.CreateOptions{})
-		if err != nil {
+		leaseToCreate := c.newLeaseCandidate()
+		if _, err := c.leaseClient.Create(ctx, leaseToCreate, metav1.CreateOptions{}); err != nil {
 			return err
 		}
 		klog.V(2).Infof("Created lease candidate")
@@ -171,7 +174,7 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	} else if err != nil {
 		return err
 	}
-	klog.V(2).Infof("lease candidate exists.. renewing")
+	klog.V(2).Infof("lease candidate exists. Renewing.")
 	clone := lease.DeepCopy()
 	clone.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 	clone.Spec.PingTime = nil
@@ -182,8 +185,8 @@ func (c *LeaseCandidate) ensureLease(ctx context.Context) error {
 	return nil
 }
 
-func (c *LeaseCandidate) newLease() *v1alpha1.LeaseCandidate {
-	lease := &v1alpha1.LeaseCandidate{
+func (c *LeaseCandidate) newLeaseCandidate() *v1alpha1.LeaseCandidate {
+	lc := &v1alpha1.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.name,
 			Namespace: c.namespace,
@@ -195,6 +198,6 @@ func (c *LeaseCandidate) newLease() *v1alpha1.LeaseCandidate {
 			PreferredStrategies: c.preferredStrategies,
 		},
 	}
-	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
-	return lease
+	lc.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
+	return lc
 }

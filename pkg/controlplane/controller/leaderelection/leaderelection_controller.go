@@ -40,11 +40,11 @@ import (
 )
 
 const (
-	controllerName          = "leader-election-controller"
-	ElectedByAnnotationName = "coordination.k8s.io/elected-by" // Value should be set to controllerName
+	controllerName = "leader-election-controller"
 
 	// Requeue interval is the interval at which a Lease is requeued to verify that it is being renewed properly.
-	requeueInterval                   = 5 * time.Second
+	defaultRequeueInterval            = 5 * time.Second
+	noRequeue                         = 0
 	defaultLeaseDurationSeconds int32 = 5
 
 	electionDuration = 5 * time.Second
@@ -158,10 +158,10 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 		return false
 	}
 
-	completed, err := c.reconcileElectionStep(ctx, key)
+	intervalForRequeue, err := c.reconcileElectionStep(ctx, key)
 	utilruntime.HandleError(err)
-	if completed {
-		defer c.queue.AddAfter(key, requeueInterval)
+	if intervalForRequeue != noRequeue {
+		defer c.queue.AddAfter(key, intervalForRequeue)
 	}
 	c.queue.Done(key)
 	return true
@@ -237,22 +237,25 @@ func (c *Controller) electionNeeded(candidates []*v1alpha1.LeaseCandidate, lease
 // PingTime + electionDuration > time.Now: We just asked all candidates to ack and are still waiting for response
 // PingTime + electionDuration < time.Now: Candidate has not responded within the appropriate PingTime. Continue the election.
 // RenewTime + 5 seconds > time.Now: All candidates acked in the last 5 seconds, continue the election.
-func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.NamespacedName) (requeue bool, err error) {
+func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.NamespacedName) (requeue time.Duration, err error) {
 	now := time.Now()
 
 	candidates, err := c.listAdmissableCandidates(leaseNN)
 	if err != nil {
-		return true, err
+		return defaultRequeueInterval, err
 	} else if len(candidates) == 0 {
-		return false, nil
+		return noRequeue, nil
 	}
-	klog.V(4).Infof("reconcileElectionStep %q %q, candidates: %d", leaseNN.Namespace, leaseNN.Name, len(candidates))
+	klog.V(4).Infof("reconcileElectionStep %s, candidates: %d", leaseNN, len(candidates))
 
 	// Check if an election is really needed by looking at the current lease
 	// and set of candidates
 	needElection, err := c.electionNeeded(candidates, leaseNN)
-	if !needElection || err != nil {
-		return needElection, err
+	if !needElection {
+		return noRequeue, err
+	}
+	if err != nil {
+		return defaultRequeueInterval, err
 	}
 
 	fastTrackElection := false
@@ -263,7 +266,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		if candidate.Spec.PingTime != nil {
 			if candidate.Spec.PingTime.Add(electionDuration).After(now) {
 				// continue waiting for the election to timeout
-				return false, nil
+				return noRequeue, nil
 			} else {
 				// election timed out without ack. Clear and start election.
 				fastTrackElection = true
@@ -271,7 +274,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 				clone.Spec.PingTime = nil
 				_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
 				if err != nil {
-					return false, err
+					return noRequeue, err
 				}
 				break
 			}
@@ -294,10 +297,10 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 				clone.Spec.PingTime = &metav1.MicroTime{Time: time.Now()}
 				_, err := c.leaseCandidateClient.LeaseCandidates(clone.Namespace).Update(ctx, clone, metav1.UpdateOptions{})
 				if err != nil {
-					return false, err
+					return noRequeue, err
 				}
 			}
-			return true, nil
+			return defaultRequeueInterval, nil
 		}
 	}
 
@@ -308,22 +311,22 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		}
 	}
 	if len(ackedCandidates) == 0 {
-		return false, fmt.Errorf("no available candidates")
+		return noRequeue, fmt.Errorf("no available candidates")
 	}
 
 	strategy, err := pickBestStrategy(ackedCandidates)
 	if err != nil {
-		return false, err
+		return noRequeue, err
 	}
 
 	if strategy != v1.OldestEmulationVersion {
 		klog.V(2).Infof("strategy %s is not recognized by CLE.", strategy)
-		return false, nil
+		return noRequeue, nil
 	}
 	electee := pickBestLeaderOldestEmulationVersion(ackedCandidates)
 
 	if electee == nil {
-		return false, fmt.Errorf("should not happen, could not find suitable electee")
+		return noRequeue, fmt.Errorf("should not happen, could not find suitable electee")
 	}
 
 	electeeName := electee.Name
@@ -332,9 +335,6 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: leaseNN.Namespace,
 			Name:      leaseNN.Name,
-			Annotations: map[string]string{
-				ElectedByAnnotationName: controllerName,
-			},
 		},
 		Spec: v1.LeaseSpec{
 			HolderIdentity:       &electeeName,
@@ -346,31 +346,27 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	_, err = c.leaseClient.Leases(leaseNN.Namespace).Create(ctx, leaderLease, metav1.CreateOptions{})
 	// If the create was successful, then we can return here.
 	if err == nil {
-		klog.Infof("Created lease %q %q for %q", leaseNN.Namespace, leaseNN.Name, electee.Name)
-		return true, nil
+		klog.Infof("Created lease %s for %q", leaseNN, electee.Name)
+		return defaultRequeueInterval, nil
 	}
 
 	// If there was an error, return
 	if !apierrors.IsAlreadyExists(err) {
-		return false, err
+		return noRequeue, err
 	}
 
 	existingLease, err := c.leaseClient.Leases(leaseNN.Namespace).Get(ctx, leaseNN.Name, metav1.GetOptions{})
 	if err != nil {
-		return false, err
+		return noRequeue, err
 	}
 	leaseClone := existingLease.DeepCopy()
 
 	// Update the Lease if it either does not have a holder or is expired
 	isExpired := isLeaseExpired(existingLease)
 	if leaseClone.Spec.HolderIdentity == nil || *leaseClone.Spec.HolderIdentity == "" || (isExpired && *leaseClone.Spec.HolderIdentity != electeeName) {
-		klog.Infof("lease %q %q is expired, resetting it and setting holder to %q", leaseNN.Namespace, leaseNN.Name, electee.Name)
+		klog.Infof("lease %s is expired, resetting it and setting holder to %q", leaseNN, electee.Name)
 		leaseClone.Spec.Strategy = &strategy
 		leaseClone.Spec.PreferredHolder = nil
-		if leaseClone.ObjectMeta.Annotations == nil {
-			leaseClone.ObjectMeta.Annotations = make(map[string]string)
-		}
-		leaseClone.ObjectMeta.Annotations[ElectedByAnnotationName] = controllerName
 		leaseClone.Spec.HolderIdentity = &electeeName
 
 		leaseClone.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
@@ -378,18 +374,19 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		leaseClone.Spec.AcquireTime = nil
 		_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, leaseClone, metav1.UpdateOptions{})
 		if err != nil {
-			return false, err
+			return time.Until(leaseClone.Spec.RenewTime.Time), err
 		}
 	} else if leaseClone.Spec.HolderIdentity != nil && *leaseClone.Spec.HolderIdentity != electeeName {
-		klog.Infof("lease %q %q already exists for holder %q but should be held by %q, marking preferredHolder", leaseNN.Namespace, leaseNN.Name, *leaseClone.Spec.HolderIdentity, electee.Name)
+		klog.Infof("lease %s already exists for holder %q but should be held by %q, marking preferredHolder", leaseNN, *leaseClone.Spec.HolderIdentity, electee.Name)
 		leaseClone.Spec.PreferredHolder = &electeeName
 		leaseClone.Spec.Strategy = &strategy
 		_, err = c.leaseClient.Leases(leaseNN.Namespace).Update(ctx, leaseClone, metav1.UpdateOptions{})
 		if err != nil {
-			return false, err
+			return noRequeue, err
 		}
+		return time.Until(leaseClone.Spec.RenewTime.Time), nil
 	}
-	return true, nil
+	return defaultRequeueInterval, nil
 }
 
 func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1alpha1.LeaseCandidate, error) {
