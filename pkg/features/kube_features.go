@@ -390,14 +390,10 @@ const (
 	// Enable POD resources API with Get method
 	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
 
+	// KubeletSeparateDiskGC enables Kubelet to garbage collection images/containers on different filesystems
 	// owner: @kannon92
 	// kep: https://kep.k8s.io/4191
 	// alpha: v1.29
-	// beta: v1.31
-	//
-	// The split image filesystem feature enables kubelet to perform garbage collection
-	// of images (read-only layers) and/or containers (writeable layers) deployed on
-	// separate filesystems.
 	KubeletSeparateDiskGC featuregate.Feature = "KubeletSeparateDiskGC"
 
 	// owner: @sallyom
@@ -1084,7 +1080,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	KubeletPodResourcesGet: {Default: false, PreRelease: featuregate.Alpha},
 
-	KubeletSeparateDiskGC: {Default: true, PreRelease: featuregate.Beta},
+	KubeletSeparateDiskGC: {Default: false, PreRelease: featuregate.Alpha},
 
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
 
