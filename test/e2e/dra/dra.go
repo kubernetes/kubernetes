@@ -1051,7 +1051,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.testPod(ctx, f.ClientSet, pod)
 		})
 
-		ginkgo.It("supports count/resourceclaim.resource ResourceQuota", func(ctx context.Context) {
+		ginkgo.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", func(ctx context.Context) {
 			claim := &resourceapi.ResourceClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "claim-0",
