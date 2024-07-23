@@ -56,7 +56,7 @@ const (
 	// deprecated: v1.29
 	//
 	// Enables Service.status.ingress.loadBanace to be set on
-	// services of types other than LoadBalancer.
+	// services of types other than LoadBalancer. Test
 	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
 
 	// owner: @bswartz
