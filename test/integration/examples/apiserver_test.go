@@ -37,14 +37,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/component-base/featuregate"
+	baseversion "k8s.io/component-base/version"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -53,6 +57,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
+	"k8s.io/sample-apiserver/pkg/apiserver"
 	sampleserver "k8s.io/sample-apiserver/pkg/cmd/server"
 	wardlev1alpha1client "k8s.io/sample-apiserver/pkg/generated/clientset/versioned/typed/wardle/v1alpha1"
 	netutils "k8s.io/utils/net"
@@ -226,18 +231,21 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 }
 
 func TestAggregatedAPIServer(t *testing.T) {
-	t.Run("WithoutWardleFeatureGateAtV1.2", func(t *testing.T) {
-		testAggregatedAPIServer(t, false, "1.2")
-	})
+	// BanFlunder default=true in 1.1
 	t.Run("WithoutWardleFeatureGateAtV1.1", func(t *testing.T) {
-		testAggregatedAPIServer(t, false, "1.1")
+		testAggregatedAPIServer(t, false, true, "1.1")
 	})
-	t.Run("WithWardleFeatureGateAtV1.1", func(t *testing.T) {
-		testAggregatedAPIServer(t, true, "1.1")
+	// BanFlunder default=false in 1.0
+	t.Run("WithoutWardleFeatureGateAtV1.0", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, false, "1.0")
+	})
+	// Explicitly set BanFlunder=true in 1.0
+	t.Run("WithWardleFeatureGateAtV1.0", func(t *testing.T) {
+		testAggregatedAPIServer(t, true, true, "1.0")
 	})
 }
 
-func testAggregatedAPIServer(t *testing.T, flunderBanningFeatureGate bool, emulationVersion string) {
+func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, emulationVersion string) {
 	const testNamespace = "kube-wardle"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -249,7 +257,7 @@ func testAggregatedAPIServer(t *testing.T, flunderBanningFeatureGate bool, emula
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 
-	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, flunderBanningFeatureGate, emulationVersion, kubeClientConfig)
+	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, emulationVersion, kubeClientConfig)
 
 	// now we're finally ready to test. These are what's run by default now
 	wardleDirectClient := client.NewForConfigOrDie(directWardleClientConfig)
@@ -289,7 +297,6 @@ func testAggregatedAPIServer(t *testing.T, flunderBanningFeatureGate bool, emula
 			Name: "badname",
 		},
 	}, metav1.CreateOptions{})
-	banFlunder := flunderBanningFeatureGate || emulationVersion == "1.2"
 	if banFlunder && err == nil {
 		t.Fatal("expect flunder:badname not admitted when wardle feature gates are specified")
 	}
@@ -536,8 +543,16 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	// endpoints cannot have loopback IPs so we need to override the resolver itself
 	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
 
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: "1.32"}, nil, framework.SharedEtcd())
+	// use DefaultKubeBinaryVersion - 1 minor for kube binary version, and 1.1 for wardle binary version so that we can test both N and N-1 wardle emulation versions.
+	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).OffsetMinor(-1)
+	wardleBinaryVersion := "1.1"
+
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: binaryVersion.String()}, nil, framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
+
+	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		apiserver.WardleComponentName, utilversion.NewEffectiveVersion(wardleBinaryVersion),
+		featuregate.NewVersionedFeatureGate(version.MustParse(wardleBinaryVersion)))
 
 	kubeClient := client.NewForConfigOrDie(getKubeConfig(testServer))
 
@@ -581,6 +596,7 @@ func runPreparedWardleServer(
 	certDir string,
 	wardlePort int,
 	flunderBanningFeatureGate bool,
+	banFlunder bool,
 	emulationVersion string,
 	kubeConfig *rest.Config,
 ) *rest.Config {
@@ -599,7 +615,7 @@ func runPreparedWardleServer(
 			"--emulated-version", fmt.Sprintf("wardle=%s", emulationVersion),
 		}
 		if flunderBanningFeatureGate {
-			args = append(args, "--feature-gates", "wardle:BanFlunder=true")
+			args = append(args, "--feature-gates", fmt.Sprintf("wardle:BanFlunder=%v", banFlunder))
 		}
 		wardleCmd := sampleserver.NewCommandStartWardleServer(ctx, wardleOptions)
 		wardleCmd.SetArgs(args)

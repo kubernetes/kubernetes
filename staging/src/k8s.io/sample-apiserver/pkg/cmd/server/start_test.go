@@ -35,13 +35,18 @@ func TestWardleEmulationVersionToKubeEmulationVersion(t *testing.T) {
 	}{
 		{
 			desc:                     "same version as than kube binary",
-			wardleEmulationVer:       version.MajorMinor(1, 1),
+			wardleEmulationVer:       version.MajorMinor(1, 2),
 			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion(),
 		},
 		{
-			desc:                     "1 version higher than kube binary",
-			wardleEmulationVer:       version.MajorMinor(1, 2),
-			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().OffsetMinor(1),
+			desc:                     "1 version lower than kube binary",
+			wardleEmulationVer:       version.MajorMinor(1, 1),
+			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().OffsetMinor(-1),
+		},
+		{
+			desc:                     "2 versions lower than kube binary",
+			wardleEmulationVer:       version.MajorMinor(1, 0),
+			expectedKubeEmulationVer: defaultKubeEffectiveVersion.BinaryVersion().OffsetMinor(-2),
 		},
 		{
 			desc:               "no mapping",
