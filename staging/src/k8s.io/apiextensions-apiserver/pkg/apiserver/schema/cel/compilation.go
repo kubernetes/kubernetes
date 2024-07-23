@@ -17,6 +17,7 @@ limitations under the License.
 package cel
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -24,7 +25,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common/types"
-	"github.com/pkg/errors"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -127,7 +127,7 @@ func Compile(s *schema.Structural, declType *apiservercel.DeclType, perCallLimit
 		return nil, nil
 	}
 	if declType == nil {
-		return nil, errors.New("Failed to convert to declType for CEL validation rules")
+		return nil, errors.New("failed to convert to declType for CEL validation rules")
 	}
 	celRules := s.XValidations
 
