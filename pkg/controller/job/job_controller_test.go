@@ -4991,6 +4991,45 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				},
 			},
 		},
+		"job without successPolicy; jobSuccessPolicy is enabled; job got SuccessCriteriaMet and Completion with CompletionsReached reason conditions": {
+			enableJobSuccessPolicy: true,
+			enableJobManagedBy:     true,
+			job: batch.Job{
+				TypeMeta:   validTypeMeta,
+				ObjectMeta: validObjectMeta,
+				Spec: batch.JobSpec{
+					Selector:       validSelector,
+					Template:       validTemplate,
+					CompletionMode: ptr.To(batch.IndexedCompletion),
+					Completions:    ptr.To[int32](1),
+					Parallelism:    ptr.To[int32](1),
+					BackoffLimit:   ptr.To[int32](math.MaxInt32),
+				},
+			},
+			pods: []v1.Pod{
+				*buildPod().uid("a1").index("0").phase(v1.PodSucceeded).trackingFinalizer().Pod,
+			},
+			wantStatus: batch.JobStatus{
+				Failed:                  0,
+				Succeeded:               1,
+				CompletedIndexes:        "0",
+				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+				Conditions: []batch.JobCondition{
+					{
+						Type:    batch.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
+					},
+					{
+						Type:    batch.JobComplete,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
+					},
+				},
+			},
+		},
 		"when the JobSuccessPolicy is disabled, the Job never got SuccessCriteriaMet condition even if the Job has the successPolicy field": {
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -5132,12 +5171,16 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 				Conditions: []batch.JobCondition{
 					{
-						Type:   batch.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batch.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 					{
-						Type:   batch.JobComplete,
-						Status: v1.ConditionTrue,
+						Type:    batch.JobComplete,
+						Status:  v1.ConditionTrue,
+						Reason:  batch.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 				},
 			},
@@ -7066,8 +7109,10 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 		},
@@ -7085,12 +7130,16 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobSuccessCriteriaMet,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobSuccessCriteriaMet,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 		},
@@ -7108,12 +7157,16 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			expectedFailed:    0,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobSuccessCriteriaMet,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobSuccessCriteriaMet,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 		},

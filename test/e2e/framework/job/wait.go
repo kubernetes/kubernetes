@@ -68,7 +68,14 @@ func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobNa
 }
 
 // WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
-func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName string, completions int32) error {
+// This function checks if the number of succeeded Job Pods reached expected completions and
+// the Job has a "Complete" condition with the expected reason.
+// The pointer "reason" argument allows us to skip "Complete" condition reason verifications.
+// The conformance test cases have the different expected "Complete" condition reason ("CompletionsReached" vs "")
+// between conformance CI jobs and e2e CI jobs since the e2e conformance test cases are performed in
+// both conformance CI jobs with GA-only features and e2e CI jobs with all default-enabled features.
+// So, we need to skip "Complete" condition reason verifications in the e2e conformance test cases.
+func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName string, reason *string, completions int32) error {
 	if err := wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
@@ -78,7 +85,7 @@ func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName 
 	}); err != nil {
 		return nil
 	}
-	return WaitForJobCondition(ctx, c, ns, jobName, batchv1.JobComplete, "")
+	return WaitForJobCondition(ctx, c, ns, jobName, batchv1.JobComplete, reason)
 }
 
 // WaitForJobReady waits for particular value of the Job .status.ready field
@@ -115,8 +122,10 @@ func WaitForJobFailed(c clientset.Interface, ns, jobName string) error {
 	})
 }
 
-// waitForJobCondition waits for the specified Job to have the expected condition with the specific reason.
-func WaitForJobCondition(ctx context.Context, c clientset.Interface, ns, jobName string, cType batchv1.JobConditionType, reason string) error {
+// WaitForJobCondition waits for the specified Job to have the expected condition with the specific reason.
+// When the nil reason is passed, the "reason" string in the condition is
+// not checked.
+func WaitForJobCondition(ctx context.Context, c clientset.Interface, ns, jobName string, cType batchv1.JobConditionType, reason *string) error {
 	err := wait.PollUntilContextTimeout(ctx, framework.Poll, JobTimeout, false, func(ctx context.Context) (bool, error) {
 		curr, err := c.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
@@ -124,7 +133,7 @@ func WaitForJobCondition(ctx context.Context, c clientset.Interface, ns, jobName
 		}
 		for _, c := range curr.Status.Conditions {
 			if c.Type == cType && c.Status == v1.ConditionTrue {
-				if reason == c.Reason {
+				if reason == nil || *reason == c.Reason {
 					return true, nil
 				}
 			}
@@ -132,7 +141,7 @@ func WaitForJobCondition(ctx context.Context, c clientset.Interface, ns, jobName
 		return false, nil
 	})
 	if err != nil {
-		return fmt.Errorf("waiting for Job %q to have the condition %q with reason: %q: %w", jobName, cType, reason, err)
+		return fmt.Errorf("waiting for Job %q to have the condition %q with reason: %v: %w", jobName, cType, reason, err)
 	}
 	return nil
 }

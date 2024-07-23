@@ -988,7 +988,12 @@ func (jm *Controller) newSuccessCondition() *batch.JobCondition {
 	if delayTerminalCondition() {
 		cType = batch.JobSuccessCriteriaMet
 	}
-	return newCondition(cType, v1.ConditionTrue, "", "", jm.clock.Now())
+	var reason, message string
+	if feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
+		reason = batch.JobReasonCompletionsReached
+		message = "Reached expected number of succeeded pods"
+	}
+	return newCondition(cType, v1.ConditionTrue, reason, message, jm.clock.Now())
 }
 
 func delayTerminalCondition() bool {
@@ -1419,7 +1424,7 @@ func (jm *Controller) recordJobFinished(job *batch.Job, finishedCond *batch.JobC
 			jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 		}
 		jm.recorder.Event(job, v1.EventTypeNormal, "Completed", "Job completed")
-		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded", "").Inc()
+		metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded", finishedCond.Reason).Inc()
 	} else {
 		jm.recorder.Event(job, v1.EventTypeWarning, finishedCond.Reason, finishedCond.Message)
 		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed", finishedCond.Reason).Inc()
