@@ -18,9 +18,10 @@ package checkpoint
 
 import (
 	"encoding/json"
+	"hash/crc32"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
@@ -36,7 +37,7 @@ type Checkpoint struct {
 	// See state.CheckpointData for the details
 	Data string
 	// Checksum is a checksum of Data
-	Checksum checksum.Checksum
+	Checksum uint32
 }
 
 type CheckpointData struct {
@@ -61,7 +62,7 @@ func NewCheckpoint(data state.ClaimInfoStateList) (*Checkpoint, error) {
 
 	return &Checkpoint{
 		Data:     string(cpDataBytes),
-		Checksum: checksum.New(string(cpDataBytes)),
+		Checksum: crc32.ChecksumIEEE(cpDataBytes),
 	}, nil
 }
 
@@ -88,7 +89,11 @@ func (cp *Checkpoint) UnmarshalCheckpoint(blob []byte) error {
 // VerifyChecksum verifies that current checksum
 // of checkpointed Data is valid
 func (cp *Checkpoint) VerifyChecksum() error {
-	return cp.Checksum.Verify(cp.Data)
+	expectedCS := crc32.ChecksumIEEE([]byte(cp.Data))
+	if expectedCS != cp.Checksum {
+		return &errors.CorruptCheckpointError{ActualCS: uint64(cp.Checksum), ExpectedCS: uint64(expectedCS)}
+	}
+	return nil
 }
 
 // GetEntries returns list of claim info states from checkpoint
