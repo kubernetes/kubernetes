@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -55,23 +56,23 @@ func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 }
 
 // Run starts one worker.
-func (c *LeaseCandidateGCController) Run(stopCh <-chan struct{}) {
+func (c *LeaseCandidateGCController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer klog.Infof("Shutting down apiserver leasecandidate garbage collector")
 
 	klog.Infof("Starting apiserver leasecandidate garbage collector")
 
-	if !cache.WaitForCacheSync(stopCh, c.leaseCandidatesSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.leaseCandidatesSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 
-	go wait.Until(c.gc, c.gcCheckPeriod, stopCh)
+	go wait.UntilWithContext(ctx, c.gc, c.gcCheckPeriod)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *LeaseCandidateGCController) gc() {
+func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 	lcs, err := c.leaseCandidateLister.List(labels.Everything())
 	if err != nil {
 		klog.ErrorS(err, "Error while listing lease candidates")
@@ -92,7 +93,7 @@ func (c *LeaseCandidateGCController) gc() {
 			continue
 		}
 		if err := c.kubeclientset.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Delete(
-			context.TODO(), lc.Name, metav1.DeleteOptions{}); err != nil {
+			ctx, lc.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			klog.ErrorS(err, "Error deleting lease")
 		}
 	}

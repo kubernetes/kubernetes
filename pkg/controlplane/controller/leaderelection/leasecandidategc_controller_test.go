@@ -128,7 +128,7 @@ func TestLeaseCandidateGCController(t *testing.T) {
 
 			cache.WaitForCacheSync(ctx.Done(), controller.leaseCandidatesSynced)
 
-			go controller.Run(ctx.Done())
+			go controller.Run(ctx)
 			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 600*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				lcs, err := client.CoordinationV1alpha1().LeaseCandidates("default").List(ctx, metav1.ListOptions{})
 				if err != nil {
