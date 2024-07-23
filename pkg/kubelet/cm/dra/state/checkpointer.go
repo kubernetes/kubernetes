@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package checkpoint
+package state
 
 import (
 	"errors"
@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	checkpointerrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
 type Checkpointer interface {

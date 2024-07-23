@@ -25,7 +25,6 @@ import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra/checkpoint"
 	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -41,7 +40,7 @@ type ClaimInfo struct {
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
 	sync.RWMutex
-	state     checkpoint.Checkpointer
+	state     state.Checkpointer
 	claimInfo map[string]*ClaimInfo
 }
 
@@ -114,7 +113,7 @@ func (info *ClaimInfo) isPrepared() bool {
 
 // newClaimInfoCache creates a new claim info cache object, pre-populated from a checkpoint (if present).
 func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
-	checkpointer, err := checkpoint.NewCheckpointer(stateDir, checkpointName)
+	checkpointer, err := state.NewCheckpointer(stateDir, checkpointName)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %+v", err)
 	}
@@ -198,7 +197,7 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 	for _, infoClaim := range cache.claimInfo {
 		claimInfoStateList = append(claimInfoStateList, infoClaim.ClaimInfoState)
 	}
-	checkpoint, err := checkpoint.NewCheckpoint(claimInfoStateList)
+	checkpoint, err := state.NewCheckpoint(claimInfoStateList)
 	if err != nil {
 		return err
 	}

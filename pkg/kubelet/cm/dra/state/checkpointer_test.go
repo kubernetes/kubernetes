@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package checkpoint
+package state
 
 import (
 	"os"
@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
-	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
 const testingCheckpoint = "dramanager_checkpoint_test"
@@ -39,7 +38,7 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		description                string
 		checkpointContent          string
 		expectedError              string
-		expectedClaimInfoStateList state.ClaimInfoStateList
+		expectedClaimInfoStateList ClaimInfoStateList
 	}{
 		{
 			description:                "new-checkpoint",
@@ -48,11 +47,11 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		{
 			description:       "single-claim-info-state",
 			checkpointContent: `{"Data":"{\"kind\":\"DRACheckpoint\",\"apiVersion\":\"checkpoint.dra.kubelet.k8s.io/v1\",\"Entries\":[{\"ClaimUID\":\"067798be-454e-4be4-9047-1aa06aea63f7\",\"ClaimName\":\"example\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-1\",\"RequestNames\":[\"test request\"],\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]}]}}}]}","Checksum":1597924435}`,
-			expectedClaimInfoStateList: state.ClaimInfoStateList{
+			expectedClaimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -72,11 +71,11 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		{
 			description:       "claim-info-state-with-multiple-devices",
 			checkpointContent: `{"Data":"{\"kind\":\"DRACheckpoint\",\"apiVersion\":\"checkpoint.dra.kubelet.k8s.io/v1\",\"Entries\":[{\"ClaimUID\":\"067798be-454e-4be4-9047-1aa06aea63f7\",\"ClaimName\":\"example\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-1\",\"RequestNames\":[\"test request\"],\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]},{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-2\",\"RequestNames\":[\"test request\"],\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]}]}}}]}","Checksum":1812303514}`,
-			expectedClaimInfoStateList: state.ClaimInfoStateList{
+			expectedClaimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -102,11 +101,11 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 		{
 			description:       "two-claim-info-states",
 			checkpointContent: `{"Data":"{\"kind\":\"DRACheckpoint\",\"apiVersion\":\"checkpoint.dra.kubelet.k8s.io/v1\",\"Entries\":[{\"ClaimUID\":\"067798be-454e-4be4-9047-1aa06aea63f7\",\"ClaimName\":\"example-1\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-1\",\"RequestNames\":[\"test request\"],\"CDIDeviceIDs\":[\"example.com/example=cdi-example\"]}]}}},{\"ClaimUID\":\"4cf8db2d-06c0-7d70-1a51-e59b25b2c16c\",\"ClaimName\":\"example-2\",\"Namespace\":\"default\",\"PodUIDs\":{\"139cdb46-f989-4f17-9561-ca10cfb509a6\":{}},\"DriverState\":{\"test-driver.cdi.k8s.io\":{\"Devices\":[{\"PoolName\":\"worker-1\",\"DeviceName\":\"dev-2\",\"RequestNames\":null,\"CDIDeviceIDs\":null}]}}}]}","Checksum":3633532417}`,
-			expectedClaimInfoStateList: state.ClaimInfoStateList{
+			expectedClaimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -122,9 +121,9 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:   "worker-1",
 									DeviceName: "dev-2",
@@ -197,16 +196,16 @@ func TestCheckpointGetOrCreate(t *testing.T) {
 func TestCheckpointStateStore(t *testing.T) {
 	testCases := []struct {
 		description               string
-		claimInfoStateList        state.ClaimInfoStateList
+		claimInfoStateList        ClaimInfoStateList
 		expectedCheckpointContent string
 	}{
 		{
 			description: "single-claim-info-state",
-			claimInfoStateList: state.ClaimInfoStateList{
+			claimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -226,11 +225,11 @@ func TestCheckpointStateStore(t *testing.T) {
 		},
 		{
 			description: "single-claim-info-state-with-multiple-devices",
-			claimInfoStateList: state.ClaimInfoStateList{
+			claimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -256,11 +255,11 @@ func TestCheckpointStateStore(t *testing.T) {
 		},
 		{
 			description: "two-claim-info-states",
-			claimInfoStateList: state.ClaimInfoStateList{
+			claimInfoStateList: ClaimInfoStateList{
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:     "worker-1",
 									DeviceName:   "dev-1",
@@ -276,9 +275,9 @@ func TestCheckpointStateStore(t *testing.T) {
 					PodUIDs:   sets.New("139cdb46-f989-4f17-9561-ca10cfb509a6"),
 				},
 				{
-					DriverState: map[string]state.DriverState{
+					DriverState: map[string]DriverState{
 						"test-driver.cdi.k8s.io": {
-							Devices: []state.Device{
+							Devices: []Device{
 								{
 									PoolName:   "worker-1",
 									DeviceName: "dev-2",

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package checkpoint
+package state
 
 import (
 	"encoding/json"
@@ -22,19 +22,17 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
-	state "k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 )
 
 const (
 	CheckpointAPIGroup   = "checkpoint.dra.kubelet.k8s.io"
 	CheckpointKind       = "DRACheckpoint"
-	CheckpointAPIVersion = CheckpointAPIGroup + "/" + state.Version
+	CheckpointAPIVersion = CheckpointAPIGroup + "/" + Version
 )
 
 // Checkpoint represents a structure to store DRA checkpoint data
 type Checkpoint struct {
 	// Data is a JSON serialized checkpoint data
-	// See state.CheckpointData for the details
 	Data string
 	// Checksum is a checksum of Data
 	Checksum uint32
@@ -42,11 +40,11 @@ type Checkpoint struct {
 
 type CheckpointData struct {
 	metav1.TypeMeta
-	Entries state.ClaimInfoStateList
+	Entries ClaimInfoStateList
 }
 
 // NewCheckpoint creates a new checkpoint from a list of claim info states
-func NewCheckpoint(data state.ClaimInfoStateList) (*Checkpoint, error) {
+func NewCheckpoint(data ClaimInfoStateList) (*Checkpoint, error) {
 	cpData := &CheckpointData{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       CheckpointKind,
@@ -97,7 +95,7 @@ func (cp *Checkpoint) VerifyChecksum() error {
 }
 
 // GetEntries returns list of claim info states from checkpoint
-func (cp *Checkpoint) GetEntries() (state.ClaimInfoStateList, error) {
+func (cp *Checkpoint) GetEntries() (ClaimInfoStateList, error) {
 	var cpData CheckpointData
 	if err := json.Unmarshal([]byte(cp.Data), &cpData); err != nil {
 		return nil, err

@@ -17,7 +17,6 @@ limitations under the License.
 package state
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -27,11 +26,6 @@ const (
 )
 
 type ClaimInfoStateList []ClaimInfoState
-
-type CheckpointData struct {
-	metav1.TypeMeta
-	Entries ClaimInfoStateList
-}
 
 // +k8s:deepcopy-gen=true
 type ClaimInfoState struct {
