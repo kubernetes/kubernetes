@@ -19330,6 +19330,10 @@ func TestValidateResourceQuota(t *testing.T) {
 			core.ResourceQuotas:                 resource.MustParse("10"),
 			core.ResourceConfigMaps:             resource.MustParse("10"),
 			core.ResourceSecrets:                resource.MustParse("10"),
+
+			// These are unknown and not enforced unless DRA is enabled, but not invalid.
+			"count/resourceclaims.k8s.io":              resource.MustParse("1"),
+			"gold.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
 		},
 	}
 
