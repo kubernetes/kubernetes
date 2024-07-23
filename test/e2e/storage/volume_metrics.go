@@ -633,7 +633,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 			})
 
 		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
-		ginkgo.It("should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only",
+		f.It("should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only",
 			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
 				var err error
 				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
@@ -650,7 +650,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 			})
 
 		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
-		ginkgo.It("should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc",
+		f.It("should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc",
 			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
 				var err error
 				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
