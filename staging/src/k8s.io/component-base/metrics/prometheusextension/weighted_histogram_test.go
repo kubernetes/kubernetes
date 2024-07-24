@@ -99,7 +99,7 @@ func exerciseWeightedHistograms(t *testing.T, whSpecs ...weightedHistogramSpecFu
 		for _, term := range terms {
 			ee.sum += term
 		}
-		t.Logf("Adding expectation %#+v", ee)
+		t.Logf("At idx=%v, adding expectation of buckets=%#+v, upperBounds=%#+v, sum=%v, count=%v", whIdx, ee.buckets, ee.upperBounds, ee.sum, ee.count)
 		expectations = append(expectations, ee)
 	}
 	// Do the planned calls on ObserveWithWeight, in randomized order
@@ -142,8 +142,10 @@ func exerciseWeightedHistograms(t *testing.T, whSpecs ...weightedHistogramSpecFu
 		actualSum := actualHist.GetSampleSum()
 		num := math.Abs(actualSum - ee.sum)
 		den := math.Max(math.Abs(actualSum), math.Abs(ee.sum))
-		if num > den/1e14 {
-			t.Errorf("At idx=%d, expected sum %v but got %v, err=%v", idx, ee.sum, actualSum, actualSum-ee.sum)
+		relErr := num / den
+		// Issue 120112 reports relative errors as high as 9.55994394104272e-14
+		if relErr > 1e-13 {
+			t.Errorf("At idx=%d, expected sum %v but got %v, err=%v, relativeErr=%v", idx, ee.sum, actualSum, actualSum-ee.sum, relErr)
 		}
 	}
 }
