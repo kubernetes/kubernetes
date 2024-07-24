@@ -114,7 +114,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.Dae
 			}
 		}
 
-		// use any of the candidates we can, including the allowedReplacemnntPods
+		// use any of the candidates we can, including the allowedReplacementPods
 		logger.V(5).Info("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "replacements", len(allowedReplacementPods), "maxUnavailable", maxUnavailable, "numUnavailable", numUnavailable, "candidates", len(candidatePodsToDelete))
 		remainingUnavailable := maxUnavailable - numUnavailable
 		if remainingUnavailable < 0 {
