@@ -267,10 +267,6 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		}
 		return imageFs, imageFs, nil
 	}
-	containerFsInfo, err := p.cadvisor.ContainerFsInfo()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get container fs info: %v", err)
-	}
 	imageStats, err := p.imageService.ImageFsInfo(ctx)
 	if err != nil || imageStats == nil {
 		return nil, nil, fmt.Errorf("failed to get image stats: %v", err)
@@ -296,8 +292,15 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		Inodes:         imageFsInfo.Inodes,
 		InodesUsed:     imageFsInodesUsed,
 	}
+	// We rely on cadvisor to have the crio-containers label for split filesystem case.
+	// We return to avoid checking ContainerFsInfo.
 	if !splitFileSystem {
 		return fsStats, fsStats, nil
+	}
+
+	containerFsInfo, err := p.cadvisor.ContainerFsInfo()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get container fs info: %w", err)
 	}
 
 	containerFs := imageStats.ContainerFilesystems[0]
