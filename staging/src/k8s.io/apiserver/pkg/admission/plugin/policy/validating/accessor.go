@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
@@ -46,6 +47,10 @@ func (v *validatingAdmissionPolicyAccessor) GetName() string {
 	return v.Name
 }
 
+func (v *validatingAdmissionPolicyAccessor) GetCluster() string {
+	return logicalcluster.From(v.ValidatingAdmissionPolicy).String()
+}
+
 func (v *validatingAdmissionPolicyAccessor) GetParamKind() *v1.ParamKind {
 	return v.Spec.ParamKind
 }
@@ -64,6 +69,10 @@ func (v *validatingAdmissionPolicyBindingAccessor) GetNamespace() string {
 
 func (v *validatingAdmissionPolicyBindingAccessor) GetName() string {
 	return v.Name
+}
+
+func (v *validatingAdmissionPolicyBindingAccessor) GetCluster() string {
+	return logicalcluster.From(v.ValidatingAdmissionPolicyBinding).String()
 }
 
 func (v *validatingAdmissionPolicyBindingAccessor) GetPolicyName() types.NamespacedName {

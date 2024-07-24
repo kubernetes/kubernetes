@@ -24,6 +24,7 @@ import (
 type PolicyAccessor interface {
 	GetName() string
 	GetNamespace() string
+	GetCluster() string
 	GetParamKind() *v1.ParamKind
 	GetMatchConstraints() *v1.MatchResources
 }
@@ -31,6 +32,7 @@ type PolicyAccessor interface {
 type BindingAccessor interface {
 	GetName() string
 	GetNamespace() string
+	GetCluster() string
 
 	// GetPolicyName returns the name of the (Validating/Mutating)AdmissionPolicy,
 	// which is cluster-scoped, so namespace is usually left blank.

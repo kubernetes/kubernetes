@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -180,7 +181,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	var source Source[PolicyHook[P, B, E]]
 	plugin := NewPlugin[PolicyHook[P, B, E]](
 		admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update),
-		func(sif informers.SharedInformerFactory, i1 kubernetes.Interface, i2 dynamic.Interface, r meta.RESTMapper) Source[PolicyHook[P, B, E]] {
+		func(sif informers.SharedInformerFactory, i1 kubernetes.Interface, i2 dynamic.Interface, r meta.RESTMapper, c logicalcluster.Name) Source[PolicyHook[P, B, E]] {
 			source = NewPolicySource[P, B, E](
 				policyInformer,
 				bindingInformer,
@@ -190,6 +191,7 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 				sif,
 				i2,
 				r,
+				c,
 			)
 			return source
 		}, dispatcher)

@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"github.com/kcp-dev/logicalcluster/v3"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
@@ -32,9 +33,9 @@ type informer[T runtime.Object] struct {
 // It is incumbent on the caller to ensure that the generic type argument is
 // consistent with the type of the objects stored inside the SharedIndexInformer
 // as they will be casted.
-func NewInformer[T runtime.Object](informe cache.SharedIndexInformer) Informer[T] {
+func NewInformer[T runtime.Object](informe cache.SharedIndexInformer, clusterName logicalcluster.Name) Informer[T] {
 	return informer[T]{
 		SharedIndexInformer: informe,
-		lister:              NewLister[T](informe.GetIndexer()),
+		lister:              NewLister[T](informe.GetIndexer(), clusterName),
 	}
 }

@@ -1,18 +1,23 @@
 package generic
 
 import (
+	"github.com/kcp-dev/logicalcluster/v3"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/tools/cache"
 )
 
 func (c *Plugin[H]) SetNamespaceInformer(i coreinformers.NamespaceInformer) {
 	c.namespaceInformer = i
 }
 
-func (c *Plugin[H]) SetPolicyInformer(i cache.SharedIndexInformer) {
-	c.policyInformer = i
+func (c *Plugin[H]) SetInformerFactory(f informers.SharedInformerFactory) {
+	c.informerFactory = f
 }
 
-func (c *Plugin[H]) SetBindingInformer(i cache.SharedIndexInformer) {
-	c.bindingInformer = i
+func (c *Plugin[H]) SetSourceFactory(s sourceFactory[H]) {
+	c.sourceFactory = s
+}
+
+func (c *Plugin[H]) SetClusterName(clusterName logicalcluster.Name) {
+	c.clusterName = clusterName
 }

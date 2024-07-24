@@ -39,6 +39,8 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 type policySource[P runtime.Object, B runtime.Object, E Evaluator] struct {
@@ -106,11 +108,12 @@ func NewPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
 	paramInformerFactory informers.SharedInformerFactory,
 	dynamicClient dynamic.Interface,
 	restMapper meta.RESTMapper,
+	clusterName logicalcluster.Name,
 ) Source[PolicyHook[P, B, E]] {
 	res := &policySource[P, B, E]{
 		compiler:             compiler,
-		policyInformer:       generic.NewInformer[P](policyInformer),
-		bindingInformer:      generic.NewInformer[B](bindingInformer),
+		policyInformer:       generic.NewInformer[P](policyInformer, clusterName),
+		bindingInformer:      generic.NewInformer[B](bindingInformer, clusterName),
 		compiledPolicies:     map[types.NamespacedName]compiledPolicyEntry[E]{},
 		newPolicyAccessor:    newPolicyAccessor,
 		newBindingAccessor:   newBindingAccessor,
@@ -453,6 +456,7 @@ func (s *policySource[P, B, E]) compilePolicyLocked(policySpec P) E {
 		var emptyEvaluator E
 		return emptyEvaluator
 	}
+
 	key := types.NamespacedName{
 		Namespace: policyMeta.GetNamespace(),
 		Name:      policyMeta.GetName(),

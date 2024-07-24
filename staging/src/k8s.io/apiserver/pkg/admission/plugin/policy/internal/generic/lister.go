@@ -25,17 +25,21 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+
+	kcpcache "github.com/kcp-dev/apimachinery/v2/pkg/cache"
+	"github.com/kcp-dev/logicalcluster/v3"
 )
 
 var _ Lister[runtime.Object] = lister[runtime.Object]{}
 
 type namespacedLister[T runtime.Object] struct {
-	indexer   cache.Indexer
-	namespace string
+	indexer     cache.Indexer
+	namespace   string
+	clusterName logicalcluster.Name
 }
 
 func (w namespacedLister[T]) List(selector labels.Selector) (ret []T, err error) {
-	err = cache.ListAllByNamespace(w.indexer, w.namespace, selector, func(m interface{}) {
+	err = kcpcache.ListAllByClusterAndNamespace(w.indexer, w.clusterName, w.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(T))
 	})
 	return ret, err
@@ -44,7 +48,9 @@ func (w namespacedLister[T]) List(selector labels.Selector) (ret []T, err error)
 func (w namespacedLister[T]) Get(name string) (T, error) {
 	var result T
 
-	obj, exists, err := w.indexer.GetByKey(w.namespace + "/" + name)
+	key := kcpcache.ToClusterAwareKey(w.clusterName.String(), w.namespace, name)
+
+	obj, exists, err := w.indexer.GetByKey(key)
 	if err != nil {
 		return result, err
 	}
@@ -61,11 +67,12 @@ func (w namespacedLister[T]) Get(name string) (T, error) {
 }
 
 type lister[T runtime.Object] struct {
-	indexer cache.Indexer
+	indexer     cache.Indexer
+	clusterName logicalcluster.Name
 }
 
 func (w lister[T]) List(selector labels.Selector) (ret []T, err error) {
-	err = cache.ListAll(w.indexer, selector, func(m interface{}) {
+	err = kcpcache.ListAllByCluster(w.indexer, w.clusterName, selector, func(m interface{}) {
 		ret = append(ret, m.(T))
 	})
 	return ret, err
@@ -74,7 +81,9 @@ func (w lister[T]) List(selector labels.Selector) (ret []T, err error) {
 func (w lister[T]) Get(name string) (T, error) {
 	var result T
 
-	obj, exists, err := w.indexer.GetByKey(name)
+	key := kcpcache.ToClusterAwareKey(w.clusterName.String(), "", name)
+
+	obj, exists, err := w.indexer.GetByKey(key)
 	if err != nil {
 		return result, err
 	}
@@ -95,6 +104,6 @@ func (w lister[T]) Namespaced(namespace string) NamespacedLister[T] {
 	return namespacedLister[T]{namespace: namespace, indexer: w.indexer}
 }
 
-func NewLister[T runtime.Object](indexer cache.Indexer) lister[T] {
-	return lister[T]{indexer: indexer}
+func NewLister[T runtime.Object](indexer cache.Indexer, clusterName logicalcluster.Name) lister[T] {
+	return lister[T]{indexer: indexer, clusterName: clusterName}
 }
