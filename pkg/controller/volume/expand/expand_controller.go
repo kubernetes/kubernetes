@@ -398,7 +398,7 @@ func (expc *expandController) GetKubeClient() clientset.Interface {
 	return expc.kubeClient
 }
 
-func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (expc *expandController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by expand controller's VolumeHost implementation")
 }
 

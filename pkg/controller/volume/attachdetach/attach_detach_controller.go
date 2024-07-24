@@ -798,7 +798,7 @@ func (adc *attachDetachController) GetKubeClient() clientset.Interface {
 	return adc.kubeClient
 }
 
-func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (adc *attachDetachController) NewWrapperMounter(volName string, spec volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	return nil, fmt.Errorf("NewWrapperMounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 

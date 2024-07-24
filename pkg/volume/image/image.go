@@ -52,7 +52,7 @@ func (o *imagePlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume.Image != nil
 }
 
-func (o *imagePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (o *imagePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return o, nil
 }
 

@@ -296,7 +296,7 @@ func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (
 	return plugin.SupportsSELinux, nil
 }
 
-func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	if spec.Name() == FailNewMounter {
@@ -338,7 +338,7 @@ func (plugin *FakeVolumePlugin) GetUnmounters() (Unmounters []*FakeVolume) {
 }
 
 // Block volume support
-func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod) (volume.BlockVolumeMapper, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.BlockVolumeMappers)
@@ -555,8 +555,8 @@ func (f *FakeBasicVolumePlugin) Init(ost volume.VolumeHost) error {
 	return f.Plugin.Init(ost)
 }
 
-func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
-	return f.Plugin.NewMounter(spec, pod, opts)
+func (f *FakeBasicVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
+	return f.Plugin.NewMounter(spec, pod)
 }
 
 func (f *FakeBasicVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -652,7 +652,7 @@ func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spe
 	return false, nil
 }
 
-func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
+func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod) (volume.Mounter, error) {
 	return nil, nil
 }
 

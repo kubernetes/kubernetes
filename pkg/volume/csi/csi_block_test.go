@@ -42,7 +42,6 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	mapper, err := plug.NewBlockVolumeMapper(
 		spec,
 		&api.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
-		volume.VolumeOptions{},
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to make a new Mapper: %w", err)
