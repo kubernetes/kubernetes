@@ -2543,6 +2543,20 @@ func TestBindingRemoval(t *testing.T) {
 // Test_ValidateSecondaryAuthorization tests a ValidatingAdmissionPolicy that performs secondary authorization checks
 // for both users and service accounts.
 func Test_ValidateSecondaryAuthorization(t *testing.T) {
+	generic.PolicyRefreshInterval = 10 * time.Millisecond
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+		"--authorization-mode=RBAC",
+		"--anonymous-auth",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	// For test set up such as creating policies, bindings and RBAC rules.
+	adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 	testcases := []struct {
 		name             string
 		rbac             *rbacv1.PolicyRule
@@ -2595,7 +2609,7 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 		},
 	}
 
-	for _, testcase := range testcases {
+	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			clients := map[string]func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset{
 				"user":           secondaryAuthorizationUserClient,
@@ -2604,20 +2618,6 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 
 			for clientName, clientFn := range clients {
 				t.Run(clientName, func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
-					server, err := apiservertesting.StartTestServer(t, nil, []string{
-						"--enable-admission-plugins", "ValidatingAdmissionPolicy",
-						"--authorization-mode=RBAC",
-						"--anonymous-auth",
-					}, framework.SharedEtcd())
-					if err != nil {
-						t.Fatal(err)
-					}
-					defer server.TearDownFn()
-
-					// For test set up such as creating policies, bindings and RBAC rules.
-					adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
-
 					// Principal is always allowed to create and update namespaces so that the admission requests to test
 					// authorization expressions can be sent by the principal.
 					rules := []rbacv1.PolicyRule{{
@@ -2639,21 +2639,24 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 						testcase.extraAccountFn(t, adminClient, server.ClientConfig, extraRules)
 					}
 
+					policyName := fmt.Sprintf("%s-%s-%d", "validate-authz", clientName, i)
 					policy := withWaitReadyConstraintAndExpression(withValidations([]admissionregistrationv1.Validation{
 						{
 							Expression: testcase.expression,
 						},
-					}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy("validate-authz")))))
+					}, withFailurePolicy(admissionregistrationv1.Fail, withNamespaceMatch(makePolicy(policyName)))))
 					if _, err := adminClient.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
 						t.Fatal(err)
 					}
-					if err := createAndWaitReady(t, adminClient, makeBinding("validate-authz-binding", "validate-authz", ""), nil); err != nil {
+					policyBindingName := fmt.Sprintf("%s-%s", policyName, "binding")
+					policyBinding := makeBinding(policyBindingName, policyName, "")
+					if err := createAndWaitReady(t, adminClient, policyBinding, nil); err != nil {
 						t.Fatal(err)
 					}
 
 					ns := &v1.Namespace{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: "test-authz",
+							Name: fmt.Sprintf("%s-%s-%d", "test-authz", clientName, i),
 						},
 					}
 					_, err = client.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -2663,6 +2666,9 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 						expected = metav1.StatusReasonInvalid
 					}
 					checkFailureReason(t, err, expected)
+					if err := cleanupPolicy(t, adminClient, policy, policyBinding); err != nil {
+						t.Fatalf("error while cleaning up policy and its bindings: %v", err)
+					}
 				})
 			}
 		})
@@ -2839,7 +2845,7 @@ func serviceAccountClient(namespace, name string) clientFn {
 	return func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
 		clientConfig = rest.CopyConfig(clientConfig)
 		sa, err := adminClient.CoreV1().ServiceAccounts(namespace).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsAlreadyExists(err) {
 			t.Fatal(err)
 		}
 		uid := sa.UID
