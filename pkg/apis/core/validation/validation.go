@@ -4445,6 +4445,11 @@ func ValidateNodeSelectorTerm(term core.NodeSelectorTerm, fldPath *field.Path) f
 		allErrs = append(allErrs, ValidateNodeFieldSelectorRequirement(req, fldPath.Child("matchFields").Index(j))...)
 	}
 
+	termFldPath := fldPath.Child("nodeSelectorTerms")
+	if len(term.MatchExpressions) == 0 && len(term.MatchFields) == 0 {
+		return append(allErrs, field.Required(termFldPath, "must have at least one node selector term"))
+	}
+
 	return allErrs
 }
 
