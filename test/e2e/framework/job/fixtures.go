@@ -157,7 +157,24 @@ func NewTestJobOnNode(behavior, name string, rPol v1.RestartPolicy, parallelism,
 				exit 1
 			fi
 		`}
+	case "notTerminateOncePerIndex":
+		// Use marker files per index. If the given marker file already exists
+		// then terminate successfully. Otherwise create the marker file and
+		// sleep "forever" awaiting delete request.
+		setupHostPathDirectory(job)
+		job.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
+		job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
+		job.Spec.Template.Spec.Containers[0].Args = []string{`
+			if [[ -r /data/foo-$JOB_COMPLETION_INDEX ]]
+			then
+				exit 0
+			else
+				touch /data/foo-$JOB_COMPLETION_INDEX
+				sleep 1000000
+			fi
+		`}
 	}
+
 	return job
 }
 
