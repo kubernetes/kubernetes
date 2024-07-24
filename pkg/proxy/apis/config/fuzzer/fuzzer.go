@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	"fmt"
+	"net/netip"
 	"time"
 
 	"github.com/google/gofuzz"
@@ -28,6 +29,55 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// generateRandomIP is copied from pkg/apis/networking/fuzzer/fuzzer.go
+func generateRandomIP(is6 bool, c fuzz.Continue) string {
+	n := 4
+	if is6 {
+		n = 16
+	}
+	bytes := make([]byte, n)
+	for i := 0; i < n; i++ {
+		bytes[i] = uint8(c.Rand.Intn(255))
+	}
+
+	ip, ok := netip.AddrFromSlice(bytes)
+	if ok {
+		return ip.String()
+	}
+	// this should not happen
+	panic(fmt.Sprintf("invalid IP %v", bytes))
+}
+
+// generateRandomCIDR is copied from pkg/apis/networking/fuzzer/fuzzer.go
+func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
+	ip, err := netip.ParseAddr(generateRandomIP(is6, c))
+	if err != nil {
+		// generateRandomIP already panics if returns a not valid ip
+		panic(err)
+	}
+
+	n := 32
+	if is6 {
+		n = 128
+	}
+
+	bits := c.Rand.Intn(n)
+	prefix := netip.PrefixFrom(ip, bits)
+	return prefix.Masked().String()
+}
+
+// getRandomDualStackCIDR returns a random dual-stack CIDR.
+func getRandomDualStackCIDR(c fuzz.Continue) []string {
+	cidrIPv4 := generateRandomCIDR(false, c)
+	cidrIPv6 := generateRandomCIDR(true, c)
+
+	cidrs := []string{cidrIPv4, cidrIPv6}
+	if c.RandBool() {
+		cidrs = []string{cidrIPv6, cidrIPv4}
+	}
+	return cidrs[:1+c.Intn(2)]
+}
+
 // Funcs returns the fuzzer functions for the kube-proxy apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
@@ -35,6 +85,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
 			obj.ClientConnection.ContentType = c.RandString()
+			obj.DetectLocal.ClusterCIDRs = getRandomDualStackCIDR(c)
 			obj.Linux.Conntrack.MaxPerCore = ptr.To(c.Int31())
 			obj.Linux.Conntrack.Min = ptr.To(c.Int31())
 			obj.Linux.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
