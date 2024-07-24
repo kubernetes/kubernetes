@@ -516,26 +516,52 @@ func Test_ValidateAnnotationsAndWarnings(t *testing.T) {
 // Test_ValidateNamespace_WithConfigMapParams tests a ValidatingAdmissionPolicy that validates creation of a Namespace,
 // using ConfigMap as a param reference.
 func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
+	generic.PolicyRefreshInterval = 10 * time.Millisecond
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyBinding := makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", "validate-namespace-suffix-param")
+	configMap := makeConfigParams("validate-namespace-suffix-param", map[string]string{
+		"namespaceSuffix": "k8s",
+	})
+	if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), configMap, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	valPolicy := withValidations([]admissionregistrationv1.Validation{
+		{
+			Expression: "object.metadata.name.endsWith(params.data.namespaceSuffix)",
+		},
+	}, withFailurePolicy(admissionregistrationv1.Fail, withParams(configParamKind(), withNamespaceMatch(makePolicy("validate-namespace-suffix")))))
+	policy := withWaitReadyConstraintAndExpression(valPolicy)
+	if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
 	testcases := []struct {
 		name          string
-		policy        *admissionregistrationv1.ValidatingAdmissionPolicy
-		policyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding
-		configMap     *v1.ConfigMap
 		namespace     *v1.Namespace
 		err           string
 		failureReason metav1.StatusReason
 	}{
 		{
 			name: "namespace name contains suffix enforced by validating admission policy",
-			policy: withValidations([]admissionregistrationv1.Validation{
-				{
-					Expression: "object.metadata.name.endsWith(params.data.namespaceSuffix)",
-				},
-			}, withFailurePolicy(admissionregistrationv1.Fail, withParams(configParamKind(), withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
-			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", "validate-namespace-suffix-param"),
-			configMap: makeConfigParams("validate-namespace-suffix-param", map[string]string{
-				"namespaceSuffix": "k8s",
-			}),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-k8s",
@@ -545,15 +571,6 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 		},
 		{
 			name: "namespace name does NOT contain suffix enforced by validating admission policy",
-			policy: withValidations([]admissionregistrationv1.Validation{
-				{
-					Expression: "object.metadata.name.endsWith(params.data.namespaceSuffix)",
-				},
-			}, withFailurePolicy(admissionregistrationv1.Fail, withParams(configParamKind(), withNamespaceMatch(makePolicy("validate-namespace-suffix"))))),
-			policyBinding: makeBinding("validate-namespace-suffix-binding", "validate-namespace-suffix", "validate-namespace-suffix-param"),
-			configMap: makeConfigParams("validate-namespace-suffix-param", map[string]string{
-				"namespaceSuffix": "k8s",
-			}),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-foo",
@@ -563,39 +580,9 @@ func Test_ValidateNamespace_WithConfigMapParams(t *testing.T) {
 			failureReason: metav1.StatusReasonInvalid,
 		},
 	}
-
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
-				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
-			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer server.TearDownFn()
-
-			config := server.ClientConfig
-
-			client, err := clientset.NewForConfig(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if _, err := client.CoreV1().ConfigMaps("default").Create(context.TODO(), testcase.configMap, metav1.CreateOptions{}); err != nil {
-				t.Fatal(err)
-			}
-
-			policy := withWaitReadyConstraintAndExpression(testcase.policy)
-			if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
-				t.Fatal(err)
-			}
-			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
-				t.Fatal(err)
-			}
-
 			_, err = client.CoreV1().Namespaces().Create(context.TODO(), testcase.namespace, metav1.CreateOptions{})
-
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 		})
