@@ -918,6 +918,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ResourceClaimApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceFieldSelector"):
 		return &applyconfigurationscorev1.ResourceFieldSelectorApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceHealth"):
+		return &applyconfigurationscorev1.ResourceHealthApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceQuota"):
 		return &applyconfigurationscorev1.ResourceQuotaApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceQuotaSpec"):
@@ -926,6 +928,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ResourceQuotaStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceRequirements"):
 		return &applyconfigurationscorev1.ResourceRequirementsApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceStatus"):
+		return &applyconfigurationscorev1.ResourceStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ScaleIOPersistentVolumeSource"):
 		return &applyconfigurationscorev1.ScaleIOPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ScaleIOVolumeSource"):

@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	memorymanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -1026,4 +1027,17 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(pod *v1.Pod) error {
 
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return cm.draManager.PodMightNeedToUnprepareResources(UID)
+}
+
+func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+
+	// For now we only support Device Plugin
+	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
+
+	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+}
+
+func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
+	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
+	return cm.deviceManager.Updates()
 }

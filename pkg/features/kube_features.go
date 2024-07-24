@@ -664,6 +664,13 @@ const (
 	// No effect for other cases such as using serverTLSbootstap.
 	ReloadKubeletServerCertificateFile featuregate.Feature = "ReloadKubeletServerCertificateFile"
 
+	// owner: @SergeyKanzhelev
+	// kep: https://kep.k8s.io/4680
+	// alpha: v1.31
+	//
+	// Adds the AllocatedResourcesStatus to the container status.
+	ResourceHealthStatus featuregate.Feature = "ResourceHealthStatus"
+
 	// owner: @mikedanese
 	// alpha: v1.7
 	// beta: v1.12
@@ -1149,6 +1156,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RelaxedEnvironmentVariableValidation: {Default: false, PreRelease: featuregate.Alpha},
 
 	ReloadKubeletServerCertificateFile: {Default: true, PreRelease: featuregate.Beta},
+
+	ResourceHealthStatus: {Default: false, PreRelease: featuregate.Alpha},
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 

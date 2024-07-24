@@ -149,7 +149,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "containerStatuses": [
@@ -230,7 +241,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "qosClass": "qosClassValue",
@@ -312,7 +334,18 @@
               3
             ]
           }
-        }
+        },
+        "allocatedResourcesStatus": [
+          {
+            "name": "nameValue",
+            "resources": [
+              {
+                "resourceID": "resourceIDValue",
+                "health": "healthValue"
+              }
+            ]
+          }
+        ]
       }
     ],
     "resize": "resizeValue",

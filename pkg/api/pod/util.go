@@ -813,6 +813,17 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		}
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
+		setAllocatedResourcesStatusToNil := func(csl []api.ContainerStatus) {
+			for i := range csl {
+				csl[i].AllocatedResourcesStatus = nil
+			}
+		}
+		setAllocatedResourcesStatusToNil(podStatus.ContainerStatuses)
+		setAllocatedResourcesStatusToNil(podStatus.InitContainerStatuses)
+		setAllocatedResourcesStatusToNil(podStatus.EphemeralContainerStatuses)
+	}
+
 	// drop ContainerStatus.User field to empty (disable SupplementalGroupsPolicy)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SupplementalGroupsPolicy) && !supplementalGroupsPolicyInUse(oldPodSpec) {
 		dropUserField := func(csl []api.ContainerStatus) {
