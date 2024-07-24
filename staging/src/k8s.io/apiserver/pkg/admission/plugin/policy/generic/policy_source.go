@@ -41,9 +41,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var (
-	PolicyRefreshInterval = 1 * time.Second
-)
+// Interval for refreshing policies.
+// TODO: Consider reducing this to a shorter duration or replacing this entirely
+// with checks that detect when a policy change took effect.
+const policyRefreshIntervalDefault = 1 * time.Second
+
+var policyRefreshInterval = policyRefreshIntervalDefault
 
 type policySource[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	ctx                context.Context
@@ -126,6 +129,15 @@ func NewPolicySource[P runtime.Object, B runtime.Object, E Evaluator](
 	return res
 }
 
+// SetPolicyRefreshIntervalForTests allows the refresh interval to be overridden during tests.
+// This should only be called from tests.
+func SetPolicyRefreshIntervalForTests(interval time.Duration) func() {
+	policyRefreshInterval = interval
+	return func() {
+		policyRefreshInterval = policyRefreshIntervalDefault
+	}
+}
+
 func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 	if s.ctx != nil {
 		return fmt.Errorf("policy source already running")
@@ -182,7 +194,7 @@ func (s *policySource[P, B, E]) Run(ctx context.Context) error {
 	// and needs to be recompiled
 	go func() {
 		// Loop every 1 second until context is cancelled, refreshing policies
-		wait.Until(s.refreshPolicies, PolicyRefreshInterval, ctx.Done())
+		wait.Until(s.refreshPolicies, policyRefreshInterval, ctx.Done())
 	}()
 
 	<-ctx.Done()
