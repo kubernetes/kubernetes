@@ -2341,33 +2341,64 @@ func generateValidationsWithAuthzCheck(num int, exp string) []admissionregistrat
 
 // TestCRDParams tests that a CustomResource can be used as a param resource for a ValidatingAdmissionPolicy.
 func TestCRDParams(t *testing.T) {
+	generic.PolicyRefreshInterval = 10 * time.Millisecond
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
+	server, err := apiservertesting.StartTestServer(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+
+	config := server.ClientConfig
+	client, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crd := versionedCustomResourceDefinition()
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gvr := schema.GroupVersionResource{
+		Group:    crd.Spec.Group,
+		Version:  crd.Spec.Versions[0].Name,
+		Resource: crd.Spec.Names.Plural,
+	}
+	crClient := dynamicClient.Resource(gvr)
+
+	resource := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "awesome.bears.com/v1",
+		"kind":       "Panda",
+		"metadata": map[string]interface{}{
+			"name": "config-obj",
+		},
+		"spec": map[string]interface{}{
+			"nameCheck": "crd-test-k8s",
+		},
+	}}
+	_, err = crClient.Create(context.TODO(), resource, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("error creating %s: %s", gvr, err)
+	}
+
 	testcases := []struct {
 		name          string
-		resource      *unstructured.Unstructured
 		policy        *admissionregistrationv1.ValidatingAdmissionPolicy
-		policyBinding *admissionregistrationv1.ValidatingAdmissionPolicyBinding
 		namespace     *v1.Namespace
 		err           string
 		failureReason metav1.StatusReason
 	}{
 		{
 			name: "a rule that uses data from a CRD param resource does NOT pass",
-			resource: &unstructured.Unstructured{Object: map[string]interface{}{
-				"apiVersion": "awesome.bears.com/v1",
-				"kind":       "Panda",
-				"metadata": map[string]interface{}{
-					"name": "config-obj",
-				},
-				"spec": map[string]interface{}{
-					"nameCheck": "crd-test-k8s",
-				},
-			}},
 			policy: withValidations([]admissionregistrationv1.Validation{
 				{
 					Expression: "params.spec.nameCheck == object.metadata.name",
 				},
 			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1.Fail, makePolicy("test-policy"))))),
-			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "incorrect-name",
@@ -2378,22 +2409,11 @@ func TestCRDParams(t *testing.T) {
 		},
 		{
 			name: "a rule that uses data from a CRD param resource that does pass",
-			resource: &unstructured.Unstructured{Object: map[string]interface{}{
-				"apiVersion": "awesome.bears.com/v1",
-				"kind":       "Panda",
-				"metadata": map[string]interface{}{
-					"name": "config-obj",
-				},
-				"spec": map[string]interface{}{
-					"nameCheck": "crd-test-k8s",
-				},
-			}},
 			policy: withValidations([]admissionregistrationv1.Validation{
 				{
 					Expression: "params.spec.nameCheck == object.metadata.name",
 				},
 			}, withNamespaceMatch(withParams(withCRDParamKind("Panda", "awesome.bears.com", "v1"), withFailurePolicy(admissionregistrationv1.Fail, makePolicy("test-policy"))))),
-			policyBinding: makeBinding("crd-policy-binding", "test-policy", "config-obj"),
 			namespace: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "crd-test-k8s",
@@ -2405,46 +2425,14 @@ func TestCRDParams(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)
-			server, err := apiservertesting.StartTestServer(t, nil, []string{
-				"--enable-admission-plugins", "ValidatingAdmissionPolicy",
-			}, framework.SharedEtcd())
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer server.TearDownFn()
-
-			config := server.ClientConfig
-
-			client, err := clientset.NewForConfig(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			crd := versionedCustomResourceDefinition()
-			etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, crd)
-			dynamicClient, err := dynamic.NewForConfig(config)
-			if err != nil {
-				t.Fatal(err)
-			}
-			gvr := schema.GroupVersionResource{
-				Group:    crd.Spec.Group,
-				Version:  crd.Spec.Versions[0].Name,
-				Resource: crd.Spec.Names.Plural,
-			}
-			crClient := dynamicClient.Resource(gvr)
-			_, err = crClient.Create(context.TODO(), testcase.resource, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatalf("error creating %s: %s", gvr, err)
-			}
-
 			policy := withWaitReadyConstraintAndExpression(testcase.policy)
 			if _, err := client.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
 			// remove default namespace since the CRD is cluster-scoped
-			testcase.policyBinding.Spec.ParamRef.Namespace = ""
-			if err := createAndWaitReady(t, client, testcase.policyBinding, nil); err != nil {
+			policyBinding := makeBinding("crd-policy-binding", "test-policy", "config-obj")
+			policyBinding.Spec.ParamRef.Namespace = ""
+			if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
 				t.Fatal(err)
 			}
 
@@ -2452,6 +2440,10 @@ func TestCRDParams(t *testing.T) {
 
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
+			if err := cleanupPolicy(t, client, policy, policyBinding); err != nil {
+				t.Fatalf("error while cleaning up policy and its bindings: %v", err)
+			}
+
 		})
 	}
 }
