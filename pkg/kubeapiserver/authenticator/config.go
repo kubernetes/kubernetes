@@ -49,7 +49,6 @@ import (
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -323,12 +322,6 @@ func (c *authenticationConfigUpdater) updateAuthenticationConfig(ctx context.Con
 	}()
 
 	return nil
-}
-
-// IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file
-func IsValidServiceAccountKeyFile(file string) bool {
-	_, err := keyutil.PublicKeysFromFile(file)
-	return err == nil
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Token or an error
