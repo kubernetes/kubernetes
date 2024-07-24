@@ -718,8 +718,8 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 	}
 	oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
 	_, err = crClient.Update(context.TODO(), oldCR, metav1.UpdateOptions{})
-	if err == nil || !strings.Contains(err.Error(), "rule compiler initialization error: Failed to convert to declType for CEL validation rules") {
-		t.Fatalf("expect error to contain \rule compiler initialization error: Failed to convert to declType for CEL validation rules\" but get: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
+		t.Fatalf("expect error to contain \rule compiler initialization error: failed to convert to declType for CEL validation rules\" but get: %v", err)
 	}
 	// Create another CR instance with an array and be rejected
 	name2 := names.SimpleNameGenerator.GenerateName("cr-2")
