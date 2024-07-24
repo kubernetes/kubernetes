@@ -782,9 +782,10 @@ func Test_buildQueueingHintMap(t *testing.T) {
 // Test_UnionedGVKs tests UnionedGVKs worked with buildQueueingHintMap.
 func Test_UnionedGVKs(t *testing.T) {
 	tests := []struct {
-		name    string
-		plugins schedulerapi.PluginSet
-		want    map[framework.GVK]framework.ActionType
+		name                            string
+		plugins                         schedulerapi.PluginSet
+		want                            map[framework.GVK]framework.ActionType
+		enableInPlacePodVerticalScaling bool
 	}{
 		{
 			name: "filter without EnqueueExtensions plugin",
@@ -867,10 +868,10 @@ func Test_UnionedGVKs(t *testing.T) {
 			want: map[framework.GVK]framework.ActionType{},
 		},
 		{
-			name:    "plugins with default profile",
+			name:    "plugins with default profile (InPlacePodVerticalScaling: disabled)",
 			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
 			want: map[framework.GVK]framework.ActionType{
-				framework.Pod:                   framework.All,
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.Delete,
 				framework.Node:                  framework.All,
 				framework.CSINode:               framework.All - framework.Delete,
 				framework.CSIDriver:             framework.All - framework.Delete,
@@ -880,9 +881,26 @@ func Test_UnionedGVKs(t *testing.T) {
 				framework.StorageClass:          framework.All - framework.Delete,
 			},
 		},
+		{
+			name:    "plugins with default profile (InPlacePodVerticalScaling: enabled)",
+			plugins: schedulerapi.PluginSet{Enabled: defaults.PluginsV1.MultiPoint.Enabled},
+			want: map[framework.GVK]framework.ActionType{
+				framework.Pod:                   framework.Add | framework.UpdatePodLabel | framework.UpdatePodScaleDown | framework.Delete,
+				framework.Node:                  framework.All,
+				framework.CSINode:               framework.All - framework.Delete,
+				framework.CSIDriver:             framework.All - framework.Delete,
+				framework.CSIStorageCapacity:    framework.All - framework.Delete,
+				framework.PersistentVolume:      framework.All - framework.Delete,
+				framework.PersistentVolumeClaim: framework.All - framework.Delete,
+				framework.StorageClass:          framework.All - framework.Delete,
+			},
+			enableInPlacePodVerticalScaling: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
+
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

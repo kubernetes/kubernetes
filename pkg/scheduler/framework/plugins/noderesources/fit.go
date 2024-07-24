@@ -250,9 +250,9 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 func (f *Fit) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
 	podActionType := framework.Delete
 	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then PodUpdate event should be registered
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
 		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		podActionType |= framework.Update
+		podActionType |= framework.UpdatePodScaleDown
 	}
 	return []framework.ClusterEventWithHint{
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodChange},
@@ -296,7 +296,7 @@ func (f *Fit) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldOb
 		return framework.QueueSkip, nil
 	}
 
-	logger.V(5).Info("the max request resources of another scheduled pod got reduced and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+	logger.V(5).Info("another scheduled pod or the target pod itself got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return framework.Queue, nil
 }
 

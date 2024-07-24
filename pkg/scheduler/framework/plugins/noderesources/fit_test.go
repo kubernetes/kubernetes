@@ -1095,7 +1095,7 @@ func TestEventsToRegister(t *testing.T) {
 			"Register events with InPlacePodVerticalScaling feature enabled",
 			true,
 			[]framework.ClusterEventWithHint{
-				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.Update | framework.Delete}},
+				{Event: framework.ClusterEvent{Resource: "Pod", ActionType: framework.UpdatePodScaleDown | framework.Delete}},
 				{Event: framework.ClusterEvent{Resource: "Node", ActionType: framework.Add | framework.Update}},
 			},
 		},

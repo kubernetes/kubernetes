@@ -48,7 +48,7 @@ import (
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.StorageClassAdd.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.StorageClassAdd.Label).Observe(metrics.SinceInSeconds(start))
 	logger := sched.logger
 	sc, ok := obj.(*storagev1.StorageClass)
 	if !ok {
@@ -63,13 +63,13 @@ func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	// We don't need to invalidate cached results because results will not be
 	// cached for pod that has unbound immediate PVCs.
 	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.StorageClassAdd, nil, sc, nil)
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.StorageClassAdd, nil, sc, nil)
 	}
 }
 
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.NodeAdd.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.NodeAdd.Label).Observe(metrics.SinceInSeconds(start))
 	logger := sched.logger
 	node, ok := obj.(*v1.Node)
 	if !ok {
@@ -79,7 +79,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 
 	logger.V(3).Info("Add event for node", "node", klog.KObj(node))
 	nodeInfo := sched.Cache.AddNode(logger, node)
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.NodeAdd, nil, node, preCheckForNode(nodeInfo))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.NodeAdd, nil, node, preCheckForNode(nodeInfo))
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -98,7 +98,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 
 	logger.V(4).Info("Update event for node", "node", klog.KObj(newNode))
 	nodeInfo := sched.Cache.UpdateNode(logger, oldNode, newNode)
-	events := queue.NodeSchedulingPropertiesChange(newNode, oldNode)
+	events := framework.NodeSchedulingPropertiesChange(newNode, oldNode)
 
 	// Save the time it takes to update the node in the cache.
 	updatingDuration := metrics.SinceInSeconds(start)
@@ -115,7 +115,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 
 func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.NodeDelete.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.NodeDelete.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	var node *v1.Node
@@ -142,7 +142,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.UnscheduledPodAdd.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodAdd.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	pod := obj.(*v1.Pod)
@@ -154,7 +154,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
 
 func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
 	logger := sched.logger
 	oldPod, newPod := oldObj.(*v1.Pod), newObj.(*v1.Pod)
 	// Bypass update event that carries identical objects; otherwise, a duplicated
@@ -179,7 +179,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 
 func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.UnscheduledPodDelete.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.UnscheduledPodDelete.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	var pod *v1.Pod
@@ -213,13 +213,13 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	// removing it from the scheduler cache. In this case, signal a AssignedPodDelete
 	// event to immediately retry some unscheduled Pods.
 	if fwk.RejectWaitingPod(pod.UID) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, pod, nil, nil)
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodDelete, pod, nil, nil)
 	}
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.AssignedPodAdd.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.AssignedPodAdd.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	pod, ok := obj.(*v1.Pod)
@@ -243,7 +243,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 	// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
 	// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
 	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodAdd, nil, pod, nil)
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodAdd, nil, pod, nil)
 	} else {
 		sched.SchedulingQueue.AssignedPodAdded(logger, pod)
 	}
@@ -251,7 +251,7 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 
 func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.AssignedPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.AssignedPodUpdate.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	oldPod, ok := oldObj.(*v1.Pod)
@@ -270,25 +270,28 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 		logger.Error(err, "Scheduler cache UpdatePod failed", "pod", klog.KObj(oldPod))
 	}
 
-	// SchedulingQueue.AssignedPodUpdated has a problem:
-	// It internally pre-filters Pods to move to activeQ,
-	// while taking only in-tree plugins into consideration.
-	// Consequently, if custom plugins that subscribes Pod/Update events reject Pods,
-	// those Pods will never be requeued to activeQ by an assigned Pod related events,
-	// and they may be stuck in unschedulableQ.
-	//
-	// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
-	// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
-	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodUpdate, oldPod, newPod, nil)
-	} else {
-		sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod)
+	events := framework.PodSchedulingPropertiesChange(newPod, oldPod)
+	for _, evt := range events {
+		// SchedulingQueue.AssignedPodUpdated has a problem:
+		// It internally pre-filters Pods to move to activeQ,
+		// while taking only in-tree plugins into consideration.
+		// Consequently, if custom plugins that subscribes Pod/Update events reject Pods,
+		// those Pods will never be requeued to activeQ by an assigned Pod related events,
+		// and they may be stuck in unschedulableQ.
+		//
+		// Here we use MoveAllToActiveOrBackoffQueue only when QueueingHint is enabled.
+		// (We cannot switch to MoveAllToActiveOrBackoffQueue right away because of throughput concern.)
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodUpdate, oldPod, newPod, nil)
+		} else {
+			sched.SchedulingQueue.AssignedPodUpdated(logger, oldPod, newPod, evt)
+		}
 	}
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 	start := time.Now()
-	defer metrics.EventHandlingLatency.WithLabelValues(queue.AssignedPodDelete.Label).Observe(metrics.SinceInSeconds(start))
+	defer metrics.EventHandlingLatency.WithLabelValues(framework.AssignedPodDelete.Label).Observe(metrics.SinceInSeconds(start))
 
 	logger := sched.logger
 	var pod *v1.Pod
@@ -312,7 +315,7 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 		logger.Error(err, "Scheduler cache RemovePod failed", "pod", klog.KObj(pod))
 	}
 
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.AssignedPodDelete, pod, nil, nil)
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.AssignedPodDelete, pod, nil, nil)
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
@@ -557,8 +560,8 @@ func addAllEventHandlers(
 					cache.ResourceEventHandlerFuncs{
 						UpdateFunc: func(old, obj interface{}) {
 							start := time.Now()
-							defer metrics.EventHandlingLatency.WithLabelValues(queue.StorageClassUpdate.Label).Observe(metrics.SinceInSeconds(start))
-							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, queue.StorageClassUpdate, old, obj, nil)
+							defer metrics.EventHandlingLatency.WithLabelValues(framework.StorageClassUpdate.Label).Observe(metrics.SinceInSeconds(start))
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.StorageClassUpdate, old, obj, nil)
 						},
 					},
 				); err != nil {

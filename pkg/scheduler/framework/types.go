@@ -46,25 +46,48 @@ type ActionType int64
 
 // Constants for ActionTypes.
 const (
-	Add    ActionType = 1 << iota // 1
-	Delete                        // 10
-	// UpdateNodeXYZ is only applicable for Node events.
-	UpdateNodeAllocatable // 100
-	UpdateNodeLabel       // 1000
-	UpdateNodeTaint       // 10000
-	UpdateNodeCondition   // 100000
-	UpdateNodeAnnotation  // 1000000
+	Add ActionType = 1 << iota
+	Delete
 
-	All ActionType = 1<<iota - 1 // 1111111
+	// UpdateNodeXYZ is only applicable for Node events.
+	// If you use UpdateNodeXYZ,
+	// your plugin's QueueingHint is only executed for the specific sub-Update event.
+	// It's better to narrow down the scope of the event by using them instead of just using Update event
+	// for better performance in requeueing.
+	UpdateNodeAllocatable
+	UpdateNodeLabel
+	UpdateNodeTaint
+	UpdateNodeCondition
+	UpdateNodeAnnotation
+
+	// UpdatePodXYZ is only applicable for Pod events.
+	// If you use UpdatePodXYZ,
+	// your plugin's QueueingHint is only executed for the specific sub-Update event.
+	// It's better to narrow down the scope of the event by using them instead of Update event
+	// for better performance in requeueing.
+	UpdatePodLabel
+	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
+	UpdatePodScaleDown
+
+	// updatePodOther is a update for pod's other fields.
+	// It's used only for the internal event handling, and thus unexported.
+	updatePodOther
+
+	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | updatePodOther
 )
 
 // GVK is short for group/version/kind, which can uniquely represent a particular API resource.
 type GVK string
 
 // Constants for GVKs.
+//
+// Note:
+// - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
+// Use specific events rather than general ones (updatePodLabel vs update) can make the requeueing process more efficient
+// and consume less memory as less events will be cached at scheduler.
 const (
 	// There are a couple of notes about how the scheduler notifies the events of Pods:
 	// - Add: add events could be triggered by either a newly created Pod or an existing Pod that is scheduled to a Node.
@@ -164,7 +187,8 @@ func (s QueueingHint) String() string {
 type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
-	Label      string
+	// Label describes this cluster event, only used in logging and metrics.
+	Label string
 }
 
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
