@@ -60,6 +60,10 @@ var (
 	// IdentityLeaseRenewIntervalPeriod is the interval of kube-apiserver renewing its lease in seconds
 	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+
+	// LeaseCandidateGCPeriod is the interval which the leasecandidate GC controller checks for expired leases
+	// This is exposed so integration tests can tune this value.
+	LeaseCandidateGCPeriod = 30 * time.Minute
 )
 
 const (
@@ -164,7 +168,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				)
 				gccontroller := leaderelection.NewLeaseCandidateGC(
 					client,
-					1*time.Hour,
+					LeaseCandidateGCPeriod,
 					lcInformer,
 				)
 				return func(ctx context.Context, workers int) {
