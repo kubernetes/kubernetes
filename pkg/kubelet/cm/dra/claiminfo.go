@@ -40,8 +40,8 @@ type ClaimInfo struct {
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
 	sync.RWMutex
-	state     state.CheckpointState
-	claimInfo map[string]*ClaimInfo
+	checkpointer state.Checkpointer
+	claimInfo    map[string]*ClaimInfo
 }
 
 // newClaimInfoFromClaim creates a new claim info from a resource claim.
@@ -77,12 +77,12 @@ func newClaimInfoFromState(state *state.ClaimInfoState) *ClaimInfo {
 }
 
 // setCDIDevices adds a set of CDI devices to the claim info.
-func (info *ClaimInfo) addDevice(driverName string, device state.Device) {
+func (info *ClaimInfo) addDevice(driverName string, deviceState state.Device) {
 	if info.DriverState == nil {
 		info.DriverState = make(map[string]state.DriverState)
 	}
 	driverState := info.DriverState[driverName]
-	driverState.Devices = append(driverState.Devices, device)
+	driverState.Devices = append(driverState.Devices, deviceState)
 	info.DriverState[driverName] = driverState
 }
 
@@ -113,22 +113,27 @@ func (info *ClaimInfo) isPrepared() bool {
 
 // newClaimInfoCache creates a new claim info cache object, pre-populated from a checkpoint (if present).
 func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
-	stateImpl, err := state.NewCheckpointState(stateDir, checkpointName)
+	checkpointer, err := state.NewCheckpointer(stateDir, checkpointName)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %+v", err)
 	}
 
-	curState, err := stateImpl.GetOrCreate()
+	checkpoint, err := checkpointer.GetOrCreate()
 	if err != nil {
 		return nil, fmt.Errorf("error calling GetOrCreate() on checkpoint state: %v", err)
 	}
 
 	cache := &claimInfoCache{
-		state:     stateImpl,
-		claimInfo: make(map[string]*ClaimInfo),
+		checkpointer: checkpointer,
+		claimInfo:    make(map[string]*ClaimInfo),
 	}
 
-	for _, entry := range curState {
+	entries, err := checkpoint.GetClaimInfoStateList()
+	if err != nil {
+		return nil, fmt.Errorf("error calling GetEntries() on checkpoint: %w", err)
+
+	}
+	for _, entry := range entries {
 		info := newClaimInfoFromState(&entry)
 		cache.claimInfo[info.Namespace+"/"+info.ClaimName] = info
 	}
@@ -192,7 +197,11 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 	for _, infoClaim := range cache.claimInfo {
 		claimInfoStateList = append(claimInfoStateList, infoClaim.ClaimInfoState)
 	}
-	return cache.state.Store(claimInfoStateList)
+	checkpoint, err := state.NewCheckpoint(claimInfoStateList)
+	if err != nil {
+		return err
+	}
+	return cache.checkpointer.Store(checkpoint)
 }
 
 // cdiDevicesAsList returns a list of CDIDevices from the provided claim info.
