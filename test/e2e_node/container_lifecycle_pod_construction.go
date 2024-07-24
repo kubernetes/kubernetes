@@ -351,12 +351,13 @@ func parseOutput(ctx context.Context, f *framework.Framework, pod *v1.Pod) conta
 	sc := bufio.NewScanner(&buf)
 	var res containerOutputList
 	for sc.Scan() {
+		log := sc.Text()
 		fields := strings.Fields(sc.Text())
 		if len(fields) < 3 {
 			framework.ExpectNoError(fmt.Errorf("%v should have at least length 3", fields))
 		}
 		timestamp, err := time.Parse(time.RFC3339, fields[0])
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(err, "Failed to parse the timestamp, log: %q", log)
 		res = append(res, containerOutput{
 			timestamp:     timestamp,
 			containerName: fields[1],
