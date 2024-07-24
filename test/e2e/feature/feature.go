@@ -252,10 +252,6 @@ var (
 	NodeOutOfServiceVolumeDetach = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
 
 	// Owner: sig-network
-	// Marks a single test that tests pod-to-pod connectivity between every pair of nodes.
-	NoSNAT = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
-
-	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
 
