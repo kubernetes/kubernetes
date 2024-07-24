@@ -726,8 +726,8 @@ func TestCustomResourceValidatorsWithSchemaConversion(t *testing.T) {
 	}
 	oldCR.Object["metadata"].(map[string]interface{})["labels"] = map[string]interface{}{"key": "value"}
 	_, err = crClient.Update(context.TODO(), oldCR, metav1.UpdateOptions{})
-	if err == nil || !strings.Contains(err.Error(), "rule compiler initialization error: failed to convert to declType for CEL validation rules") {
-		t.Fatalf("expect error to contain \rule compiler initialization error: failed to convert to declType for CEL validation rules\" but get: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "spec.backend in body must be of type object: \"array\", <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation") {
+		t.Fatalf("expect error to contain \"spec.backend in body must be of type object: \"array\", <nil>: Invalid value: \"null\": some validation rules were not checked because the object was invalid; correct the existing errors to complete validation\" but get: %v", err)
 	}
 	// Create another CR instance with an array and be rejected
 	name2 := names.SimpleNameGenerator.GenerateName("cr-2")
