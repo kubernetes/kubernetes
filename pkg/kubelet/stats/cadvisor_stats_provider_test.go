@@ -569,7 +569,6 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, true)
 
 	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
-	mockCadvisor.EXPECT().ContainerFsInfo().Return(imageFsInfo, nil)
 	mockRuntime.EXPECT().ImageFsInfo(ctx).Return(imageFsInfoResponse, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
