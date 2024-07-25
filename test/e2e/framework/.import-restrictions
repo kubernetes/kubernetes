@@ -34,6 +34,7 @@ rules:
   # Third party deps
   - selectorRegexp: ^github.com/|^gopkg.in
     allowedPrefixes: [
+      "dario.cat/mergo",
       "gopkg.in/inf.v0",
       "gopkg.in/yaml.v2",
       "gopkg.in/evanphx/json-patch.v4",
@@ -49,7 +50,6 @@ rules:
       "github.com/google/go-cmp/cmp/cmpopts",
       "github.com/google/gofuzz",
       "github.com/google/uuid",
-      "github.com/imdario/mergo",
       "github.com/prometheus/client_golang/",
       "github.com/prometheus/client_model/",
       "github.com/prometheus/common/",

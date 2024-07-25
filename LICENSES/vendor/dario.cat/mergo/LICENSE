@@ -1,4 +1,4 @@
-= vendor/github.com/imdario/mergo licensed under: =
+= vendor/dario.cat/mergo licensed under: =
 
 Copyright (c) 2013 Dario Castañé. All rights reserved.
 Copyright (c) 2012 The Go Authors. All rights reserved.
@@ -29,4 +29,4 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/github.com/imdario/mergo/LICENSE ff13e03bb57bf9c52645f2f942afa28b
+= vendor/dario.cat/mergo/LICENSE ff13e03bb57bf9c52645f2f942afa28b
