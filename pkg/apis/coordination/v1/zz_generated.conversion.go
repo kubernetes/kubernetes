@@ -125,6 +125,8 @@ func autoConvert_v1_LeaseSpec_To_coordination_LeaseSpec(in *v1.LeaseSpec, out *c
 	out.AcquireTime = (*metav1.MicroTime)(unsafe.Pointer(in.AcquireTime))
 	out.RenewTime = (*metav1.MicroTime)(unsafe.Pointer(in.RenewTime))
 	out.LeaseTransitions = (*int32)(unsafe.Pointer(in.LeaseTransitions))
+	out.Strategy = (*coordination.CoordinatedLeaseStrategy)(unsafe.Pointer(in.Strategy))
+	out.PreferredHolder = (*string)(unsafe.Pointer(in.PreferredHolder))
 	return nil
 }
 
@@ -139,6 +141,8 @@ func autoConvert_coordination_LeaseSpec_To_v1_LeaseSpec(in *coordination.LeaseSp
 	out.AcquireTime = (*metav1.MicroTime)(unsafe.Pointer(in.AcquireTime))
 	out.RenewTime = (*metav1.MicroTime)(unsafe.Pointer(in.RenewTime))
 	out.LeaseTransitions = (*int32)(unsafe.Pointer(in.LeaseTransitions))
+	out.Strategy = (*v1.CoordinatedLeaseStrategy)(unsafe.Pointer(in.Strategy))
+	out.PreferredHolder = (*string)(unsafe.Pointer(in.PreferredHolder))
 	return nil
 }
 

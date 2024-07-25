@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -41,6 +42,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
+	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
 	"k8s.io/kubernetes/pkg/controlplane/controller/systemnamespaces"
 	"k8s.io/kubernetes/pkg/features"
@@ -58,6 +60,10 @@ var (
 	// IdentityLeaseRenewIntervalPeriod is the interval of kube-apiserver renewing its lease in seconds
 	// IdentityLeaseRenewIntervalPeriod is exposed so integration tests can tune this value.
 	IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+
+	// LeaseCandidateGCPeriod is the interval which the leasecandidate GC controller checks for expired leases
+	// This is exposed so integration tests can tune this value.
+	LeaseCandidateGCPeriod = 30 * time.Minute
 )
 
 const (
@@ -143,6 +149,35 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	_, publicServicePort, err := c.Generic.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
+		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
+		lcInformer := s.VersionedInformers.Coordination().V1alpha1().LeaseCandidates()
+		// Ensure that informers are registered before starting. Coordinated Leader Election leader-elected
+		// and may register informer handlers after they are started.
+		_ = leaseInformer.Informer()
+		_ = lcInformer.Informer()
+		s.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-coordinated-leader-election-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			go leaderelection.RunWithLeaderElection(hookContext, s.GenericAPIServer.LoopbackClientConfig, func() (func(ctx context.Context, workers int), error) {
+				controller, err := leaderelection.NewController(
+					leaseInformer,
+					lcInformer,
+					client.CoordinationV1(),
+					client.CoordinationV1alpha1(),
+				)
+				gccontroller := leaderelection.NewLeaseCandidateGC(
+					client,
+					LeaseCandidateGCPeriod,
+					lcInformer,
+				)
+				return func(ctx context.Context, workers int) {
+					go controller.Run(ctx, workers)
+					go gccontroller.Run(ctx)
+				}, err
+			})
+			return nil
+		})
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {

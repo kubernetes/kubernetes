@@ -37,4 +37,6 @@ spec:
   holderIdentity: holderIdentityValue
   leaseDurationSeconds: 2
   leaseTransitions: 5
+  preferredHolder: preferredHolderValue
   renewTime: "2004-01-01T01:01:01.000004Z"
+  strategy: strategyValue

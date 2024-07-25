@@ -83,6 +83,7 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 		"events",
 		"events.events.k8s.io",
 		"flowschemas.flowcontrol.apiserver.k8s.io",
+		"leasecandidates.coordination.k8s.io",
 		"leases.coordination.k8s.io",
 		"localsubjectaccessreviews.authorization.k8s.io",
 		"mutatingwebhookconfigurations.admissionregistration.k8s.io",

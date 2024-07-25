@@ -28,8 +28,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
-
+	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -78,6 +79,7 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	garbagecollector "k8s.io/kubernetes/pkg/controller/garbagecollector"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -288,6 +290,34 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			defer close(leaderMigrator.MigrationReady)
 			return startSATokenControllerInit(ctx, controllerContext, controllerName)
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		if err != nil {
+			return err
+		}
+		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
+		if err != nil {
+			return err
+		}
+
+		// Start lease candidate controller for coordinated leader election
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
+			c.Client,
+			"kube-system",
+			id,
+			"kube-controller-manager",
+			binaryVersion.FinalizeVersion(),
+			emulationVersion.FinalizeVersion(),
+			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
+		)
+		if err != nil {
+			return err
+		}
+		healthzHandler.AddHealthChecker(healthz.NewInformerSyncHealthz(waitForSync))
+
+		go leaseCandidate.Run(ctx)
 	}
 
 	// Start the main lock
@@ -886,6 +916,7 @@ func leaderElectAndRun(ctx context.Context, c *config.CompletedConfig, lockIdent
 		Callbacks:     callbacks,
 		WatchDog:      electionChecker,
 		Name:          leaseName,
+		Coordinated:   utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection),
 	})
 
 	panic("unreachable")

@@ -24,8 +24,10 @@ import (
 	"os"
 	goruntime "runtime"
 
+	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
-
+	coordinationv1 "k8s.io/api/coordination/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -58,6 +60,7 @@ import (
 	"k8s.io/klog/v2"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
@@ -207,6 +210,33 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	})
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
+	if cc.LeaderElection != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		if err != nil {
+			return err
+		}
+		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
+		if err != nil {
+			return err
+		}
+
+		// Start lease candidate controller for coordinated leader election
+		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
+			cc.Client,
+			metav1.NamespaceSystem,
+			cc.LeaderElection.Lock.Identity(),
+			"kube-scheduler",
+			binaryVersion.FinalizeVersion(),
+			emulationVersion.FinalizeVersion(),
+			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
+		)
+		if err != nil {
+			return err
+		}
+		readyzChecks = append(readyzChecks, healthz.NewInformerSyncHealthz(waitForSync))
+		go leaseCandidate.Run(ctx)
+	}
+
 	// Start up the healthz server.
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newHealthEndpointsAndMetricsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
@@ -245,6 +275,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
+			cc.LeaderElection.Coordinated = true
+		}
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				close(waitingForLeader)
