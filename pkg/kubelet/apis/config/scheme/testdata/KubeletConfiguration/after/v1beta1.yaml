@@ -77,8 +77,8 @@ oomScoreAdj: -999
 podLogsDir: /var/log/pods
 podPidsLimit: -1
 port: 10250
-pullImageSecretRecheckPeriod: 0s
 pullImageSecretRecheck: false
+pullImageSecretRecheckPeriod: 0s
 registerNode: true
 registryBurst: 10
 registryPullQPS: 5

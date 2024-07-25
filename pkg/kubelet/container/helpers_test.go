@@ -1037,6 +1037,6 @@ func TestHashAuth(t *testing.T) {
 	for _, tc := range testCases {
 		hashVal, err := HashAuth(tc.auth)
 		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	}
 }

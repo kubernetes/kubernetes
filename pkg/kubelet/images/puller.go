@@ -27,11 +27,10 @@ import (
 )
 
 type pullResult struct {
-	imageRef     string
-	imageSize    uint64
-	err          error
-	pullDuration time.Duration
-	// pullCredentialsHash of successful pull with auth, nil if no auth used or error
+	imageRef            string
+	imageSize           uint64
+	err                 error
+	pullDuration        time.Duration
 	pullCredentialsHash string
 }
 

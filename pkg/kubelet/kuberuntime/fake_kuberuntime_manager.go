@@ -47,7 +47,8 @@ const (
 	fakeNodeAllocatableMemory = "32Gi"
 	fakeNodeAllocatableCPU    = "16"
 
-	fakePodLogsDirectory = "/var/log/pods"
+	fakePodLogsDirectory     = "/var/log/pods"
+	fakeKubeletRootDirectory = "/var/lib/kubelet"
 )
 
 type fakeHTTP struct {
@@ -140,6 +141,8 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		&fakePodPullingTimeRecorder{},
 		nil,
 		metav1.Duration{Duration: 1 * time.Minute},
+		ptr.To[bool](true),
+		fakeKubeletRootDirectory,
 	)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
 		&fakeHTTP{},

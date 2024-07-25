@@ -3227,6 +3227,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
 		kubeCfg.PullImageSecretRecheckPeriod,
+		kubeCfg.PullImageSecretRecheck,
 	)
 	assert.NoError(t, err)
 

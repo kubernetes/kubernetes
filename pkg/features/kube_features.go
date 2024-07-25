@@ -370,9 +370,9 @@ const (
 	// fallback to using it's cgroupDriver option.
 	KubeletCgroupDriverFromCRI featuregate.Feature = "KubeletCgroupDriverFromCRI"
 
-	// owner: @mikebrow @pacoxu
+	// owner: @mikebrow @pacoxu @sairameshv
 	// kep: http://kep.k8s.io/2535
-	// alpha: v1.30
+	// alpha: v1.31
 	//
 	// Enables kubelet to ensure images pulled with pod imagePullSecrets are authenticated
 	// by other pods that do not have the same credentials.

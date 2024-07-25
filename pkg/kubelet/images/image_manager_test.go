@@ -246,7 +246,7 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 	fakeRuntime.InspectErr = c.inspectErr
 
 	fakePodPullingTimeRecorder = &mockPodPullingTimeRecorder{}
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder, nil, metav1.Duration{Duration: 24 * time.Hour})
+	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, maxParallelImagePulls, c.qps, c.burst, fakePodPullingTimeRecorder, nil, metav1.Duration{Duration: 24 * time.Hour}, utilpointer.Bool(true), "/var/lib/kubelet")
 	return
 }
 
@@ -594,7 +594,6 @@ func TestShouldPullImage(t *testing.T) {
 		description       string
 		container         *v1.Container
 		imagePresent      bool
-		pulledBySecret    bool
 		ensuredBySecret   bool
 		expectedWithFGOff bool
 		expectedWithFGOn  bool
@@ -603,7 +602,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullAlways should always pull esp. if not present",
 			container:         pullAlways,
 			imagePresent:      false,
-			pulledBySecret:    false,
 			ensuredBySecret:   false,
 			expectedWithFGOff: true,
 			expectedWithFGOn:  true,
@@ -612,7 +610,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullAlways should always pull even if present and not pulled by secret",
 			container:         pullAlways,
 			imagePresent:      true,
-			pulledBySecret:    false,
 			ensuredBySecret:   false,
 			expectedWithFGOff: true,
 			expectedWithFGOn:  true,
@@ -621,7 +618,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullAlways should always pull even if present and ensuredBySecret",
 			container:         pullAlways,
 			imagePresent:      true,
-			pulledBySecret:    true,
 			ensuredBySecret:   true,
 			expectedWithFGOff: true,
 			expectedWithFGOn:  true,
@@ -630,34 +626,30 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullIfNotPresent should pull if not present",
 			container:         pullIfNotPresent,
 			imagePresent:      false,
-			pulledBySecret:    false,
 			ensuredBySecret:   false,
 			expectedWithFGOff: true,
 			expectedWithFGOn:  true,
 		},
 		{
-			description:       "PullIfNotPresent should pull if not present even if pulledBySecret and ensuredBySecret",
+			description:       "PullIfNotPresent should pull if not present even if ensuredBySecret",
 			container:         pullIfNotPresent,
 			imagePresent:      false,
-			pulledBySecret:    true,
 			ensuredBySecret:   true,
 			expectedWithFGOff: true,
 			expectedWithFGOn:  true,
 		},
 		{
-			description:       "PullIfNotPresent should not pull if present (and secrets are not involved)",
+			description:       "PullIfNotPresent should pull if present (and secrets are not involved)",
 			container:         pullIfNotPresent,
 			imagePresent:      true,
-			pulledBySecret:    false,
 			ensuredBySecret:   false,
 			expectedWithFGOff: false,
-			expectedWithFGOn:  false,
+			expectedWithFGOn:  true,
 		},
 		{
 			description:       "PullIfNotPresent should not pull if present (and secrets are involved and match)",
 			container:         pullIfNotPresent,
 			imagePresent:      true,
-			pulledBySecret:    true,
 			ensuredBySecret:   true,
 			expectedWithFGOff: false,
 			expectedWithFGOn:  false,
@@ -666,7 +658,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullIfNotPresent should pull if present and secrets are involved and no match, unless ensure fg is off",
 			container:         pullIfNotPresent,
 			imagePresent:      true,
-			pulledBySecret:    true,
 			ensuredBySecret:   false,
 			expectedWithFGOff: false,
 			expectedWithFGOn:  true,
@@ -675,7 +666,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullNever should never report pull, but we'll throw error in EnsureImageExists()",
 			container:         pullNever,
 			imagePresent:      false,
-			pulledBySecret:    false,
 			ensuredBySecret:   false,
 			expectedWithFGOff: false,
 			expectedWithFGOn:  false,
@@ -684,7 +674,6 @@ func TestShouldPullImage(t *testing.T) {
 			description:       "PullNever should never pull even if pulled by secret and not ensured by secret",
 			container:         pullNever,
 			imagePresent:      true,
-			pulledBySecret:    true,
 			ensuredBySecret:   false,
 			expectedWithFGOff: false,
 			expectedWithFGOn:  false,
@@ -692,16 +681,16 @@ func TestShouldPullImage(t *testing.T) {
 	}
 
 	t.Run("disable_ensure_secret_pull_image_features", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, false)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, false)
 		for i, test := range tests {
-			sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
+			sp := shouldPullImage(test.container.ImagePullPolicy, test.imagePresent, test.ensuredBySecret, false)
 			assert.Equal(t, test.expectedWithFGOff, sp, "TestCase[%d]: %s ensured image fg disabled", i, test.description)
 		}
 	})
 	t.Run("enable_ensure_secret_pull_image_features", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)()
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletEnsureSecretPulledImages, true)
 		for i, test := range tests {
-			sp := shouldPullImage(test.container, test.imagePresent, test.pulledBySecret, test.ensuredBySecret)
+			sp := shouldPullImage(test.container.ImagePullPolicy, test.imagePresent, test.ensuredBySecret, true)
 			assert.Equal(t, test.expectedWithFGOn, sp, "TestCase[%d]: %s ensured image fg enabled", i, test.description)
 		}
 	})

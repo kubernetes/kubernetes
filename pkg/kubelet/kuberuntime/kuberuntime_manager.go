@@ -214,6 +214,7 @@ func NewKubeGenericRuntimeManager(
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
 	pullImageSecretRecheckPeriod metav1.Duration,
+	pullImageSecretRecheck *bool,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
@@ -283,7 +284,9 @@ func NewKubeGenericRuntimeManager(
 		imagePullBurst,
 		podPullingTimeRecorder,
 		&kubeRuntimeManager.keyring,
-		pullImageSecretRecheckPeriod)
+		pullImageSecretRecheckPeriod,
+		pullImageSecretRecheck,
+		rootDirectory)
 
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(insecureContainerLifecycleHTTPClient, kubeRuntimeManager, kubeRuntimeManager, recorder)
 	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager, tracer)

@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
@@ -60,17 +63,23 @@ type imageManager struct {
 
 	keyring *credentialprovider.DockerKeyring
 	// ensureSecretPulledImages - map of imageref (image digest) to successful secret pulled image details
-	ensureSecretPulledImages     map[string]*imagePullInfo
+	ensureSecretPulledImages     map[string]*ImagePullInfo
 	pullImageSecretRecheckPeriod metav1.Duration
+	pullImageSecretRecheck       bool
 	lock                         sync.RWMutex
+	fsLock                       sync.RWMutex
+	// imageStateManagerPath root directory to store pull image metadata
+	imageStateManagerPath string
 }
 
 var _ ImageManager = &imageManager{}
 
+const imageManagerstateFileName = "image_state_manager"
+
 // NewImageManager instantiates a new ImageManager object.
 func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff,
 	serialized bool, maxParallelImagePulls *int32, qps float32, burst int, podPullingTimeRecorder ImagePodPullingTimeRecorder,
-	keyring *credentialprovider.DockerKeyring, pullImageSecretRecheckPeriod metav1.Duration) ImageManager {
+	keyring *credentialprovider.DockerKeyring, pullImageSecretRecheckPeriod metav1.Duration, pullImageSecretRecheck *bool, rootDirectory string) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
 	var puller imagePuller
@@ -79,7 +88,10 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 	} else {
 		puller = newParallelImagePuller(imageService, maxParallelImagePulls)
 	}
-
+	var pullImageSecretCheck bool
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && pullImageSecretRecheck != nil {
+		pullImageSecretCheck = *pullImageSecretRecheck
+	}
 	return &imageManager{
 		recorder:                     recorder,
 		imageService:                 imageService,
@@ -87,14 +99,16 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 		puller:                       puller,
 		podPullingTimeRecorder:       podPullingTimeRecorder,
 		keyring:                      keyring,
-		ensureSecretPulledImages:     make(map[string]*imagePullInfo),
+		ensureSecretPulledImages:     make(map[string]*ImagePullInfo),
 		pullImageSecretRecheckPeriod: pullImageSecretRecheckPeriod,
+		pullImageSecretRecheck:       pullImageSecretCheck,
+		imageStateManagerPath:        filepath.Join(rootDirectory, imageManagerstateFileName),
 	}
 }
 
 // shouldPullImage returns whether we should pull an image according to
 // the presence and pull policy of the image.
-func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent, pulledBySecret, ensuredBySecret bool) bool {
+func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent, ensuredBySecret, pullImageSecretRecheck bool) bool {
 	switch pullPolicy {
 	case v1.PullNever:
 		return false
@@ -107,13 +121,10 @@ func shouldPullImage(pullPolicy v1.PullPolicy, imagePresent, pulledBySecret, ens
 		}
 		// if the imageRef has been pulled by a secret and Pull Policy is PullIfNotPresent
 		// we need to ensure that the current pod's secrets map to an auth that has Already
-		// pulled the image successfully. Otherwise pod B could use pod A's images
-		// without auth. So in this case if pulledBySecret but not ensured by matching
-		// secret auth for a pull again for the pod B scenario where the auth does not match
-		if utilfeature.DefaultFeatureGate.Enabled((features.KubeletEnsureSecretPulledImages)) {
-			if pulledBySecret && !ensuredBySecret {
-				return true // noting here that old behaviour returns false in this case indicating the image should not be pulled
-			}
+		// pulled the image successfully. Otherwise, pod B could use pod A's images
+		// without auth. So in this case, pull the image again even if it is present but not ensured
+		if pullImageSecretRecheck && !ensuredBySecret {
+			return true // noting here that old behaviour returns false in this case indicating the image should not be pulled
 		}
 		return false
 	}
@@ -129,29 +140,29 @@ func (m *imageManager) logIt(objRef *v1.ObjectReference, eventtype, event, prefi
 	}
 }
 
-type ensuredInfo struct {
+// EnsuredInfo contains the data if an image is ensured and the last ensured time
+type EnsuredInfo struct {
 	// true for ensured secret
-	ensured bool
+	Ensured bool `json:"ensured"`
 	// the secret should be verified again if current time is after the due date.
 	// and the due date is `PullImageSecretRecheckPeriod` after last ensured date.
 	// `PullImageSecretRecheckPeriod` is configurable in kubelet config.
-	lastEnsuredDate time.Time
+	LastEnsuredDate time.Time `json:"lastEnsuredDate"`
 }
 
-type imagePullInfo struct {
+type ImagePullInfo struct {
 	// TODO: (mikebrow) time of last pull for this imageRef
 	// TODO: (mikebrow) time of pull for each particular auth hash
 	//       note @mrunalp makes a good point that we can utilize /apimachinery/pkg/util/sets/string.go here
 
 	// map of auths hash (keys) used to successfully pull this imageref
-	Auths map[string]*ensuredInfo
+	Auths map[string]*EnsuredInfo `json:"auths"`
 }
 
 // EnsureImageExists pulls the image for the specified pod and imageRef, and returns
 // (imageRef, error message, error).
 func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectReference, pod *v1.Pod, imgRef string, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, podRuntimeHandler string, pullPolicy v1.PullPolicy) (imageRef, message string, err error) {
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, imgRef)
-
 	// If the image contains no tag or digest, a default tag should be applied.
 	image, err := applyDefaultImageTag(imgRef)
 	if err != nil {
@@ -180,18 +191,24 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
 		return "", msg, ErrImageInspect
 	}
-
 	present := imageRef != ""
 	var pulledBySecret, ensuredBySecret bool
-	if present && utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
-		pulledBySecret, ensuredBySecret, err = m.isEnsuredBySecret(imageRef, spec, pullSecrets)
+	if m.pullImageSecretRecheck {
+		err = m.loadEnsureSecretPulledImagesData()
 		if err != nil {
-			return "", "Error get ensured check by secret", err
+			msg := fmt.Sprintf("Failed to load image manager state %q: %v", spec.Image, err)
+			return "", msg, err
+		}
+		if present {
+			pulledBySecret, ensuredBySecret, err = m.isEnsuredBySecret(imageRef, spec, pullSecrets)
+			if err != nil {
+				return "", "Error get ensured check by secret", err
+			}
 		}
 		klog.V(5).InfoS("Get ensured check by secret", "image", image, "imageRef", imageRef, "pulledBySecret", pulledBySecret, "ensuredBySecret", ensuredBySecret)
 	}
 
-	if !shouldPullImage(pullPolicy, present, pulledBySecret, ensuredBySecret) {
+	if !shouldPullImage(pullPolicy, present, ensuredBySecret, m.pullImageSecretRecheck) {
 		// should not pull when pull never, or if present and correctly authenticated
 		if present {
 			msg := fmt.Sprintf("Container image %q already present on machine", imgRef)
@@ -235,22 +252,70 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 	metrics.ImagePullDuration.WithLabelValues(metrics.GetImageSizeBucket(imagePullResult.imageSize)).Observe(imagePullDuration.Seconds())
 	m.backOff.GC()
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
-		func() {
-			m.lock.Lock()
-			defer m.lock.Unlock()
-			// store/create hashMatch map entry for auth config hash key used to pull the image
-			// for this imageref (digest)
+	if m.pullImageSecretRecheck {
+		// Get the ImageRef that is already present in the local storage
+		imageRef, err := m.imageService.GetImageRef(ctx, spec)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to inspect image %q: %v", spec.Image, err)
+			m.logIt(objRef, v1.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, klog.Warning)
+			return "", msg, ErrImageInspect
+		}
+		// store/create hashMatch map entry for auth config hash key used to pull the image
+		// for this imageref (digest)
+		// save the data of only images that have imageRef
+		if imageRef != "" {
+			m.lock.RLock()
 			digest := m.ensureSecretPulledImages[imageRef]
+			m.lock.RUnlock()
 			if digest == nil {
-				digest = &imagePullInfo{Auths: make(map[string]*ensuredInfo)}
-				m.ensureSecretPulledImages[imageRef] = digest
+				digest = &ImagePullInfo{Auths: make(map[string]*EnsuredInfo)}
 			}
-			digest.Auths[imagePullResult.pullCredentialsHash] = &ensuredInfo{true, time.Now()}
-		}()
+			digest.Auths[imagePullResult.pullCredentialsHash] = &EnsuredInfo{true, time.Now()}
+			m.lock.Lock()
+			m.ensureSecretPulledImages[imageRef] = digest
+			m.lock.Unlock()
+		}
+		err = m.storeEnsureSecretPulledImagesData()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to store image manager state %q: %v", spec.Image, err)
+			return "", msg, err
+		}
 	}
 
 	return imagePullResult.imageRef, "", nil
+}
+
+func (m *imageManager) storeEnsureSecretPulledImagesData() error {
+	byteData, err := utiljson.Marshal(m.ensureSecretPulledImages)
+	if err != nil {
+		return err
+	}
+	m.fsLock.Lock()
+	defer m.fsLock.Unlock()
+	err = os.WriteFile(m.imageStateManagerPath, byteData, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *imageManager) loadEnsureSecretPulledImagesData() error {
+	_, err := os.Stat(m.imageStateManagerPath)
+	if err != nil && !os.IsExist(err) {
+		klog.InfoS("Failed to stat file", "file", m.imageStateManagerPath, "error", err)
+		return nil
+	}
+	m.fsLock.Lock()
+	defer m.fsLock.Unlock()
+	byteData, err := os.ReadFile(m.imageStateManagerPath)
+	if err != nil {
+		return err
+	}
+	err = utiljson.Unmarshal(byteData, &m.ensureSecretPulledImages)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func evalCRIPullErr(imgRef string, err error) (errMsg string, errRes error) {
@@ -309,40 +374,42 @@ func applyDefaultImageTag(image string) (string, error) {
 // 2. ensuredBySecret: true if the secret for an auth used to pull an
 // image has already been authenticated through a successful pull request
 // and the same auth exists for this podSandbox/image.
-func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.ImageSpec, pullSecrets []v1.Secret) (bool, bool, error) {
+func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.ImageSpec, pullSecrets []v1.Secret) (pulledBySecret bool, ensuredBySecret bool, _ error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	if m.pullImageSecretRecheck {
+		err := m.refreshCache()
+		if err != nil {
+			return pulledBySecret, ensuredBySecret, err
+		}
+	}
 	if imageRef == "" {
-		return false, false, errors.New("imageRef is empty")
+		return pulledBySecret, ensuredBySecret, errors.New("imageRef is empty")
 	}
 
 	// if the image is in the ensured secret pulled image list, it is pulled by secret
-	pulledBySecret := m.ensureSecretPulledImages[imageRef] != nil
+	pulledBySecret = m.ensureSecretPulledImages[imageRef] != nil
 
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
-		return pulledBySecret, false, err
+		return pulledBySecret, ensuredBySecret, err
 	}
 
 	if m.keyring == nil {
-		return pulledBySecret, false, nil
+		return pulledBySecret, ensuredBySecret, nil
 	}
 	keyring, err := credentialprovidersecrets.MakeDockerKeyring(pullSecrets, *m.keyring)
 	if err != nil {
-		return pulledBySecret, false, err
+		return pulledBySecret, ensuredBySecret, err
 	}
 
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
-		return pulledBySecret, false, nil
-	}
-	// if the pullImageSecretRecheckPeriod is 0, we don't need to check the secret again
-	if m.pullImageSecretRecheckPeriod.Duration == 0 {
-		return pulledBySecret, true, nil
+		return pulledBySecret, ensuredBySecret, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) && m.pullImageSecretRecheckPeriod.Duration > 0 {
+	if m.pullImageSecretRecheck {
 		for _, currentCreds := range creds {
 			auth := &runtimeapi.AuthConfig{
 				Username:      currentCreds.Username,
@@ -358,14 +425,40 @@ func (m *imageManager) isEnsuredBySecret(imageRef string, image kubecontainer.Im
 				klog.ErrorS(err, "Failed to hash auth", "auth", auth)
 				continue
 			}
+			m.lock.RLock()
 			digest := m.ensureSecretPulledImages[imageRef]
+			m.lock.RUnlock()
 			if digest != nil {
 				ensuredInfo := digest.Auths[hash]
-				if ensuredInfo != nil && ensuredInfo.ensured && ensuredInfo.lastEnsuredDate.Add(m.pullImageSecretRecheckPeriod.Duration).After(time.Now()) {
-					return pulledBySecret, true, nil
+				if ensuredBySecret = ensuredInfo != nil && ensuredInfo.Ensured; ensuredBySecret {
+					return pulledBySecret, ensuredBySecret, nil
 				}
 			}
 		}
 	}
-	return pulledBySecret, false, nil
+	return pulledBySecret, ensuredBySecret, nil
+}
+
+func (m *imageManager) refreshCache() error {
+	var lock sync.RWMutex
+	lock.Lock()
+	defer lock.Unlock()
+	if m.pullImageSecretRecheck && m.pullImageSecretRecheckPeriod.Duration == 0 {
+		// Based on the design proposal of the enhancement, the kubelet is not supposed to invalidate the cache
+		// Reference: https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2535-ensure-secret-pulled-images#proposal
+		return nil
+	}
+	for k, v := range m.ensureSecretPulledImages {
+		for i, auth := range v.Auths {
+			if auth != nil && auth.LastEnsuredDate.Add(m.pullImageSecretRecheckPeriod.Duration).Before(time.Now()) {
+				delete(m.ensureSecretPulledImages[k].Auths, i)
+			}
+			/* TODO: When do we delete the metadata?
+			if len(v.Auths) == 0 {
+				delete(m.ensureSecretPulledImages, k)
+			}
+			*/
+		}
+	}
+	return m.storeEnsureSecretPulledImagesData()
 }

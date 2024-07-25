@@ -127,7 +127,10 @@ func pickFieldsToHash(container *v1.Container) map[string]string {
 	return retval
 }
 
-// HashAuth - returns a hash code for a CRI pull image auth, and an error if the hash cannot be calculated.
+// HashAuth returns a hash code of a CRI pull image auth,
+// and an error if the hash cannot be calculated.
+// This hash code would be used as a metadata of the image pull info
+// to determine if an image is ensured and has to be pulled or not
 func HashAuth(auth *runtimeapi.AuthConfig) (string, error) {
 	hash := fnv.New64a()
 	authJSON, err := json.Marshal(auth)
