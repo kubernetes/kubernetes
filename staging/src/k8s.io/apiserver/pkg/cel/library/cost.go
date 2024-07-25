@@ -498,19 +498,27 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 			rhs := args[1]
 			if lhs.Type().Equal(rhs.Type()) == types.True {
 				t := lhs.Type()
-				switch t {
-				case cel.IPType, cel.CIDRType, cel.QuantityType: // O(1) cost equality checks
-					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-				case cel.FormatType:
-					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
-				case cel.URLType:
-					size := checker.SizeEstimate{Min: 1, Max: 1}
-					rhSize := rhs.ComputedSize()
-					lhSize := rhs.ComputedSize()
-					if rhSize != nil && lhSize != nil {
-						size = rhSize.Union(*lhSize)
+				if t.Kind() == types.OpaqueKind {
+					switch t.TypeName() {
+					case cel.IPType.TypeName(), cel.CIDRType.TypeName():
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 					}
-					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+				}
+				if t.Kind() == types.StructKind {
+					switch t {
+					case cel.QuantityType: // O(1) cost equality checks
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+					case cel.FormatType:
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+					case cel.URLType:
+						size := checker.SizeEstimate{Min: 1, Max: 1}
+						rhSize := rhs.ComputedSize()
+						lhSize := rhs.ComputedSize()
+						if rhSize != nil && lhSize != nil {
+							size = rhSize.Union(*lhSize)
+						}
+						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+					}
 				}
 			}
 		}

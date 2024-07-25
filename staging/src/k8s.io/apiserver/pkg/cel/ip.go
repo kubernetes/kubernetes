@@ -33,7 +33,7 @@ type IP struct {
 }
 
 var (
-	IPType = cel.ObjectType("net.IP")
+	IPType = cel.OpaqueType("net.IP")
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
