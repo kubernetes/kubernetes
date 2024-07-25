@@ -112,6 +112,14 @@ func (*cidrs) LibraryName() string {
 	return "net.cidr"
 }
 
+func (*cidrs) declarations() map[string][]cel.FunctionOpt {
+	return cidrLibraryDecls
+}
+
+func (*cidrs) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.CIDRType, apiservercel.IPType}
+}
+
 var cidrLibraryDecls = map[string][]cel.FunctionOpt{
 	"cidr": {
 		cel.Overload("string_to_cidr", []*cel.Type{cel.StringType}, apiservercel.CIDRType,

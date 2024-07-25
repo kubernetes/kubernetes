@@ -146,6 +146,14 @@ func (*quantity) LibraryName() string {
 	return "k8s.quantity"
 }
 
+func (*quantity) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.QuantityType}
+}
+
+func (*quantity) declarations() map[string][]cel.FunctionOpt {
+	return quantityLibraryDecls
+}
+
 var quantityLibraryDecls = map[string][]cel.FunctionOpt{
 	"quantity": {
 		cel.Overload("string_to_quantity", []*cel.Type{cel.StringType}, apiservercel.QuantityType, cel.UnaryBinding((stringToQuantity))),

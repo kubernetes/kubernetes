@@ -25,6 +25,7 @@ import (
 	"github.com/google/cel-go/common/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation"
 	apiservercel "k8s.io/apiserver/pkg/cel"
@@ -91,6 +92,14 @@ type format struct{}
 
 func (*format) LibraryName() string {
 	return "format"
+}
+
+func (*format) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.FormatType}
+}
+
+func (*format) declarations() map[string][]cel.FunctionOpt {
+	return formatLibraryDecls
 }
 
 func ZeroArgumentFunctionBinding(binding func() ref.Val) decls.OverloadOpt {

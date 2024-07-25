@@ -116,6 +116,14 @@ func (*urls) LibraryName() string {
 	return "k8s.urls"
 }
 
+func (*urls) Types() []*cel.Type {
+	return []*cel.Type{apiservercel.URLType}
+}
+
+func (*urls) declarations() map[string][]cel.FunctionOpt {
+	return urlLibraryDecls
+}
+
 var urlLibraryDecls = map[string][]cel.FunctionOpt{
 	"url": {
 		cel.Overload("string_to_url", []*cel.Type{cel.StringType}, apiservercel.URLType,

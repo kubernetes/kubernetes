@@ -235,6 +235,19 @@ func (*authz) LibraryName() string {
 	return "k8s.authz"
 }
 
+func (*authz) Types() []*cel.Type {
+	return []*cel.Type{
+		AuthorizerType,
+		PathCheckType,
+		GroupCheckType,
+		ResourceCheckType,
+		DecisionType}
+}
+
+func (*authz) declarations() map[string][]cel.FunctionOpt {
+	return authzLibraryDecls
+}
+
 var authzLibraryDecls = map[string][]cel.FunctionOpt{
 	"path": {
 		cel.MemberOverload("authorizer_path", []*cel.Type{AuthorizerType, cel.StringType}, PathCheckType,
@@ -325,6 +338,14 @@ type authzSelectors struct{}
 
 func (*authzSelectors) LibraryName() string {
 	return "k8s.authzSelectors"
+}
+
+func (*authzSelectors) Types() []*cel.Type {
+	return []*cel.Type{ResourceCheckType}
+}
+
+func (*authzSelectors) declarations() map[string][]cel.FunctionOpt {
+	return authzSelectorsLibraryDecls
 }
 
 var authzSelectorsLibraryDecls = map[string][]cel.FunctionOpt{

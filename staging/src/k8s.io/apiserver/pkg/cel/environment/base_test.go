@@ -18,11 +18,14 @@ package environment
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/google/cel-go/cel"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/cel/library"
 )
 
 // BenchmarkLoadBaseEnv is expected to be very fast, because a
@@ -110,6 +113,28 @@ func TestLibraryCoverage(t *testing.T) {
 				"For backward compatibility, libraries should not be removed without being replaced by a new version.", lib.removed, name)
 		}
 	}
+}
+
+func TestKnownLibraries(t *testing.T) {
+	known := sets.New[string]()
+	used := sets.New[string]()
+
+	for _, lib := range library.KnownLibraries() {
+		known.Insert(lib.LibraryName())
+	}
+	for _, libName := range MustBaseEnvSet(version.MajorMinor(1, 0), true).storedExpressions.Libraries() {
+		if strings.HasPrefix(libName, "cel.lib") { // ignore core libs
+			continue
+		}
+		used.Insert(libName)
+	}
+
+	unexpected := used.Difference(known)
+
+	if len(unexpected) != 0 {
+		t.Errorf("Expected all libraries in the base environment to be included k8s.io/apiserver/pkg/cel/library's KnownLibraries, but found missing libraries: %v", unexpected)
+	}
+
 }
 
 func librariesInVersions(t *testing.T, vops ...VersionedOptions) []string {

@@ -17,19 +17,18 @@ limitations under the License.
 package library
 
 import (
-	"testing"
-
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/decls"
+	"github.com/google/cel-go/common/types"
+	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestLibraryCompatibility(t *testing.T) {
-	var libs []map[string][]cel.FunctionOpt
-	libs = append(libs, authzLibraryDecls, listsLibraryDecls, regexLibraryDecls, urlLibraryDecls, quantityLibraryDecls, ipLibraryDecls, cidrLibraryDecls, formatLibraryDecls, authzSelectorsLibraryDecls)
 	functionNames := sets.New[string]()
-	for _, lib := range libs {
-		for name := range lib {
+	for _, lib := range KnownLibraries() {
+		for name := range lib.declarations() {
 			functionNames[name] = struct{}{}
 		}
 	}
@@ -65,4 +64,34 @@ func TestLibraryCompatibility(t *testing.T) {
 	if len(missing) != 0 {
 		t.Errorf("Expected all functions in the libraries to be assigned to a kubernetes release, but found the missing function names: %v", missing)
 	}
+}
+
+func TestTypeRegistration(t *testing.T) {
+	for _, lib := range KnownLibraries() {
+		registeredTypes := sets.New[*cel.Type]()
+		usedTypes := sets.New[*cel.Type]()
+		// scan all registered functions
+		for _, fn := range lib.declarations() {
+			testFn, err := decls.NewFunction("test", fn...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, o := range testFn.OverloadDecls() {
+				for _, at := range o.ArgTypes() {
+					switch at.Kind() {
+					case types.OpaqueKind, types.StructKind:
+						usedTypes.Insert(at)
+					}
+				}
+			}
+		}
+		for _, t := range lib.Types() {
+			registeredTypes.Insert(t)
+		}
+		unregistered := usedTypes.Difference(registeredTypes)
+		if len(unregistered) != 0 {
+			t.Errorf("Expected types to be registered with the %s library Type() functions, but they were not: %v", lib.LibraryName(), unregistered)
+		}
+	}
+
 }
