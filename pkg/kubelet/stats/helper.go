@@ -168,6 +168,31 @@ func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Pro
 	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(num)}
 }
 
+func mergeProcessStats(first *statsapi.ProcessStats, second *statsapi.ProcessStats) *statsapi.ProcessStats {
+	if first == nil && second == nil {
+		return nil
+	}
+
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+
+	firstProcessCount := uint64(0)
+	if first.ProcessCount != nil {
+		firstProcessCount = *first.ProcessCount
+	}
+
+	secondProcessCount := uint64(0)
+	if second.ProcessCount != nil {
+		secondProcessCount = *second.ProcessCount
+	}
+
+	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(firstProcessCount + secondProcessCount)}
+}
+
 // cadvisorInfoToNetworkStats returns the statsapi.NetworkStats converted from
 // the container info from cadvisor.
 func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
