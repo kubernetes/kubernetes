@@ -64,15 +64,17 @@ func getAvailablePort() (int, error) {
 
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
-func startEtcd(output io.Writer) (func(), error) {
-	etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
-	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
-	if err == nil {
-		klog.Infof("etcd already running at %s", etcdURL)
-		conn.Close()
-		return func() {}, nil
+func startEtcd(output io.Writer, forceCreate bool) (func(), error) {
+	if !forceCreate {
+		etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
+		conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
+		if err == nil {
+			klog.Infof("etcd already running at %s", etcdURL)
+			_ = conn.Close()
+			return func() {}, nil
+		}
+		klog.V(1).Infof("could not connect to etcd: %v", err)
 	}
-	klog.V(1).Infof("could not connect to etcd: %v", err)
 
 	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil, output)
 	if err != nil {
@@ -217,7 +219,7 @@ func EtcdMain(tests func() int) {
 		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
-	stop, err := startEtcd(nil)
+	stop, err := startEtcd(nil, false)
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
@@ -247,8 +249,8 @@ func GetEtcdURL() string {
 //
 // Starting etcd multiple times per test run instead of once with EtcdMain
 // provides better separation between different tests.
-func StartEtcd(tb testing.TB, etcdOutput io.Writer) {
-	stop, err := startEtcd(etcdOutput)
+func StartEtcd(tb testing.TB, etcdOutput io.Writer, forceCreate bool) {
+	stop, err := startEtcd(etcdOutput, forceCreate)
 	if err != nil {
 		tb.Fatalf("unable to start etcd: %v", err)
 	}
