@@ -235,6 +235,23 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// url accessors
 		cost := uint64(1)
 		return &cost
+	case "_==_":
+		if len(args) == 2 {
+			unitCost := uint64(1)
+			lhs := args[0]
+			switch lhs.(type) {
+			case cel.Quantity:
+				return &unitCost
+			case cel.IP:
+				return &unitCost
+			case cel.CIDR:
+				return &unitCost
+			case *cel.Format: // Formats have a small max size.
+				return &unitCost
+			case cel.URL: // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
+				return &unitCost
+			}
+		}
 	}
 	if panicOnUnknown && !knownUnhandledFunctions[function] {
 		panic(fmt.Errorf("CallCost: unhandled function %q or args %v", function, args))
@@ -278,7 +295,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "url":
 		if len(args) == 1 {
 			sz := l.sizeEstimate(args[0])
-			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor), ResultSize: &sz}
 		}
 	case "lowerAscii", "upperAscii", "substring", "trim":
 		if target != nil {
@@ -475,6 +492,28 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// url accessors
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+	case "_==_":
+		if len(args) == 2 {
+			lhs := args[0]
+			rhs := args[1]
+			if lhs.Type().Equal(rhs.Type()) == types.True {
+				t := lhs.Type()
+				switch t {
+				case cel.IPType, cel.CIDRType, cel.QuantityType: // O(1) cost equality checks
+					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
+				case cel.FormatType:
+					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+				case cel.URLType:
+					size := checker.SizeEstimate{Min: 1, Max: 1}
+					rhSize := rhs.ComputedSize()
+					lhSize := rhs.ComputedSize()
+					if rhSize != nil && lhSize != nil {
+						size = rhSize.Union(*lhSize)
+					}
+					return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
+				}
+			}
+		}
 	}
 	if panicOnUnknown && !knownUnhandledFunctions[function] {
 		panic(fmt.Errorf("EstimateCallCost: unhandled function %q, target %v, args %v", function, target, args))

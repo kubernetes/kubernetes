@@ -33,7 +33,7 @@ type CIDR struct {
 }
 
 var (
-	CIDRType = cel.OpaqueType("net.CIDR")
+	CIDRType = cel.ObjectType("net.CIDR")
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
