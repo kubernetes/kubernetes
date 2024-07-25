@@ -48,7 +48,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/component-base/featuregate"
-	baseversion "k8s.io/component-base/version"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -231,33 +230,40 @@ func TestAPIServiceWaitOnStart(t *testing.T) {
 }
 
 func TestAggregatedAPIServer(t *testing.T) {
-	// BanFlunder default=true in 1.1
+	// Testing default, BanFlunder default=true in 1.2
+	t.Run("WithoutWardleFeatureGateAtV1.2", func(t *testing.T) {
+		testAggregatedAPIServer(t, false, true, "1.2", "1.2")
+	})
+	// Testing emulation version N, BanFlunder default=true in 1.1
 	t.Run("WithoutWardleFeatureGateAtV1.1", func(t *testing.T) {
-		testAggregatedAPIServer(t, false, true, "1.1")
+		testAggregatedAPIServer(t, false, true, "1.1", "1.1")
 	})
-	// BanFlunder default=false in 1.0
+	// Testing emulation version N-1, BanFlunder default=false in 1.0
 	t.Run("WithoutWardleFeatureGateAtV1.0", func(t *testing.T) {
-		testAggregatedAPIServer(t, false, false, "1.0")
+		testAggregatedAPIServer(t, false, false, "1.1", "1.0")
 	})
-	// Explicitly set BanFlunder=true in 1.0
+	// Testing emulation version N-1, Explicitly set BanFlunder=true in 1.0
 	t.Run("WithWardleFeatureGateAtV1.0", func(t *testing.T) {
-		testAggregatedAPIServer(t, true, true, "1.0")
+		testAggregatedAPIServer(t, true, true, "1.1", "1.0")
 	})
 }
 
-func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, emulationVersion string) {
+func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, wardleBinaryVersion, wardleEmulationVersion string) {
 	const testNamespace = "kube-wardle"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace)
+	// each wardle binary is bundled with a specific kube binary.
+	kubeBinaryVersion := sampleserver.WardleVersionToKubeVersion(version.MustParse(wardleBinaryVersion)).String()
+
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, kubeBinaryVersion, wardleBinaryVersion)
 	kubeClientConfig := getKubeConfig(testKAS)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 
-	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, emulationVersion, kubeClientConfig)
+	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, wardleEmulationVersion, kubeClientConfig)
 
 	// now we're finally ready to test. These are what's run by default now
 	wardleDirectClient := client.NewForConfigOrDie(directWardleClientConfig)
@@ -531,7 +537,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	}
 }
 
-func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
+func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespace, kubebinaryVersion, wardleBinaryVersion string) (*kastesting.TestServer, *sampleserver.WardleServerOptions, int) {
 	// makes the kube-apiserver very responsive.  it's normally a minute
 	dynamiccertificates.FileRefreshDuration = 1 * time.Second
 
@@ -543,11 +549,7 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	// endpoints cannot have loopback IPs so we need to override the resolver itself
 	t.Cleanup(app.SetServiceResolverForTests(staticURLServiceResolver(fmt.Sprintf("https://127.0.0.1:%d", wardlePort))))
 
-	// use DefaultKubeBinaryVersion - 1 minor for kube binary version, and 1.1 for wardle binary version so that we can test both N and N-1 wardle emulation versions.
-	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).OffsetMinor(-1)
-	wardleBinaryVersion := "1.1"
-
-	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: binaryVersion.String()}, nil, framework.SharedEtcd())
+	testServer := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, BinaryVersion: kubebinaryVersion}, nil, framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
 	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(

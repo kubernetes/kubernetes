@@ -60,7 +60,7 @@ type WardleServerOptions struct {
 	AlternateDNS []string
 }
 
-func wardleEmulationVersionToKubeEmulationVersion(ver *version.Version) *version.Version {
+func WardleVersionToKubeVersion(ver *version.Version) *version.Version {
 	if ver.Major() != 1 {
 		return nil
 	}
@@ -153,7 +153,7 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 
 	// Set the emulation version mapping from the "Wardle" component to the kube component.
 	// This ensures that the emulation version of the latter is determined by the emulation version of the former.
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.SetEmulationVersionMapping(apiserver.WardleComponentName, utilversion.DefaultKubeComponent, wardleEmulationVersionToKubeEmulationVersion))
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.SetEmulationVersionMapping(apiserver.WardleComponentName, utilversion.DefaultKubeComponent, WardleVersionToKubeVersion))
 
 	utilversion.DefaultComponentGlobalsRegistry.AddFlags(flags)
 
