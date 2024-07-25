@@ -2268,6 +2268,8 @@ rules:
       branch: master
     - repository: component-base
       branch: master
+    - repository: component-helpers
+      branch: master
     - repository: kms
       branch: master
     - repository: kubelet
