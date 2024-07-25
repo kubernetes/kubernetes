@@ -1,10 +1,13 @@
 # The following labels are used in this file:
 # - fast: short execution time, ideally less than 30 seconds
 # - integration-test: used to select workloads that
-#   run in pull-kubernetes-integration. Choosing those tests
+#   run in ci-kubernetes-integration-master. Choosing those tests
 #   is a tradeoff between code coverage and overall runtime.
-#   We should make each test case with integration-test label very small,
+# - short: used to select workloads that
+#   run in pull-kubernetes-integration.
+#   We should make each test case with short label very small,
 #   so that all tests with the label should take less than 5 min to complete.
+#   They can be run using --short=true flag.
 # - performance: used to select workloads that run
 #   in ci-benchmark-scheduler-perf. Such workloads
 #   must run long enough (ideally, longer than 10 seconds)
