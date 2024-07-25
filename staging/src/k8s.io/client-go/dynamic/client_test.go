@@ -189,8 +189,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "10",
 					},
@@ -221,8 +221,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "39",
 					},

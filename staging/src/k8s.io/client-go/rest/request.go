@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -776,6 +778,9 @@ type WatchListResult struct {
 	// during streaming.
 	err error
 
+	// table hold the collected table
+	table map[string]any
+
 	// items hold the collected data
 	items []runtime.Object
 
@@ -784,10 +789,61 @@ type WatchListResult struct {
 	// the end of the stream.
 	initialEventsEndBookmarkRV string
 
-	// gv represents the API version
+	// apiVersion represents the API version
+	// kind represents the Object kind
 	// it is used to construct the final list response
 	// normally this information is filled by the server
-	gv schema.GroupVersion
+	apiVersion, kind string
+}
+
+type eventTable map[string]any
+
+// asTable convert given object into unstructured Table.
+func asTable(obj runtime.Object) (eventTable, error) {
+	return runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+}
+
+// setTableMetadata will copy everything but rows into receiver, such as
+// ObjectMeta, columnDefinitions, resourceVersion are all included.
+func (t eventTable) setTableMetadata(newTable eventTable) {
+	if len(t) == 0 {
+		for k, v := range newTable {
+			if k == "rows" {
+				t[k] = []any{}
+				continue
+			}
+			t[k] = runtime.DeepCopyJSONValue(v)
+		}
+	}
+}
+
+// appendRow will merge all rows of given Table into the previous one.
+func (t eventTable) appendRow(newTable eventTable) {
+	oldRows, ok := t["rows"].([]interface{})
+	if !ok {
+		oldRows = []any{}
+	}
+
+	newRows, ok := newTable["rows"].([]interface{})
+	if ok {
+		oldRows = append(oldRows, newRows...)
+	}
+
+	t["rows"] = oldRows
+}
+
+// getRowObject returns object from the Table's first row. and if the object is not available,
+// it will return an error.
+func (t eventTable) getRowObject() (runtime.Object, error) {
+	if v, ok := t["rows"].([]any); ok && len(v) == 1 {
+		if v, ok := v[0].(map[string]any); ok {
+			if obj, ok := v["object"].(map[string]interface{}); ok {
+				return &unstructured.Unstructured{Object: obj}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("failed extracting object from TableRow")
 }
 
 func (r WatchListResult) Into(obj runtime.Object) error {
@@ -795,31 +851,38 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		return r.err
 	}
 
-	listPtr, err := meta.GetItemsPtr(obj)
-	if err != nil {
-		return err
-	}
-	listVal, err := conversion.EnforcePtr(listPtr)
-	if err != nil {
-		return err
-	}
-	if listVal.Kind() != reflect.Slice {
-		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
-	}
-
-	if len(r.items) == 0 {
-		listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+	if isTable(r.kind, r.apiVersion) {
+		// if a Table was populated, convert held table into result.
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidation(r.table, obj, false); err != nil {
+			return fmt.Errorf("failed to convert table into result: %w", err)
+		}
 	} else {
-		listVal.Set(reflect.MakeSlice(listVal.Type(), len(r.items), len(r.items)))
-		for i, o := range r.items {
-			if listVal.Type().Elem() != reflect.TypeOf(o).Elem() {
-				return fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
+		listPtr, err := meta.GetItemsPtr(obj)
+		if err != nil {
+			return err
+		}
+		listVal, err := conversion.EnforcePtr(listPtr)
+		if err != nil {
+			return err
+		}
+		if listVal.Kind() != reflect.Slice {
+			return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
+		}
+
+		if len(r.items) == 0 {
+			listVal.Set(reflect.MakeSlice(listVal.Type(), 0, 0))
+		} else {
+			listVal.Set(reflect.MakeSlice(listVal.Type(), len(r.items), len(r.items)))
+			for i, o := range r.items {
+				if listVal.Type().Elem() != reflect.TypeOf(o).Elem() {
+					return fmt.Errorf("received object type = %v at index = %d, doesn't match the list item type = %v", reflect.TypeOf(o).Elem(), i, listVal.Type().Elem())
+				}
+				listVal.Index(i).Set(reflect.ValueOf(o).Elem())
 			}
-			listVal.Index(i).Set(reflect.ValueOf(o).Elem())
 		}
 	}
 
-	listMeta, err := meta.ListAccessor(obj)
+	listMeta, err := meta.CommonAccessor(obj)
 	if err != nil {
 		return err
 	}
@@ -829,11 +892,49 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 	if err != nil {
 		return err
 	}
-	version := r.gv.String()
-	typeMeta.SetAPIVersion(version)
-	typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
+
+	typeMeta.SetAPIVersion(r.apiVersion)
+	typeMeta.SetKind(r.kind)
+
+	// TODO: we should finally remove this logic once determineListGVK could return gvk correctly.
+	if len(r.kind) == 0 {
+		typeMeta.SetKind(reflect.TypeOf(obj).Elem().Name())
+	}
 
 	return nil
+}
+
+// determineListGVK returns the apiVersion and kind of the List which should be return by Into method
+func determineListGVK(object runtime.Object) (string, string, error) {
+	typeMeta, err := meta.TypeAccessor(object)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get object type: %w", err)
+	}
+
+	kind, apiVersion := typeMeta.GetKind(), typeMeta.GetAPIVersion()
+
+	// TODO: there are two problems here:
+	// 1. TypeMeta of a typed object is empty, since decoder will erase it.
+	// 2. The kind of the List object seams not always to be a List suffix added to the end of the object.
+	// I believe this can be addressed by https://github.com/kubernetes/kubernetes/pull/126199, then gvk
+	// will provided by object annotation from server. for now, just keeping in previous behavior.
+	if len(kind) == 0 && len(apiVersion) == 0 {
+		return kind, apiVersion, nil
+	}
+
+	// if row object is Table, it will be merged into a Table object
+	if isTable(typeMeta.GetKind(), typeMeta.GetAPIVersion()) {
+		return kind, apiVersion, nil
+	}
+
+	// if row object is not a Table, all items will be merged and constructed into a List object
+	return kind + "List", apiVersion, nil
+}
+
+// isTable return true when given gvk is metav1.Table or metav1beta1.Table
+func isTable(kind, apiVersion string) bool {
+	return kind == "Table" &&
+		(apiVersion == metav1.SchemeGroupVersion.String() || apiVersion == metav1beta1.SchemeGroupVersion.String())
 }
 
 // WatchList establishes a stream to get a consistent snapshot of data
@@ -864,6 +965,7 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 	defer w.Stop()
 	var lastKey string
 	var items []runtime.Object
+	var tableResult = eventTable{}
 
 	for {
 		select {
@@ -876,9 +978,30 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 			if event.Type == watch.Error {
 				return WatchListResult{err: errors.FromObject(event.Object)}
 			}
-			meta, err := meta.Accessor(event.Object)
+			kind, apiVersion, err := determineListGVK(event.Object)
 			if err != nil {
-				return WatchListResult{err: fmt.Errorf("failed to parse watch event: %#v", event)}
+				return WatchListResult{err: err}
+			}
+
+			// if response is Table:
+			// 1. every table must have exactly ONE row
+			// 2. metadata is placed on rows[0].Object
+			object := event.Object
+			var eventTable eventTable
+			if isTable(kind, apiVersion) {
+				eventTable, err = asTable(event.Object)
+				if err != nil {
+					return WatchListResult{err: fmt.Errorf("failed to parse watch event: %#v, err: %w", event, err)}
+				}
+				tableResult.setTableMetadata(eventTable)
+				object, err = eventTable.getRowObject()
+				if err != nil {
+					return WatchListResult{err: fmt.Errorf("failed to parse watch event: %#v, err: %w", event, err)}
+				}
+			}
+			meta, err := meta.Accessor(object)
+			if err != nil {
+				return WatchListResult{err: fmt.Errorf("failed to parse watch event: %#v, err: %w", event, err)}
 			}
 
 			switch event.Type {
@@ -890,14 +1013,24 @@ func (r *Request) handleWatchList(ctx context.Context, w watch.Interface) WatchL
 				if len(lastKey) > 0 && lastKey > key {
 					return WatchListResult{err: fmt.Errorf("cannot add the obj (%#v) with the key = %s, as it violates the ordering guarantees provided by the watchlist feature in beta phase, lastInsertedKey was = %s", event.Object, key, lastKey)}
 				}
-				items = append(items, event.Object)
+				if eventTable != nil {
+					tableResult.appendRow(eventTable)
+				} else {
+					items = append(items, event.Object)
+				}
 				lastKey = key
 			case watch.Bookmark:
 				if meta.GetAnnotations()[metav1.InitialEventsAnnotationKey] == "true" {
+					// TODO: we should finally remove this logic once determineListGVK could return gvk correctly.
+					if len(apiVersion) == 0 {
+						apiVersion = r.c.content.GroupVersion.String()
+					}
 					return WatchListResult{
+						table:                      tableResult,
 						items:                      items,
 						initialEventsEndBookmarkRV: meta.GetResourceVersion(),
-						gv:                         r.c.content.GroupVersion,
+						apiVersion:                 apiVersion,
+						kind:                       kind,
 					}
 				}
 			default:

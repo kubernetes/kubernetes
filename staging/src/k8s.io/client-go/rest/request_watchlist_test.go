@@ -27,7 +27,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,7 +43,7 @@ func TestWatchListResult(t *testing.T) {
 		target WatchListResult
 		result runtime.Object
 
-		expectedResult *v1.PodList
+		expectedResult runtime.Object
 		expectedErr    error
 	}{
 		{
@@ -66,6 +68,15 @@ func TestWatchListResult(t *testing.T) {
 			expectedErr: fmt.Errorf("dummy err"),
 		},
 		{
+			name:   "empty table",
+			target: WatchListResult{apiVersion: "meta.k8s.io/v1", kind: "Table"},
+			result: &metav1.Table{},
+			expectedResult: &metav1.Table{TypeMeta: metav1.TypeMeta{
+				APIVersion: "meta.k8s.io/v1",
+				Kind:       "Table",
+			}},
+		},
+		{
 			name:   "empty list",
 			result: &v1.PodList{},
 			expectedResult: &v1.PodList{
@@ -76,7 +87,7 @@ func TestWatchListResult(t *testing.T) {
 		{
 			name:   "gv is applied",
 			result: &v1.PodList{},
-			target: WatchListResult{gv: schema.GroupVersion{Group: "g", Version: "v"}},
+			target: WatchListResult{apiVersion: "g/v"},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList", APIVersion: "g/v"},
 				Items:    []v1.Pod{},
@@ -85,7 +96,7 @@ func TestWatchListResult(t *testing.T) {
 		{
 			name:   "gv is applied, empty group",
 			result: &v1.PodList{},
-			target: WatchListResult{gv: schema.GroupVersion{Version: "v"}},
+			target: WatchListResult{apiVersion: "v"},
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList", APIVersion: "v"},
 				Items:    []v1.Pod{},
@@ -108,6 +119,32 @@ func TestWatchListResult(t *testing.T) {
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{Kind: "PodList"},
 				Items:    []v1.Pod{*makePod(1), *makePod(2)},
+			},
+		},
+		{
+			name: "table are applied",
+			target: WatchListResult{
+				apiVersion:                 "meta.k8s.io/v1",
+				kind:                       "Table",
+				table:                      makeTable(t, makePod(1)),
+				initialEventsEndBookmarkRV: "1",
+			},
+			result: &metav1.Table{},
+			expectedResult: &metav1.Table{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "meta.k8s.io/v1",
+					Kind:       "Table",
+				},
+				ListMeta: metav1.ListMeta{ResourceVersion: "1"},
+				ColumnDefinitions: []metav1.TableColumnDefinition{
+					{Name: "Name", Type: "string", Format: "name", Priority: 0},
+				},
+				Rows: []metav1.TableRow{
+					{
+						Cells:  []any{"name"},
+						Object: runtime.RawExtension{Raw: []byte(`{"metadata":{"creationTimestamp":null,"name":"pod-1","namespace":"ns","resourceVersion":"1"},"spec":{"containers":null},"status":{}}`)},
+					},
+				},
 			},
 		},
 		{
@@ -144,7 +181,8 @@ func TestWatchListSuccess(t *testing.T) {
 		name           string
 		gv             schema.GroupVersion
 		watchEvents    []watch.Event
-		expectedResult *v1.PodList
+		newFunc        func() runtime.Object
+		expectedResult runtime.Object
 	}{
 		{
 			name: "happy path",
@@ -157,6 +195,7 @@ func TestWatchListSuccess(t *testing.T) {
 				{Type: watch.Added, Object: makePod(2)},
 				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
 			},
+			newFunc: func() runtime.Object { return &v1.PodList{} },
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "core/v1",
@@ -173,6 +212,7 @@ func TestWatchListSuccess(t *testing.T) {
 				{Type: watch.Added, Object: makePod(1)},
 				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
 			},
+			newFunc: func() runtime.Object { return &v1.PodList{} },
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "v1",
@@ -188,6 +228,7 @@ func TestWatchListSuccess(t *testing.T) {
 			watchEvents: []watch.Event{
 				{Type: watch.Bookmark, Object: makeBookmarkEvent(5)},
 			},
+			newFunc: func() runtime.Object { return &v1.PodList{} },
 			expectedResult: &v1.PodList{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "v1",
@@ -195,6 +236,41 @@ func TestWatchListSuccess(t *testing.T) {
 				},
 				ListMeta: metav1.ListMeta{ResourceVersion: "5"},
 				Items:    []v1.Pod{},
+			},
+		},
+		{
+			name: "only the bookmark in Table",
+			gv:   schema.GroupVersion{Version: "v1"},
+			watchEvents: []watch.Event{
+				{Type: watch.Bookmark, Object: &unstructured.Unstructured{Object: makeTable(t, makeBookmarkEvent(5))}},
+			},
+			newFunc: func() runtime.Object { return &metav1.Table{} },
+			expectedResult: &metav1.Table{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "meta.k8s.io/v1",
+					Kind:       "Table",
+				},
+				ListMeta:          metav1.ListMeta{ResourceVersion: "5"},
+				ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "Name", Type: "string", Format: "name"}},
+			},
+		},
+		{
+			name: "only the bookmark in Table (UnstructuredList)",
+			gv:   schema.GroupVersion{Version: "v1"},
+			watchEvents: []watch.Event{
+				{Type: watch.Bookmark, Object: &unstructured.Unstructured{Object: makeTable(t, makeBookmarkEvent(5))}},
+			},
+			newFunc: func() runtime.Object { return &unstructured.UnstructuredList{} },
+			expectedResult: &unstructured.UnstructuredList{
+				Items: []unstructured.Unstructured{},
+				Object: map[string]any{
+					"apiVersion":        "meta.k8s.io/v1",
+					"columnDefinitions": []any{map[string]any{"format": "name", "name": "Name", "type": "string"}},
+					"kind":              "Table",
+					"metadata":          map[string]any{"resourceVersion": "5"},
+					"resourceVersion":   "5",
+					"rows":              []any{},
+				},
 			},
 		},
 	}
@@ -220,8 +296,7 @@ func TestWatchListSuccess(t *testing.T) {
 			if res.err != nil {
 				t.Fatal(res.err)
 			}
-
-			result := &v1.PodList{}
+			result := scenario.newFunc()
 			if err := res.Into(result); err != nil {
 				t.Fatal(err)
 			}
@@ -358,6 +433,38 @@ func makeBookmarkEvent(rv uint64) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: fmt.Sprintf("%d", rv),
 			Annotations:     map[string]string{metav1.InitialEventsAnnotationKey: "true"},
+		},
+	}
+}
+func makeTable(t *testing.T, obj runtime.Object) map[string]any {
+	meta, err := meta.CommonAccessor(obj)
+	if err != nil {
+		t.Error(err)
+		return nil
+	}
+
+	un, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		t.Error(t)
+		return nil
+	}
+
+	return map[string]any{
+		"apiVersion":      "meta.k8s.io/v1",
+		"kind":            "Table",
+		"resourceVersion": meta.GetResourceVersion(),
+		"columnDefinitions": []any{
+			map[string]any{
+				"name":   "Name",
+				"type":   "string",
+				"format": "name",
+			},
+		},
+		"rows": []any{
+			map[string]any{
+				"cells":  []any{"name"},
+				"object": un,
+			},
 		},
 	}
 }
