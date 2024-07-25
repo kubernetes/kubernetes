@@ -19,6 +19,7 @@ package library
 import (
 	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
@@ -27,6 +28,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/cel"
 )
 
@@ -47,6 +49,22 @@ var knownUnhandledFunctions = map[string]bool{
 	"!_":            true,
 	"strings.quote": true,
 }
+
+// TODO: Replace this with a utility that extracts types from libraries.
+var knownKubernetesRuntimeTypes = sets.New[reflect.Type](
+	reflect.ValueOf(cel.URL{}).Type(),
+	reflect.ValueOf(cel.IP{}).Type(),
+	reflect.ValueOf(cel.CIDR{}).Type(),
+	reflect.ValueOf(&cel.Format{}).Type(),
+	reflect.ValueOf(cel.Quantity{}).Type(),
+)
+var knownKubernetesCompilerTypes = sets.New[ref.Type](
+	cel.CIDRType,
+	cel.IPType,
+	cel.FormatType,
+	cel.QuantityType,
+	cel.URLType,
+)
 
 // CostEstimator implements CEL's interpretable.ActualCostEstimator and checker.CostEstimator.
 type CostEstimator struct {
@@ -250,6 +268,10 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 				return &unitCost
 			case cel.URL: // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
 				return &unitCost
+			default:
+				if panicOnUnknown && knownKubernetesRuntimeTypes.Has(reflect.ValueOf(lhs).Type()) {
+					panic(fmt.Errorf("CallCost: unhandled equality for Kubernetes type %T", lhs))
+				}
 			}
 		}
 	}
@@ -519,6 +541,9 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 						}
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: size.Max}.MultiplyByCostFactor(common.StringTraversalCostFactor)}
 					}
+				}
+				if panicOnUnknown && knownKubernetesCompilerTypes.Has(t) {
+					panic(fmt.Errorf("EstimateCallCost: unhandled equality for Kubernetes type %v", t))
 				}
 			}
 		}
