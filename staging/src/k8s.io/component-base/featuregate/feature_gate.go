@@ -115,9 +115,6 @@ type FeatureGate interface {
 	// set on the copy without mutating the original. This is useful for validating
 	// config against potential feature gate changes before committing those changes.
 	DeepCopy() MutableVersionedFeatureGate
-	// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
-	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
-	CopyKnownFeatures() MutableVersionedFeatureGate
 	// Validate checks if the flag gates are valid at the emulated version.
 	Validate() []error
 }
@@ -189,6 +186,10 @@ type MutableVersionedFeatureGate interface {
 	ExplicitlySet(name Feature) bool
 	// ResetFeatureValueToDefault resets the value of the feature back to the default value.
 	ResetFeatureValueToDefault(name Feature) error
+	// DeepCopyAndReset copies all the registered features of the FeatureGate object, with all the known features and overrides,
+	// and resets all the enabled status of the new feature gate.
+	// This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
+	DeepCopyAndReset() MutableVersionedFeatureGate
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -423,10 +424,7 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 	}
 
 	// Copy existing state
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		known[k] = v
-	}
+	known := f.GetAllVersioned()
 
 	for name, specs := range features {
 		sort.Sort(specs)
@@ -458,11 +456,8 @@ func (f *featureGate) OverrideDefaultAtVersion(name Feature, override bool, ver 
 		return fmt.Errorf("cannot override default for feature %q: gates already added to a flag set", name)
 	}
 
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		sort.Sort(v)
-		known[k] = v
-	}
+	// Copy existing state
+	known := f.GetAllVersioned()
 
 	specs, ok := known[name]
 	if !ok {
@@ -509,7 +504,9 @@ func (f *featureGate) GetAll() map[Feature]FeatureSpec {
 func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 	retval := map[Feature]VersionedSpecs{}
 	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		retval[k] = v
+		vCopy := make([]FeatureSpec, len(v))
+		_ = copy(vCopy, v)
+		retval[k] = vCopy
 	}
 	return retval
 }
@@ -660,9 +657,10 @@ func (f *featureGate) KnownFeatures() []string {
 	return known
 }
 
-// CopyKnownFeatures returns a partial copy of the FeatureGate object, with all the known features and overrides.
+// DeepCopyAndReset copies all the registered features of the FeatureGate object, with all the known features and overrides,
+// and resets all the enabled status of the new feature gate.
 // This is useful for creating a new instance of feature gate without inheriting all the enabled configurations of the base feature gate.
-func (f *featureGate) CopyKnownFeatures() MutableVersionedFeatureGate {
+func (f *featureGate) DeepCopyAndReset() MutableVersionedFeatureGate {
 	fg := NewVersionedFeatureGate(f.EmulationVersion())
 	known := f.GetAllVersioned()
 	fg.known.Store(known)
@@ -676,10 +674,7 @@ func (f *featureGate) DeepCopy() MutableVersionedFeatureGate {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	// Copy existing state.
-	known := map[Feature]VersionedSpecs{}
-	for k, v := range f.known.Load().(map[Feature]VersionedSpecs) {
-		known[k] = v
-	}
+	known := f.GetAllVersioned()
 	enabled := map[Feature]bool{}
 	for k, v := range f.enabled.Load().(map[Feature]bool) {
 		enabled[k] = v
