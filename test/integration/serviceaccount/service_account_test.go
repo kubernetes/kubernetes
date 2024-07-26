@@ -393,6 +393,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
+		ctx,
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,

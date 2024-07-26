@@ -17,6 +17,8 @@ limitations under the License.
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"time"
@@ -116,30 +118,30 @@ func (c *Controller) handleErr(err error, key string) {
 }
 
 // Run begins watching and syncing.
-func (c *Controller) Run(workers int, stopCh chan struct{}) {
+func (c *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 
 	// Let the workers stop when we are done
 	defer c.queue.ShutDown()
 	klog.Info("Starting Pod controller")
 
-	go c.informer.Run(stopCh)
+	go c.informer.RunWithContext(ctx)
 
 	// Wait for all involved caches to be synced, before processing items from the queue is started
-	if !cache.WaitForCacheSync(stopCh, c.informer.HasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.informer.HasSynced) {
 		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 	klog.Info("Stopping Pod controller")
 }
 
-func (c *Controller) runWorker() {
+func (c *Controller) runWorker(ctx context.Context) {
 	for c.processNextItem() {
 	}
 }
@@ -163,6 +165,8 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+
+	ctx := context.Background()
 
 	// create the pod watcher
 	podListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "pods", v1.NamespaceDefault, fields.Everything())
@@ -211,9 +215,9 @@ func main() {
 	})
 
 	// Now let's start the controller
-	stop := make(chan struct{})
-	defer close(stop)
-	go controller.Run(1, stop)
+	cancelCtx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("time to stop because main has completed"))
+	go controller.Run(cancelCtx, 1)
 
 	// Wait forever
 	select {}

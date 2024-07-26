@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -51,8 +53,9 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 	}
 
 	t.Run("testing NoopInitialEventsEndBookmarkTicker", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
 		clock := testingclock.NewFakeClock(time.Now())
-		target := newInitialEventsEndBookmarkTickerInternal("testName", clock, clock.Now(), time.Second, false)
+		target := newInitialEventsEndBookmarkTickerInternal(ctx, "testName", clock, clock.Now(), time.Second, false)
 
 		clock.Step(30 * time.Second)
 		assertNoEvents(t, target.C())
@@ -73,8 +76,9 @@ func TestInitialEventsEndBookmarkTicker(t *testing.T) {
 	})
 
 	t.Run("testing InitialEventsEndBookmarkTicker backed by a fake clock", func(t *testing.T) {
+		_, ctx := ktesting.NewTestContext(t)
 		clock := testingclock.NewFakeClock(time.Now())
-		target := newInitialEventsEndBookmarkTickerInternal("testName", clock, clock.Now(), time.Second, true)
+		target := newInitialEventsEndBookmarkTickerInternal(ctx, "testName", clock, clock.Now(), time.Second, true)
 		clock.Step(500 * time.Millisecond)
 		assertNoEvents(t, target.C())
 
@@ -469,7 +473,8 @@ func TestWatchList(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
 			scenario := s // capture as local variable
-			listWatcher, store, reflector, stopCh := testData()
+			_, ctx := ktesting.NewTestContext(t)
+			listWatcher, store, reflector, ctx, cancel := testData(ctx)
 			go func() {
 				for i, e := range scenario.watchEvents {
 					listWatcher.fakeWatcher.Action(e.Type, e.Object)
@@ -478,7 +483,7 @@ func TestWatchList(t *testing.T) {
 						continue
 					}
 					if i+1 == scenario.closeAfterWatchEvents {
-						close(stopCh)
+						cancel(fmt.Errorf("done after %d watch events", i))
 					}
 				}
 			}()
@@ -490,7 +495,7 @@ func TestWatchList(t *testing.T) {
 				reflector.UseWatchList = ptr.To(false)
 			}
 
-			err := reflector.ListAndWatch(stopCh)
+			err := reflector.ListAndWatchWithContext(ctx)
 			if scenario.expectedError != nil && err == nil {
 				t.Fatalf("expected error %q, got nil", scenario.expectedError)
 			}
@@ -567,19 +572,19 @@ func makePod(name, rv string) *v1.Pod {
 	return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, ResourceVersion: rv, UID: types.UID(name)}}
 }
 
-func testData() (*fakeListWatcher, Store, *Reflector, chan struct{}) {
+func testData(ctx context.Context) (*fakeListWatcher, Store, *Reflector, context.Context, func(error)) {
+	ctx, cancel := context.WithCancelCause(ctx)
 	s := NewStore(MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
 	lw := &fakeListWatcher{
 		fakeWatcher: watch.NewFake(),
 		stop: func() {
-			close(stopCh)
+			cancel(errors.New("time to stop"))
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)
 	r.UseWatchList = ptr.To(true)
 
-	return lw, s, r, stopCh
+	return lw, s, r, ctx, cancel
 }
 
 type fakeListWatcher struct {

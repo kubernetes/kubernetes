@@ -453,7 +453,7 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	errCh := make(chan error)
-	_ = informer.SetWatchErrorHandler(func(_ *Reflector, err error) {
+	_ = informer.SetWatchErrorHandlerWithContext(func(_ context.Context, _ *Reflector, err error) {
 		errCh <- err
 	})
 
@@ -488,7 +488,7 @@ func TestSharedInformerStartRace(t *testing.T) {
 			informer.SetTransform(func(i interface{}) (interface{}, error) {
 				return i, nil
 			})
-			informer.SetWatchErrorHandler(func(r *Reflector, err error) {
+			_ = informer.SetWatchErrorHandlerWithContext(func(ctx context.Context, r *Reflector, err error) {
 			})
 		}
 	}()

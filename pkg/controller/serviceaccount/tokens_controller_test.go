@@ -454,7 +454,7 @@ func TestTokenCreation(t *testing.T) {
 			secretInformer := informers.Core().V1().Secrets().Informer()
 			secrets := secretInformer.GetStore()
 			serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-			controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+			controller, err := NewTokensController(ctx, informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 			if err != nil {
 				t.Fatalf("error creating Tokens controller: %v", err)
 			}

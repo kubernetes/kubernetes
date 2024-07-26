@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 const (
@@ -29,13 +30,14 @@ const (
 )
 
 func BenchmarkListener(b *testing.B) {
+	_, ctx := ktesting.NewTestContext(b)
 	var notification addNotification
 
 	var swg sync.WaitGroup
 	swg.Add(b.N)
 	b.SetParallelism(concurrencyLevel)
 	// Preallocate enough space so that benchmark does not run out of it
-	pl := newProcessListener(&ResourceEventHandlerFuncs{
+	pl := newProcessListener(ctx, &ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
@@ -43,7 +45,7 @@ func BenchmarkListener(b *testing.B) {
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop
-	wg.Start(pl.run)
+	wg.StartWithContext(ctx, pl.run)
 	wg.Start(pl.pop)
 
 	b.ReportAllocs()

@@ -50,6 +50,7 @@ func NewCacheMutationDetector(name string) MutationDetector {
 	if !mutationDetectionEnabled {
 		return dummyMutationDetector{}
 	}
+	//nolint:logcheck // This code shouldn't be used in production.
 	klog.Warningln("Mutation detector is enabled, this will result in memory leakage.")
 	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second, retainDuration: 2 * time.Minute}
 }
