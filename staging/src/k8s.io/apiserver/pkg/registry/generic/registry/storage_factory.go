@@ -17,6 +17,7 @@ limitations under the License.
 package registry
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -54,6 +55,7 @@ func StorageWithCacher() generic.StorageDecorator {
 		}
 
 		cacherConfig := cacherstorage.Config{
+			Ctx:            context.TODO(), // TODO (https://github.com/kubernetes/enhancements/issues/3077): allow caller to pass in a context.
 			Storage:        s,
 			Versioner:      storage.APIObjectVersioner{},
 			GroupResource:  storageConfig.GroupResource,

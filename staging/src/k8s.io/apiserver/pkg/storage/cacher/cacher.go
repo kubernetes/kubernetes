@@ -70,6 +70,9 @@ const (
 
 // Config contains the configuration for a given Cache.
 type Config struct {
+	// An optional context for controlling background goroutines and contextual logging.
+	Ctx context.Context
+
 	// An underlying storage.Interface.
 	Storage storage.Interface
 
@@ -303,7 +306,8 @@ type Cacher struct {
 	// Handling graceful termination.
 	stopLock sync.RWMutex
 	stopped  bool
-	stopCh   chan struct{}
+	ctx      context.Context
+	cancel   func()
 	stopWg   sync.WaitGroup
 
 	clock clock.Clock
@@ -335,9 +339,22 @@ func (c *Cacher) RequestWatchProgress(ctx context.Context) error {
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
-// given configuration.
-func NewCacherFromConfig(config Config) (*Cacher, error) {
-	stopCh := make(chan struct{})
+// given configuration. It runs goroutines in the background. If the config contains
+// a context, then that context can be used to stop those goroutines in addition or instead of calling
+// Stop.
+func NewCacherFromConfig(config Config) (c *Cacher, err error) {
+	ctx := config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	stopCh := ctx.Done()
+	defer func() {
+		if err != nil {
+			cancel()
+		}
+	}()
+
 	obj := config.NewFunc()
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
@@ -389,7 +406,8 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh:           stopCh,
+		cancel:           cancel,
+		ctx:              ctx,
 		clock:            config.Clock,
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(config.Clock, defaultBookmarkFrequency),
@@ -437,19 +455,19 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	go func() {
 		defer cacher.stopWg.Done()
 		defer cacher.terminateAllWatchers()
-		wait.Until(
-			func() {
+		wait.UntilWithContext(ctx,
+			func(ctx context.Context) {
 				if !cacher.isStopped() {
-					cacher.startCaching(stopCh)
+					cacher.startCaching(ctx)
 				}
-			}, time.Second, stopCh,
+			}, time.Second,
 		)
 	}()
 
 	return cacher, nil
 }
 
-func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
+func (c *Cacher) startCaching(ctx context.Context) {
 	// The 'usable' lock is always 'RLock'able when it is safe to use the cache.
 	// It is safe to use the cache after a successful list until a disconnection.
 	// We start with usable (write) locked. The below OnReplace function will
@@ -474,7 +492,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// need to retry it on errors under lock.
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
-	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
+	if err := c.reflector.ListAndWatchWithContext(ctx); err != nil {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
 	}
 }
@@ -1014,7 +1032,7 @@ func (c *Cacher) dispatchEvents() {
 	// Since we cannot send a bookmark when the lastProcessedResourceVersion is 0,
 	// we poll aggressively for the first list RV before entering the dispatch loop.
 	lastProcessedResourceVersion := uint64(0)
-	if err := wait.PollUntilContextCancel(wait.ContextForChannel(c.stopCh), 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
+	if err := wait.PollUntilContextCancel(c.ctx, 10*time.Millisecond, true, func(_ context.Context) (bool, error) {
 		if rv := c.watchCache.getListResourceVersion(); rv != 0 {
 			lastProcessedResourceVersion = rv
 			return true, nil
@@ -1058,7 +1076,7 @@ func (c *Cacher) dispatchEvents() {
 				continue
 			}
 			c.dispatchEvent(bookmarkEvent)
-		case <-c.stopCh:
+		case <-c.ctx.Done():
 			return
 		}
 	}
@@ -1308,7 +1326,7 @@ func (c *Cacher) Stop() {
 	c.stopped = true
 	c.ready.stop()
 	c.stopLock.Unlock()
-	close(c.stopCh)
+	c.cancel()
 	c.stopWg.Wait()
 }
 

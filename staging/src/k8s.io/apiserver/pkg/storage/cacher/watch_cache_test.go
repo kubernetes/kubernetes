@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
@@ -675,7 +675,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 		},
 	}
 	r := cache.NewReflector(lw, &v1.Pod{}, store, 0)
-	r.ListAndWatch(wait.NeverStop)
+	require.NoError(t, r.ListAndWatchWithContext(ctx))
 
 	{
 		_, version, _, err := store.WaitUntilFreshAndList(ctx, 10, "", nil)

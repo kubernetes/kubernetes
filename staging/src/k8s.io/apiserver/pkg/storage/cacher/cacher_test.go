@@ -38,6 +38,7 @@ import (
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 )
 
@@ -427,6 +428,7 @@ func testSetup(t *testing.T, opts ...setupOption) (context.Context, *Cacher, tea
 }
 
 func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context, *Cacher, *etcd3testing.EtcdTestServer, tearDownFunc) {
+	_, ctx := ktesting.NewTestContext(t)
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -441,6 +443,7 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 	}
 
 	config := Config{
+		Ctx:            ctx,
 		Storage:        wrappedStorage,
 		Versioner:      storage.APIObjectVersioner{},
 		GroupResource:  schema.GroupResource{Resource: "pods"},
@@ -457,7 +460,6 @@ func testSetupWithEtcdServer(t *testing.T, opts ...setupOption) (context.Context
 	if err != nil {
 		t.Fatalf("Failed to initialize cacher: %v", err)
 	}
-	ctx := context.Background()
 	terminate := func() {
 		cacher.Stop()
 		server.Terminate(t)
