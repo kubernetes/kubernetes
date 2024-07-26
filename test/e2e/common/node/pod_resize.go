@@ -866,6 +866,24 @@ func doPodResizeTests(f *framework.Framework) {
 				},
 			},
 		},
+		{
+			name: "Burstable QoS pod, one container with cpu requests + limits - increase cpu requests",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "300m"},
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"200m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m"},
+				},
+			},
+		},
 	}
 
 	timeouts := framework.NewTimeoutContext()
