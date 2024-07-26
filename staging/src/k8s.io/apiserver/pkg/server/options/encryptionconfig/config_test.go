@@ -1847,7 +1847,7 @@ func TestComputeEncryptionConfigHash(t *testing.T) {
 }
 
 func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
-	defaultUseSeed := GetKDF()
+	defaultUseSeed := GetKDF(context.Background())
 
 	origNowFunc := envelopekmsv2.NowFunc
 	now := origNowFunc() // freeze time
@@ -2072,12 +2072,12 @@ func Test_kmsv2PluginProbe_rotateDEKOnKeyIDChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer SetKDFForTests(tt.useSeed)()
-
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
 
-			ctx := testContext(t)
+			testContextValueInjection, setKDFForTests := WithKDFForTests()
+			ctx := testContextValueInjection(testContext(t))
+			setKDFForTests(tt.useSeed)
 
 			h := &kmsv2PluginProbe{
 				name:    "panda",

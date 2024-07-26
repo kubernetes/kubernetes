@@ -67,6 +67,9 @@ type EtcdOptions struct {
 	// SkipHealthEndpoints, when true, causes the Apply methods to not set up health endpoints.
 	// This allows multiple invocations of the Apply methods without duplication of said endpoints.
 	SkipHealthEndpoints bool
+
+	// TestContextValueInjection allows for tests to override settings that no longer have external end user config.
+	TestContextValueInjection func(context.Context) context.Context
 }
 
 var storageTypes = sets.NewString(
@@ -295,6 +298,9 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 	}
 
 	ctxServer := wait.ContextForChannel(c.DrainedNotify())
+	if s.TestContextValueInjection != nil {
+		ctxServer = s.TestContextValueInjection(ctxServer)
+	}
 	ctxTransformers, closeTransformers := context.WithCancel(ctxServer)
 	defer func() {
 		// in case of error, we want to close partially initialized (if any) transformers

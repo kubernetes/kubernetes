@@ -87,7 +87,7 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config, testContextValueInjection func(context.Context) context.Context) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
@@ -117,7 +117,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 	}
 
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
-		tb, nil,
+		tb, &kubeapiservertesting.TestServerInstanceOptions{EnableCertAuth: true, EtcdOptionsTestContextValueInjection: testContextValueInjection},
 		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)

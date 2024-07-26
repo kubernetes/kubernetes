@@ -165,7 +165,7 @@ func (r envelopekmsv2) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // TestDefaultValues tests default flag values without setting any of the feature flags or
 // calling SetKDFForTests, and assert that the data stored in etcd is using KDF
 func TestDefaultValues(t *testing.T) {
-	if encryptionconfig.GetKDF() != true {
+	if encryptionconfig.GetKDF(context.Background()) != true {
 		t.Fatalf("without updating the feature flags, default value of KMSv2KDF should be enabled.")
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) != true {
@@ -193,7 +193,7 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -248,14 +248,12 @@ resources:
 // 4. The cipherTextPayload (ex. Secret) should be encrypted via AES GCM transform / extended nonce GCM
 // 5. kmstypes.EncryptedObject structure should be serialized and deposited in ETCD
 func TestKMSv2Provider(t *testing.T) {
-	defaultUseSeed := encryptionconfig.GetKDF()
+	defaultUseSeed := encryptionconfig.GetKDF(context.Background())
 
 	t.Run("regular gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(false)()
 		testKMSv2Provider(t, !defaultUseSeed)
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(true)()
 		testKMSv2Provider(t, defaultUseSeed)
 	})
 }
@@ -277,7 +275,10 @@ resources:
 	providerName := "kms-provider"
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(useSeed)
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -401,15 +402,14 @@ resources:
 // 7. when kms-plugin is down, no-op update for a pod should succeed and not result in RV change even once the DEK/seed is valid
 func TestKMSv2ProviderKeyIDStaleness(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(false)()
-		testKMSv2ProviderKeyIDStaleness(t)
+		testKMSv2ProviderKeyIDStaleness(t, false)
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		testKMSv2ProviderKeyIDStaleness(t)
+		testKMSv2ProviderKeyIDStaleness(t, true)
 	})
 }
 
-func testKMSv2ProviderKeyIDStaleness(t *testing.T) {
+func testKMSv2ProviderKeyIDStaleness(t *testing.T, useSeed bool) {
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -425,7 +425,10 @@ resources:
 `
 	pluginMock := kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(useSeed)
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -451,8 +454,6 @@ resources:
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
-
-	useSeed := encryptionconfig.GetKDF()
 
 	var firstEncryptedDEKSource []byte
 	var f checkFunc
@@ -481,7 +482,7 @@ resources:
 		}
 	}
 	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
-		1, 1, "k8s:enc:kms:v2:kms-provider:", f,
+		1, 1, "k8s:enc:kms:v2:kms-provider:", useSeed, f,
 	)
 	if len(firstEncryptedDEKSource) == 0 {
 		t.Fatal("unexpected empty DEK or seed")
@@ -619,7 +620,7 @@ resources:
 	}
 
 	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
-		1, 1, "k8s:enc:kms:v2:kms-provider:", checkDEK,
+		1, 1, "k8s:enc:kms:v2:kms-provider:", useSeed, checkDEK,
 	)
 
 	// fix plugin and wait for new writes to start working again
@@ -648,7 +649,7 @@ resources:
 		t.Fatalf("Resource version should not have changed after plugin health is restored. old pod: %v, new pod: %v", updatedNewPod, updatedNewPod2)
 	}
 	// flip the current config
-	defer encryptionconfig.SetKDFForTests(!useSeed)()
+	setKDFForTests(!useSeed)
 
 	// 9. confirm that no-op update for a pod results in RV change due to KDF config change
 	var version9 string
@@ -672,8 +673,7 @@ resources:
 
 func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(false)()
-		testKMSv2ProviderDEKSourceReuse(t,
+		testKMSv2ProviderDEKSourceReuse(t, false,
 			func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
 					t.Errorf("key %s: want key ID %s, got %s", etcdKey, "1", obj.KeyID)
@@ -688,8 +688,7 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 		)
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(true)()
-		testKMSv2ProviderDEKSourceReuse(t,
+		testKMSv2ProviderDEKSourceReuse(t, true,
 			func(_ int, _ uint64, etcdKey string, obj kmstypes.EncryptedObject) {
 				if obj.KeyID != "1" {
 					t.Errorf("key %s: want key ID %s, got %s", etcdKey, "1", obj.KeyID)
@@ -699,7 +698,7 @@ func TestKMSv2ProviderDEKSourceReuse(t *testing.T) {
 	})
 }
 
-func testKMSv2ProviderDEKSourceReuse(t *testing.T, f checkFunc) {
+func testKMSv2ProviderDEKSourceReuse(t *testing.T, useSeed bool, f checkFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	t.Cleanup(cancel)
 
@@ -717,7 +716,10 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(useSeed)
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -747,13 +749,13 @@ resources:
 
 	assertPodDEKSources(ctx, t, test.kubeAPIServer.ServerOpts.Etcd.StorageConfig,
 		podCount, 1, // key ID does not change during the test so we should only have a single DEK
-		"k8s:enc:kms:v2:kms-provider:", f,
+		"k8s:enc:kms:v2:kms-provider:", useSeed, f,
 	)
 }
 
 type checkFunc func(i int, counter uint64, etcdKey string, obj kmstypes.EncryptedObject)
 
-func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebackend.Config, podCount, dekSourcesCount int, kmsPrefix string, f checkFunc) {
+func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebackend.Config, podCount, dekSourcesCount int, kmsPrefix string, useSeed bool, f checkFunc) {
 	t.Helper()
 
 	rawClient, etcdClient, err := integration.GetEtcdClients(config.Transport)
@@ -770,8 +772,6 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 	if len(response.Kvs) != podCount {
 		t.Fatalf("expected %d KVs, but got %d", podCount, len(response.Kvs))
 	}
-
-	useSeed := encryptionconfig.GetKDF()
 
 	out := make([]kmstypes.EncryptedObject, len(response.Kvs))
 	for i, kv := range response.Kvs {
@@ -833,8 +833,6 @@ func assertPodDEKSources(ctx context.Context, t *testing.T, config storagebacken
 }
 
 func TestKMSv2Healthz(t *testing.T) {
-	defer encryptionconfig.SetKDFForTests(randomBool())()
-
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -855,7 +853,13 @@ resources:
 	pluginMock1 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := kmsv2mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(randomBool())
+	if randomBool() {
+		testContextValueInjection = nil // also exercise the unset path
+	}
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
@@ -898,8 +902,6 @@ resources:
 }
 
 func TestKMSv2SingleService(t *testing.T) {
-	defer encryptionconfig.SetKDFForTests(randomBool())()
-
 	var kmsv2Calls int
 	origEnvelopeKMSv2ServiceFactory := encryptionconfig.EnvelopeKMSv2ServiceFactory
 	encryptionconfig.EnvelopeKMSv2ServiceFactory = func(ctx context.Context, endpoint, providerName string, callTimeout time.Duration) (kmsv2svc.Service, error) {
@@ -933,7 +935,13 @@ resources:
 
 	_ = kmsv2mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(randomBool())
+	if randomBool() {
+		testContextValueInjection = nil // also exercise the unset path
+	}
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -988,7 +996,7 @@ resources:
 	storageConfig := framework.SharedEtcd()
 
 	// KMSv2 is enabled by default. Loading a encryptionConfig with KMSv2 should work
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1060,7 +1068,7 @@ resources:
 
 	// After a restart, loading a encryptionConfig with the same KMSv2 plugin before the restart should work, decryption of data encrypted with v2 should work
 
-	test, err = newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	test, err = newTransformTest(t, encryptionConfig, false, "", storageConfig, nil)
 	if err != nil {
 		t.Fatalf("Failed to restart api server, error: %v", err)
 	}
@@ -1087,8 +1095,6 @@ func BenchmarkKMSv2KDF(b *testing.B) {
 	klog.SetOutput(io.Discard)
 	klog.LogToStderr(false)
 
-	defer encryptionconfig.SetKDFForTests(false)()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	b.Cleanup(cancel)
 
@@ -1108,7 +1114,10 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(false)
+
+	test, err := newTransformTest(b, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1242,8 +1251,6 @@ func BenchmarkKMSv2REST(b *testing.B) {
 	klog.SetOutput(io.Discard)
 	klog.LogToStderr(false)
 
-	defer encryptionconfig.SetKDFForTests(true)()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	b.Cleanup(cancel)
 
@@ -1261,7 +1268,10 @@ resources:
 `
 	_ = kmsv2mock.NewBase64Plugin(b, "@kms-provider.sock")
 
-	test, err := newTransformTest(b, encryptionConfig, false, "", nil)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(true)
+
+	test, err := newTransformTest(b, encryptionConfig, false, "", nil, testContextValueInjection)
 	if err != nil {
 		b.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -1327,16 +1337,14 @@ func randomBool() bool { return utilrand.Int()%2 == 1 }
 // TestKMSv2ProviderLegacyData confirms that legacy data recorded from the earliest released commit can still be read.
 func TestKMSv2ProviderLegacyData(t *testing.T) {
 	t.Run("regular gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(false)()
-		testKMSv2ProviderLegacyData(t)
+		testKMSv2ProviderLegacyData(t, false)
 	})
 	t.Run("extended nonce gcm", func(t *testing.T) {
-		defer encryptionconfig.SetKDFForTests(true)()
-		testKMSv2ProviderLegacyData(t)
+		testKMSv2ProviderLegacyData(t, true)
 	})
 }
 
-func testKMSv2ProviderLegacyData(t *testing.T) {
+func testKMSv2ProviderLegacyData(t *testing.T, useSeed bool) {
 	encryptionConfig := `
 kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
@@ -1359,7 +1367,10 @@ resources:
 	storageConfig := storagebackend.NewDefaultConfig(path.Join(legacyDataEtcdPrefix, "registry"), nil)
 	storageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig)
+	testContextValueInjection, setKDFForTests := encryptionconfig.WithKDFForTests()
+	setKDFForTests(useSeed)
+
+	test, err := newTransformTest(t, encryptionConfig, false, "", storageConfig, testContextValueInjection)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}

@@ -102,27 +102,37 @@ const (
 	//   in this case, all KMS plugins are probed via this single endpoint
 	//   the endpoint is present even if there are no KMS plugins configured (it is a no-op then)
 	kmsReloadHealthCheckName = "kms-providers"
+
+	kdfDisabledContextKey kdfDisabledContextKeyType = 1
 )
+
+type kdfDisabledContextKeyType int
 
 var codecs serializer.CodecFactory
 
+// WithKDFForTests emulates a per context feature gate using an atomic bool.
 // this atomic bool allows us to swap enablement of the KMSv2KDF feature in tests
-// as the feature gate is now locked to true starting with v1.29
-// Note: it cannot be set by an end user
-var kdfDisabled atomic.Bool
-
-// this function should only be called in tests to swap enablement of the KMSv2KDF feature
-func SetKDFForTests(b bool) func() {
-	kdfDisabled.Store(!b)
-	return func() {
-		kdfDisabled.Store(false)
+// as the feature gate is now locked to true starting with v1.29.
+// tests that wire the context wrapper into the main server context can then
+// use the returned function to swap enablement of the KMSv2KDF feature.
+// Note: it cannot be set by an end user.
+func WithKDFForTests() (func(context.Context) context.Context, func(bool)) {
+	var kdfDisabled atomic.Bool
+	testContextValueInjection := func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, kdfDisabledContextKey, &kdfDisabled)
 	}
+	setKDFForTests := func(b bool) { kdfDisabled.Store(!b) }
+	return testContextValueInjection, setKDFForTests
 }
 
 // this function should be used to determine enablement of the KMSv2KDF feature
 // instead of getting it from DefaultFeatureGate as the feature gate is now locked
 // to true starting with v1.29
-func GetKDF() bool {
+func GetKDF(ctx context.Context) bool {
+	kdfDisabled, ok := ctx.Value(kdfDisabledContextKey).(*atomic.Bool)
+	if !ok {
+		return true // KDF is enabled by default
+	}
 	return !kdfDisabled.Load()
 }
 
@@ -179,17 +189,24 @@ func (k kmsHealthChecker) Check(req *http.Request) error {
 	return utilerrors.Reduce(utilerrors.NewAggregate(errs))
 }
 
-func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
-	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
+func (h *kmsPluginProbe) toHealthzCheck(_ context.Context, idx int) healthz.HealthChecker {
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(_ *http.Request) error {
 		return h.check()
 	})
 }
 
-func (h *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
+func (h *kmsv2PluginProbe) toHealthzCheck(valueCtx context.Context, idx int) healthz.HealthChecker {
 	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
-		return h.check(r.Context())
+		return h.check(&valueSwapContext{valueCtx: valueCtx, Context: r.Context()})
 	})
 }
+
+type valueSwapContext struct {
+	valueCtx context.Context
+	context.Context
+}
+
+func (v *valueSwapContext) Value(key any) any { return v.valueCtx.Value(key) }
 
 // EncryptionConfiguration represents the parsed and normalized encryption configuration for the apiserver.
 type EncryptionConfiguration struct {
@@ -250,14 +267,14 @@ func getTransformerOverridesAndKMSPluginHealthzCheckers(ctx context.Context, con
 	}
 	for i := range probes {
 		probe := probes[i]
-		kmsHealthChecks = append(kmsHealthChecks, probe.toHealthzCheck(i))
+		kmsHealthChecks = append(kmsHealthChecks, probe.toHealthzCheck(ctx, i))
 	}
 
 	return transformers, kmsHealthChecks, kmsUsed, nil
 }
 
 type healthChecker interface {
-	toHealthzCheck(idx int) healthz.HealthChecker
+	toHealthzCheck(valueCtx context.Context, idx int) healthz.HealthChecker
 }
 
 // getTransformerOverridesAndKMSPluginProbes creates the set of transformers and KMS probes based on the given config.
@@ -389,7 +406,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// this gate can only change during tests, but the check is cheap enough to always make
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
-	useSeed := GetKDF()
+	useSeed := GetKDF(ctx)
 	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
