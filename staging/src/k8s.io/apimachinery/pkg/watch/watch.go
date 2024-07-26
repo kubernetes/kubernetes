@@ -17,6 +17,8 @@ limitations under the License.
 package watch
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -291,38 +293,51 @@ func (f *RaceFreeFakeWatcher) Action(action EventType, obj runtime.Object) {
 // ProxyWatcher lets you wrap your channel in watch Interface. threadsafe.
 type ProxyWatcher struct {
 	result chan Event
-	stopCh chan struct{}
-
-	mutex   sync.Mutex
-	stopped bool
+	ctx    context.Context
+	cancel func(error)
 }
 
 var _ Interface = &ProxyWatcher{}
 
-// NewProxyWatcher creates new ProxyWatcher by wrapping a channel
+// NewProxyWatcher creates new ProxyWatcher by wrapping a channel.
+// The ProxyWatcher runs until Stop is called.
+//
+// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewProxyWatcherWithContext should be used instead of NewProxyWatcher in code which supports contextual logging.
 func NewProxyWatcher(ch chan Event) *ProxyWatcher {
-	return &ProxyWatcher{
-		result:  ch,
-		stopCh:  make(chan struct{}),
-		stopped: false,
+	return NewProxyWatcherWithContext(context.Background(), ch)
+}
+
+// NewProxyWatcherWithContext creates new ProxyWatcher by wrapping a channel.
+// The ProxyWatcher runs until the context is done or Stop is called.
+func NewProxyWatcherWithContext(ctx context.Context, ch chan Event) *ProxyWatcher {
+	pw := &ProxyWatcher{
+		result: ch,
 	}
+	pw.ctx, pw.cancel = context.WithCancelCause(ctx)
+	go func() {
+		// Avoid resource leak when parent context gets canceled instead
+		// of calling Stop.
+		<-pw.ctx.Done()
+		pw.cancel(errors.New("context passed to NewProxyWatcherWithContext got canceled"))
+	}()
+	return pw
 }
 
 // Stop implements Interface
 func (pw *ProxyWatcher) Stop() {
-	pw.mutex.Lock()
-	defer pw.mutex.Unlock()
-	if !pw.stopped {
-		pw.stopped = true
-		close(pw.stopCh)
-	}
+	pw.cancel(errors.New("ProxyWatcher.Stop was called"))
 }
 
-// Stopping returns true if Stop() has been called
+// Context returns the context used by the watcher.
+// It will be done when Stop gets called or the parent
+// context is done.
+func (pw *ProxyWatcher) Context() context.Context {
+	return pw.ctx
+}
+
+// Stopping returns true if the context is done.
 func (pw *ProxyWatcher) Stopping() bool {
-	pw.mutex.Lock()
-	defer pw.mutex.Unlock()
-	return pw.stopped
+	return pw.ctx.Err() != nil
 }
 
 // ResultChan implements Interface
@@ -331,8 +346,10 @@ func (pw *ProxyWatcher) ResultChan() <-chan Event {
 }
 
 // StopChan returns stop channel
+//
+// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // Context should be used instead of StopCh in code which supports contextual logging.
 func (pw *ProxyWatcher) StopChan() <-chan struct{} {
-	return pw.stopCh
+	return pw.ctx.Done()
 }
 
 // MockWatcher implements watch.Interface with mockable functions.

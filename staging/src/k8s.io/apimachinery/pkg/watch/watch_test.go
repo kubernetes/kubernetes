@@ -17,12 +17,14 @@ limitations under the License.
 package watch_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	. "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type testType string
@@ -138,6 +140,9 @@ func TestEmpty(t *testing.T) {
 }
 
 func TestProxyWatcher(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	events := []Event{
 		{Added, testType("foo")},
 		{Modified, testType("qux")},
@@ -147,7 +152,7 @@ func TestProxyWatcher(t *testing.T) {
 	}
 
 	ch := make(chan Event, len(events))
-	w := NewProxyWatcher(ch)
+	w := NewProxyWatcherWithContext(ctx, ch)
 
 	for _, e := range events {
 		ch <- e
@@ -163,9 +168,13 @@ func TestProxyWatcher(t *testing.T) {
 
 	w.Stop()
 
+	if !w.Stopping() {
+		t.Error("Watcher isn't closed")
+	}
+
 	select {
 	// Closed channel always reads immediately
-	case <-w.StopChan():
+	case <-w.Context().Done():
 	default:
 		t.Error("Channel isn't closed")
 	}
