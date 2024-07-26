@@ -120,13 +120,14 @@ const (
 
 // NewController creates a ResourceClaim controller.
 func NewController(
-	logger klog.Logger,
+	ctx context.Context,
 	adminAccessEnabled bool,
 	kubeClient clientset.Interface,
 	podInformer v1informers.PodInformer,
 	claimInformer resourceinformers.ResourceClaimInformer,
 	templateInformer resourceinformers.ResourceClaimTemplateInformer) (*Controller, error) {
 
+	logger := klog.FromContext(ctx)
 	ec := &Controller{
 		adminAccessEnabled: adminAccessEnabled,
 		kubeClient:         kubeClient,
@@ -146,7 +147,7 @@ func NewController(
 
 	metrics.RegisterMetrics()
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithContext(ctx, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, false)
 		},
@@ -156,10 +157,10 @@ func NewController(
 		DeleteFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := claimInformer.Informer().AddEventHandlerWithContext(ctx, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
@@ -172,7 +173,7 @@ func NewController(
 			logger.V(6).Info("deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{}); err != nil {
 		return nil, err
 	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
@@ -190,7 +191,7 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(ctx, claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
 		time.Hour,

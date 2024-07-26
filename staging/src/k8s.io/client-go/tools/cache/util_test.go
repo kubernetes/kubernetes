@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"bytes"
+	"sync"
 	"testing"
 
 	fcache "k8s.io/client-go/tools/cache/testing"
@@ -26,4 +28,22 @@ func newFakeControllerSource(tb testing.TB) *fcache.FakeControllerSource {
 	source := fcache.NewFakeControllerSource()
 	tb.Cleanup(source.Shutdown)
 	return source
+}
+
+// threadSafeBuffer is a thread-safe wrapper around bytes.Buffer.
+type threadSafeBuffer struct {
+	buffer bytes.Buffer
+	mu     sync.Mutex
+}
+
+func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.Write(p)
+}
+
+func (b *threadSafeBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.String()
 }
