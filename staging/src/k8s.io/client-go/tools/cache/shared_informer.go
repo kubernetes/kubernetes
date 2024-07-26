@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -159,7 +160,16 @@ type SharedInformer interface {
 	// be competing load and scheduling noise.
 	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
+	//
+	// Contextual logging: AddEventHandlerWithContext should be used instead of AddEventHandlerWithResyncPeriod in code which supports contextual logging.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
+	// AddEventHandlerWithContext is a variant of AddEventHandler and AddEventHandlerWithResyncPeriod
+	// where additional optional parameters are passed in a struct. If no resync period
+	// is specified there, AddEventHandlerWithContext behaves like AddEventHandler.
+	//
+	// Canceling the context has the same affect as calling RemoveEventHandler.
+	// To avoid a goroutine leak, either the context must get canceled or the event handler must get removed.
+	AddEventHandlerWithContext(ctx context.Context, handler ResourceEventHandler, config HandlerOptions) (ResourceEventHandlerRegistration, error)
 	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// This function is guaranteed to be idempotent, and thread-safe.
@@ -170,7 +180,12 @@ type SharedInformer interface {
 	GetController() Controller
 	// Run starts and runs the shared informer, returning after it stops.
 	// The informer will be stopped when stopCh is closed.
+	//
+	// Contextual logging: RunWithContext should be used instead of Run in code which uses contextual logging.
 	Run(stopCh <-chan struct{})
+	// RunWithContext starts and runs the shared informer, returning after it stops.
+	// The informer will be stopped when the context is canceled.
+	RunWithContext(ctx context.Context)
 	// HasSynced returns true if the shared informer's store has been
 	// informed by at least one full LIST of the authoritative state
 	// of the informer's object collection.  This is unrelated to "resync".
@@ -197,7 +212,13 @@ type SharedInformer interface {
 	// The handler is intended for visibility, not to e.g. pause the consumers.
 	// The handler should return quickly - any expensive processing should be
 	// offloaded.
+	//
+	// Contextual logging: SetWatchErrorHandlerWithContext should be used instead of SetWatchErrorHandler in code which supports contextual logging.
 	SetWatchErrorHandler(handler WatchErrorHandler) error
+
+	// SetWatchErrorHandlerWithContext is a variant of SetWatchErrorHandler where
+	// the handler is passed an additional context parameter.
+	SetWatchErrorHandlerWithContext(handler WatchErrorHandlerWithContext) error
 
 	// The TransformFunc is called for each object which is about to be stored.
 	//
@@ -226,6 +247,16 @@ type ResourceEventHandlerRegistration interface {
 	// HasSynced reports if both the parent has synced and all pre-sync
 	// events have been delivered.
 	HasSynced() bool
+}
+
+// Optional configuration options for [SharedInformer.AddEventHandlerWithContext].
+// May be left empty.
+type HandlerOptions struct {
+	// ResyncPeriod requests a certain resync period from an informer. Zero
+	// means the handler does not care about resyncs. Not all informers do
+	// resyncs, even if requested. See
+	// [SharedInformer.AddEventHandlerWithResyncPeriod] for details.
+	ResyncPeriod time.Duration
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -309,15 +340,38 @@ const (
 // WaitForNamedCacheSync is a wrapper around WaitForCacheSync that generates log messages
 // indicating that the caller identified by name is waiting for syncs, followed by
 // either a successful or failed sync.
+//
+// Contextual logging: WaitForNamedCacheSyncWithContext should be used instead of WaitForNamedCacheSync in code which supports contextual logging.
 func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
-	klog.Infof("Waiting for caches to sync for %s", controllerName)
+	klog.Background().Info("Waiting for caches to sync", "controller", controllerName)
 
 	if !WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s", controllerName))
+		utilruntime.HandleErrorWithContext(context.Background(), nil, "Unable to sync caches", "controller", controllerName)
 		return false
 	}
 
-	klog.Infof("Caches are synced for %s", controllerName)
+	klog.Background().Info("Caches are synced", "controller", controllerName)
+	return true
+}
+
+// WaitForNamedCacheSyncWithContext is a wrapper around WaitForCacheSyncWithContext that generates log messages
+// indicating that the caller is waiting for syncs, followed by either a successful or failed sync.
+//
+// Contextual logging can be used to identify the caller in those log messages. The log level is zero,
+// the same as in [WaitForNamedCacheSync]. If this is too verbose, then store a logger with an increased
+// threshold in the context:
+//
+//	WaitForNamedCacheSyncWithContext(klog.NewContext(ctx, logger.V(5)), ...)
+func WaitForNamedCacheSyncWithContext(ctx context.Context, cacheSyncs ...InformerSynced) bool {
+	logger := klog.FromContext(ctx)
+	logger.Info("Waiting for caches to sync")
+
+	if !WaitForCacheSync(ctx.Done(), cacheSyncs...) {
+		utilruntime.HandleErrorWithContext(ctx, nil, "Unable to sync caches")
+		return false
+	}
+
+	logger.Info("Caches are synced")
 	return true
 }
 
@@ -389,7 +443,7 @@ type sharedIndexInformer struct {
 	blockDeltas sync.Mutex
 
 	// Called whenever the ListAndWatch drops the connection with an error.
-	watchErrorHandler WatchErrorHandler
+	watchErrorHandler WatchErrorHandlerWithContext
 
 	transform TransformFunc
 }
@@ -401,6 +455,9 @@ type sharedIndexInformer struct {
 // notice any change in behavior.
 type dummyController struct {
 	informer *sharedIndexInformer
+}
+
+func (v *dummyController) RunWithContext(context.Context) {
 }
 
 func (v *dummyController) Run(stopCh <-chan struct{}) {
@@ -433,6 +490,12 @@ type deleteNotification struct {
 }
 
 func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) error {
+	return s.SetWatchErrorHandlerWithContext(func(_ context.Context, r *Reflector, err error) {
+		handler(r, err)
+	})
+}
+
+func (s *sharedIndexInformer) SetWatchErrorHandlerWithContext(handler WatchErrorHandlerWithContext) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -457,10 +520,15 @@ func (s *sharedIndexInformer) SetTransform(handler TransformFunc) error {
 }
 
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
+	s.RunWithContext(wait.ContextForChannel(stopCh))
+}
+
+func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
+	logger := klog.FromContext(ctx)
 
 	if s.HasStarted() {
-		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
+		logger.Info("Warning: the sharedIndexInformer has started, run more than once is not allowed")
 		return
 	}
 
@@ -483,8 +551,8 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			RetryOnError:      false,
 			ShouldResync:      s.processor.shouldResync,
 
-			Process:           s.HandleDeltas,
-			WatchErrorHandler: s.watchErrorHandler,
+			Process:                      s.HandleDeltas,
+			WatchErrorHandlerWithContext: s.watchErrorHandler,
 		}
 
 		s.controller = New(cfg)
@@ -492,20 +560,23 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.started = true
 	}()
 
-	// Separate stop channel because Processor should be stopped strictly after controller
-	processorStopCh := make(chan struct{})
+	// Separate stop context because Processor should be stopped strictly after controller.
+	// Cancelation in the parent context is ignored.
+	processorStopCtx, stopProcessor := context.WithCancelCause(context.WithoutCancel(ctx))
 	var wg wait.Group
-	defer wg.Wait()              // Wait for Processor to stop
-	defer close(processorStopCh) // Tell Processor to stop
-	wg.StartWithChannel(processorStopCh, s.cacheMutationDetector.Run)
-	wg.StartWithChannel(processorStopCh, s.processor.run)
+	defer wg.Wait()                                         // Wait for Processor to stop
+	defer stopProcessor(errors.New("informer is stopping")) // Tell Processor to stop
+	// TODO: extend the MutationDetector interface so that it optionally
+	// has a RunWithContext method that we can use here.
+	wg.StartWithChannel(processorStopCtx.Done(), s.cacheMutationDetector.Run)
+	wg.StartWithContext(processorStopCtx, s.processor.run)
 
 	defer func() {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 		s.stopped = true // Don't want any new listeners
 	}()
-	s.controller.Run(stopCh)
+	s.controller.RunWithContext(ctx)
 }
 
 func (s *sharedIndexInformer) HasStarted() bool {
@@ -558,19 +629,19 @@ func (s *sharedIndexInformer) GetController() Controller {
 }
 
 func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) (ResourceEventHandlerRegistration, error) {
-	return s.AddEventHandlerWithResyncPeriod(handler, s.defaultEventHandlerResyncPeriod)
+	return s.AddEventHandlerWithContext(context.Background(), handler, HandlerOptions{ResyncPeriod: s.defaultEventHandlerResyncPeriod})
 }
 
-func determineResyncPeriod(desired, check time.Duration) time.Duration {
+func determineResyncPeriod(logger klog.Logger, desired, check time.Duration) time.Duration {
 	if desired == 0 {
 		return desired
 	}
 	if check == 0 {
-		klog.Warningf("The specified resyncPeriod %v is invalid because this shared informer doesn't support resyncing", desired)
+		logger.Info("Warning: the specified resync period is invalid because this shared informer doesn't support resyncing", "resyncPeriod", desired)
 		return 0
 	}
 	if desired < check {
-		klog.Warningf("The specified resyncPeriod %v is being increased to the minimum resyncCheckPeriod %v", desired, check)
+		logger.Info("Warning: the specified resync period is being increased to the minimum resync check period", "resyncPeriod", desired, "resyncCheckPeriod", check)
 		return check
 	}
 	return desired
@@ -579,6 +650,10 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 const minimumResyncPeriod = 1 * time.Second
 
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error) {
+	return s.AddEventHandlerWithContext(context.Background(), handler, HandlerOptions{ResyncPeriod: resyncPeriod})
+}
+
+func (s *sharedIndexInformer) AddEventHandlerWithContext(ctx context.Context, handler ResourceEventHandler, config HandlerOptions) (ResourceEventHandlerRegistration, error) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -586,30 +661,33 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		return nil, fmt.Errorf("handler %v was not added to shared informer because it has stopped already", handler)
 	}
 
+	logger := klog.FromContext(ctx)
+	resyncPeriod := config.ResyncPeriod
 	if resyncPeriod > 0 {
 		if resyncPeriod < minimumResyncPeriod {
-			klog.Warningf("resyncPeriod %v is too small. Changing it to the minimum allowed value of %v", resyncPeriod, minimumResyncPeriod)
+			logger.Info("Warning: resync period is too small. Changing it to the minimum allowed value", "resyncPeriod", resyncPeriod, "minimumResyncPeriod", minimumResyncPeriod)
 			resyncPeriod = minimumResyncPeriod
 		}
 
 		if resyncPeriod < s.resyncCheckPeriod {
 			if s.started {
-				klog.Warningf("resyncPeriod %v is smaller than resyncCheckPeriod %v and the informer has already started. Changing it to %v", resyncPeriod, s.resyncCheckPeriod, s.resyncCheckPeriod)
+				logger.Info("Warning: resync period is smaller than resync check period and the informer has already started. Changing it to the resync check period", "resyncPeriod", resyncPeriod, "resyncCheckPeriod", s.resyncCheckPeriod)
 				resyncPeriod = s.resyncCheckPeriod
 			} else {
 				// if the event handler's resyncPeriod is smaller than the current resyncCheckPeriod, update
 				// resyncCheckPeriod to match resyncPeriod and adjust the resync periods of all the listeners
 				// accordingly
 				s.resyncCheckPeriod = resyncPeriod
-				s.processor.resyncCheckPeriodChanged(resyncPeriod)
+				s.processor.resyncCheckPeriodChanged(logger, resyncPeriod)
 			}
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
+	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
 
 	if !s.started {
-		return s.processor.addListener(listener), nil
+		s.processor.addListener(logger, listener)
+		return s.handleCancellation(ctx, listener), nil
 	}
 
 	// in order to safely join, we have to
@@ -620,7 +698,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	handle := s.processor.addListener(listener)
+	s.processor.addListener(logger, listener)
 	for _, item := range s.indexer.List() {
 		// Note that we enqueue these notifications with the lock held
 		// and before returning the handle. That means there is never a
@@ -632,7 +710,57 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		// thread adding them and the counter is temporarily zero).
 		listener.add(addNotification{newObj: item, isInInitialList: true})
 	}
-	return handle, nil
+
+	return s.handleCancellation(ctx, listener), nil
+}
+
+func (s *sharedIndexInformer) handleCancellation(ctx context.Context, listener *processorListener) ResourceEventHandlerRegistration {
+	// If the context gets canceled, we need to call RemoveEventHandler.
+	// This depends on running a goroutine here. If RemoveEventHandler gets
+	// called instead, we need to inform that goroutine that it can stop.
+	// To implement this, we use a cancel context and pass the cancel
+	// function to RemoveEventHandler in the ResourceEventHandlerRegistration
+	// that we got from the processor.
+	//
+	// All of this can be skipped if the context has no stop channel because
+	// then it can never get canceled (for example, it is context.Background()).
+	// This is relevant for the traditional AddEventHandler variants because
+	// it was not required to remove handlers registered that way to avoid
+	// goroutine leaks.
+	if ctx.Done() == nil {
+		// Returning a pointer is intentional: it ensures that the
+		// resulting ResourceEventHandlerRegistration is comparable.
+		// Returning a value would break that because functions
+		// are not comparable.
+		return &resourceEventHandlerRegistration{
+			processorListener: listener,
+			cancel:            func() {},
+		}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	handle := &resourceEventHandlerRegistration{
+		processorListener: listener,
+		cancel:            cancel,
+	}
+	go func() {
+		// Ensure that no matter what happens, cancel gets called to clean up.
+		// More specifically, the parent context could get canceled, in which
+		// case our cancel context still needs to be canceled separately.
+		defer cancel()
+		// Wait for parent context or our own cancel context being canceled
+		// by RemoveEventHandler.
+		<-ctx.Done()
+		// Might not have been done yet. It's idempotent.
+		_ = s.RemoveEventHandler(handle)
+	}()
+
+	return handle
+}
+
+type resourceEventHandlerRegistration struct {
+	*processorListener
+	cancel func()
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool) error {
@@ -690,6 +818,15 @@ func (s *sharedIndexInformer) IsStopped() bool {
 }
 
 func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegistration) error {
+	registrationHandle, ok := handle.(*resourceEventHandlerRegistration)
+	if !ok {
+		return fmt.Errorf("invalid key type %T", handle)
+	}
+
+	// Also tell the goroutine from AddEventHandlerWithContext to stop when
+	// we are done.
+	defer registrationHandle.cancel()
+
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -699,7 +836,7 @@ func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegi
 	// 3. unblock
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
-	return s.processor.removeListener(handle)
+	return s.processor.removeListener(registrationHandle.processorListener)
 }
 
 // sharedProcessor has a collection of processorListener and can
@@ -717,24 +854,16 @@ type sharedProcessor struct {
 	wg        wait.Group
 }
 
-func (p *sharedProcessor) getListener(registration ResourceEventHandlerRegistration) *processorListener {
+// isRegistered checks whether the given listener is still registered.
+func (p *sharedProcessor) isRegistered(listener *processorListener) bool {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
-	if p.listeners == nil {
-		return nil
-	}
-
-	if result, ok := registration.(*processorListener); ok {
-		if _, exists := p.listeners[result]; exists {
-			return result
-		}
-	}
-
-	return nil
+	_, exists := p.listeners[listener]
+	return exists
 }
 
-func (p *sharedProcessor) addListener(listener *processorListener) ResourceEventHandlerRegistration {
+func (p *sharedProcessor) addListener(logger klog.Logger, listener *processorListener) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
@@ -748,18 +877,13 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 		p.wg.Start(listener.run)
 		p.wg.Start(listener.pop)
 	}
-
-	return listener
 }
 
-func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration) error {
+func (p *sharedProcessor) removeListener(listener *processorListener) error {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
-	listener, ok := handle.(*processorListener)
-	if !ok {
-		return fmt.Errorf("invalid key type %t", handle)
-	} else if p.listeners == nil {
+	if p.listeners == nil {
 		// No listeners are registered, do nothing
 		return nil
 	} else if _, exists := p.listeners[listener]; !exists {
@@ -794,7 +918,7 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 	}
 }
 
-func (p *sharedProcessor) run(stopCh <-chan struct{}) {
+func (p *sharedProcessor) run(ctx context.Context) {
 	func() {
 		p.listenersLock.RLock()
 		defer p.listenersLock.RUnlock()
@@ -804,7 +928,7 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 		}
 		p.listenersStarted = true
 	}()
-	<-stopCh
+	<-ctx.Done()
 
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
@@ -844,13 +968,13 @@ func (p *sharedProcessor) shouldResync() bool {
 	return resyncNeeded
 }
 
-func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Duration) {
+func (p *sharedProcessor) resyncCheckPeriodChanged(logger klog.Logger, resyncCheckPeriod time.Duration) {
 	p.listenersLock.RLock()
 	defer p.listenersLock.RUnlock()
 
 	for listener := range p.listeners {
 		resyncPeriod := determineResyncPeriod(
-			listener.requestedResyncPeriod, resyncCheckPeriod)
+			logger, listener.requestedResyncPeriod, resyncCheckPeriod)
 		listener.setResyncPeriod(resyncPeriod)
 	}
 }
@@ -867,6 +991,7 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 // processorListener also keeps track of the adjusted requested resync
 // period of the listener.
 type processorListener struct {
+	logger klog.Logger
 	nextCh chan interface{}
 	addCh  chan interface{}
 
@@ -910,8 +1035,9 @@ func (p *processorListener) HasSynced() bool {
 	return p.syncTracker.HasSynced()
 }
 
-func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
+func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
 	ret := &processorListener{
+		logger:                logger,
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
@@ -934,7 +1060,7 @@ func (p *processorListener) add(notification interface{}) {
 }
 
 func (p *processorListener) pop() {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithLogr(p.logger)
 	defer close(p.nextCh) // Tell .run() to stop
 
 	var nextCh chan<- interface{}
@@ -966,11 +1092,21 @@ func (p *processorListener) pop() {
 func (p *processorListener) run() {
 	// this call blocks until the channel is closed.  When a panic happens during the notification
 	// we will catch it, **the offending item will be skipped!**, and after a short delay (one second)
-	// the next notification will be attempted.  This is usually better than the alternative of never
+	// the next notification will be attempted. This is usually better than the alternative of never
 	// delivering again.
-	stopCh := make(chan struct{})
-	wait.Until(func() {
-		for next := range p.nextCh {
+	//
+	// This only applies if utilruntime is configured to not panic, which is not the default.
+	sleepAfterCrash := false
+	for next := range p.nextCh {
+		if sleepAfterCrash {
+			// Sleep before processing the next item.
+			time.Sleep(time.Second)
+		}
+		func() {
+			// Gets reset below, but only if we get that far.
+			sleepAfterCrash = true
+			defer utilruntime.HandleCrashWithLogr(p.logger)
+
 			switch notification := next.(type) {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
@@ -982,12 +1118,11 @@ func (p *processorListener) run() {
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
 			default:
-				utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
+				utilruntime.HandleErrorWithLogr(p.logger, nil, "unrecognized notification", "notificationType", fmt.Sprintf("%T", next))
 			}
-		}
-		// the only way to get here is if the p.nextCh is empty and closed
-		close(stopCh)
-	}, 1*time.Second, stopCh)
+			sleepAfterCrash = false
+		}()
+	}
 }
 
 // shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,

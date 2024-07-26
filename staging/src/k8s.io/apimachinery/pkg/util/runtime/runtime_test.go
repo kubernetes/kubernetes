@@ -180,8 +180,8 @@ func TestHandleCrashContextual(t *testing.T) {
 					_, _, line, _ := runtime.Caller(0)
 					handleCrash(logger, tt.trigger, handler)
 					if tt.expectPanic != "" {
-						assert.Contains(t, buffer.String(), fmt.Sprintf(`E%s  %d runtime_test.go:%d] "Observed a panic" panic=%q`, timeString, os.Getpid(), line+1, tt.expectPanic))
-						assert.Contains(t, buffer.String(), fmt.Sprintf(`I%s  %d runtime_test.go:%d] "handler called" panic=%q
+						assert.Contains(t, buffer.String(), fmt.Sprintf(`E%s %7d runtime_test.go:%d] "Observed a panic" panic=%q`, timeString, os.Getpid(), line+1, tt.expectPanic))
+						assert.Contains(t, buffer.String(), fmt.Sprintf(`I%s %7d runtime_test.go:%d] "handler called" panic=%q
 `, timeString, os.Getpid(), line+1, tt.expectPanic))
 					} else {
 						assert.Empty(t, buffer.String())
@@ -300,7 +300,7 @@ func TestHandleError(t *testing.T) {
 
 					_, _, line, _ := runtime.Caller(0)
 					handleError(logger, tc.err, tc.msg, tc.keysAndValues...)
-					assert.Equal(t, fmt.Sprintf("E%s  %d runtime_test.go:%d] %s\n", timeString, os.Getpid(), line+1, tc.expectLog), buffer.String())
+					assert.Equal(t, fmt.Sprintf("E%s %7d runtime_test.go:%d] %s\n", timeString, os.Getpid(), line+1, tc.expectLog), buffer.String())
 				})
 			}
 		})
