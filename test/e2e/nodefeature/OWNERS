@@ -1,0 +1,20 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  # Features in test/e2e/nodefeature/nodefeature.go are not directly mapped to the kubelet feature gates,
+  # but is a good approximation to allow adding alpha features by SIG approvers.
+  - feature-approvers
+  # Also include SIG Node approvers, keeping in-sync with test/e2e_node/OWNERS
+  - tallclair
+  - derekwaynecarr
+  - klueska
+  - sjenning
+  - mrunalp
+  - SergeyKanzhelev
+  - endocrimes
+reviewers:
+  - bart0sh
+  - endocrimes
+  - sig-node-reviewers
+labels:
+  - sig/node
