@@ -55,6 +55,9 @@ type DeltaFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// If set, log output will go to this logger instead of klog.Background().
+	Logger *klog.Logger
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -136,6 +139,10 @@ type DeltaFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
+
+	// logger is a per-instance logger. This gets chosen when constructing
+	// the instance, with klog.Background() as default.
+	logger klog.Logger
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -253,6 +260,10 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
+		logger:                klog.Background(),
+	}
+	if opts.Logger != nil {
+		f.logger = *opts.Logger
 	}
 	f.cond.L = &f.lock
 	return f
@@ -487,10 +498,10 @@ func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType Del
 		// when given a non-empty list (as it is here).
 		// If somehow it happens anyway, deal with it but complain.
 		if oldDeltas == nil {
-			klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; ignoring", id, oldDeltas, obj)
+			f.logger.Error(nil, "Impossible dedupDeltas, ignoring", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 			return nil
 		}
-		klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; breaking invariant by storing empty Deltas", id, oldDeltas, obj)
+		f.logger.Error(nil, "Impossible dedupDeltas, breaking invariant by storing empty Deltas", "id", id, "oldDeltas", oldDeltas, "obj", obj)
 		f.items[id] = newDeltas
 		return fmt.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; broke DeltaFIFO invariant by storing empty Deltas", id, oldDeltas, obj)
 	}
@@ -597,7 +608,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		item, ok := f.items[id]
 		if !ok {
 			// This should never happen
-			klog.Errorf("Inconceivable! %q was in f.queue but not f.items; ignoring.", id)
+			f.logger.Error(nil, "Inconceivable! Item was in f.queue but not f.items; ignoring", "id", id)
 			continue
 		}
 		delete(f.items, id)
@@ -694,10 +705,10 @@ func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 			deletedObj, exists, err := f.knownObjects.GetByKey(k)
 			if err != nil {
 				deletedObj = nil
-				klog.Errorf("Unexpected error %v during lookup of key %v, placing DeleteFinalStateUnknown marker without object", err, k)
+				f.logger.Error(err, "Unexpected error during lookup, placing DeleteFinalStateUnknown marker without object", "key", k)
 			} else if !exists {
 				deletedObj = nil
-				klog.Infof("Key %v does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", k)
+				f.logger.Info("Key does not exist in known objects store, placing DeleteFinalStateUnknown marker without object", "key", k)
 			}
 			queuedDeletions++
 			if err := f.queueActionLocked(Deleted, DeletedFinalStateUnknown{k, deletedObj}); err != nil {
@@ -737,10 +748,10 @@ func (f *DeltaFIFO) Resync() error {
 func (f *DeltaFIFO) syncKeyLocked(key string) error {
 	obj, exists, err := f.knownObjects.GetByKey(key)
 	if err != nil {
-		klog.Errorf("Unexpected error %v during lookup of key %v, unable to queue object for sync", err, key)
+		f.logger.Error(err, "Unexpected error during lookup, unable to queue object for sync", "key", key)
 		return nil
 	} else if !exists {
-		klog.Infof("Key %v does not exist in known objects store, unable to queue object for sync", key)
+		f.logger.Info("Key does not exist in known objects store, unable to queue object for sync", "key", key)
 		return nil
 	}
 
