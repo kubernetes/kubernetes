@@ -83,7 +83,6 @@ func topologicalSortWithOneRoot(graph map[v1.CoordinatedLeaseStrategy][]v1.Coord
 	}
 
 	if len(sorted) != len(graph) {
-		fmt.Printf("%s", (sorted))
 		return nil // Cycle detected
 	}
 
