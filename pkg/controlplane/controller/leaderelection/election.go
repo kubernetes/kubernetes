@@ -103,7 +103,7 @@ func pickBestStrategy(candidates []*v1alpha1.LeaseCandidate) (v1.CoordinatedLeas
 	}
 
 	sorted := topologicalSortWithOneRoot(graph)
-	if sorted == nil {
+	if len(sorted) == 0 {
 		return nilStrategy, fmt.Errorf("invalid strategy")
 	}
 
