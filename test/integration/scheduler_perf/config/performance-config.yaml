@@ -29,7 +29,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 5
@@ -70,7 +70,7 @@
     namespace: sched-1
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 1
@@ -106,7 +106,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 5
@@ -239,7 +239,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 5
@@ -438,7 +438,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 5
@@ -479,7 +479,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 10
@@ -617,7 +617,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 20
@@ -686,7 +686,7 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes/2InitPods
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       initNodes: 5
       initPods: 2
@@ -1181,7 +1181,7 @@
     collectMetrics: true
   workloads:
   - name: fast
-    labels: [integration-test, fast]
+    labels: [integration-test, fast, short]
     params:
       # This testcase runs through all code paths without
       # taking too long overall.

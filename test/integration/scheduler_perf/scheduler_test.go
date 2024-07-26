@@ -18,8 +18,6 @@ package benchmark
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func TestScheduling(t *testing.T) {
@@ -32,7 +30,7 @@ func TestScheduling(t *testing.T) {
 	}
 
 	if testing.Short() {
-		testSchedulingLabelFilter = ptr.To(*testSchedulingLabelFilter + ",+short")
+		*testSchedulingLabelFilter += ",+short"
 	}
 
 	for _, tc := range testCases {
