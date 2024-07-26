@@ -89,6 +89,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 
+	// ResourceHealthStatus (SIG-node, resource health Status for device plugins and DRA <https://kep.k8s.io/4680>)
+	ResourceHealthStatus = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceHealthStatus"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ProcMountType = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ProcMountType"))
 
