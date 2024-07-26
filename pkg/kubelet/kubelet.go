@@ -2803,9 +2803,13 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 		return pod
 	}
 
-	// If the pod cannot be resized, use the old resource spec during the rest of SyncPod()
-	// for a case where a container is restarted.
-	// Extract the old spec from the latest container status.
+	// This `copyPodResourceToSpec` is called if the pod resize is not admitted bellow.
+	// In this case, pod.Spec.Containers[i].Resources contains unacceptable values.
+	// These values must not be used for restarting a container in case it needs restarting along with its exit.
+	// This function copies old but valid container resource spec extracted from the latest container status to
+	// pod.Spec.Containers[i].Resources.
+	// A copied pod must be passed to this function so that user requested resource spec that is recorded in
+	// the pod manager is not overwritten.
 	copyPodResourceToSpec := func(podCopy *v1.Pod) {
 		for i, container := range podCopy.Spec.Containers {
 			containerStatus, found := podutil.GetContainerStatus(podCopy.Status.ContainerStatuses, container.Name)
@@ -2822,6 +2826,8 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod) *v1.Pod {
 	defer kl.podResizeMutex.Unlock()
 	fit, updatedPod, resizeStatus := kl.canResizePod(pod)
 	if updatedPod == nil {
+		// It is not clear if the reize is admitted or not.
+		// Call copyPodResourceToSpec() for a case that requested pod spec is not acceptable.
 		updatedPod = pod.DeepCopy()
 		copyPodResourceToSpec(updatedPod)
 		return updatedPod
