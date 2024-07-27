@@ -174,7 +174,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Millisecond))),
 						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
