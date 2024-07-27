@@ -120,7 +120,7 @@ func NewCandidate(clientset kubernetes.Interface,
 func (c *LeaseCandidate) Run(ctx context.Context) {
 	defer c.queue.ShutDown()
 
-	go c.informerFactory.Start(ctx.Done())
+	c.informerFactory.Start(ctx.Done())
 	if !cache.WaitForNamedCacheSync("leasecandidateclient", ctx.Done(), c.hasSynced) {
 		return
 	}

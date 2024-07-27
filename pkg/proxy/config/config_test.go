@@ -240,7 +240,7 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service := &v1.Service{
@@ -265,7 +265,7 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	config := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	handler := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &v1.Service{
@@ -304,7 +304,7 @@ func TestNewServicesMultipleHandlersAddedAndNotified(t *testing.T) {
 	handler2 := NewServiceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	service1 := &v1.Service{
@@ -339,7 +339,7 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	endpoints1 := &discoveryv1.EndpointSlice{
@@ -386,7 +386,7 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
 	config.RegisterEventHandler(handler2)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go config.Run(stopCh)
 
 	endpoints1 := &discoveryv1.EndpointSlice{

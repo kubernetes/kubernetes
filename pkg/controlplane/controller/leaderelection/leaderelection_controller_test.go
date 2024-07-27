@@ -32,8 +32,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/utils/ptr"
-
-	"k8s.io/client-go/tools/cache"
 )
 
 func TestReconcileElectionStep(t *testing.T) {
@@ -339,7 +337,7 @@ func TestReconcileElectionStep(t *testing.T) {
 			ctx := context.Background()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			_ = informerFactory.Coordination().V1alpha1().LeaseCandidates().Lister()
+
 			controller, err := NewController(
 				informerFactory.Coordination().V1().Leases(),
 				informerFactory.Coordination().V1alpha1().LeaseCandidates(),
@@ -349,8 +347,7 @@ func TestReconcileElectionStep(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			go informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+
 			// Set up the fake client with the existing lease
 			if tc.existingLease != nil {
 				_, err = client.CoordinationV1().Leases(tc.existingLease.Namespace).Create(ctx, tc.existingLease, metav1.CreateOptions{})
@@ -366,7 +363,10 @@ func TestReconcileElectionStep(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			cache.WaitForCacheSync(ctx.Done(), controller.leaseCandidateInformer.Informer().HasSynced)
+
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
 			requeue, err := controller.reconcileElectionStep(ctx, tc.leaseNN)
 
 			if (requeue != 0) != tc.expectedRequeue {
@@ -639,7 +639,7 @@ func TestController(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			go informerFactory.Start(ctx.Done())
+			informerFactory.Start(ctx.Done())
 			go controller.Run(ctx, 1)
 
 			go func() {

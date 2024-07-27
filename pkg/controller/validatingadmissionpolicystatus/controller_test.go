@@ -113,7 +113,7 @@ func TestTypeChecking(t *testing.T) {
 			if err != nil {
 				t.Fatalf("cannot create controller: %v", err)
 			}
-			go informerFactory.Start(ctx.Done())
+			informerFactory.Start(ctx.Done())
 			go controller.Run(ctx, 1)
 			err = wait.PollUntilContextCancel(ctx, time.Second, false, func(ctx context.Context) (done bool, err error) {
 				name := policy.Name
