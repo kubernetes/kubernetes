@@ -60,7 +60,7 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	serviceConfig := NewServiceConfig(ctx, sharedInformers.Core().V1().Services(), time.Minute)
 	serviceConfig.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go serviceConfig.Run(stopCh)
 
 	// Add the first service
@@ -141,7 +141,7 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	endpointsliceConfig := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
 	endpointsliceConfig.RegisterEventHandler(handler)
-	go sharedInformers.Start(stopCh)
+	sharedInformers.Start(stopCh)
 	go endpointsliceConfig.Run(stopCh)
 
 	// Add the first endpoints

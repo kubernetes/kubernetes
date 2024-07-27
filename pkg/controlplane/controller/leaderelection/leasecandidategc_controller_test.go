@@ -115,7 +115,7 @@ func TestLeaseCandidateGCController(t *testing.T) {
 			leaseCandidateInformer := informerFactory.Coordination().V1alpha1().LeaseCandidates()
 			controller := NewLeaseCandidateGC(client, 10*time.Millisecond, leaseCandidateInformer)
 
-			go informerFactory.Start(ctx.Done())
+			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
 			// Create lease candidates
