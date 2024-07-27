@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
 
@@ -115,9 +114,6 @@ func TestLeaseCandidateGCController(t *testing.T) {
 			leaseCandidateInformer := informerFactory.Coordination().V1alpha1().LeaseCandidates()
 			controller := NewLeaseCandidateGC(client, 10*time.Millisecond, leaseCandidateInformer)
 
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
-
 			// Create lease candidates
 			for _, lc := range tc.leaseCandidates {
 				_, err := client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Create(ctx, lc, metav1.CreateOptions{})
@@ -126,7 +122,8 @@ func TestLeaseCandidateGCController(t *testing.T) {
 				}
 			}
 
-			cache.WaitForCacheSync(ctx.Done(), controller.leaseCandidatesSynced)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 
 			go controller.Run(ctx)
 			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 600*time.Second, true, func(ctx context.Context) (done bool, err error) {

@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/coordination/v1"
 	v1alpha1 "k8s.io/api/coordination/v1alpha1"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha1.LeaseCandidate) *v1alpha1.LeaseCandidate {
@@ -155,15 +156,15 @@ func compare(lhs, rhs *v1alpha1.LeaseCandidate) int {
 	return result
 }
 
-func isLeaseExpired(lease *v1.Lease) bool {
-	currentTime := time.Now()
+func isLeaseExpired(clock clock.Clock, lease *v1.Lease) bool {
+	currentTime := clock.Now()
 	return lease.Spec.RenewTime == nil ||
 		lease.Spec.LeaseDurationSeconds == nil ||
 		lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second).Before(currentTime)
 }
 
-func isLeaseCandidateExpired(lease *v1alpha1.LeaseCandidate) bool {
-	currentTime := time.Now()
+func isLeaseCandidateExpired(clock clock.Clock, lease *v1alpha1.LeaseCandidate) bool {
+	currentTime := clock.Now()
 	return lease.Spec.RenewTime == nil ||
 		lease.Spec.RenewTime.Add(leaseCandidateValidDuration).Before(currentTime)
 }

@@ -31,10 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
 
 func TestReconcileElectionStep(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
 	tests := []struct {
 		name                    string
 		leaseNN                 types.NamespacedName
@@ -83,7 +86,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -108,7 +111,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -121,7 +124,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.18.0",
 						BinaryVersion:       "1.18.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -134,7 +137,7 @@ func TestReconcileElectionStep(t *testing.T) {
 				Spec: v1.LeaseSpec{
 					HolderIdentity:       ptr.To("component-identity-1"),
 					LeaseDurationSeconds: ptr.To(int32(10)),
-					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now())),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 				},
 			},
 			expectLease:             true,
@@ -157,8 +160,8 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * electionDuration))),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-4 * electionDuration))),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-2 * electionDuration))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-4 * electionDuration))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -171,8 +174,8 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(time.Now())),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Millisecond))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -197,7 +200,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -210,7 +213,7 @@ func TestReconcileElectionStep(t *testing.T) {
 				Spec: v1.LeaseSpec{
 					HolderIdentity:       ptr.To("component-identity-expired"),
 					LeaseDurationSeconds: ptr.To(int32(10)),
-					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
 				},
 			},
 			expectLease:            true,
@@ -232,8 +235,8 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * time.Minute))),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-2 * time.Minute))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -257,7 +260,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-2 * electionDuration))),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-2 * electionDuration))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -283,8 +286,8 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						PingTime:            ptr.To(metav1.NewMicroTime(time.Now())),
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+						PingTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -308,7 +311,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{"foo.com/bar"},
 					},
 				},
@@ -321,7 +324,7 @@ func TestReconcileElectionStep(t *testing.T) {
 				Spec: v1.LeaseSpec{
 					HolderIdentity:       ptr.To("component-identity-expired"),
 					LeaseDurationSeconds: ptr.To(int32(10)),
-					RenewTime:            ptr.To(metav1.NewMicroTime(time.Now().Add(-1 * time.Minute))),
+					RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-1 * time.Minute))),
 				},
 			},
 			expectLease:            true,
@@ -344,6 +347,7 @@ func TestReconcileElectionStep(t *testing.T) {
 				client.CoordinationV1(),
 				client.CoordinationV1alpha1(),
 			)
+			controller.clock = fakeClock
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -435,6 +439,8 @@ func TestReconcileElectionStep(t *testing.T) {
 }
 
 func TestController(t *testing.T) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
 	cases := []struct {
 		name                       string
 		leaseNN                    types.NamespacedName
@@ -455,7 +461,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -485,7 +491,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -498,7 +504,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -511,7 +517,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -549,7 +555,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -590,7 +596,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.20.0",
 						BinaryVersion:       "1.20.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -603,7 +609,7 @@ func TestController(t *testing.T) {
 						LeaseName:           "component-A",
 						EmulationVersion:    "1.19.0",
 						BinaryVersion:       "1.19.0",
-						RenewTime:           ptr.To(metav1.NewMicroTime(time.Now())),
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
@@ -680,7 +686,7 @@ func TestController(t *testing.T) {
 							if err == nil {
 								if lease.Spec.PingTime != nil {
 									c := lease.DeepCopy()
-									c.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+									c.Spec.RenewTime = &metav1.MicroTime{Time: fakeClock.Now()}
 									_, err = client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Update(ctx, c, metav1.UpdateOptions{})
 									if err != nil {
 										runtime.HandleError(err)

@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/coordination/v1alpha1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/clock"
 
 	"k8s.io/klog/v2"
 )
@@ -42,6 +43,8 @@ type LeaseCandidateGCController struct {
 	leaseCandidatesSynced  cache.InformerSynced
 
 	gcCheckPeriod time.Duration
+
+	clock clock.Clock
 }
 
 // NewLeaseCandidateGC creates a new LeaseCandidateGCController.
@@ -52,6 +55,7 @@ func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 		leaseCandidateInformer: leaseCandidateInformer,
 		leaseCandidatesSynced:  leaseCandidateInformer.Informer().HasSynced,
 		gcCheckPeriod:          gcCheckPeriod,
+		clock:                  clock.RealClock{},
 	}
 }
 
@@ -80,7 +84,7 @@ func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 	}
 	for _, leaseCandidate := range lcs {
 		// evaluate lease from cache
-		if !isLeaseCandidateExpired(leaseCandidate) {
+		if !isLeaseCandidateExpired(c.clock, leaseCandidate) {
 			continue
 		}
 		lc, err := c.kubeclientset.CoordinationV1alpha1().LeaseCandidates(leaseCandidate.Namespace).Get(ctx, leaseCandidate.Name, metav1.GetOptions{})
@@ -89,7 +93,7 @@ func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 			continue
 		}
 		// evaluate lease from apiserver
-		if !isLeaseCandidateExpired(lc) {
+		if !isLeaseCandidateExpired(c.clock, lc) {
 			continue
 		}
 		if err := c.kubeclientset.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Delete(
