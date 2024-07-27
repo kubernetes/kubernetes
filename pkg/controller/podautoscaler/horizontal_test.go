@@ -807,6 +807,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
 	go hpaController.Run(ctx, 5)
 
 	tc.Lock()
@@ -5279,6 +5280,7 @@ func TestMultipleHPAs(t *testing.T) {
 	hpaController.scaleDownEvents = scaleDownEventsMap
 
 	informerFactory.Start(tCtx.Done())
+	informerFactory.WaitForCacheSync(tCtx.Done())
 	go hpaController.Run(tCtx, 5)
 
 	timeoutTime := time.After(15 * time.Second)
