@@ -28,9 +28,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -729,6 +733,91 @@ kubelet_running_pods 2
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
 				t.Fatal(err)
 			}
+		})
+	}
+}
+
+func TestCacheWithEventedPLEG(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EventedPLEG, true)
+	eventedPLEGUsage = true
+
+	startTime := time.Now()
+	const (
+		containerState      = kubecontainer.ContainerStateRunning
+		initialRestartCount = 3
+		newRestartCount     = 5
+	)
+
+	for i, tc := range []struct {
+		testName             string
+		timeStamp            time.Time
+		exprectedResult      bool
+		expectedRestartCount int
+	}{
+		{
+			testName:             "PodStatus has a newer timestamp",
+			timeStamp:            startTime.Add(10 * time.Second),
+			exprectedResult:      true,
+			expectedRestartCount: newRestartCount,
+		},
+		{
+			testName:             "PodStatus has an older timestamp",
+			timeStamp:            startTime.Add(-10 * time.Second),
+			exprectedResult:      false,
+			expectedRestartCount: initialRestartCount,
+		},
+		{
+			testName:             "PodStatus has no timestamp",
+			exprectedResult:      true,
+			expectedRestartCount: newRestartCount,
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			ctx := context.Background()
+			runtimeMock := containertest.NewMockRuntime(t)
+			pleg := newTestGenericPLEGWithRuntimeMock(runtimeMock)
+
+			podID := types.UID(fmt.Sprintf("test-pod%d", i))
+			podName := fmt.Sprintf("test-pod%d", i)
+			podNamespace := "test-namespace"
+			container := createTestContainer("c0", containerState)
+			pod := &kubecontainer.Pod{
+				ID:         podID,
+				Name:       podName,
+				Namespace:  podNamespace,
+				Containers: []*kubecontainer.Container{container},
+			}
+			initialStatus := &kubecontainer.PodStatus{
+				ID: podID,
+				ContainerStatuses: []*kubecontainer.Status{{
+					ID:           container.ID,
+					State:        containerState,
+					RestartCount: initialRestartCount,
+				}},
+			}
+
+			// Setinitial data
+			pleg.cache.Set(podID, initialStatus, nil, startTime)
+
+			newStatus := &kubecontainer.PodStatus{
+				ID:        podID,
+				Name:      podName,
+				Namespace: podNamespace,
+				ContainerStatuses: []*kubecontainer.Status{{
+					ID:           container.ID,
+					State:        containerState,
+					RestartCount: newRestartCount,
+				}},
+				TimeStamp: tc.timeStamp,
+			}
+
+			runtimeMock.EXPECT().GetPodStatus(ctx, podID, podName, podNamespace).Return(newStatus, nil)
+			err, result := pleg.updateCache(ctx, pod, pod.ID)
+			require.NoError(t, err)
+			assert.Equal(t, tc.exprectedResult, result)
+			cachedStatus, err := pleg.cache.Get(podID)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedRestartCount, cachedStatus.ContainerStatuses[0].RestartCount)
 		})
 	}
 }
