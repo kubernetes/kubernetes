@@ -2403,6 +2403,154 @@ func Test_ValidateSecondaryAuthorization(t *testing.T) {
 	}
 }
 
+func TestCRDsOnStartup(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ValidatingAdmissionPolicy, true)()
+
+	testContext, testCancel := context.WithCancel(context.Background())
+	defer testCancel()
+
+	// Start server and create CRD, and validatingadmission policy and binding
+	etcdConfig := framework.SharedEtcd()
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+		"--authorization-mode=RBAC",
+		"--anonymous-auth",
+	}, etcdConfig)
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(server.ClientConfig)
+	apiextclient := apiextensionsclientset.NewForConfigOrDie(server.ClientConfig)
+	myCRD := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foos.cr.bar.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "foos",
+				Kind:   "Foo",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
+			},
+		},
+	}
+
+	// Create a bunch of fake CRDs to make the initial startup sync take a long time
+	for i := 0; i < 100; i++ {
+		crd := myCRD.DeepCopy()
+		crd.Name = fmt.Sprintf("foos%d.cr.bar.com", i)
+		crd.Spec.Names.Plural = fmt.Sprintf("foos%d", i)
+		crd.Spec.Names.Kind = fmt.Sprintf("Foo%d", i)
+
+		if _, err := apiextclient.ApiextensionsV1().CustomResourceDefinitions().Create(context.Background(), crd, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	etcd.CreateTestCRDs(t, apiextclient, false, myCRD)
+	crdGVK := schema.GroupVersionKind{
+		Group:   "cr.bar.com",
+		Version: "v1",
+		Kind:    "Foo",
+	}
+	crdGVR := crdGVK.GroupVersion().WithResource("foos")
+
+	param := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name":      "test",
+				"namespace": "default",
+			},
+			"foo": "bar",
+		},
+	}
+	param.GetObjectKind().SetGroupVersionKind(crdGVK)
+
+	if _, err := dynamicClient.Resource(crdGVR).Namespace("default").Create(context.TODO(), param, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	policy := withValidations([]admissionregistrationv1beta1.Validation{
+		{
+			Expression: "object.metadata.name.startsWith(params.metadata.name)",
+			Message:    "wrong prefix",
+		},
+	}, withParams(withCRDParamKind(crdGVK.Kind, crdGVK.Group, crdGVK.Version), withNamespaceMatch(withFailurePolicy(admissionregistrationv1beta1.Fail, makePolicy("allowed-prefixes")))))
+	policy = withWaitReadyConstraintAndExpression(policy)
+	_, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().Create(context.TODO(), policy, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// validate that namespaces starting with "test" are allowed
+	policyBinding := makeBinding("allowed-prefixes-binding", "allowed-prefixes", "test")
+	if err := createAndWaitReady(t, client, policyBinding, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	doCheck := func(client clientset.Interface) {
+		if waitErr := wait.PollUntilContextTimeout(testContext, time.Millisecond*100, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+			disallowedNamespace := &v1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "not-test-",
+				},
+			}
+
+			_, err = client.CoreV1().Namespaces().Create(testContext, disallowedNamespace, metav1.CreateOptions{})
+			if err == nil {
+				return false, nil
+			}
+
+			if strings.Contains(err.Error(), "not yet synced to use for admission") {
+				return false, nil
+			}
+
+			if strings.Contains(err.Error(), "failed to find resource referenced by paramKind") {
+				return false, nil
+			}
+
+			if !strings.Contains(err.Error(), "wrong prefix") {
+				return false, err
+			}
+
+			return true, nil
+		}); waitErr != nil {
+			t.Errorf("timed out waiting: %v", err)
+		}
+	}
+
+	// Show that the policy & binding are correctly working before restarting
+	// to use the paramKind and deliver an error
+	doCheck(client)
+	server.TearDownFn()
+
+	// Start the server.
+	server = apiservertesting.StartTestServerOrDie(
+		t,
+		&apiservertesting.TestServerInstanceOptions{
+			SkipHealthzCheck: true,
+		},
+		[]string{
+			"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+			"--authorization-mode=RBAC",
+			"--anonymous-auth",
+		},
+		etcdConfig)
+	defer server.TearDownFn()
+
+	// Now that the server is restarted, show again that the policy & binding are correctly working
+	client = clientset.NewForConfigOrDie(server.ClientConfig)
+
+	doCheck(client)
+
+}
+
 type clientFn func(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset
 
 func secondaryAuthorizationUserClient(t *testing.T, adminClient *clientset.Clientset, clientConfig *rest.Config, rules []rbacv1.PolicyRule) *clientset.Clientset {
