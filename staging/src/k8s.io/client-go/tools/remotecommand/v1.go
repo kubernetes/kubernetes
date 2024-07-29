@@ -17,11 +17,12 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/klog/v2"
 )
@@ -47,15 +48,17 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV1) stream(conn streamCreator) error {
+func (p *streamProtocolV1) stream(ctx context.Context, conn streamCreator) error {
 	doneChan := make(chan struct{}, 2)
 	errorChan := make(chan error)
+	logger := klog.FromContext(ctx)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
-		klog.V(6).Infof("Copying %s", s)
-		defer klog.V(6).Infof("Done copying %s", s)
+		logger.V(6).Info("Copying", "data", s)
+		defer logger.V(6).Info("Done copying", "data", s)
 		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
-			klog.Errorf("Error copying %s: %v", s, err)
+			// Should this really dump potentially sensitive data into the log?!
+			logger.Error(err, "Error copying", "data", s)
 		}
 		if s == v1.StreamTypeStdout || s == v1.StreamTypeStderr {
 			doneChan <- struct{}{}
@@ -66,7 +69,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	var err error
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeError)
-	p.errorStream, err = conn.CreateStream(headers)
+	p.errorStream, err = conn.createStream(ctx, headers)
 	if err != nil {
 		return err
 	}
@@ -81,7 +84,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 	// process data before the client starts sending any. See https://issues.k8s.io/16373 for more info.
 	if p.Stdin != nil {
 		headers.Set(v1.StreamType, v1.StreamTypeStdin)
-		p.remoteStdin, err = conn.CreateStream(headers)
+		p.remoteStdin, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -90,7 +93,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	if p.Stdout != nil {
 		headers.Set(v1.StreamType, v1.StreamTypeStdout)
-		p.remoteStdout, err = conn.CreateStream(headers)
+		p.remoteStdout, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -99,7 +102,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	if p.Stderr != nil && !p.Tty {
 		headers.Set(v1.StreamType, v1.StreamTypeStderr)
-		p.remoteStderr, err = conn.CreateStream(headers)
+		p.remoteStderr, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}

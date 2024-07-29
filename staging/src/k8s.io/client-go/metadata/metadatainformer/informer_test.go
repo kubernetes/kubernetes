@@ -138,8 +138,8 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 			// act
 			informerListerForGvr := target.ForResource(ts.gvr)
 			informerListerForGvr.Informer().AddEventHandler(ts.handler(informerReciveObjectCh))
-			target.Start(ctx.Done())
-			if synced := target.WaitForCacheSync(ctx.Done()); !synced[ts.gvr] {
+			target.StartWithContext(ctx)
+			if synced := target.WaitForCacheSyncWithContext(ctx); !synced[ts.gvr] {
 				t.Fatalf("informer for %s hasn't synced", ts.gvr)
 			}
 

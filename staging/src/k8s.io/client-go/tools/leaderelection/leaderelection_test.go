@@ -37,6 +37,7 @@ import (
 	fakeclient "k8s.io/client-go/testing"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 )
 
@@ -583,6 +584,8 @@ func testReleaseLease(t *testing.T, objectType string) {
 	for i := range tests {
 		test := &tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
 			// OnNewLeader is called async so we have to wait for it.
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -644,7 +647,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 			wg.Wait()
 			wg.Add(1)
 
-			if test.expectSuccess != le.release() {
+			if test.expectSuccess != le.release(ctx) {
 				t.Errorf("unexpected result of release: [succeeded=%v]", !test.expectSuccess)
 			}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,9 +104,19 @@ func (e *eventProcessor) stop() {
 // NewIndexerInformerWatcher will create an IndexerInformer and wrap it into watch.Interface
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
+//
+// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // NewIndexerInformerWatcherWithContext should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
 func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
+	return NewIndexerInformerWatcherWithContext(context.Background(), lw, objType)
+}
+
+// NewIndexerInformerWatcherWithContext will create an IndexerInformer and wrap it into watch.Interface
+// so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
+// it also returns a channel you can use to wait for the informers to fully shutdown.
+// The watcher will run until the context is done.
+func NewIndexerInformerWatcherWithContext(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	ch := make(chan watch.Event)
-	w := watch.NewProxyWatcher(ch)
+	w := watch.NewProxyWatcherWithContext(ctx, ch)
 	e := newEventProcessor(ch)
 
 	indexer, informer := cache.NewIndexerInformer(lw, objType, 0, cache.ResourceEventHandlerFuncs{
@@ -143,7 +154,7 @@ func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (
 	go func() {
 		defer close(doneCh)
 		defer e.stop()
-		informer.Run(w.StopChan())
+		informer.RunWithContext(w.Context())
 	}()
 
 	return indexer, informer, w, doneCh

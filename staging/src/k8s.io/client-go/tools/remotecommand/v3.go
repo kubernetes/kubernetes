@@ -17,12 +17,13 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -42,9 +43,9 @@ func newStreamProtocolV3(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV3) createStreams(conn streamCreator) error {
+func (p *streamProtocolV3) createStreams(ctx context.Context, conn streamCreator) error {
 	// set up the streams from v2
-	if err := p.streamProtocolV2.createStreams(conn); err != nil {
+	if err := p.streamProtocolV2.createStreams(ctx, conn); err != nil {
 		return err
 	}
 
@@ -53,7 +54,7 @@ func (p *streamProtocolV3) createStreams(conn streamCreator) error {
 		headers := http.Header{}
 		headers.Set(v1.StreamType, v1.StreamTypeResize)
 		var err error
-		p.resizeStream, err = conn.CreateStream(headers)
+		p.resizeStream, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -62,12 +63,12 @@ func (p *streamProtocolV3) createStreams(conn streamCreator) error {
 	return nil
 }
 
-func (p *streamProtocolV3) handleResizes() {
+func (p *streamProtocolV3) handleResizes(ctx context.Context) {
 	if p.resizeStream == nil || p.TerminalSizeQueue == nil {
 		return
 	}
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 
 		encoder := json.NewEncoder(p.resizeStream)
 		for {
@@ -76,28 +77,28 @@ func (p *streamProtocolV3) handleResizes() {
 				return
 			}
 			if err := encoder.Encode(&size); err != nil {
-				runtime.HandleError(err)
+				runtime.HandleErrorWithContext(ctx, err, "Encode new terminal size")
 			}
 		}
 	}()
 }
 
-func (p *streamProtocolV3) stream(conn streamCreator) error {
-	if err := p.createStreams(conn); err != nil {
+func (p *streamProtocolV3) stream(ctx context.Context, conn streamCreator) error {
+	if err := p.createStreams(ctx, conn); err != nil {
 		return err
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
 
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV3{})
+	errorChan := watchErrorStream(ctx, p.errorStream, &errorDecoderV3{})
 
-	p.handleResizes()
+	p.handleResizes(ctx)
 
-	p.copyStdin()
+	p.copyStdin(ctx)
 
 	var wg sync.WaitGroup
-	p.copyStdout(&wg)
-	p.copyStderr(&wg)
+	p.copyStdout(ctx, &wg)
+	p.copyStderr(ctx, &wg)
 
 	// we're waiting for stdout/stderr to finish copying
 	wg.Wait()

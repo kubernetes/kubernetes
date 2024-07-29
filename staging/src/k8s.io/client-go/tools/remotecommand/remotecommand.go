@@ -50,9 +50,9 @@ type Executor interface {
 }
 
 type streamCreator interface {
-	CreateStream(headers http.Header) (httpstream.Stream, error)
+	createStream(ctx context.Context, headers http.Header) (httpstream.Stream, error)
 }
 
 type streamProtocolHandler interface {
-	stream(conn streamCreator) error
+	stream(ctx context.Context, conn streamCreator) error
 }

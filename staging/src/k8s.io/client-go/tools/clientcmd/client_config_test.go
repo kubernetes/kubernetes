@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestMergoSemantics(t *testing.T) {
@@ -890,6 +891,7 @@ func TestNamespaceOverride(t *testing.T) {
 }
 
 func TestAuthConfigMerge(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	content := `
 apiVersion: v1
 clusters:
@@ -928,7 +930,7 @@ users:
 	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0666); err != nil {
 		t.Error(err)
 	}
-	config, err := BuildConfigFromFlags("", tmpfile.Name())
+	config, err := BuildConfigFromFlagsWithContext(ctx, "", tmpfile.Name())
 	if err != nil {
 		t.Error(err)
 	}

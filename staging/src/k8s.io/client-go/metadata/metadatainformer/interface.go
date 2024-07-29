@@ -17,6 +17,8 @@ limitations under the License.
 package metadatainformer
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
@@ -26,6 +28,8 @@ import (
 type SharedInformerFactory interface {
 	// Start initializes all requested informers. They are handled in goroutines
 	// which run until the stop channel gets closed.
+	//
+	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
 	Start(stopCh <-chan struct{})
 
 	// ForResource gives generic access to a shared informer of the matching type.
@@ -33,6 +37,7 @@ type SharedInformerFactory interface {
 
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
+	// TODO (https://github.com/kubernetes/kubernetes/issues/126379): logcheck:context // WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging.
 	WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool
 
 	// Shutdown marks a factory as shutting down. At that point no new
@@ -41,6 +46,34 @@ type SharedInformerFactory interface {
 	//
 	// In addition, Shutdown blocks until all goroutines have terminated. For that
 	// to happen, the close channel(s) that they were started with must be closed,
+	// either before Shutdown gets called or while it is waiting.
+	//
+	// Shutdown may be called multiple times, even concurrently. All such calls will
+	// block until all goroutines have terminated.
+	Shutdown()
+}
+
+// SharedInformerFactory provides access to a shared informer and lister for dynamic client
+type SharedInformerFactoryWithContext interface {
+	SharedInformerFactory
+
+	// StartWithContext initializes all requested informers. They are handled in goroutines
+	// which run until the context gets canceled.
+	StartWithContext(ctx context.Context)
+
+	// ForResource gives generic access to a shared informer of the matching type.
+	ForResource(gvr schema.GroupVersionResource) informers.GenericInformer
+
+	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced
+	// or the context gets canceled.
+	WaitForCacheSyncWithContext(ctx context.Context) map[schema.GroupVersionResource]bool
+
+	// Shutdown marks a factory as shutting down. At that point no new
+	// informers can be started anymore and Start will return without
+	// doing anything.
+	//
+	// In addition, Shutdown blocks until all goroutines have terminated. For that
+	// to happen, the contexts that they were started with must be canceled,
 	// either before Shutdown gets called or while it is waiting.
 	//
 	// Shutdown may be called multiple times, even concurrently. All such calls will

@@ -130,7 +130,8 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 	}
 	defer conn.Close()
 	e.negotiated = conn.Subprotocol()
-	klog.V(4).Infof("The subprotocol is %s", e.negotiated)
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Negotiated stream subprotocol", "protocol", e.negotiated)
 
 	var streamer streamProtocolHandler
 	switch e.negotiated {
@@ -143,7 +144,7 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 	case remotecommand.StreamProtocolV2Name:
 		streamer = newStreamProtocolV2(options)
 	case "":
-		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		logger.V(4).Info("The server did not negotiate a streaming protocol version, falling back to initial version", "streamProtocol", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
 		streamer = newStreamProtocolV1(options)
@@ -159,11 +160,12 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 		}()
 		creator := newWSStreamCreator(conn)
 		go creator.readDemuxLoop(
+			ctx,
 			e.upgrader.DataBufferSize(),
 			e.heartbeatPeriod,
 			e.heartbeatDeadline,
 		)
-		errorChan <- streamer.stream(creator)
+		errorChan <- streamer.stream(ctx, creator)
 	}()
 
 	select {
@@ -213,7 +215,7 @@ func (c *wsStreamCreator) setStream(id byte, s *stream) error {
 
 // CreateStream uses id from passed headers to create a stream over "c.conn" connection.
 // Returns a Stream structure or nil and an error if one occurred.
-func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
+func (c *wsStreamCreator) createStream(ctx context.Context, headers http.Header) (httpstream.Stream, error) {
 	streamType := headers.Get(v1.StreamType)
 	id, ok := streamType2streamID[streamType]
 	if !ok {
@@ -230,6 +232,7 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 		conn:          c.conn,
 		connWriteLock: &c.connWriteLock,
 		id:            id,
+		logger:        klog.LoggerWithValues(klog.FromContext(ctx), "streamID", id),
 	}
 	if err := c.setStream(id, s); err != nil {
 		_ = s.writePipe.Close()
@@ -244,12 +247,12 @@ func (c *wsStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, 
 // into one of the individual stream pipes (by checking the stream id). This
 // loop can *not* be run concurrently, because there can only be one websocket
 // connection reader at a time (a read mutex would provide no benefit).
-func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, deadline time.Duration) {
+func (c *wsStreamCreator) readDemuxLoop(ctx context.Context, bufferSize int, period time.Duration, deadline time.Duration) {
 	// Initialize and start the ping/pong heartbeat.
-	h := newHeartbeat(c.conn, period, deadline)
+	h := newHeartbeat(ctx, c.conn, period, deadline)
 	// Set initial timeout for websocket connection reading.
 	if err := c.conn.SetReadDeadline(time.Now().Add(deadline)); err != nil {
-		klog.Errorf("Websocket initial setting read deadline failed %v", err)
+		klog.FromContext(ctx).Error(err, "Websocket initial setting read deadline failed")
 		return
 	}
 	go h.start()
@@ -293,7 +296,7 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 		streamID := readBuffer[0]
 		s := c.getStream(streamID)
 		if s == nil {
-			klog.Errorf("Unknown stream id %d, discarding message", streamID)
+			klog.FromContext(ctx).Info("Unknown stream id, discarding message", "id", streamID)
 			continue
 		}
 		for {
@@ -336,6 +339,9 @@ func (c *wsStreamCreator) closeAllStreamReaders(err error) {
 }
 
 type stream struct {
+	// logger includes the stream ID as additional value if (and only if!) contextual logging is enabled.
+	// TODO (once contextual logging is GA): remove the redundant "streamID" parameter in log calls.
+	logger    klog.Logger
 	headers   http.Header
 	readPipe  *io.PipeReader
 	writePipe *io.PipeWriter
@@ -354,8 +360,9 @@ func (s *stream) Read(p []byte) (n int, err error) {
 
 // Write writes directly to the underlying WebSocket connection.
 func (s *stream) Write(p []byte) (n int, err error) {
-	klog.V(4).Infof("Write() on stream %d", s.id)
-	defer klog.V(4).Infof("Write() done on stream %d", s.id)
+
+	s.logger.V(4).Info("Write()", "streamID", s.id)
+	defer s.logger.V(4).Info("Write() done", "streamID", s.id)
 	s.connWriteLock.Lock()
 	defer s.connWriteLock.Unlock()
 	if s.conn == nil {
@@ -363,7 +370,7 @@ func (s *stream) Write(p []byte) (n int, err error) {
 	}
 	err = s.conn.SetWriteDeadline(time.Now().Add(writeDeadline))
 	if err != nil {
-		klog.V(7).Infof("Websocket setting write deadline failed %v", err)
+		s.logger.V(7).Info("Websocket setting write deadline failed", "err", err)
 		return 0, err
 	}
 	// Message writer buffers the message data, so we don't need to do that ourselves.
@@ -392,8 +399,8 @@ func (s *stream) Write(p []byte) (n int, err error) {
 
 // Close half-closes the stream, indicating this side is finished with the stream.
 func (s *stream) Close() error {
-	klog.V(4).Infof("Close() on stream %d", s.id)
-	defer klog.V(4).Infof("Close() done on stream %d", s.id)
+	s.logger.V(4).Info("Close()", "streamID", s.id)
+	defer s.logger.V(4).Info("Close() done", "streamID", s.id)
 	s.connWriteLock.Lock()
 	defer s.connWriteLock.Unlock()
 	if s.conn == nil {
@@ -406,8 +413,8 @@ func (s *stream) Close() error {
 }
 
 func (s *stream) Reset() error {
-	klog.V(4).Infof("Reset() on stream %d", s.id)
-	defer klog.V(4).Infof("Reset() done on stream %d", s.id)
+	s.logger.V(4).Info("Reset()", "streamID", s.id)
+	defer s.logger.V(4).Info("Reset() done", "streamID", s.id)
 	s.Close()
 	return s.writePipe.Close()
 }
@@ -436,26 +443,30 @@ type heartbeat struct {
 	message []byte
 	// optionally received data message with "pong" message, same as sent with ping
 	pongMessage []byte
+	// logger is used by the heartbeat instance for logging.
+	logger klog.Logger
 }
 
 // newHeartbeat creates heartbeat structure encapsulating fields necessary to
 // run the websocket connection ping/pong mechanism and sets up handlers on
 // the websocket connection.
-func newHeartbeat(conn *gwebsocket.Conn, period time.Duration, deadline time.Duration) *heartbeat {
+func newHeartbeat(ctx context.Context, conn *gwebsocket.Conn, period time.Duration, deadline time.Duration) *heartbeat {
+	logger := klog.FromContext(ctx)
 	h := &heartbeat{
 		conn:   conn,
 		period: period,
 		closer: make(chan struct{}),
+		logger: logger,
 	}
 	// Set up handler for receiving returned "pong" message from other endpoint
 	// by pushing the read deadline into the future. The "msg" received could
 	// be empty.
 	h.conn.SetPongHandler(func(msg string) error {
 		// Push the read deadline into the future.
-		klog.V(8).Infof("Pong message received (%s)--resetting read deadline", msg)
+		logger.V(8).Info("Pong message received -- resetting read deadline", "msg", msg)
 		err := h.conn.SetReadDeadline(time.Now().Add(deadline))
 		if err != nil {
-			klog.Errorf("Websocket setting read deadline failed %v", err)
+			logger.Error(err, "Websocket setting read deadline failed")
 			return err
 		}
 		if len(msg) > 0 {
@@ -487,16 +498,16 @@ func (h *heartbeat) start() {
 	for {
 		select {
 		case <-h.closer:
-			klog.V(8).Infof("closed channel--returning")
+			h.logger.V(8).Info("Closed channel--returning")
 			return
 		case <-t.C:
 			// "WriteControl" does not need to be protected by a mutex. According to
 			// gorilla/websockets library docs: "The Close and WriteControl methods can
 			// be called concurrently with all other methods."
 			if err := h.conn.WriteControl(gwebsocket.PingMessage, h.message, time.Now().Add(pingReadDeadline)); err == nil {
-				klog.V(8).Infof("Websocket Ping succeeeded")
+				h.logger.V(8).Info("Websocket Ping succeeeded")
 			} else {
-				klog.Errorf("Websocket Ping failed: %v", err)
+				h.logger.Error(err, "Websocket Ping failed")
 				if errors.Is(err, gwebsocket.ErrCloseSent) {
 					// we continue because c.conn.CloseChan will manage closing the connection already
 					continue

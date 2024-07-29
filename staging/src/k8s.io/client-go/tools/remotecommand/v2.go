@@ -17,12 +17,13 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -47,13 +48,13 @@ func newStreamProtocolV2(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV2) createStreams(conn streamCreator) error {
+func (p *streamProtocolV2) createStreams(ctx context.Context, conn streamCreator) error {
 	var err error
 	headers := http.Header{}
 
 	// set up error stream
 	headers.Set(v1.StreamType, v1.StreamTypeError)
-	p.errorStream, err = conn.CreateStream(headers)
+	p.errorStream, err = conn.createStream(ctx, headers)
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	// set up stdin stream
 	if p.Stdin != nil {
 		headers.Set(v1.StreamType, v1.StreamTypeStdin)
-		p.remoteStdin, err = conn.CreateStream(headers)
+		p.remoteStdin, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -70,7 +71,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	// set up stdout stream
 	if p.Stdout != nil {
 		headers.Set(v1.StreamType, v1.StreamTypeStdout)
-		p.remoteStdout, err = conn.CreateStream(headers)
+		p.remoteStdout, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	// set up stderr stream
 	if p.Stderr != nil && !p.Tty {
 		headers.Set(v1.StreamType, v1.StreamTypeStderr)
-		p.remoteStderr, err = conn.CreateStream(headers)
+		p.remoteStderr, err = conn.createStream(ctx, headers)
 		if err != nil {
 			return err
 		}
@@ -87,13 +88,13 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	return nil
 }
 
-func (p *streamProtocolV2) copyStdin() {
+func (p *streamProtocolV2) copyStdin(ctx context.Context) {
 	if p.Stdin != nil {
 		var once sync.Once
 
 		// copy from client's stdin to container's stdin
 		go func() {
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 
 			// if p.stdin is noninteractive, p.g. `echo abc | kubectl exec -i <pod> -- cat`, make sure
 			// we close remoteStdin as soon as the copy from p.stdin to remoteStdin finishes. Otherwise
@@ -101,7 +102,7 @@ func (p *streamProtocolV2) copyStdin() {
 			defer once.Do(func() { p.remoteStdin.Close() })
 
 			if _, err := io.Copy(p.remoteStdin, readerWrapper{p.Stdin}); err != nil {
-				runtime.HandleError(err)
+				runtime.HandleErrorWithContext(ctx, err, "Copying stdin")
 			}
 		}()
 
@@ -120,26 +121,26 @@ func (p *streamProtocolV2) copyStdin() {
 		// When that happens, we must Close() on our side of remoteStdin, to
 		// allow the copy in hijack to complete, and hijack to return.
 		go func() {
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			defer once.Do(func() { p.remoteStdin.Close() })
 
 			// this "copy" doesn't actually read anything - it's just here to wait for
 			// the server to close remoteStdin.
 			if _, err := io.Copy(io.Discard, p.remoteStdin); err != nil {
-				runtime.HandleError(err)
+				runtime.HandleErrorWithContext(ctx, err, "waiting for server to close remote stdin")
 			}
 		}()
 	}
 }
 
-func (p *streamProtocolV2) copyStdout(wg *sync.WaitGroup) {
+func (p *streamProtocolV2) copyStdout(ctx context.Context, wg *sync.WaitGroup) {
 	if p.Stdout == nil {
 		return
 	}
 
 	wg.Add(1)
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 		defer wg.Done()
 		// make sure, packet in queue can be consumed.
 		// block in queue may lead to deadlock in conn.server
@@ -147,42 +148,42 @@ func (p *streamProtocolV2) copyStdout(wg *sync.WaitGroup) {
 		defer io.Copy(io.Discard, p.remoteStdout)
 
 		if _, err := io.Copy(p.Stdout, p.remoteStdout); err != nil {
-			runtime.HandleError(err)
+			runtime.HandleErrorWithContext(ctx, err, "Copying stdout")
 		}
 	}()
 }
 
-func (p *streamProtocolV2) copyStderr(wg *sync.WaitGroup) {
+func (p *streamProtocolV2) copyStderr(ctx context.Context, wg *sync.WaitGroup) {
 	if p.Stderr == nil || p.Tty {
 		return
 	}
 
 	wg.Add(1)
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 		defer wg.Done()
 		defer io.Copy(io.Discard, p.remoteStderr)
 
 		if _, err := io.Copy(p.Stderr, p.remoteStderr); err != nil {
-			runtime.HandleError(err)
+			runtime.HandleErrorWithContext(ctx, err, "Copying stderr")
 		}
 	}()
 }
 
-func (p *streamProtocolV2) stream(conn streamCreator) error {
-	if err := p.createStreams(conn); err != nil {
+func (p *streamProtocolV2) stream(ctx context.Context, conn streamCreator) error {
+	if err := p.createStreams(ctx, conn); err != nil {
 		return err
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
 
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV2{})
+	errorChan := watchErrorStream(ctx, p.errorStream, &errorDecoderV2{})
 
-	p.copyStdin()
+	p.copyStdin(ctx)
 
 	var wg sync.WaitGroup
-	p.copyStdout(&wg)
-	p.copyStderr(&wg)
+	p.copyStdout(ctx, &wg)
+	p.copyStderr(ctx, &wg)
 
 	// we're waiting for stdout/stderr to finish copying
 	wg.Wait()

@@ -17,6 +17,7 @@ limitations under the License.
 package events
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -83,7 +84,8 @@ func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Objec
 	}
 	event := recorder.makeEvent(refRegarding, refRelated, timestamp, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
 	go func() {
-		defer utilruntime.HandleCrash()
+		ctx := klog.NewContext(context.Background(), logger)
+		defer utilruntime.HandleCrashWithContext(ctx)
 		recorder.Action(watch.Added, event)
 	}()
 }

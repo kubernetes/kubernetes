@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/metadata"
@@ -44,13 +45,13 @@ func WithTransform(transform cache.TransformFunc) SharedInformerOption {
 }
 
 // NewSharedInformerFactory constructs a new instance of metadataSharedInformerFactory for all namespaces.
-func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactory {
+func NewSharedInformerFactory(client metadata.Interface, defaultResync time.Duration) SharedInformerFactoryWithContext {
 	return NewFilteredSharedInformerFactory(client, defaultResync, metav1.NamespaceAll, nil)
 }
 
 // NewFilteredSharedInformerFactory constructs a new instance of metadataSharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
-func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SharedInformerFactory {
+func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SharedInformerFactoryWithContext {
 	return &metadataSharedInformerFactory{
 		client:           client,
 		defaultResync:    defaultResync,
@@ -62,7 +63,7 @@ func NewFilteredSharedInformerFactory(client metadata.Interface, defaultResync t
 }
 
 // NewSharedInformerFactoryWithOptions constructs a new instance of metadataSharedInformerFactory with additional options.
-func NewSharedInformerFactoryWithOptions(client metadata.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
+func NewSharedInformerFactoryWithOptions(client metadata.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactoryWithContext {
 	factory := &metadataSharedInformerFactory{
 		client:           client,
 		namespace:        v1.NamespaceAll,
@@ -99,6 +100,7 @@ type metadataSharedInformerFactory struct {
 }
 
 var _ SharedInformerFactory = &metadataSharedInformerFactory{}
+var _ SharedInformerFactoryWithContext = &metadataSharedInformerFactory{}
 
 func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResource) informers.GenericInformer {
 	f.lock.Lock()
@@ -119,6 +121,11 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 
 // Start initializes all requested informers.
 func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
+	f.StartWithContext(wait.ContextForChannel(stopCh))
+}
+
+// Start initializes all requested informers.
+func (f *metadataSharedInformerFactory) StartWithContext(ctx context.Context) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -135,7 +142,7 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 			informer := informer.Informer()
 			go func() {
 				defer f.wg.Done()
-				informer.Run(stopCh)
+				informer.RunWithContext(ctx)
 			}()
 			f.startedInformers[informerType] = true
 		}
@@ -144,6 +151,11 @@ func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 // WaitForCacheSync waits for all started informers' cache were synced.
 func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[schema.GroupVersionResource]bool {
+	return f.WaitForCacheSyncWithContext(wait.ContextForChannel(stopCh))
+}
+
+// WaitForCacheSync waits for all started informers' cache were synced.
+func (f *metadataSharedInformerFactory) WaitForCacheSyncWithContext(ctx context.Context) map[schema.GroupVersionResource]bool {
 	informers := func() map[schema.GroupVersionResource]cache.SharedIndexInformer {
 		f.lock.Lock()
 		defer f.lock.Unlock()
@@ -159,7 +171,7 @@ func (f *metadataSharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{})
 
 	res := map[schema.GroupVersionResource]bool{}
 	for informType, informer := range informers {
-		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
+		res[informType] = cache.WaitForCacheSync(ctx.Done(), informer.HasSynced)
 	}
 	return res
 }

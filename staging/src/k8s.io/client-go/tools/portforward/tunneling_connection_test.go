@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -36,9 +37,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/websocket"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// Stream channel that will receive streams created on upstream SPDY server.
 	streamChan := make(chan httpstream.Stream)
 	defer close(streamChan)
@@ -54,7 +57,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 		require.NoError(t, err)
 		defer conn.Close() //nolint:errcheck
 		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
-		tunnelingConn := NewTunnelingConnection("server", conn)
+		tunnelingConn := NewTunnelingConnectionWithContext(ctx, "server", conn)
 		spdyConn, err := spdy.NewServerConnection(tunnelingConn, justQueueStream(streamChan))
 		require.NoError(t, err)
 		defer spdyConn.Close() //nolint:errcheck
@@ -64,7 +67,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 	// Dial the client tunneling connection to the tunneling server.
 	url, err := url.Parse(tunnelingServer.URL)
 	require.NoError(t, err)
-	dialer, err := NewSPDYOverWebsocketDialer(url, &rest.Config{Host: url.Host})
+	dialer, err := NewSPDYOverWebsocketDialerWithContext(ctx, url, &rest.Config{Host: url.Host})
 	require.NoError(t, err)
 	spdyClient, protocol, err := dialer.Dial(constants.PortForwardV1Name)
 	require.NoError(t, err)
@@ -94,6 +97,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 }
 
 func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stopServerChan := make(chan struct{})
 	defer close(stopServerChan)
 	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -111,7 +115,7 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 	// Create the client side tunneling connection.
 	url, err := url.Parse(tunnelingServer.URL)
 	require.NoError(t, err)
-	tConn, err := dialForTunnelingConnection(url)
+	tConn, err := dialForTunnelingConnection(ctx, url)
 	require.NoError(t, err, "error creating client tunneling connection")
 	defer tConn.Close() //nolint:errcheck
 	// Validate "LocalAddr()" and "RemoteAddr()"
@@ -126,6 +130,7 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 }
 
 func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	stopServerChan := make(chan struct{})
 	defer close(stopServerChan)
 	tunnelingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -143,7 +148,7 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 	// Create the client side tunneling connection.
 	url, err := url.Parse(tunnelingServer.URL)
 	require.NoError(t, err)
-	tConn, err := dialForTunnelingConnection(url)
+	tConn, err := dialForTunnelingConnection(ctx, url)
 	require.NoError(t, err, "error creating client tunneling connection")
 	defer tConn.Close() //nolint:errcheck
 	// Validate the read and write deadlines.
@@ -164,7 +169,7 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 // dialForTunnelingConnection upgrades a request at the passed "url", creating
 // a websocket connection. Returns the TunnelingConnection injected with the
 // websocket connection or an error if one occurs.
-func dialForTunnelingConnection(url *url.URL) (*TunnelingConnection, error) {
+func dialForTunnelingConnection(ctx context.Context, url *url.URL) (*TunnelingConnection, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
@@ -179,7 +184,7 @@ func dialForTunnelingConnection(url *url.URL) (*TunnelingConnection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewTunnelingConnection("client", conn), nil
+	return NewTunnelingConnectionWithContext(ctx, "client", conn), nil
 }
 
 func justQueueStream(streams chan httpstream.Stream) func(httpstream.Stream, <-chan struct{}) error {

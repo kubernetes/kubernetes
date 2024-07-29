@@ -26,6 +26,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -124,28 +126,19 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 
 func TestToleratingMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
+	var warningErr error
 	loadingRules := ClientConfigLoadingRules{
 		Precedence:       []string{"bogus1", "bogus2", "bogus3"},
 		WarnIfAllMissing: true,
-		Warner:           func(err error) { klog.Warning(err) },
+		Warner:           func(err error) { warningErr = err },
 	}
-
-	buffer := &bytes.Buffer{}
-
-	klog.LogToStderr(false)
-	klog.SetOutput(buffer)
 
 	_, err := loadingRules.Load()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	klog.Flush()
-	expectedLog := fmt.Sprintf("Config not found: %s", envVarValue)
-	if !strings.Contains(buffer.String(), expectedLog) {
-		t.Fatalf("expected log: \"%s\"", expectedLog)
-	}
+	require.NoError(t, err, "load config")
+	require.ErrorContains(t, warningErr, fmt.Sprintf("Config not found: %s", envVarValue))
 }
 
+//nolint:logcheck // This test intentionally uses non-context APIs.
 func TestWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
@@ -171,6 +164,7 @@ func TestWarningMissingFiles(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // This test intentionally uses non-context APIs.
 func TestNoWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)

@@ -352,7 +352,7 @@ func TestStreamExitsAfterConnectionIsClosed(t *testing.T) {
 
 	errorChan := make(chan error)
 	go func() {
-		errorChan <- streamer.stream(conn)
+		errorChan <- streamer.stream(ctx, spdyStreamCreator{conn: conn})
 	}()
 
 	// Wait until stream goroutine starts.

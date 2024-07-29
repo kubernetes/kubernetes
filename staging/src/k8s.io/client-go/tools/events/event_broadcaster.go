@@ -314,6 +314,8 @@ func getKey(event *eventsv1.Event) eventKey {
 // TODO: this function should also return an error.
 //
 // Deprecated: use StartLogging instead.
+//
+//logcheck:context // StartLogging should be used instead of StartStructuredLogging in code which supports contextual logging.
 func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func() {
 	logger := klog.Background().V(int(verbosity))
 	stopWatcher, err := e.StartLogging(logger)
@@ -328,7 +330,8 @@ func (e *eventBroadcasterImpl) StartStructuredLogging(verbosity klog.Level) func
 // To adjust verbosity, use the logger's V method (i.e. pass `logger.V(3)` instead of `logger`).
 // The returned function can be ignored or used to stop recording, if desired.
 func (e *eventBroadcasterImpl) StartLogging(logger klog.Logger) (func(), error) {
-	return e.StartEventWatcher(
+	return e.StartEventWatcherWithContext(
+		klog.NewContext(context.Background(), logger),
 		func(obj runtime.Object) {
 			event, ok := obj.(*eventsv1.Event)
 			if !ok {
@@ -341,19 +344,31 @@ func (e *eventBroadcasterImpl) StartLogging(logger klog.Logger) (func(), error) 
 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
+//
+// TODO: logcheck:context // StartEventWatcherWithContext should be used instead of StartEventWatcher in code which supports contextual logging.
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) (func(), error) {
+	return e.StartEventWatcherWithContext(context.Background(), eventHandler)
+}
+
+// StartEventWatcherWithContext starts sending events received from this EventBroadcaster to the given event handler function.
+// The return value is used to stop recording. Alternatively, the context can be used to stop.
+func (e *eventBroadcasterImpl) StartEventWatcherWithContext(ctx context.Context, eventHandler func(event runtime.Object)) (func(), error) {
 	watcher, err := e.Watch()
 	if err != nil {
 		return nil, err
 	}
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		for {
-			watchEvent, ok := <-watcher.ResultChan()
-			if !ok {
+			select {
+			case <-ctx.Done():
 				return
+			case watchEvent, ok := <-watcher.ResultChan():
+				if !ok {
+					return
+				}
+				eventHandler(watchEvent.Object)
 			}
-			eventHandler(watchEvent.Object)
 		}
 	}()
 	return watcher.Stop, nil
@@ -368,7 +383,7 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 		}
 		e.recordToSink(ctx, event, clock.RealClock{})
 	}
-	stopWatcher, err := e.StartEventWatcher(eventHandler)
+	stopWatcher, err := e.StartEventWatcherWithContext(ctx, eventHandler)
 	if err != nil {
 		return err
 	}
@@ -381,6 +396,8 @@ func (e *eventBroadcasterImpl) startRecordingEvents(ctx context.Context) error {
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // Deprecated: use StartRecordingToSinkWithContext instead.
+//
+//logcheck:context
 func (e *eventBroadcasterImpl) StartRecordingToSink(stopCh <-chan struct{}) {
 	err := e.StartRecordingToSinkWithContext(wait.ContextForChannel(stopCh))
 	if err != nil {

@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestWebSocketClient_LoopbackStdinToStdout returns random data sent on the STDIN channel
@@ -1046,6 +1047,7 @@ func TestWebSocketClient_ExecutorErrors(t *testing.T) {
 }
 
 func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	var upgrader = gwebsocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // Accepting all requests
@@ -1078,7 +1080,7 @@ func TestWebSocketClient_HeartbeatSucceeds(t *testing.T) {
 	var expectedMsg = "test heartbeat message"
 	var period = 100 * time.Millisecond
 	var deadline = 200 * time.Millisecond
-	heartbeat := newHeartbeat(client, period, deadline)
+	heartbeat := newHeartbeat(ctx, client, period, deadline)
 	heartbeat.setMessage(expectedMsg)
 	// Add a channel to the handler to retrieve the "pong" message.
 	pongMsgCh := make(chan string)
@@ -1126,11 +1128,13 @@ func TestLateStreamCreation(t *testing.T) {
 }
 
 func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
 	// Validate Stream functions.
 	c := newWSStreamCreator(nil)
 	headers := http.Header{}
 	headers.Set(v1.StreamType, v1.StreamTypeStdin)
-	s, err := c.CreateStream(headers)
+	s, err := c.createStream(ctx, headers)
 	if err != nil {
 		t.Errorf("unexpected stream creation error: %v", err)
 	}
@@ -1170,7 +1174,7 @@ func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
 	// Validate CreateStream errors -- unknown stream
 	headers = http.Header{}
 	headers.Set(v1.StreamType, "UNKNOWN")
-	_, err = c.CreateStream(headers)
+	_, err = c.createStream(ctx, headers)
 	if err == nil {
 		t.Errorf("expecting CreateStream error, but received none")
 	} else if !strings.Contains(err.Error(), "unknown stream type") {
@@ -1179,7 +1183,7 @@ func TestWebSocketClient_StreamsAndExpectedErrors(t *testing.T) {
 	// Validate CreateStream errors -- duplicate stream
 	headers.Set(v1.StreamType, v1.StreamTypeError)
 	c.streams[remotecommand.StreamErr] = &stream{}
-	_, err = c.CreateStream(headers)
+	_, err = c.createStream(ctx, headers)
 	if err == nil {
 		t.Errorf("expecting CreateStream error, but received none")
 	} else if !strings.Contains(err.Error(), "duplicate stream") {

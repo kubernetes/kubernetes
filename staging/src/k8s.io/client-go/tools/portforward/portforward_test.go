@@ -18,6 +18,8 @@ package portforward
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,6 +34,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type fakeDialer struct {
@@ -294,14 +297,14 @@ func TestParsePortsAndNew(t *testing.T) {
 		}
 
 		dialer := &fakeDialer{}
-		expectedStopChan := make(chan struct{})
+		_, ctx := ktesting.NewTestContext(t)
 		readyChan := make(chan struct{})
 
 		var pf *PortForwarder
 		if len(test.addresses) > 0 {
-			pf, err = NewOnAddresses(dialer, test.addresses, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
+			pf, err = NewOnAddressesWithContext(ctx, dialer, test.addresses, test.input, readyChan, os.Stdout, os.Stderr)
 		} else {
-			pf, err = New(dialer, test.input, expectedStopChan, readyChan, os.Stdout, os.Stderr)
+			pf, err = NewWithContext(ctx, dialer, test.input, readyChan, os.Stdout, os.Stderr)
 		}
 		haveError = err != nil
 		if e, a := test.expectNewError, haveError; e != a {
@@ -343,7 +346,7 @@ func TestParsePortsAndNew(t *testing.T) {
 		} else if !reflect.DeepEqual(test.expectedPorts, ports) {
 			t.Fatalf("%d: ports: expected %#v, got %#v", i, test.expectedPorts, ports)
 		}
-		if e, a := expectedStopChan, pf.stopChan; e != a {
+		if e, a := ctx.Done(), pf.ctx.Done(); e != a {
 			t.Fatalf("%d: stopChan: expected %#v, got %#v", i, e, a)
 		}
 		if pf.Ready == nil {
@@ -429,17 +432,18 @@ func TestGetListener(t *testing.T) {
 }
 
 func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	dialer := &fakeDialer{
 		conn:               newFakeConnection(),
 		negotiatedProtocol: PortForwardProtocolV1Name,
 	}
 
-	stopChan := make(chan struct{})
+	ctx, cancel := context.WithCancelCause(ctx)
 	readyChan := make(chan struct{})
 	errChan := make(chan error)
 
 	defer func() {
-		close(stopChan)
+		cancel(errors.New("test completed"))
 
 		forwardErr := <-errChan
 		if forwardErr != nil {
@@ -447,7 +451,7 @@ func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
 		}
 	}()
 
-	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	pf, err := NewWithContext(ctx, dialer, []string{":5000"}, readyChan, os.Stdout, os.Stderr)
 
 	if err != nil {
 		t.Fatalf("error while calling New: %s", err)
@@ -476,9 +480,10 @@ func TestGetPortsReturnsDynamicallyAssignedLocalPort(t *testing.T) {
 }
 
 func TestHandleConnection(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	out := bytes.NewBufferString("")
 
-	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, nil)
+	pf, err := NewWithContext(ctx, &fakeDialer{}, []string{":2222"}, nil, out, nil)
 	if err != nil {
 		t.Fatalf("error while calling New: %s", err)
 	}
@@ -518,10 +523,11 @@ func TestHandleConnection(t *testing.T) {
 }
 
 func TestHandleConnectionSendsRemoteError(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	out := bytes.NewBufferString("")
 	errOut := bytes.NewBufferString("")
 
-	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, errOut)
+	pf, err := NewWithContext(ctx, &fakeDialer{}, []string{":2222"}, nil, out, errOut)
 	if err != nil {
 		t.Fatalf("error while calling New: %s", err)
 	}
@@ -552,10 +558,11 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 }
 
 func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	out := bytes.NewBufferString("")
 	errOut := bytes.NewBufferString("")
 
-	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, errOut)
+	pf, err := NewWithContext(ctx, &fakeDialer{}, []string{":2222"}, nil, out, errOut)
 	if err != nil {
 		t.Fatalf("error while calling New: %s", err)
 	}
@@ -570,16 +577,18 @@ func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
 }
 
 func TestForwardPortsReturnsErrorWhenConnectionIsLost(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	dialer := &fakeDialer{
 		conn:               newFakeConnection(),
 		negotiatedProtocol: PortForwardProtocolV1Name,
 	}
 
-	stopChan := make(chan struct{})
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test completed"))
 	readyChan := make(chan struct{})
 	errChan := make(chan error)
 
-	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	pf, err := NewWithContext(ctx, dialer, []string{":5000"}, readyChan, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("failed to create new PortForwarder: %s", err)
 	}
@@ -602,16 +611,18 @@ func TestForwardPortsReturnsErrorWhenConnectionIsLost(t *testing.T) {
 }
 
 func TestForwardPortsReturnsNilWhenStopChanIsClosed(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	dialer := &fakeDialer{
 		conn:               newFakeConnection(),
 		negotiatedProtocol: PortForwardProtocolV1Name,
 	}
 
-	stopChan := make(chan struct{})
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(errors.New("test completed"))
 	readyChan := make(chan struct{})
 	errChan := make(chan error)
 
-	pf, err := New(dialer, []string{":5000"}, stopChan, readyChan, os.Stdout, os.Stderr)
+	pf, err := NewWithContext(ctx, dialer, []string{":5000"}, readyChan, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("failed to create new PortForwarder: %s", err)
 	}
@@ -622,9 +633,9 @@ func TestForwardPortsReturnsNilWhenStopChanIsClosed(t *testing.T) {
 
 	<-pf.Ready
 
-	// Closing (or sending to) stopChan indicates a stop request by the caller, which should result in pf.ForwardPorts()
+	// Canceling the context indicates a stop request by the caller, which should result in pf.ForwardPorts()
 	// returning nil.
-	close(stopChan)
+	cancel(errors.New("testing stop"))
 
 	err = <-errChan
 	if err != nil {

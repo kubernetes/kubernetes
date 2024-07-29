@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -32,12 +33,14 @@ type errorStreamDecoder interface {
 // decodes it with the given errorStreamDecoder, sends the decoded error (or nil if the remote
 // command exited successfully) to the returned error channel, and closes it.
 // This function returns immediately.
-func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
+func watchErrorStream(ctx context.Context, errorStream io.Reader, d errorStreamDecoder) chan error {
 	errorChan := make(chan error)
 
 	go func() {
-		defer runtime.HandleCrash()
+		defer runtime.HandleCrashWithContext(ctx)
 
+		// TODO (once Go supports it): stop reading when context is canceled
+		// https://github.com/golang/go/issues/20280, https://github.com/golang/go/issues/67622
 		message, err := io.ReadAll(errorStream)
 		switch {
 		case err != nil && err != io.EOF:

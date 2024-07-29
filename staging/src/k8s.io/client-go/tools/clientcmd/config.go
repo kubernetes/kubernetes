@@ -488,10 +488,13 @@ func getConfigFromFile(filename string) (*clientcmdapi.Config, error) {
 	return config, nil
 }
 
-// GetConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit
+// GetConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit.
+//
+// Deprecated: LoadFromFile and k8s.io/client-go/tools/clientcmd/api.NewConfig should be used instead, with error handling implemented by the caller.
 func GetConfigFromFileOrDie(filename string) *clientcmdapi.Config {
 	config, err := getConfigFromFile(filename)
 	if err != nil {
+		//nolint:logcheck // Historic API that cannot be made context-aware.
 		klog.FatalDepth(1, err)
 	}
 

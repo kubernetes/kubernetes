@@ -16,6 +16,8 @@ limitations under the License.
 
 package remotecommand
 
+import "context"
+
 // streamProtocolV5 add support for V5 of the remote command subprotocol.
 // For the streamProtocolHandler, this version is the same as V4.
 type streamProtocolV5 struct {
@@ -30,6 +32,6 @@ func newStreamProtocolV5(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV5) stream(conn streamCreator) error {
-	return p.streamProtocolV4.stream(conn)
+func (p *streamProtocolV5) stream(ctx context.Context, conn streamCreator) error {
+	return p.streamProtocolV4.stream(ctx, conn)
 }

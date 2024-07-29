@@ -39,6 +39,7 @@ import (
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 )
 
 // TestEventProcessorExit is expected to timeout if the event processor fails
@@ -290,14 +291,15 @@ func TestNewInformerWatcher(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, tc.watchListFeatureEnabled)
+			_, ctx := ktesting.NewTestContext(t)
 
 			fake := fakeclientset.NewSimpleClientset(tc.objects...)
 			inputCh := make(chan watch.Event)
-			inputWatcher := watch.NewProxyWatcher(inputCh)
+			inputWatcher := watch.NewProxyWatcherWithContext(ctx, inputCh)
 			// Indexer should stop the input watcher when the output watcher is stopped.
 			// But stop it at the end of the test, just in case.
 			defer inputWatcher.Stop()
-			inputStopCh := inputWatcher.StopChan()
+			inputStopCtx := inputWatcher.Context()
 			fake.PrependWatchReactor("secrets", testcore.DefaultWatchReactor(inputWatcher, nil))
 			// Send events and then close the done channel
 			inputDoneCh := make(chan struct{})
@@ -306,7 +308,7 @@ func TestNewInformerWatcher(t *testing.T) {
 				for _, e := range tc.inputEvents {
 					select {
 					case inputCh <- e:
-					case <-inputStopCh:
+					case <-inputStopCtx.Done():
 						return
 					}
 				}
@@ -314,13 +316,13 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.CoreV1().Secrets("").List(context.TODO(), options)
+					return fake.CoreV1().Secrets("").List(ctx, options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.CoreV1().Secrets("").Watch(context.TODO(), options)
+					return fake.CoreV1().Secrets("").Watch(ctx, options)
 				},
 			}
-			_, _, outputWatcher, informerDoneCh := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+			_, _, outputWatcher, informerDoneCh := NewIndexerInformerWatcherWithContext(ctx, lw, &corev1.Secret{})
 			outputCh := outputWatcher.ResultChan()
 			timeoutCh := time.After(wait.ForeverTestTimeout)
 			var result []watch.Event
@@ -358,7 +360,7 @@ func TestNewInformerWatcher(t *testing.T) {
 				for _, e := range tc.inputEvents {
 					select {
 					case inputCh <- e:
-					case <-inputStopCh:
+					case <-inputStopCtx.Done():
 						return
 					}
 				}
@@ -384,6 +386,7 @@ func TestNewInformerWatcher(t *testing.T) {
 //
 // Code from @liggitt
 func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	listCalls := 0
 	watchCalls := 0
 	lw := &cache.ListWatch{
@@ -413,7 +416,7 @@ func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
 			return w, nil
 		},
 	}
-	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+	_, _, w, done := NewIndexerInformerWatcherWithContext(ctx, lw, &corev1.Secret{})
 	defer w.Stop()
 
 	// Expect secret add

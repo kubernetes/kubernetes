@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,30 +44,30 @@ func newStreamProtocolV4(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV4) createStreams(conn streamCreator) error {
-	return p.streamProtocolV3.createStreams(conn)
+func (p *streamProtocolV4) createStreams(ctx context.Context, conn streamCreator) error {
+	return p.streamProtocolV3.createStreams(ctx, conn)
 }
 
-func (p *streamProtocolV4) handleResizes() {
-	p.streamProtocolV3.handleResizes()
+func (p *streamProtocolV4) handleResizes(ctx context.Context) {
+	p.streamProtocolV3.handleResizes(ctx)
 }
 
-func (p *streamProtocolV4) stream(conn streamCreator) error {
-	if err := p.createStreams(conn); err != nil {
+func (p *streamProtocolV4) stream(ctx context.Context, conn streamCreator) error {
+	if err := p.createStreams(ctx, conn); err != nil {
 		return err
 	}
 
 	// now that all the streams have been created, proceed with reading & copying
 
-	errorChan := watchErrorStream(p.errorStream, &errorDecoderV4{})
+	errorChan := watchErrorStream(ctx, p.errorStream, &errorDecoderV4{})
 
-	p.handleResizes()
+	p.handleResizes(ctx)
 
-	p.copyStdin()
+	p.copyStdin(ctx)
 
 	var wg sync.WaitGroup
-	p.copyStdout(&wg)
-	p.copyStderr(&wg)
+	p.copyStdout(ctx, &wg)
+	p.copyStderr(ctx, &wg)
 
 	// we're waiting for stdout/stderr to finish copying
 	wg.Wait()

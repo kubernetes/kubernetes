@@ -17,6 +17,7 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func init() {
@@ -159,7 +161,8 @@ func TestNewRetryWatcher(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewRetryWatcher(tc.initialRV, nil)
+			_, ctx := ktesting.NewTestContext(t)
+			_, err := NewRetryWatcherWithContext(ctx, tc.initialRV, nil)
 			if !reflect.DeepEqual(err, tc.err) {
 				t.Errorf("Expected error: %v, got: %v", tc.err, err)
 			}
@@ -171,27 +174,29 @@ func TestRetryWatcher(t *testing.T) {
 	tt := []struct {
 		name        string
 		initialRV   string
-		watchClient cache.Watcher
+		watchClient func(ctx context.Context) cache.Watcher
 		watchCount  uint32
 		expected    []watch.Event
 	}{
 		{
 			name:      "recovers if watchClient returns error",
 			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
-					firstRun := true
-					return func(options metav1.ListOptions) (watch.Interface, error) {
-						if firstRun {
-							firstRun = false
-							return nil, fmt.Errorf("test error")
-						}
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+						firstRun := true
+						return func(options metav1.ListOptions) (watch.Interface, error) {
+							if firstRun {
+								firstRun = false
+								return nil, fmt.Errorf("test error")
+							}
 
-						return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-							makeTestEvent(2),
-						}))), nil
-					}
-				}(),
+							return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+								makeTestEvent(2),
+							}))), nil
+						}
+					}(),
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -201,20 +206,22 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "recovers if watchClient returns nil watcher",
 			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
-					firstRun := true
-					return func(options metav1.ListOptions) (watch.Interface, error) {
-						if firstRun {
-							firstRun = false
-							return nil, nil
-						}
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+						firstRun := true
+						return func(options metav1.ListOptions) (watch.Interface, error) {
+							if firstRun {
+								firstRun = false
+								return nil, nil
+							}
 
-						return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-							makeTestEvent(2),
-						}))), nil
-					}
-				}(),
+							return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+								makeTestEvent(2),
+							}))), nil
+						}
+					}(),
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -224,12 +231,14 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "works with empty initialRV",
 			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(2),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(2),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 1,
 			expected: []watch.Event{
@@ -239,13 +248,15 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "works with initialRV set, skipping the preceding items but reading those directly following",
 			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(1),
-						makeTestEvent(2),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(1),
+							makeTestEvent(2),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 1,
 			expected: []watch.Event{
@@ -255,12 +266,14 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "works with initialRV set, skipping the preceding items with none following",
 			initialRV: "3",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(2),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(2),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 1,
 			expected:   nil,
@@ -268,16 +281,18 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "fails on Gone (RV too old error)",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(5),
-						makeTestEvent(6),
-						{Type: watch.Error, Object: &apierrors.NewGone("").ErrStatus},
-						makeTestEvent(7),
-						makeTestEvent(8),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(5),
+							makeTestEvent(6),
+							{Type: watch.Error, Object: &apierrors.NewGone("").ErrStatus},
+							makeTestEvent(7),
+							makeTestEvent(8),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 1,
 			expected: []watch.Event{
@@ -291,17 +306,19 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "recovers from timeout error",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(6),
-						{
-							Type:   watch.Error,
-							Object: &apierrors.NewTimeoutError("", 0).ErrStatus,
-						},
-						makeTestEvent(7),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(6),
+							{
+								Type:   watch.Error,
+								Object: &apierrors.NewTimeoutError("", 0).ErrStatus,
+							},
+							makeTestEvent(7),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -312,17 +329,19 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "recovers from internal server error",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(6),
-						{
-							Type:   watch.Error,
-							Object: &apierrors.NewInternalError(errors.New("")).ErrStatus,
-						},
-						makeTestEvent(7),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(6),
+							{
+								Type:   watch.Error,
+								Object: &apierrors.NewInternalError(errors.New("")).ErrStatus,
+							},
+							makeTestEvent(7),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -333,19 +352,21 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "recovers from unexpected error code",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(6),
-						{
-							Type: watch.Error,
-							Object: &metav1.Status{
-								Code: 666,
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(6),
+							{
+								Type: watch.Error,
+								Object: &metav1.Status{
+									Code: 666,
+								},
 							},
-						},
-						makeTestEvent(7),
-					}))), nil
-				},
+							makeTestEvent(7),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -356,17 +377,19 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "recovers from unexpected error type",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(6),
-						{
-							Type:   watch.Error,
-							Object: &unexpectedError{},
-						},
-						makeTestEvent(7),
-					}))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(6),
+							{
+								Type:   watch.Error,
+								Object: &unexpectedError{},
+							},
+							makeTestEvent(7),
+						}))), nil
+					},
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -377,12 +400,14 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 1 closed watch and reads 1 item",
 			initialRV: "5",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(6),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(6),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 2,
 			expected: []watch.Event{
@@ -392,13 +417,15 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 2 closed watches and reads 2 items",
 			initialRV: "4",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(5),
-						makeTestEvent(6),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(5),
+							makeTestEvent(6),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 3,
 			expected: []watch.Event{
@@ -409,13 +436,15 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 2 closed watches and reads 2 items for nonconsecutive RVs",
 			initialRV: "4",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(5),
-						makeTestEvent(7),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(5),
+							makeTestEvent(7),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 3,
 			expected: []watch.Event{
@@ -426,13 +455,15 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 2 closed watches and reads 2 items for nonconsecutive RVs starting at much lower RV",
 			initialRV: "2",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(5),
-						makeTestEvent(7),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(5),
+							makeTestEvent(7),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 3,
 			expected: []watch.Event{
@@ -443,15 +474,17 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 4 closed watches and reads 4 items for nonconsecutive, spread RVs",
 			initialRV: "2",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(5),
-						makeTestEvent(6),
-						makeTestEvent(7),
-						makeTestEvent(11),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(5),
+							makeTestEvent(6),
+							makeTestEvent(7),
+							makeTestEvent(11),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 5,
 			expected: []watch.Event{
@@ -464,17 +497,19 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 4 closed watches and reads 4 items for nonconsecutive, spread RVs and skips those with lower or equal RV",
 			initialRV: "2",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(1),
-						makeTestEvent(2),
-						makeTestEvent(5),
-						makeTestEvent(6),
-						makeTestEvent(7),
-						makeTestEvent(11),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(1, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(1),
+							makeTestEvent(2),
+							makeTestEvent(5),
+							makeTestEvent(6),
+							makeTestEvent(7),
+							makeTestEvent(11),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 5,
 			expected: []watch.Event{
@@ -487,17 +522,19 @@ func TestRetryWatcher(t *testing.T) {
 		{
 			name:      "survives 2 closed watches and reads 2+2+1 items skipping those with equal RV",
 			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return watch.NewProxyWatcher(closeAfterN(2, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-						makeTestEvent(1),
-						makeTestEvent(2),
-						makeTestEvent(5),
-						makeTestEvent(6),
-						makeTestEvent(7),
-						makeTestEvent(11),
-					})))), nil
-				},
+			watchClient: func(ctx context.Context) cache.Watcher {
+				return &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return watch.NewProxyWatcherWithContext(ctx, closeAfterN(2, arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(1),
+							makeTestEvent(2),
+							makeTestEvent(5),
+							makeTestEvent(6),
+							makeTestEvent(7),
+							makeTestEvent(11),
+						})))), nil
+					},
+				}
 			},
 			watchCount: 3,
 			expected: []watch.Event{
@@ -513,10 +550,15 @@ func TestRetryWatcher(t *testing.T) {
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+
 			t.Parallel()
 
-			atomicCounter, watchFunc := withCounter(tc.watchClient)
-			watcher, err := newRetryWatcher(tc.initialRV, watchFunc, time.Duration(0))
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			atomicCounter, watchFunc := withCounter(tc.watchClient(ctx))
+			watcher, err := newRetryWatcher(ctx, tc.initialRV, watchFunc, time.Duration(0))
 			if err != nil {
 				t.Fatalf("failed to create a RetryWatcher: %v", err)
 			}
@@ -571,9 +613,13 @@ func TestRetryWatcher(t *testing.T) {
 }
 
 func TestRetryWatcherToFinishWithUnreadEvents(t *testing.T) {
-	watcher, err := NewRetryWatcher("1", &cache.ListWatch{
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	watcher, err := NewRetryWatcherWithContext(ctx, "1", &cache.ListWatch{
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return watch.NewProxyWatcher(arrayToChannel([]watch.Event{
+			return watch.NewProxyWatcherWithContext(ctx, arrayToChannel([]watch.Event{
 				makeTestEvent(2),
 			})), nil
 		},

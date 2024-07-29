@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -24,9 +25,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type fakeReader struct {
@@ -46,13 +48,14 @@ type fakeStreamCreator struct {
 
 var _ streamCreator = &fakeStreamCreator{}
 
-func (f *fakeStreamCreator) CreateStream(headers http.Header) (httpstream.Stream, error) {
+func (f *fakeStreamCreator) createStream(_ context.Context, headers http.Header) (httpstream.Stream, error) {
 	streamType := headers.Get(v1.StreamType)
 	f.created[streamType] = true
 	return nil, f.errors[streamType]
 }
 
 func TestV2CreateStreams(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name        string
 		stdin       bool
@@ -130,7 +133,7 @@ func TestV2CreateStreams(t *testing.T) {
 		}
 
 		h := newStreamProtocolV2(opts).(*streamProtocolV2)
-		err := h.createStreams(conn)
+		err := h.createStreams(ctx, conn)
 
 		if test.expectError {
 			if err == nil {
@@ -178,6 +181,8 @@ func TestV2CreateStreams(t *testing.T) {
 }
 
 func TestV2ErrorStreamReading(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
 	tests := []struct {
 		name          string
 		stream        io.Reader
@@ -199,7 +204,7 @@ func TestV2ErrorStreamReading(t *testing.T) {
 		h := newStreamProtocolV2(StreamOptions{}).(*streamProtocolV2)
 		h.errorStream = test.stream
 
-		ch := watchErrorStream(h.errorStream, &errorDecoderV2{})
+		ch := watchErrorStream(ctx, h.errorStream, &errorDecoderV2{})
 		if ch == nil {
 			t.Fatalf("%s: unexpected nil channel", test.name)
 		}
