@@ -272,26 +272,34 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return nil, nil, fmt.Errorf("failed to get container fs info: %v", err)
 	}
 	imageStats, err := p.imageService.ImageFsInfo(ctx)
-	if err != nil || imageStats == nil {
-		return nil, nil, fmt.Errorf("failed to get image stats: %v", err)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get image stats: %w", err)
+	}
+	if imageStats == nil || len(imageStats.ImageFilesystems) == 0 || len(imageStats.ContainerFilesystems) == 0 {
+		return nil, nil, fmt.Errorf("missing image stats: %+v", imageStats)
 	}
 	splitFileSystem := false
-	if imageStats.ImageFilesystems[0].FsId.Mountpoint != imageStats.ContainerFilesystems[0].FsId.Mountpoint {
-		klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageStats.ImageFilesystems[0], "ContainerFilesystems", imageStats.ContainerFilesystems[0])
+	imageFs := imageStats.ImageFilesystems[0]
+	containerFs := imageStats.ContainerFilesystems[0]
+	if imageFs.FsId != nil && containerFs.FsId != nil && imageFs.FsId.Mountpoint != containerFs.FsId.Mountpoint {
+		klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageFs, "ContainerFilesystems", containerFs)
 		splitFileSystem = true
 	}
-	imageFs := imageStats.ImageFilesystems[0]
 	var imageFsInodesUsed *uint64
 	if imageFsInfo.Inodes != nil && imageFsInfo.InodesFree != nil {
 		imageFsIU := *imageFsInfo.Inodes - *imageFsInfo.InodesFree
 		imageFsInodesUsed = &imageFsIU
+	}
+	var usedBytes uint64
+	if imageFs.GetUsedBytes() != nil {
+		usedBytes = imageFs.GetUsedBytes().GetValue()
 	}
 
 	fsStats := &statsapi.FsStats{
 		Time:           metav1.NewTime(imageFsInfo.Timestamp),
 		AvailableBytes: &imageFsInfo.Available,
 		CapacityBytes:  &imageFsInfo.Capacity,
-		UsedBytes:      &imageFs.UsedBytes.Value,
+		UsedBytes:      &usedBytes,
 		InodesFree:     imageFsInfo.InodesFree,
 		Inodes:         imageFsInfo.Inodes,
 		InodesUsed:     imageFsInodesUsed,
@@ -300,18 +308,21 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return fsStats, fsStats, nil
 	}
 
-	containerFs := imageStats.ContainerFilesystems[0]
 	var containerFsInodesUsed *uint64
 	if containerFsInfo.Inodes != nil && containerFsInfo.InodesFree != nil {
 		containerFsIU := *containerFsInfo.Inodes - *containerFsInfo.InodesFree
 		containerFsInodesUsed = &containerFsIU
+	}
+	var usedContainerBytes uint64
+	if containerFs.GetUsedBytes() != nil {
+		usedContainerBytes = containerFs.GetUsedBytes().GetValue()
 	}
 
 	fsContainerStats := &statsapi.FsStats{
 		Time:           metav1.NewTime(containerFsInfo.Timestamp),
 		AvailableBytes: &containerFsInfo.Available,
 		CapacityBytes:  &containerFsInfo.Capacity,
-		UsedBytes:      &containerFs.UsedBytes.Value,
+		UsedBytes:      &usedContainerBytes,
 		InodesFree:     containerFsInfo.InodesFree,
 		Inodes:         containerFsInfo.Inodes,
 		InodesUsed:     containerFsInodesUsed,
