@@ -994,6 +994,22 @@ func TestComputePodActions(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
 		},
+		"restart created but not started containers if RestartPolicy == OnFailure": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				// The first container completed, don't restart it.
+				status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+				status.ContainerStatuses[0].ExitCode = 0
+
+				// The second container was created, but never started.
+				status.ContainerStatuses[1].State = kubecontainer.ContainerStateCreated
+			},
+			actions: podActions{
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToStart: []int{1},
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+			},
+		},
 		"don't restart containers if RestartPolicy == Never": {
 			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyNever },
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
