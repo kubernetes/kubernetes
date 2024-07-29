@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1927,7 +1928,28 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 			AllocatedResourcesStatus: []v1.ResourceStatus{expectedStatus},
 		},
 	}
+
+	// Sort the resources for the expected status and actual status
+	sortContainerStatuses(status.ContainerStatuses)
+	sortContainerStatuses(expectedContainerStatuses)
+
 	if !reflect.DeepEqual(status.ContainerStatuses, expectedContainerStatuses) {
 		t.Errorf("UpdateAllocatedResourcesStatus failed, expected: %v, got: %v", expectedContainerStatuses, status.ContainerStatuses)
+	}
+}
+
+// Helper function to sort ResourceHealth slices
+func sortResourceHealth(resources []v1.ResourceHealth) {
+	sort.SliceStable(resources, func(i, j int) bool {
+		return resources[i].ResourceID < resources[j].ResourceID
+	})
+}
+
+// Helper function to sort ContainerStatus slices
+func sortContainerStatuses(statuses []v1.ContainerStatus) {
+	for i := range statuses {
+		for j := range statuses[i].AllocatedResourcesStatus {
+			sortResourceHealth(statuses[i].AllocatedResourcesStatus[j].Resources)
+		}
 	}
 }
