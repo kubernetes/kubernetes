@@ -74,9 +74,9 @@ type Plugin struct {
 	podsGetter     corev1lister.PodLister
 	nodesGetter    corev1lister.NodeLister
 
-	expansionRecoveryEnabled              bool
-	dynamicResourceAllocationEnabled      bool
-	kubeletCSRAdmissionValidationDisabled bool
+	expansionRecoveryEnabled                       bool
+	dynamicResourceAllocationEnabled               bool
+	allowInsecureKubeletCertificateSigningRequests bool
 }
 
 var (
@@ -89,7 +89,7 @@ var (
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.expansionRecoveryEnabled = featureGates.Enabled(features.RecoverVolumeExpansionFailure)
 	p.dynamicResourceAllocationEnabled = featureGates.Enabled(features.DynamicResourceAllocation)
-	p.kubeletCSRAdmissionValidationDisabled = featureGates.Enabled(features.DisableKubeletCSRAdmissionValidation)
+	p.allowInsecureKubeletCertificateSigningRequests = featureGates.Enabled(features.AllowInsecureKubeletCertificateSigningRequests)
 }
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
@@ -176,7 +176,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return p.admitResourceSlice(nodeName, a)
 
 	case csrResource:
-		if p.kubeletCSRAdmissionValidationDisabled {
+		if p.allowInsecureKubeletCertificateSigningRequests {
 			return nil
 		}
 		return p.admitCSR(nodeName, a)

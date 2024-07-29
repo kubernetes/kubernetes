@@ -228,9 +228,10 @@ const (
 	// owner: @micahhausler
 	// Deprecated: v1.31
 	//
-	// Disable Node Admission plugin validation of CSRs for kubelet signers where CN=system:node:$nodeName.
+	// Setting AllowInsecureKubeletCertificateSigningRequests to true disables node admission validation of CSRs
+	// for kubelet signers where CN=system:node:$nodeName.
 	// Remove in v1.33
-	DisableKubeletCSRAdmissionValidation featuregate.Feature = "DisableKubeletCSRAdmissionValidation"
+	AllowInsecureKubeletCertificateSigningRequests featuregate.Feature = "AllowInsecureKubeletCertificateSigningRequests"
 
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
@@ -1326,7 +1327,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// ...
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
 
-	DisableKubeletCSRAdmissionValidation: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
+	AllowInsecureKubeletCertificateSigningRequests: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.33
 
 	StorageNamespaceIndex: {Default: true, PreRelease: featuregate.Beta},
 

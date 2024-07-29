@@ -1278,7 +1278,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			features:   feature.DefaultFeatureGate,
 			setupFunc: func(t *testing.T) {
 				t.Helper()
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DisableKubeletCSRAdmissionValidation, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.AllowInsecureKubeletCertificateSigningRequests, true)
 			},
 		},
 		{
