@@ -74,7 +74,6 @@ import (
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/informers"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/prometheus/slis"
@@ -153,8 +152,8 @@ type Config struct {
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion
-	// FeatureGate is a way to plumb feature gate through if you have them.
-	FeatureGate featuregate.FeatureGate
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry utilversion.ComponentGlobalsRegistry
 	// AuditBackend is where audit events are sent to.
 	AuditBackend audit.Backend
 	// AuditPolicyRuleEvaluator makes the decision of whether and how to audit log a request.
@@ -459,9 +458,10 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
 		ShutdownWatchTerminationGracePeriod: time.Duration(0),
 
-		APIServerID:           id,
-		StorageVersionManager: storageversion.NewDefaultManager(),
-		TracerProvider:        tracing.NewNoopTracerProvider(),
+		APIServerID:              id,
+		StorageVersionManager:    storageversion.NewDefaultManager(),
+		TracerProvider:           tracing.NewNoopTracerProvider(),
+		ComponentGlobalsRegistry: utilversion.DefaultComponentGlobalsRegistry,
 	}
 }
 
@@ -687,8 +687,8 @@ func (c *Config) ShutdownInitiatedNotify() <-chan struct{} {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
-	if c.FeatureGate == nil {
-		c.FeatureGate = utilfeature.DefaultFeatureGate
+	if c.EffectiveVersion == nil {
+		c.EffectiveVersion = c.ComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent)
 	}
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		c.ExternalAddress = c.PublicAddress.String()
@@ -833,13 +833,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageReadinessHook:  NewStorageReadinessHook(c.StorageInitializationTimeout),
 		StorageVersionManager: c.StorageVersionManager,
 
-		EffectiveVersion: c.EffectiveVersion,
-		FeatureGate:      c.FeatureGate,
+		EffectiveVersion:         c.EffectiveVersion,
+		ComponentGlobalsRegistry: c.ComponentGlobalsRegistry,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if c.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		manager := c.AggregatedDiscoveryGroupManager
 		if manager == nil {
 			manager = discoveryendpoint.NewResourceManager("apis")
@@ -1054,14 +1054,14 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
 	}
 	handler = genericfilters.WithHTTPLogging(handler)
-	if c.FeatureGate.Enabled(genericfeatures.APIServerTracing) {
+	if c.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(genericfeatures.APIServerTracing) {
 		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	}
 	handler = genericapifilters.WithLatencyTrackers(handler)
 	// WithRoutine will execute future handlers in a separate goroutine and serving
 	// handler in current goroutine to minimize the stack memory usage. It must be
 	// after WithPanicRecover() to be protected from panics.
-	if c.FeatureGate.Enabled(genericfeatures.APIServingWithRoutine) {
+	if c.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(genericfeatures.APIServingWithRoutine) {
 		handler = routine.WithRoutine(handler, c.LongRunningFunc)
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
@@ -1105,7 +1105,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		if c.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 			wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
 			s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 		} else {

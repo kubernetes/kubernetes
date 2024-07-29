@@ -78,7 +78,7 @@ cluster's shared state through which all other components interact.`,
 		// stop printing usage when the command errors
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+			if err := s.GenericServerRunOptions.ComponentGlobalsRegistry.Set(); err != nil {
 				return err
 			}
 			// silence client-go warnings.

@@ -149,8 +149,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.ComponentGlobalsRegistry = s.ComponentGlobalsRegistry
 	c.EffectiveVersion = s.ComponentGlobalsRegistry.EffectiveVersionFor(s.ComponentName)
-	c.FeatureGate = s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName)
 
 	return nil
 }

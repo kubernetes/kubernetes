@@ -31,14 +31,11 @@ import (
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/openapi"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -123,10 +120,6 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	featureGate := utilfeature.DefaultMutableFeatureGate
-	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-	utilversion.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(utilversion.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
 	s.AddFlags(fs)
 
@@ -149,10 +142,6 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	fs.Parse(customFlags)
-
-	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
-		return result, err
-	}
 
 	if err := s.Complete(); err != nil {
 		return result, fmt.Errorf("failed to set default options: %v", err)

@@ -406,6 +406,10 @@ func (r *componentGlobalsRegistry) Set() error {
 
 func (r *componentGlobalsRegistry) Validate() []error {
 	var errs []error
+	if err := r.SetFallback(); err != nil {
+		errs = append(errs, err)
+		return errs
+	}
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	for _, globals := range r.componentGlobals {

@@ -266,11 +266,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 // Validate validates all the required options.
 func (o *Options) Validate() []error {
 	var errs []error
-	if err := o.ComponentGlobalsRegistry.SetFallback(); err != nil {
-		errs = append(errs, err)
-	} else {
-		errs = append(errs, o.ComponentGlobalsRegistry.Validate()...)
-	}
+	errs = append(errs, o.ComponentGlobalsRegistry.Validate()...)
 	if err := validation.ValidateKubeSchedulerConfiguration(o.ComponentConfig); err != nil {
 		errs = append(errs, err.Errors()...)
 	}

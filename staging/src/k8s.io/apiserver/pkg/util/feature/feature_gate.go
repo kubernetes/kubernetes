@@ -17,6 +17,8 @@ limitations under the License.
 package feature
 
 import (
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilversion "k8s.io/apiserver/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -31,3 +33,8 @@ var (
 	// Top-level commands/options setup that needs to modify this feature gate should use DefaultMutableFeatureGate.
 	DefaultFeatureGate featuregate.FeatureGate = DefaultMutableFeatureGate
 )
+
+func init() {
+	utilruntime.Must(utilversion.DefaultComponentGlobalsRegistry.Register(
+		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), DefaultMutableFeatureGate))
+}

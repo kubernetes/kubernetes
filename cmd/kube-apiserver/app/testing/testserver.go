@@ -343,7 +343,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		return result, err
 	}
 
-	if err := utilversion.DefaultComponentGlobalsRegistry.Set(); err != nil {
+	if err := s.GenericServerRunOptions.ComponentGlobalsRegistry.Set(); err != nil {
 		return result, err
 	}
 

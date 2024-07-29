@@ -400,10 +400,6 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 func (s *KubeControllerManagerOptions) Validate(allControllers []string, disabledByDefaultControllers []string, controllerAliases map[string]string) error {
 	var errs []error
 
-	if err := s.ComponentGlobalsRegistry.SetFallback(); err != nil {
-		errs = append(errs, err)
-	}
-
 	errs = append(errs, s.ComponentGlobalsRegistry.Validate()...)
 	errs = append(errs, s.Generic.Validate(allControllers, disabledByDefaultControllers, controllerAliases)...)
 	errs = append(errs, s.KubeCloudShared.Validate()...)

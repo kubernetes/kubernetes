@@ -53,7 +53,6 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilversion "k8s.io/apiserver/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	openapibuilder3 "k8s.io/kube-openapi/pkg/builder3"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
@@ -243,8 +242,8 @@ type GenericAPIServer struct {
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion utilversion.EffectiveVersion
-	// FeatureGate is a way to plumb feature gate through if you have them.
-	FeatureGate featuregate.FeatureGate
+	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
+	ComponentGlobalsRegistry utilversion.ComponentGlobalsRegistry
 
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
@@ -783,7 +782,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		resourceInfos = append(resourceInfos, r...)
 
-		if s.FeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+		if s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(features.AggregatedDiscoveryEndpoint) {
 			// Aggregated discovery only aggregates resources under /apis
 			if apiPrefix == APIGroupPrefix {
 				s.AggregatedDiscoveryGroupManager.AddGroupVersion(
@@ -811,8 +810,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 
 	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
 
-	if s.FeatureGate.Enabled(features.StorageVersionAPI) &&
-		s.FeatureGate.Enabled(features.APIServerIdentity) {
+	if s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(features.StorageVersionAPI) &&
+		s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(features.APIServerIdentity) {
 		// API installation happens before we start listening on the handlers,
 		// therefore it is safe to register ResourceInfos here. The handler will block
 		// write requests until the storage versions of the targeting resources are updated.
@@ -842,7 +841,7 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	legacyRootAPIHandler := discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix)
-	if s.FeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+	if s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent).Enabled(features.AggregatedDiscoveryEndpoint) {
 		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager)
 		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/api", metav1.APIVersions{}))
 	} else {
