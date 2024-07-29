@@ -266,22 +266,27 @@ func newMetricsCollector(config *metricsCollectorConfig, labels map[string]strin
 	}
 }
 
+func (mc *metricsCollector) init() {
+	// Reset the metrics so that the measurements do not interfere with those collected during the previous steps.
+	legacyregistry.Reset()
+}
+
 func (*metricsCollector) run(tCtx ktesting.TContext) {
 	// metricCollector doesn't need to start before the tests, so nothing to do here.
 }
 
-func (pc *metricsCollector) collect() []DataItem {
+func (mc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for metric, labelValsSlice := range pc.Metrics {
+	for metric, labelValsSlice := range mc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
 		if labelValsSlice == nil {
-			dataItem := collectHistogramVec(metric, pc.labels, nil)
+			dataItem := collectHistogramVec(metric, mc.labels, nil)
 			if dataItem != nil {
 				dataItems = append(dataItems, *dataItem)
 			}
 		} else {
 			for _, lvMap := range uniqueLVCombos(labelValsSlice) {
-				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
+				dataItem := collectHistogramVec(metric, mc.labels, lvMap)
 				if dataItem != nil {
 					dataItems = append(dataItems, *dataItem)
 				}
@@ -370,13 +375,16 @@ type throughputCollector struct {
 	errorMargin           float64
 }
 
-func newThroughputCollector(tb ktesting.TB, podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
+func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[string]string, namespaces []string, errorMargin float64) *throughputCollector {
 	return &throughputCollector{
 		podInformer: podInformer,
 		labels:      labels,
 		namespaces:  namespaces,
 		errorMargin: errorMargin,
 	}
+}
+
+func (tc *throughputCollector) init() {
 }
 
 func (tc *throughputCollector) run(tCtx ktesting.TContext) {
