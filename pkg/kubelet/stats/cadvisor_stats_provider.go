@@ -242,26 +242,87 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (*statsapi.FsS
 	if err != nil {
 		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
 	}
+<<<<<<< HEAD
 	imageStats, err := p.imageService.ImageStats(ctx)
 	if err != nil || imageStats == nil {
 		return nil, fmt.Errorf("failed to get image stats: %v", err)
 	}
 
+=======
+	imageStats, err := p.imageService.ImageFsInfo(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get image stats: %w", err)
+	}
+	if imageStats == nil || len(imageStats.ImageFilesystems) == 0 || len(imageStats.ContainerFilesystems) == 0 {
+		return nil, nil, fmt.Errorf("missing image stats: %+v", imageStats)
+	}
+	splitFileSystem := false
+	imageFs := imageStats.ImageFilesystems[0]
+	containerFs := imageStats.ContainerFilesystems[0]
+	if imageFs.FsId != nil && containerFs.FsId != nil && imageFs.FsId.Mountpoint != containerFs.FsId.Mountpoint {
+		klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageFs, "ContainerFilesystems", containerFs)
+		splitFileSystem = true
+	}
+>>>>>>> Fix kubelet cadvisor stats runtime panic
 	var imageFsInodesUsed *uint64
 	if imageFsInfo.Inodes != nil && imageFsInfo.InodesFree != nil {
 		imageFsIU := *imageFsInfo.Inodes - *imageFsInfo.InodesFree
 		imageFsInodesUsed = &imageFsIU
+	}
+	var usedBytes uint64
+	if imageFs.GetUsedBytes() != nil {
+		usedBytes = imageFs.GetUsedBytes().GetValue()
 	}
 
 	return &statsapi.FsStats{
 		Time:           metav1.NewTime(imageFsInfo.Timestamp),
 		AvailableBytes: &imageFsInfo.Available,
 		CapacityBytes:  &imageFsInfo.Capacity,
+<<<<<<< HEAD
 		UsedBytes:      &imageStats.TotalStorageBytes,
 		InodesFree:     imageFsInfo.InodesFree,
 		Inodes:         imageFsInfo.Inodes,
 		InodesUsed:     imageFsInodesUsed,
 	}, nil
+=======
+		UsedBytes:      &usedBytes,
+		InodesFree:     imageFsInfo.InodesFree,
+		Inodes:         imageFsInfo.Inodes,
+		InodesUsed:     imageFsInodesUsed,
+	}
+	// We rely on cadvisor to have the crio-containers label for split filesystem case.
+	// We return to avoid checking ContainerFsInfo.
+	if !splitFileSystem {
+		return fsStats, fsStats, nil
+	}
+
+	containerFsInfo, err := p.cadvisor.ContainerFsInfo()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get container fs info: %w", err)
+	}
+
+	var containerFsInodesUsed *uint64
+	if containerFsInfo.Inodes != nil && containerFsInfo.InodesFree != nil {
+		containerFsIU := *containerFsInfo.Inodes - *containerFsInfo.InodesFree
+		containerFsInodesUsed = &containerFsIU
+	}
+	var usedContainerBytes uint64
+	if containerFs.GetUsedBytes() != nil {
+		usedContainerBytes = containerFs.GetUsedBytes().GetValue()
+	}
+
+	fsContainerStats := &statsapi.FsStats{
+		Time:           metav1.NewTime(containerFsInfo.Timestamp),
+		AvailableBytes: &containerFsInfo.Available,
+		CapacityBytes:  &containerFsInfo.Capacity,
+		UsedBytes:      &usedContainerBytes,
+		InodesFree:     containerFsInfo.InodesFree,
+		Inodes:         containerFsInfo.Inodes,
+		InodesUsed:     containerFsInodesUsed,
+	}
+
+	return fsStats, fsContainerStats, nil
+>>>>>>> Fix kubelet cadvisor stats runtime panic
 }
 
 // ImageFsDevice returns name of the device where the image filesystem locates,
