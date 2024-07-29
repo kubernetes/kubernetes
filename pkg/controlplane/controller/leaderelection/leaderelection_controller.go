@@ -278,7 +278,8 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 
 		if candidate.Spec.PingTime == nil ||
 			// If PingTime is outdated, send another PingTime only if it already acked the first one.
-			(candidate.Spec.PingTime.Add(electionDuration).Before(now) && candidate.Spec.PingTime.Before(candidate.Spec.RenewTime)) {
+			// This checks for pingTime <= renewTime because equality is possible in unit tests using a fake clock.
+			(candidate.Spec.PingTime.Add(electionDuration).Before(now) && !candidate.Spec.RenewTime.Before(candidate.Spec.PingTime)) {
 			// TODO(jefftree): We should randomize the order of sending pings and do them in parallel
 			// so that all candidates have equal opportunity to ack.
 			clone := candidate.DeepCopy()
@@ -300,7 +301,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 			continue // shouldn't be the case after the above
 		}
 
-		if candidate.Spec.RenewTime != nil && candidate.Spec.PingTime.Before(candidate.Spec.RenewTime) {
+		if candidate.Spec.RenewTime != nil && !candidate.Spec.RenewTime.Before(candidate.Spec.PingTime) {
 			continue // this has renewed already
 		}
 

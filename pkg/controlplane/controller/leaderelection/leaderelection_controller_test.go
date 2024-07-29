@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -697,6 +698,7 @@ func TestController(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			controller.clock = fakeClock
 
 			for _, obj := range tc.leases {
 				t.Logf("Pre-creating lease %s/%s", obj.Namespace, obj.Name)
@@ -715,6 +717,9 @@ func TestController(t *testing.T) {
 
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
+			if !cache.WaitForNamedCacheSync(controllerName, ctx.Done(), controller.leaseRegistration.HasSynced, controller.leaseCandidateRegistration.HasSynced) {
+				return
+			}
 			go controller.Run(ctx, 1)
 
 			if rand.Intn(2) == 0 {
@@ -747,9 +752,9 @@ func TestController(t *testing.T) {
 								continue // only candidate-aware controllers will follow preferredHolder
 							}
 
-							t.Logf("Deleting lease %s/%s because of preferredHolder %q != %q", l.Namespace, l.Name, *ph, *l.Spec.HolderIdentity)
+							fmt.Printf("Deleting lease %s/%s because of preferredHolder %q != %q", l.Namespace, l.Name, *ph, *l.Spec.HolderIdentity)
 							if err = client.CoordinationV1().Leases(expectedLease.Namespace).Delete(ctx, expectedLease.Name, metav1.DeleteOptions{}); err != nil {
-								t.Logf("Error deleting lease %s/%s: %v", l.Namespace, l.Name, err)
+								fmt.Printf("Error deleting lease %s/%s: %v", l.Namespace, l.Name, err)
 							}
 						}
 					}
@@ -768,12 +773,12 @@ func TestController(t *testing.T) {
 						for _, lc := range tc.createAfterControllerStart {
 							c, err := client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Get(ctx, lc.Name, metav1.GetOptions{})
 							if err == nil {
-								if c.Spec.PingTime != nil {
-									t.Logf("Answering ping for %s/%s", c.Namespace, c.Name)
+								if c.Spec.PingTime != nil && c.Spec.PingTime.Before(c.Spec.RenewTime) {
+									fmt.Printf("Answering ping for %s/%s", c.Namespace, c.Name)
 									c.Spec.RenewTime = &metav1.MicroTime{Time: fakeClock.Now()}
 									_, err = client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Update(ctx, c, metav1.UpdateOptions{})
 									if err != nil {
-										t.Logf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
+										fmt.Printf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
 									}
 								}
 							}
