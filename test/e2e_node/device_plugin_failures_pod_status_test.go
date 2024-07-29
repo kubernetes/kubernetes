@@ -26,7 +26,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/features"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -123,6 +125,8 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHea
 	devicePluginUpdateTimeout := 1 * time.Minute
 
 	ginkgo.It("will report a Healthy and then Unhealthy single device in the pod status", func(ctx context.Context) {
+		e2eskipper.SkipUnlessFeatureGateEnabled(features.ResourceHealthStatus)
+
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
@@ -181,6 +185,8 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHea
 	})
 
 	ginkgo.It("will report a Device Status for the failed pod in the pod status", func(ctx context.Context) {
+		e2eskipper.SkipUnlessFeatureGateEnabled(features.ResourceHealthStatus)
+
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
