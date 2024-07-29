@@ -97,16 +97,17 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, testArg de
 	var (
 		mutex      = &sync.Mutex{}
 		watchTimes = make(map[string]metav1.Time)
-		stopCh     = make(chan struct{})
 	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// create test pod data structure
 	pods := newDensityTestPods(testArg.podsNr, false, imageutils.GetPauseImageName(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(ctx, f, mutex, watchTimes, podType)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	go controller.RunWithContext(ctx)
 
 	ginkgo.By("Creating a batch of pods")
 	// It returns a map['pod name']'creation time' containing the creation timestamps

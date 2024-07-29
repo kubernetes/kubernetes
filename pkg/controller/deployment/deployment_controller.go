@@ -160,7 +160,7 @@ func NewDeploymentController(ctx context.Context, dInformer appsinformers.Deploy
 
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	dc.eventBroadcaster.StartStructuredLogging(3)
@@ -173,7 +173,7 @@ func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting controller", "controller", "deployment")
 	defer logger.Info("Shutting down controller", "controller", "deployment")
 
-	if !cache.WaitForNamedCacheSync("deployment", ctx.Done(), dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
 	}
 
@@ -202,12 +202,12 @@ func (dc *DeploymentController) deleteDeployment(logger klog.Logger, obj interfa
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		d, ok = tombstone.Obj.(*apps.Deployment)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Deployment %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -329,12 +329,12 @@ func (dc *DeploymentController) deleteReplicaSet(logger klog.Logger, obj interfa
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		rs, ok = tombstone.Obj.(*apps.ReplicaSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -363,12 +363,12 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -400,7 +400,7 @@ func (dc *DeploymentController) deletePod(logger klog.Logger, obj interface{}) {
 func (dc *DeploymentController) enqueue(deployment *apps.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -410,7 +410,7 @@ func (dc *DeploymentController) enqueue(deployment *apps.Deployment) {
 func (dc *DeploymentController) enqueueRateLimited(deployment *apps.Deployment) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -421,7 +421,7 @@ func (dc *DeploymentController) enqueueRateLimited(deployment *apps.Deployment) 
 func (dc *DeploymentController) enqueueAfter(deployment *apps.Deployment, after time.Duration) {
 	key, err := controller.KeyFunc(deployment)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", deployment, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -514,7 +514,7 @@ func (dc *DeploymentController) handleErr(ctx context.Context, err error, key st
 		return
 	}
 
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed")
 	logger.V(2).Info("Dropping deployment out of the queue", "deployment", klog.KRef(ns, name), "err", err)
 	dc.queue.Forget(key)
 }

@@ -35,6 +35,7 @@ func newBootstrapSignerControllerDescriptor() *ControllerDescriptor {
 }
 func startBootstrapSignerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	bsc, err := bootstrap.NewSigner(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("bootstrap-signer"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
@@ -57,6 +58,7 @@ func newTokenCleanerControllerDescriptor() *ControllerDescriptor {
 }
 func startTokenCleanerController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	tcc, err := bootstrap.NewTokenCleaner(
+		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("token-cleaner"),
 		controllerContext.InformerFactory.Core().V1().Secrets(),
 		bootstrap.DefaultTokenCleanerOptions(),

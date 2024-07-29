@@ -214,10 +214,10 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
-	c.eventBroadcaster.StartLogging(klog.Infof)
+	c.eventBroadcaster.StartStructuredLogging(0)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
@@ -227,7 +227,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting EndpointSliceMirroring controller")
 	defer logger.Info("Shutting down EndpointSliceMirroring controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", ctx.Done(), c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 
@@ -275,7 +275,7 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 
 	logger.Info("Retry budget exceeded, dropping Endpoints out of the queue", "key", key, "err", err)
 	c.queue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Syncing failed")
 }
 
 func (c *Controller) syncEndpoints(logger klog.Logger, key string) error {
@@ -347,7 +347,7 @@ func (c *Controller) syncEndpoints(logger klog.Logger, key string) error {
 func (c *Controller) queueEndpoints(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v (type %T): %v", obj, obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v (type %T): %v", obj, obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -373,7 +373,7 @@ func (c *Controller) shouldMirror(endpoints *v1.Endpoints) bool {
 func (c *Controller) onServiceAdd(obj interface{}) {
 	service := obj.(*v1.Service)
 	if service == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceAdd() expected type v1.Service, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceAdd() expected type v1.Service, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if service.Spec.Selector == nil {
@@ -386,7 +386,7 @@ func (c *Controller) onServiceUpdate(prevObj, obj interface{}) {
 	service := obj.(*v1.Service)
 	prevService := prevObj.(*v1.Service)
 	if service == nil || prevService == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Service, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceUpdate() expected type v1.Service, got %T, %T", prevObj, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if (service.Spec.Selector == nil) != (prevService.Spec.Selector == nil) {
@@ -398,7 +398,7 @@ func (c *Controller) onServiceUpdate(prevObj, obj interface{}) {
 func (c *Controller) onServiceDelete(obj interface{}) {
 	service := getServiceFromDeleteAction(obj)
 	if service == nil {
-		utilruntime.HandleError(fmt.Errorf("onServiceDelete() expected type v1.Service, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onServiceDelete() expected type v1.Service, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if service.Spec.Selector == nil {
@@ -410,7 +410,7 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 func (c *Controller) onEndpointsAdd(logger klog.Logger, obj interface{}) {
 	endpoints := obj.(*v1.Endpoints)
 	if endpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsAdd() expected type v1.Endpoints, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointsAdd() expected type v1.Endpoints, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if !c.shouldMirror(endpoints) {
@@ -425,7 +425,7 @@ func (c *Controller) onEndpointsUpdate(logger klog.Logger, prevObj, obj interfac
 	endpoints := obj.(*v1.Endpoints)
 	prevEndpoints := prevObj.(*v1.Endpoints)
 	if endpoints == nil || prevEndpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointsUpdate() expected type v1.Endpoints, got %T, %T", prevObj, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if !c.shouldMirror(endpoints) && !c.shouldMirror(prevEndpoints) {
@@ -439,7 +439,7 @@ func (c *Controller) onEndpointsUpdate(logger klog.Logger, prevObj, obj interfac
 func (c *Controller) onEndpointsDelete(logger klog.Logger, obj interface{}) {
 	endpoints := getEndpointsFromDeleteAction(obj)
 	if endpoints == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointsDelete() expected type v1.Endpoints, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointsDelete() expected type v1.Endpoints, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if !c.shouldMirror(endpoints) {
@@ -455,7 +455,7 @@ func (c *Controller) onEndpointsDelete(logger klog.Logger, obj interface{}) {
 func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointSliceAdd() expected type discovery.EndpointSlice, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointSliceAdd() expected type discovery.EndpointSlice, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if managedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
@@ -471,7 +471,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	// EndpointSlice generation does not change when labels change. Although the
@@ -496,7 +496,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 	endpointSlice := getEndpointSliceFromDeleteAction(obj)
 	if endpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("onEndpointSliceDelete() expected type discovery.EndpointSlice, got %T", obj))
+		utilruntime.HandleError(fmt.Errorf("onEndpointSliceDelete() expected type discovery.EndpointSlice, got %T", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
@@ -513,7 +513,7 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 func (c *Controller) queueEndpointsForEndpointSlice(endpointSlice *discovery.EndpointSlice) {
 	key, err := endpointsControllerKey(endpointSlice)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v (type %T): %v", endpointSlice, endpointSlice, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v (type %T): %v", endpointSlice, endpointSlice, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 

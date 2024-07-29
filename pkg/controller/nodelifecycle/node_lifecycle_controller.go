@@ -429,11 +429,11 @@ func NewNodeLifecycleController(
 
 	logger.Info("Controller will reconcile labels")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
+		AddFunc: controllerutil.CreateAddNodeHandler(logger, func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
 			return nil
 		}),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+		UpdateFunc: controllerutil.CreateUpdateNodeHandler(logger, func(_, newNode *v1.Node) error {
 			nc.nodeUpdateQueue.Add(newNode.Name)
 			return nil
 		}),
@@ -456,7 +456,7 @@ func NewNodeLifecycleController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	nc.broadcaster.StartStructuredLogging(3)
@@ -475,7 +475,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	logger.Info("Starting node controller")
 	defer logger.Info("Shutting down node controller")
 
-	if !cache.WaitForNamedCacheSync("taint", ctx.Done(), nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
@@ -736,7 +736,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 		if currentReadyCondition != nil {
 			pods, err := nc.getPodsAssignedToNode(node.Name)
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to list pods of node %v: %v", node.Name, err))
+				utilruntime.HandleErrorWithContext(ctx, err, "Unable to list pods of node", "node", klog.KObj(node))
 				if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 					// If error happened during node status transition (Ready -> NotReady)
 					// we need to mark node for retry to force MarkPodsNotReady execution
@@ -755,7 +755,7 @@ func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 				fallthrough
 			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
 				if err = controllerutil.MarkPodsNotReady(ctx, nc.kubeClient, nc.recorder, pods, node.Name); err != nil {
-					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err))
+					utilruntime.HandleErrorWithContext(ctx, err, "Unable to mark all pods NotReady on node, queuing for retry", "node", klog.KObj(node))
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 					return
 				}

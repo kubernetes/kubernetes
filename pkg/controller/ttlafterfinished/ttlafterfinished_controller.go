@@ -105,14 +105,14 @@ func New(ctx context.Context, jobInformer batchinformers.JobInformer, client cli
 
 // Run starts the workers to clean up Jobs.
 func (tc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer tc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL after finished controller")
 	defer logger.Info("Shutting down TTL after finished controller")
 
-	if !cache.WaitForNamedCacheSync("TTL after finished", ctx.Done(), tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.jListerSynced) {
 		return
 	}
 
@@ -146,7 +146,7 @@ func (tc *Controller) enqueue(logger klog.Logger, job *batch.Job) {
 	logger.V(4).Info("Add job to cleanup", "job", klog.KObj(job))
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -156,7 +156,7 @@ func (tc *Controller) enqueue(logger klog.Logger, job *batch.Job) {
 func (tc *Controller) enqueueAfter(job *batch.Job, after time.Duration) {
 	key, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -176,18 +176,18 @@ func (tc *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer tc.queue.Done(key)
 
 	err := tc.processJob(ctx, key)
-	tc.handleErr(err, key)
+	tc.handleErr(ctx, err, key)
 
 	return true
 }
 
-func (tc *Controller) handleErr(err error, key string) {
+func (tc *Controller) handleErr(ctx context.Context, err error, key string) {
 	if err == nil {
 		tc.queue.Forget(key)
 		return
 	}
 
-	utilruntime.HandleError(fmt.Errorf("error cleaning up Job %v, will retry: %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Error cleaning up Job, will retry", "key", key)
 	tc.queue.AddRateLimited(key)
 }
 

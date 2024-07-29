@@ -357,7 +357,8 @@ func (j *TestJig) WaitForEndpointOnNode(ctx context.Context, nodeName string) er
 func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Duration) error {
 	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", j.Name)
-	stopCh := make(chan struct{})
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	endpointAvailable := false
 	endpointSliceAvailable := false
 
@@ -393,11 +394,8 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 			},
 		},
 	)
-	defer func() {
-		close(stopCh)
-	}()
 
-	go controller.Run(stopCh)
+	go controller.RunWithContext(ctx)
 
 	var esController cache.Controller
 	_, esController = cache.NewInformer(
@@ -438,7 +436,7 @@ func (j *TestJig) waitForAvailableEndpoint(ctx context.Context, timeout time.Dur
 		},
 	)
 
-	go esController.Run(stopCh)
+	go esController.RunWithContext(ctx)
 
 	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, timeout, false, func(ctx context.Context) (bool, error) {
 		return endpointAvailable && endpointSliceAvailable, nil

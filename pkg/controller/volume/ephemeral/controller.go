@@ -97,7 +97,7 @@ func NewController(
 	ephemeralvolumemetrics.RegisterMetrics()
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	ec.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ephemeral_volume"})
 
@@ -135,7 +135,7 @@ func (ec *ephemeralController) enqueuePod(obj interface{}) {
 			// It has at least one ephemeral inline volume, work on it.
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(pod)
 			if err != nil {
-				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err))
+				runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pod, err)) //nolint:logcheck // Not reached, all objects have a key.
 				return
 			}
 			ec.queue.Add(key)
@@ -158,7 +158,7 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 	// the PVC.
 	objs, err := ec.podIndexer.ByIndex(common.PodPVCIndex, fmt.Sprintf("%s/%s", pvc.Namespace, pvc.Name))
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err))
+		runtime.HandleError(fmt.Errorf("listing pods from cache: %v", err)) //nolint:logcheck // Local cache should not fail.
 		return
 	}
 	for _, obj := range objs {
@@ -167,13 +167,13 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 }
 
 func (ec *ephemeralController) Run(ctx context.Context, workers int) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	defer ec.queue.ShutDown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ephemeral volume controller")
 	defer logger.Info("Shutting down ephemeral volume controller")
 
-	if !cache.WaitForNamedCacheSync("ephemeral", ctx.Done(), ec.podSynced, ec.pvcsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ec.podSynced, ec.pvcsSynced) {
 		return
 	}
 
@@ -202,7 +202,7 @@ func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	runtime.HandleError(fmt.Errorf("%v failed with: %v", key, err))
+	runtime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	ec.queue.AddRateLimited(key)
 
 	return true

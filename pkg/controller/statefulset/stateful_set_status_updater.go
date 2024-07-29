@@ -18,7 +18,6 @@ package statefulset
 
 import (
 	"context"
-	"fmt"
 
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 )
 
 // StatefulSetStatusUpdaterInterface is an interface used to update the StatefulSetStatus associated with a StatefulSet.
@@ -65,7 +65,7 @@ func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
 			// make a copy so we don't mutate the shared cache
 			set = updated.DeepCopy()
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated StatefulSet %s/%s from lister: %v", set.Namespace, set.Name, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Error getting updated StatefulSet", "statefulset", klog.KObj(set))
 		}
 
 		return updateErr

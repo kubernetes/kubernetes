@@ -1491,23 +1491,23 @@ done
 // waitForPodStatusByInformer waits pod status change by informer
 func waitForPodStatusByInformer(ctx context.Context, c clientset.Interface, podNamespace, podName string, timeout time.Duration, condition func(pod *v1.Pod) (bool, error)) error {
 	// TODO (pohly): rewrite with gomega.Eventually to get intermediate progress reports.
-	stopCh := make(chan struct{})
+	doneCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	checkPodStatusFunc := func(pod *v1.Pod) {
 		if ok, _ := condition(pod); ok {
-			close(stopCh)
+			cancel()
 		}
 	}
 	controller := newInformerWatchPod(ctx, c, podNamespace, podName, checkPodStatusFunc)
-	go controller.Run(stopCh)
+	go controller.RunWithContext(doneCtx)
 	after := time.After(timeout)
 	select {
-	case <-stopCh:
+	case <-doneCtx.Done():
+		// cancel called in checkPodStatusFunc.
 		return nil
 	case <-ctx.Done():
-		close(stopCh)
-		return fmt.Errorf("timeout to wait pod status ready")
+		return fmt.Errorf("request by parent to stop waiting for pod status ready")
 	case <-after:
-		close(stopCh)
 		return fmt.Errorf("timeout to wait pod status ready")
 	}
 }

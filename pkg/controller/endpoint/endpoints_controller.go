@@ -169,7 +169,7 @@ type Controller struct {
 // Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	e.eventBroadcaster.StartStructuredLogging(3)
@@ -182,7 +182,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint controller")
 	defer logger.Info("Shutting down endpoint controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint", ctx.Done(), e.podsSynced, e.servicesSynced, e.endpointsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
 	}
 
@@ -191,7 +191,7 @@ func (e *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		e.checkLeftoverEndpoints()
 	}()
 
@@ -204,7 +204,7 @@ func (e *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := endpointsliceutil.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err)) //nolint:logcheck // Not reached, local cache with objects that have key.
 		return
 	}
 	for key := range services {
@@ -290,7 +290,7 @@ func (e *Controller) deletePod(obj interface{}) {
 func (e *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	e.queue.Add(key)
@@ -300,7 +300,7 @@ func (e *Controller) onServiceUpdate(obj interface{}) {
 func (e *Controller) onServiceDelete(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	e.queue.Add(key)
@@ -309,7 +309,7 @@ func (e *Controller) onServiceDelete(obj interface{}) {
 func (e *Controller) onEndpointsDelete(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	e.queue.Add(key)
@@ -331,19 +331,19 @@ func (e *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 	defer e.queue.Done(eKey)
 
-	logger := klog.FromContext(ctx)
 	err := e.syncService(ctx, eKey)
-	e.handleErr(logger, err, eKey)
+	e.handleErr(ctx, err, eKey)
 
 	return true
 }
 
-func (e *Controller) handleErr(logger klog.Logger, err error, key string) {
+func (e *Controller) handleErr(ctx context.Context, err error, key string) {
 	if err == nil {
 		e.queue.Forget(key)
 		return
 	}
 
+	logger := klog.FromContext(ctx)
 	ns, name, keyErr := cache.SplitMetaNamespaceKey(key)
 	if keyErr != nil {
 		logger.Error(err, "Failed to split meta namespace cache key", "key", key)
@@ -357,7 +357,7 @@ func (e *Controller) handleErr(logger klog.Logger, err error, key string) {
 
 	logger.Info("Dropping service out of the queue", "service", klog.KRef(ns, name), "err", err)
 	e.queue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 }
 
 func (e *Controller) syncService(ctx context.Context, key string) error {
@@ -579,7 +579,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 func (e *Controller) checkLeftoverEndpoints() {
 	list, err := e.endpointsLister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err))
+		utilruntime.HandleError(fmt.Errorf("Unable to list endpoints (%v); orphaned endpoints will not be cleaned up. (They're pretty harmless, but you can restart this component if you want another attempt made.)", err)) //nolint:logcheck // Local cache should not fail.
 		return
 	}
 	for _, ep := range list {
@@ -593,7 +593,7 @@ func (e *Controller) checkLeftoverEndpoints() {
 		}
 		key, err := controller.KeyFunc(ep)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
+			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep)) //nolint:logcheck // Not reached, all objects have a key.
 			continue
 		}
 		e.queue.Add(key)

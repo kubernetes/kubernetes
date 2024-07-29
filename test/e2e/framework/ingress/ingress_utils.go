@@ -1009,7 +1009,7 @@ func (cont *NginxIngressController) Init(ctx context.Context) {
 
 	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
-	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
+	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(ctx, cont.Client, cont.Ns, sel))
 	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(ctx, metav1.ListOptions{LabelSelector: sel.String()})
 	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {

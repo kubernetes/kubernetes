@@ -74,7 +74,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	reflectorCtx, reflectorCtxCancel := context.WithCancel(context.Background())
 	defer reflectorCtxCancel()
 	store.setCancelOnReplace(reflectorCtxCancel)
-	err = target.ListAndWatch(reflectorCtx.Done())
+	err = target.ListAndWatchWithContext(reflectorCtx)
 	require.NoError(t, err)
 
 	t.Log("Verifying if the secret reflector was properly synchronised")
@@ -91,7 +91,7 @@ func TestReflectorWatchListFallback(t *testing.T) {
 	reflectorCtx, reflectorCtxCancel = context.WithCancel(context.Background())
 	defer reflectorCtxCancel()
 	store.setCancelOnReplace(reflectorCtxCancel)
-	err = target.ListAndWatch(reflectorCtx.Done())
+	err = target.ListAndWatchWithContext(reflectorCtx)
 	require.NoError(t, err)
 
 	t.Log("Verifying if the secret reflector was properly synchronised")

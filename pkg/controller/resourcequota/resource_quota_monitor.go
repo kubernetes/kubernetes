@@ -124,15 +124,16 @@ func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactor
 type monitor struct {
 	controller cache.Controller
 
-	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
+	// ctx stops Controller. If ctx is nil, the monitor is considered to be
 	// not yet started.
-	stopCh chan struct{}
+	ctx    context.Context
+	cancel func()
 }
 
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
-func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+func (m *monitor) run() {
+	m.controller.RunWithContext(m.ctx)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -171,7 +172,7 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
 		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		shared.Informer().AddEventHandlerWithConfig(ctx, handlers, cache.HandlerConfig{ResyncPeriod: qm.resyncPeriod()})
 		return shared.Informer().GetController(), nil
 	}
 	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
@@ -234,8 +235,8 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 	qm.monitors = current
 
 	for _, monitor := range toRemove {
-		if monitor.stopCh != nil {
-			close(monitor.stopCh)
+		if monitor.cancel != nil {
+			monitor.cancel()
 		}
 	}
 
@@ -264,10 +265,10 @@ func (qm *QuotaMonitor) StartMonitors(ctx context.Context) {
 	monitors := qm.monitors
 	started := 0
 	for _, monitor := range monitors {
-		if monitor.stopCh == nil {
-			monitor.stopCh = make(chan struct{})
+		if monitor.ctx == nil {
+			monitor.ctx, monitor.cancel = context.WithCancel(ctx)
 			qm.informerFactory.Start(qm.stopCh)
-			go monitor.Run()
+			go monitor.run()
 			started++
 		}
 	}
@@ -301,7 +302,7 @@ func (qm *QuotaMonitor) IsSynced(ctx context.Context) bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 
@@ -321,7 +322,7 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	// The following workers are hanging forever until the queue is
 	// shutted down, so we need to shut it down in a separate goroutine.
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithContext(ctx)
 		defer qm.resourceChanges.ShutDown()
 
 		<-ctx.Done()
@@ -334,9 +335,9 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	monitors := qm.monitors
 	stopped := 0
 	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
+		if monitor.cancel != nil {
 			stopped++
-			close(monitor.stopCh)
+			monitor.cancel()
 		}
 	}
 	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))
@@ -358,7 +359,7 @@ func (qm *QuotaMonitor) processResourceChanges(ctx context.Context) bool {
 	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Cannot access obj")
 		return true
 	}
 	klog.FromContext(ctx).V(4).Info("QuotaMonitor process object",

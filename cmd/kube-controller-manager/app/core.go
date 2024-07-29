@@ -626,6 +626,7 @@ func newServiceAccountControllerDescriptor() *ControllerDescriptor {
 
 func startServiceAccountController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	sac, err := serviceaccountcontroller.NewServiceAccountsController(
+		ctx,
 		controllerContext.InformerFactory.Core().V1().ServiceAccounts(),
 		controllerContext.InformerFactory.Core().V1().Namespaces(),
 		controllerContext.ClientBuilder.ClientOrDie("service-account-controller"),

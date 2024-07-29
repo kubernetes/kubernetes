@@ -164,13 +164,16 @@ func NewHorizontalController(
 		hpaSelectors:        selectors.NewBiMultimap(),
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	hpaInformer.Informer().AddEventHandlerWithConfig(
+		ctx,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
 			DeleteFunc: hpaController.deleteHPA,
 		},
-		resyncPeriod,
+		cache.HandlerConfig{
+			ResyncPeriod: resyncPeriod,
+		},
 	)
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
@@ -194,14 +197,14 @@ func NewHorizontalController(
 
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer a.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")
 	defer logger.Info("Shutting down HPA controller")
 
-	if !cache.WaitForNamedCacheSync("HPA", ctx.Done(), a.hpaListerSynced, a.podListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 
@@ -221,7 +224,7 @@ func (a *HorizontalController) updateHPA(old, cur interface{}) {
 func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -243,7 +246,7 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 func (a *HorizontalController) deleteHPA(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -272,7 +275,7 @@ func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 
 	deleted, err := a.reconcileKey(ctx, key)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to reconcile", "key", key)
 	}
 	// Add request processing HPA to queue with resyncPeriod delay.
 	// Requests are always added to queue with resyncPeriod delay. If there's already request
@@ -760,7 +763,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
 		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to update status")
 		}
 		return fmt.Errorf("invalid API version in scale target reference: %v%w", err, errSpec)
 	}
@@ -775,7 +778,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
 		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to update status")
 		}
 		return fmt.Errorf("unable to determine resource for scale target reference: %v", err)
 	}
@@ -785,7 +788,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
 		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to update status")
 		}
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
@@ -833,7 +836,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		if err != nil && metricDesiredReplicas == -1 {
 			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
 			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "Failed to update status")
 			}
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
 			return fmt.Errorf("failed to compute desired number of replicas based on listed metrics for %s: %v", reference, err)
@@ -876,7 +879,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
 			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
 			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "Failed to update status")
 			}
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}

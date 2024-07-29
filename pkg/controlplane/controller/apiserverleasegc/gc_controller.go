@@ -71,23 +71,23 @@ func NewAPIServerLeaseGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 }
 
 // Run starts one worker.
-func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
+func (c *Controller) Run(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer klog.Infof("Shutting down apiserver lease garbage collector")
 
 	klog.Infof("Starting apiserver lease garbage collector")
 
 	// we have a personal informer that is narrowly scoped, start it.
-	go c.leaseInformer.Run(stopCh)
+	go c.leaseInformer.RunWithContext(ctx)
 
-	if !cache.WaitForCacheSync(stopCh, c.leasesSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.leasesSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 
-	go wait.Until(c.gc, c.gcCheckPeriod, stopCh)
+	go wait.Until(c.gc, c.gcCheckPeriod, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *Controller) gc() {

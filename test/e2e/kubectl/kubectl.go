@@ -1795,7 +1795,7 @@ metadata:
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": podName}))
-			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			err := testutils.WaitForPodsWithLabelRunning(ctx, c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
@@ -1997,7 +1997,7 @@ metadata:
 
 			ginkgo.By("verifying the pod " + podName + " is running")
 			label := labels.SelectorFromSet(map[string]string{"run": podName})
-			err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+			err := testutils.WaitForPodsWithLabelRunning(ctx, c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
@@ -2271,7 +2271,7 @@ func curl(url string) (string, error) {
 func validateGuestbookApp(ctx context.Context, c clientset.Interface, ns string) {
 	framework.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
-	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
+	err := testutils.WaitForPodsWithLabelRunning(ctx, c, ns, label)
 	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(ctx, c, "get", "", `{"data":""}`, guestbookStartupTimeout, ns) {

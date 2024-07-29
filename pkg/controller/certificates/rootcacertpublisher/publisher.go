@@ -100,14 +100,14 @@ type Publisher struct {
 
 // Run starts process
 func (c *Publisher) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting root CA cert publisher controller")
 	defer logger.Info("Shutting down root CA cert publisher controller")
 
-	if !cache.WaitForNamedCacheSync("crt configmap", ctx.Done(), c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.cmListerSynced) {
 		return
 	}
 
@@ -121,7 +121,7 @@ func (c *Publisher) Run(ctx context.Context, workers int) {
 func (c *Publisher) configMapDeleted(obj interface{}) {
 	cm, err := convertToCM(obj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
@@ -133,7 +133,7 @@ func (c *Publisher) configMapDeleted(obj interface{}) {
 func (c *Publisher) configMapUpdated(_, newObj interface{}) {
 	cm, err := convertToCM(newObj)
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	if cm.Name != RootCACertConfigMapName {
@@ -170,7 +170,7 @@ func (c *Publisher) processNextWorkItem(ctx context.Context) bool {
 	defer c.queue.Done(key)
 
 	if err := c.syncHandler(ctx, key); err != nil {
-		utilruntime.HandleError(fmt.Errorf("syncing %q failed: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 		c.queue.AddRateLimited(key)
 		return true
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -44,7 +45,10 @@ type newObjectFunc func() runtime.Object
 type isImmutableFunc func(runtime.Object) bool
 
 // objectCacheItem is a single item stored in objectCache.
+// The reflector runs until the parent context in the objectCache is
+// done or the item's stop method is called.
 type objectCacheItem struct {
+	parentCtx context.Context
 	refMap    map[types.UID]int
 	store     *cacheStore
 	reflector *cache.Reflector
@@ -54,13 +58,13 @@ type objectCacheItem struct {
 	// waitGroup is used to ensure that there won't be two concurrent calls to reflector.Run
 	waitGroup sync.WaitGroup
 
-	// lock is to ensure the access and modify of lastAccessTime, stopped, and immutable are thread safety,
-	// and protecting from closing stopCh multiple times.
+	// lock is to ensure the access and modify of lastAccessTime, stopped, and immutable are thread safety.
+	// Strictly speaking, the context doesn't need it because it may be canceled more than once.
 	lock           sync.Mutex
 	lastAccessTime time.Time
-	stopped        bool
 	immutable      bool
-	stopCh         chan struct{}
+	ctx            context.Context // child context of parentCtx
+	cancel         func()
 }
 
 func (i *objectCacheItem) stop() bool {
@@ -69,12 +73,15 @@ func (i *objectCacheItem) stop() bool {
 	return i.stopThreadUnsafe()
 }
 
+func (i *objectCacheItem) stopped() bool {
+	return i.ctx.Err() != nil
+}
+
 func (i *objectCacheItem) stopThreadUnsafe() bool {
-	if i.stopped {
+	if i.stopped() {
 		return false
 	}
-	i.stopped = true
-	close(i.stopCh)
+	i.cancel()
 	if !i.immutable {
 		i.store.unsetInitialized()
 	}
@@ -100,7 +107,7 @@ func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) b
 	// In case of overloaded kube-apiserver, if the list request is
 	// already being processed, all the work would lost and would have
 	// to be retried.
-	if !i.stopped && i.store.hasSynced() && now.After(i.lastAccessTime.Add(maxIdleTime)) {
+	if !i.stopped() && i.store.hasSynced() && now.After(i.lastAccessTime.Add(maxIdleTime)) {
 		return i.stopThreadUnsafe()
 	}
 	return false
@@ -109,11 +116,10 @@ func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) b
 func (i *objectCacheItem) restartReflectorIfNeeded() {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	if i.immutable || !i.stopped {
+	if i.immutable || !i.stopped() {
 		return
 	}
-	i.stopCh = make(chan struct{})
-	i.stopped = false
+	i.ctx, i.cancel = context.WithCancel(i.parentCtx)
 	go i.startReflector()
 }
 
@@ -121,7 +127,7 @@ func (i *objectCacheItem) startReflector() {
 	i.waitGroup.Wait()
 	i.waitGroup.Add(1)
 	defer i.waitGroup.Done()
-	i.reflector.Run(i.stopCh)
+	i.reflector.RunWithContext(i.ctx)
 }
 
 // cacheStore is in order to rewrite Replace function to mark initialized flag
@@ -157,6 +163,7 @@ func (c *cacheStore) unsetInitialized() {
 // objectCache is a local cache of objects propagated via
 // individual watches.
 type objectCache struct {
+	ctx           context.Context
 	listObject    listObjectFunc
 	watchObject   watchObjectFunc
 	newObject     newObjectFunc
@@ -165,29 +172,30 @@ type objectCache struct {
 	clock         clock.Clock
 	maxIdleTime   time.Duration
 
-	lock    sync.RWMutex
-	items   map[objectKey]*objectCacheItem
-	stopped bool
+	lock  sync.RWMutex
+	items map[objectKey]*objectCacheItem
 }
 
 const minIdleTime = 1 * time.Minute
 
 // NewObjectCache returns a new watch-based instance of Store interface.
+// Background activities run until the context is done.
 func NewObjectCache(
+	ctx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
 	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	clock clock.Clock,
-	maxIdleTime time.Duration,
-	stopCh <-chan struct{}) Store {
+	maxIdleTime time.Duration) Store {
 
 	if maxIdleTime < minIdleTime {
 		maxIdleTime = minIdleTime
 	}
 
 	store := &objectCache{
+		ctx:           ctx,
 		listObject:    listObject,
 		watchObject:   watchObject,
 		newObject:     newObject,
@@ -198,8 +206,8 @@ func NewObjectCache(
 		items:         make(map[objectKey]*objectCacheItem),
 	}
 
-	go wait.Until(store.startRecycleIdleWatch, time.Minute, stopCh)
-	go store.shutdownWhenStopped(stopCh)
+	go wait.Until(store.startRecycleIdleWatch, time.Minute, ctx.Done())
+	go store.shutdownWhenStopped()
 	return store
 }
 
@@ -236,15 +244,16 @@ func (c *objectCache) newReflectorLocked(namespace, name string) *objectCacheIte
 		},
 	)
 	item := &objectCacheItem{
+		parentCtx: c.ctx,
 		refMap:    make(map[types.UID]int),
 		store:     store,
 		reflector: reflector,
 		hasSynced: func() (bool, error) { return store.hasSynced(), nil },
-		stopCh:    make(chan struct{}),
 	}
+	item.ctx, item.cancel = context.WithCancel(item.parentCtx)
 
 	// Don't start reflector if Kubelet is already shutting down.
-	if !c.stopped {
+	if c.ctx.Err() == nil {
 		go item.startReflector()
 	}
 	return item
@@ -296,9 +305,7 @@ func (c *objectCache) key(namespace, name string) string {
 }
 
 func (c *objectCache) isStopped() bool {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.stopped
+	return c.ctx.Err() != nil
 }
 
 func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
@@ -362,13 +369,12 @@ func (c *objectCache) startRecycleIdleWatch() {
 	}
 }
 
-func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
-	<-stopCh
+func (c *objectCache) shutdownWhenStopped() {
+	<-c.ctx.Done()
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.stopped = true
 	for _, item := range c.items {
 		item.stop()
 	}
@@ -381,6 +387,7 @@ func (c *objectCache) shutdownWhenStopped(stopCh <-chan struct{}) {
 //     referenced objects that aren't referenced from other registered pods
 //   - every GetObject() returns a value from local cache propagated via watches
 func NewWatchBasedManager(
+	ctx context.Context,
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
@@ -396,6 +403,6 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	// TODO propagate stopCh from the higher level.
-	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
+	objectStore := NewObjectCache(ctx, listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

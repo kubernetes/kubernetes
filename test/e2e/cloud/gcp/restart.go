@@ -52,13 +52,14 @@ var _ = SIGDescribe("Restart", framework.WithDisruptive(), func() {
 	var numNodes int
 	var systemNamespace string
 
-	ginkgo.BeforeEach(func(ctx context.Context) {
+	var init = func(ctx context.Context) {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
 		e2eskipper.SkipUnlessProviderIs("gce", "gke")
 		var err error
-		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
+		ps, err = testutils.NewPodStore(ctx, f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 		framework.ExpectNoError(err)
+		ginkgo.DeferCleanup(ps.Stop)
 		numNodes, err = e2enode.TotalRegistered(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
 		systemNamespace = metav1.NamespaceSystem
@@ -80,16 +81,12 @@ var _ = SIGDescribe("Restart", framework.WithDisruptive(), func() {
 			printStatusAndLogsForNotReadyPods(ctx, f.ClientSet, systemNamespace, originalPodNames, pods)
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
-	})
-
-	ginkgo.AfterEach(func() {
-		if ps != nil {
-			ps.Stop()
-		}
-	})
+	}
 
 	// TODO(upodroid) This test will be removed in 1.33 when kubeup is removed
 	f.It(f.WithLabel("KubeUp"), "should restart all nodes and ensure all nodes and pods recover", func(ctx context.Context) {
+		init(ctx)
+
 		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
 		framework.ExpectNoError(err)

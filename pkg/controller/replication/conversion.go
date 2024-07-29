@@ -74,7 +74,11 @@ func (i conversionInformer) AddEventHandler(handler cache.ResourceEventHandler) 
 }
 
 func (i conversionInformer) AddEventHandlerWithResyncPeriod(handler cache.ResourceEventHandler, resyncPeriod time.Duration) (cache.ResourceEventHandlerRegistration, error) {
-	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod)
+	return i.SharedIndexInformer.AddEventHandlerWithResyncPeriod(conversionEventHandler{handler}, resyncPeriod) //nolint:logcheck // Should not get called.
+}
+
+func (i conversionInformer) AddEventHandlerWithConfig(ctx context.Context, handler cache.ResourceEventHandler, config cache.HandlerConfig) (cache.ResourceEventHandlerRegistration, error) {
+	return i.SharedIndexInformer.AddEventHandlerWithConfig(ctx, conversionEventHandler{handler}, config)
 }
 
 type conversionLister struct {
@@ -128,7 +132,7 @@ type conversionEventHandler struct {
 func (h conversionEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 	rs, err := convertRCtoRS(obj.(*v1.ReplicationController), nil)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("dropping RC OnAdd event: can't convert object %#v to RS: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("dropping RC OnAdd event: can't convert object %#v to RS: %v", obj, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	h.handler.OnAdd(rs, isInInitialList)
@@ -137,12 +141,12 @@ func (h conversionEventHandler) OnAdd(obj interface{}, isInInitialList bool) {
 func (h conversionEventHandler) OnUpdate(oldObj, newObj interface{}) {
 	oldRS, err := convertRCtoRS(oldObj.(*v1.ReplicationController), nil)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("dropping RC OnUpdate event: can't convert old object %#v to RS: %v", oldObj, err))
+		utilruntime.HandleError(fmt.Errorf("dropping RC OnUpdate event: can't convert old object %#v to RS: %v", oldObj, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	newRS, err := convertRCtoRS(newObj.(*v1.ReplicationController), nil)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("dropping RC OnUpdate event: can't convert new object %#v to RS: %v", newObj, err))
+		utilruntime.HandleError(fmt.Errorf("dropping RC OnUpdate event: can't convert new object %#v to RS: %v", newObj, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	h.handler.OnUpdate(oldRS, newRS)
@@ -154,17 +158,17 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 		// Convert the Obj inside DeletedFinalStateUnknown.
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: couldn't get object from tombstone %+v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		rc, ok = tombstone.Obj.(*v1.ReplicationController)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: tombstone contained object that is not a RC %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		rs, err := convertRCtoRS(rc, nil)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: can't convert object %#v to RS: %v", obj, err))
+			utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: can't convert object %#v to RS: %v", obj, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		h.handler.OnDelete(cache.DeletedFinalStateUnknown{Key: tombstone.Key, Obj: rs})
@@ -174,7 +178,7 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 	// It's a regular RC object.
 	rs, err := convertRCtoRS(rc, nil)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: can't convert object %#v to RS: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("dropping RC OnDelete event: can't convert object %#v to RS: %v", obj, err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return
 	}
 	h.handler.OnDelete(rs)

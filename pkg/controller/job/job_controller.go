@@ -212,7 +212,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	logger := klog.FromContext(ctx)
 
 	// Start events processing pipeline.
@@ -226,7 +226,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting job controller")
 	defer logger.Info("Shutting down job controller")
 
-	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
@@ -240,7 +240,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 }
 
 // getPodJobs returns a list of Jobs that potentially match a Pod.
-func (jm *Controller) getPodJobs(pod *v1.Pod) []*batch.Job {
+func (jm *Controller) getPodJobs(logger klog.Logger, pod *v1.Pod) []*batch.Job {
 	jobs, err := jm.jobLister.GetPodJobs(pod)
 	if err != nil {
 		return nil
@@ -248,7 +248,7 @@ func (jm *Controller) getPodJobs(pod *v1.Pod) []*batch.Job {
 	if len(jobs) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		utilruntime.HandleError(fmt.Errorf("user error! more than one job is selecting pods with labels: %+v", pod.Labels))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "user error! more than one job is selecting pods", "labels", pod.Labels)
 	}
 	ret := make([]*batch.Job, 0, len(jobs))
 	for i := range jobs {
@@ -313,7 +313,7 @@ func (jm *Controller) addPod(logger klog.Logger, obj interface{}) {
 	// them to see if anyone wants to adopt it.
 	// DO NOT observe creation because no controller should be waiting for an
 	// orphan.
-	for _, job := range jm.getPodJobs(pod) {
+	for _, job := range jm.getPodJobs(logger, pod) {
 		jm.enqueueSyncJobBatched(logger, job)
 	}
 }
@@ -386,7 +386,7 @@ func (jm *Controller) updatePod(logger klog.Logger, old, cur interface{}) {
 	// to see if anyone wants to adopt it now.
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
 	if labelChanged || controllerRefChanged {
-		for _, job := range jm.getPodJobs(curPod) {
+		for _, job := range jm.getPodJobs(logger, curPod) {
 			jm.enqueueSyncJobBatched(logger, job)
 		}
 	}
@@ -407,12 +407,12 @@ func (jm *Controller) deletePod(logger klog.Logger, obj interface{}, final bool)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Tombstone contained object that is not a pod", "obj", obj)
 			return
 		}
 	}
@@ -483,7 +483,7 @@ func (jm *Controller) updateJob(logger klog.Logger, old, cur interface{}) {
 	// The job shouldn't be marked as finished until all pod finalizers are removed.
 	// This is a backup operation in this case.
 	if util.IsJobFinished(curJob) {
-		jm.cleanupPodFinalizers(curJob)
+		jm.cleanupPodFinalizers(logger, curJob)
 	}
 
 	// check if need to add a new rsync for ActiveDeadlineSeconds
@@ -511,16 +511,16 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		jobObj, ok = tombstone.Obj.(*batch.Job)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a job %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Tombstone contained object that is not a job", "obj", obj)
 			return
 		}
 	}
-	jm.cleanupPodFinalizers(jobObj)
+	jm.cleanupPodFinalizers(logger, jobObj)
 }
 
 // enqueueSyncJobImmediately tells the Job controller to invoke syncJob
@@ -555,7 +555,7 @@ func (jm *Controller) enqueueSyncJobWithDelay(logger klog.Logger, obj interface{
 func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}, delay time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Couldn't get key for object", "obj", obj)
 		return
 	}
 
@@ -572,7 +572,7 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 func (jm *Controller) enqueueOrphanPod(obj *v1.Pod) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	jm.orphanQueue.Add(key)
@@ -598,7 +598,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("syncing job: %w", err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing job failed")
 	jm.queue.AddRateLimited(key)
 
 	return true
@@ -617,7 +617,7 @@ func (jm *Controller) processNextOrphanPod(ctx context.Context) bool {
 	defer jm.orphanQueue.Done(key)
 	err := jm.syncOrphanPod(ctx, key)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing orphan pod: %v", err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Syncing orphan pod failed")
 		jm.orphanQueue.AddRateLimited(key)
 	} else {
 		jm.orphanQueue.Forget(key)
@@ -1018,7 +1018,7 @@ func (jm *Controller) deleteActivePods(ctx context.Context, job *batch.Job, pods
 			if err := jm.podControl.DeletePod(ctx, job.Namespace, pod.Name, job); err != nil && !apierrors.IsNotFound(err) {
 				atomic.AddInt32(&successfulDeletes, -1)
 				errCh <- err
-				utilruntime.HandleError(err)
+				utilruntime.HandleErrorWithContext(ctx, err, "Deleting pod failed")
 			}
 			if podutil.IsPodReady(pod) {
 				atomic.AddInt32(&deletedReady, 1)
@@ -1054,10 +1054,9 @@ func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey 
 		// Decrement the expected number of deletes because the informer won't observe this deletion
 		jm.expectations.DeletionObserved(logger, jobKey)
 		if !apierrors.IsNotFound(err) {
-			logger.V(2).Info("Failed to delete Pod", "job", klog.KObj(job), "pod", klog.KObj(pod), "err", err)
 			atomic.AddInt32(&successfulDeletes, -1)
 			errCh <- err
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Deleting Pod failed", "job", klog.KObj(job), "pod", klog.KObj(pod))
 		}
 	}
 
@@ -1376,7 +1375,7 @@ func (jm *Controller) removeTrackingFinalizerFromPods(ctx context.Context, jobKe
 					}
 					if !apierrors.IsNotFound(err) {
 						errCh <- err
-						utilruntime.HandleError(fmt.Errorf("removing tracking finalizer: %w", err))
+						utilruntime.HandleErrorWithContext(ctx, err, "Removing tracking finalizer failed")
 						return
 					}
 				}
@@ -1541,7 +1540,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Couldn't get key for job", "obj", job)
 		return 0, metrics.JobSyncActionTracking, nil
 	}
 
@@ -1697,9 +1696,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 						}
 					}
 					if err != nil {
-						defer utilruntime.HandleError(err)
-						// Decrement the expected number of creates because the informer won't observe this pod
-						logger.V(2).Info("Failed creation, decrementing expectations", "job", klog.KObj(job))
+						defer utilruntime.HandleErrorWithContext(ctx, err, "Failed creation, decremented expectations", "job", klog.KObj(job))
 						jm.expectations.CreationObserved(logger, jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
@@ -2016,11 +2013,11 @@ func onlyReplaceFailedPods(job *batch.Job) bool {
 	return job.Spec.PodFailurePolicy != nil
 }
 
-func (jm *Controller) cleanupPodFinalizers(job *batch.Job) {
+func (jm *Controller) cleanupPodFinalizers(logger klog.Logger, job *batch.Job) {
 	// Listing pods shouldn't really fail, as we are just querying the informer cache.
 	selector, err := metav1.LabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("parsing deleted job selector: %v", err))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Parsing deleted job selector failed")
 		return
 	}
 	pods, _ := jm.podStore.Pods(job.Namespace).List(selector)

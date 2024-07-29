@@ -121,13 +121,13 @@ var (
 
 // Run begins watching and syncing.
 func (ttlc *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer ttlc.queue.ShutDown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting TTL controller")
 	defer logger.Info("Shutting down TTL controller")
 
-	if !cache.WaitForNamedCacheSync("TTL", ctx.Done(), ttlc.hasSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ttlc.hasSynced) {
 		return
 	}
 
@@ -141,7 +141,7 @@ func (ttlc *Controller) Run(ctx context.Context, workers int) {
 func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Unexpected object type", "obj", klog.Format(obj))
 		return
 	}
 
@@ -160,7 +160,7 @@ func (ttlc *Controller) addNode(logger klog.Logger, obj interface{}) {
 func (ttlc *Controller) updateNode(logger klog.Logger, _, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Unexpected object type", "obj", klog.Format(newObj))
 		return
 	}
 	// Processing all updates of nodes guarantees that we will update
@@ -176,12 +176,12 @@ func (ttlc *Controller) deleteNode(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		_, ok = tombstone.Obj.(*v1.Node)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj))
+			utilruntime.HandleError(fmt.Errorf("unexpected object types: %v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -226,7 +226,7 @@ func (ttlc *Controller) processItem(ctx context.Context) bool {
 	}
 
 	ttlc.queue.AddRateLimited(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	return true
 }
 

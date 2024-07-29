@@ -17,7 +17,6 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -31,6 +30,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestConfigMapCreation(t *testing.T) {
@@ -122,6 +122,7 @@ func TestConfigMapCreation(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			client := fake.NewSimpleClientset(caConfigMap, existNS)
 			informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
 			cmInformer := informers.Core().V1().ConfigMaps()
@@ -155,7 +156,6 @@ func TestConfigMapCreation(t *testing.T) {
 				cmStore.Add(tc.UpdatedConfigMap)
 				controller.configMapUpdated(nil, tc.UpdatedConfigMap)
 			}
-			ctx := context.TODO()
 			for controller.queue.Len() != 0 {
 				controller.processNextWorkItem(ctx)
 			}
@@ -250,6 +250,7 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			client := fake.NewSimpleClientset(tc.ExistingConfigMaps...)
 			configMapIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			for _, obj := range tc.ExistingConfigMaps {
@@ -264,7 +265,6 @@ func TestConfigMapUpdateNoHotLoop(t *testing.T) {
 				cmListerSynced: func() bool { return true },
 				nsListerSynced: func() bool { return true },
 			}
-			ctx := context.TODO()
 			err := controller.syncNamespace(ctx, "default")
 			if err != nil {
 				t.Fatal(err)

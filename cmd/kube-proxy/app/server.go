@@ -435,7 +435,7 @@ func serveHealthz(ctx context.Context, hz *healthcheck.ProxierHealthServer, errC
 	go wait.Until(fn, 5*time.Second, ctx.Done())
 }
 
-func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
+func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
@@ -462,8 +462,7 @@ func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enabl
 	fn := func() {
 		err := http.ListenAndServe(bindAddress, proxyMux)
 		if err != nil {
-			err = fmt.Errorf("starting metrics server failed: %w", err)
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Starting metrics server failed")
 			if errCh != nil {
 				errCh <- err
 				// if in hardfail mode, never retry again
@@ -512,7 +511,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serveHealthz(ctx, s.HealthzServer, healthzErrCh)
 
 	// Start up a metrics server if requested
-	serveMetrics(s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
+	serveMetrics(ctx, s.Config.MetricsBindAddress, s.Config.Mode, s.Config.EnableProfiling, metricsErrCh)
 
 	noProxyName, err := labels.NewRequirement(apis.LabelServiceProxyName, selection.DoesNotExist, nil)
 	if err != nil {

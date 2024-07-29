@@ -92,7 +92,7 @@ type Signer struct {
 }
 
 // NewSigner returns a new *Signer.
-func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
+func NewSigner(ctx context.Context, cl clientset.Interface, secrets informers.SecretInformer, configMaps informers.ConfigMapInformer, options SignerOptions) (*Signer, error) {
 	e := &Signer{
 		client:             cl,
 		configMapKey:       options.ConfigMapNamespace + "/" + options.ConfigMapName,
@@ -111,14 +111,15 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 		),
 	}
 
-	configMaps.Informer().AddEventHandlerWithResyncPeriod(
+	configMaps.Informer().AddEventHandlerWithConfig(
+		ctx,
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.ConfigMap:
 					return t.Name == options.ConfigMapName && t.Namespace == options.ConfigMapNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleErrorWithContext(ctx, nil, "Object passed to Signer that is not expected", "objectType", fmt.Sprintf("%T", obj))
 					return false
 				}
 			},
@@ -127,17 +128,20 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				UpdateFunc: func(_, _ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		options.ConfigMapResync,
+		cache.HandlerConfig{
+			ResyncPeriod: options.ConfigMapResync,
+		},
 	)
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	secrets.Informer().AddEventHandlerWithConfig(
+		ctx,
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Secret:
 					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.secretNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleErrorWithContext(ctx, nil, "Object passed to Signer that is not expected", "objectType", fmt.Sprintf("%T", obj))
 					return false
 				}
 			},
@@ -147,7 +151,9 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
 			},
 		},
-		options.SecretResync,
+		cache.HandlerConfig{
+			ResyncPeriod: options.SecretResync,
+		},
 	)
 
 	return e, nil
@@ -156,10 +162,10 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 // Run runs controller loops and returns when they are done
 func (e *Signer) Run(ctx context.Context) {
 	// Shut down queues
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer e.syncQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("bootstrap_signer", ctx.Done(), e.configMapSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, e.configMapSynced, e.secretSynced) {
 		return
 	}
 
@@ -221,7 +227,7 @@ func (e *Signer) signConfigMap(ctx context.Context) {
 	for tokenID, tokenValue := range tokens {
 		sig, err := jws.ComputeDetachedSignature(content, tokenID, tokenValue)
 		if err != nil {
-			utilruntime.HandleError(err)
+			utilruntime.HandleErrorWithContext(ctx, err, "Computing detached signature failed")
 		}
 
 		// Check to see if this signature is changed or new.
@@ -260,7 +266,7 @@ func (e *Signer) getConfigMap() *v1.ConfigMap {
 	// sync things up.
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			utilruntime.HandleError(err)
+			utilruntime.HandleError(err) //nolint:logcheck // Local cache should not fail.
 		}
 		return nil
 	}
@@ -271,7 +277,7 @@ func (e *Signer) getConfigMap() *v1.ConfigMap {
 func (e *Signer) listSecrets() []*v1.Secret {
 	secrets, err := e.secretLister.Secrets(e.secretNamespace).List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Local cache should not fail.
 		return nil
 	}
 

@@ -444,7 +444,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 }
 
 func (dc *DisruptionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	// Start events processing pipeline.
@@ -463,7 +463,7 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 	logger.Info("Starting disruption controller")
 	defer logger.Info("Shutting down disruption controller")
 
-	if !cache.WaitForNamedCacheSync("disruption", ctx.Done(), dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 
@@ -642,7 +642,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing PodDisruptionBudget, requeuing", "key", dKey, err)
 	dc.queue.AddRateLimited(dKey)
 
 	return true
@@ -679,7 +679,7 @@ func (dc *DisruptionController) processNextStalePodDisruptionWorkItem(ctx contex
 		dc.stalePodDisruptionQueue.Forget(key)
 		return true
 	}
-	utilruntime.HandleError(fmt.Errorf("error syncing Pod %v to clear DisruptionTarget condition, requeueing: %w", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing Pod to clear DisruptionTarget condition, requeueing", "key", key)
 	dc.stalePodDisruptionQueue.AddRateLimited(key)
 	return true
 }

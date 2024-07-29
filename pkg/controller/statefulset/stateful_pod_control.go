@@ -187,7 +187,7 @@ func (spc *StatefulPodControl) UpdateStatefulPod(ctx context.Context, set *apps.
 			// make a copy so we don't mutate the shared cache
 			pod = updated.DeepCopy()
 		} else {
-			utilruntime.HandleError(fmt.Errorf("error getting updated Pod %s/%s: %w", set.Namespace, pod.Name, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Error getting updated Pod", "pod", klog.KObj(pod))
 		}
 
 		return updateErr

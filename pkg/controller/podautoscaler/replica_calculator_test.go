@@ -17,7 +17,6 @@ limitations under the License.
 package podautoscaler
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"testing"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -337,6 +337,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 }
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
 	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
@@ -345,10 +346,8 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingTolerance, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
-	stop := make(chan struct{})
-	defer close(stop)
-	informerFactory.Start(stop)
-	if !cache.WaitForNamedCacheSync("HPA", stop, informer.Informer().HasSynced) {
+	informerFactory.Start(tCtx.Done())
+	if !cache.WaitForNamedCacheSyncWithContext(tCtx, informer.Informer().HasSynced) {
 		return
 	}
 
@@ -358,7 +357,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	require.NoError(t, err, "something went horribly wrong...")
 
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, tc.container)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(tCtx, tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")

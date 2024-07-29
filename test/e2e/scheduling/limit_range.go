@@ -91,7 +91,7 @@ var _ = SIGDescribe("LimitRange", func() {
 				return f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.LimitRange{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithContext(ctx, lw, &v1.LimitRange{})
 		defer w.Stop()
 
 		timeoutCtx, cancel := context.WithTimeout(ctx, wait.ForeverTestTimeout)

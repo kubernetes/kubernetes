@@ -170,7 +170,7 @@ var _ = SIGDescribe("SchedulerPredicates", framework.WithSerial(), func() {
 		// and there is no need to create additional pods.
 		// StartPods requires at least one pod to replicate.
 		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
+			framework.ExpectNoError(testutils.StartPods(ctx, cs, podsNeededForSaturation, ns, "overcommit",
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},

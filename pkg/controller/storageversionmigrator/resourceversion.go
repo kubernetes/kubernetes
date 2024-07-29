@@ -110,7 +110,7 @@ func (rv *ResourceVersionController) updateSVM(logger klog.Logger, oldObj, newOb
 func (rv *ResourceVersionController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err)) //nolint:logcheck // Should not be reached.
 		return
 	}
 
@@ -118,14 +118,14 @@ func (rv *ResourceVersionController) enqueue(svm *svmv1alpha1.StorageVersionMigr
 }
 
 func (rv *ResourceVersionController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer rv.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", ResourceVersionControllerName)
 	defer logger.Info("Shutting down", "controller", ResourceVersionControllerName)
 
-	if !cache.WaitForNamedCacheSync(ResourceVersionControllerName, ctx.Done(), rv.svmSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, rv.svmSynced) {
 		return
 	}
 

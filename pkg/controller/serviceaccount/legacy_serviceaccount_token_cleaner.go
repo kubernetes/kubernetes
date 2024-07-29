@@ -97,13 +97,13 @@ func NewLegacySATokenCleaner(saInformer coreinformers.ServiceAccountInformer, se
 }
 
 func (tc *LegacySATokenCleaner) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting legacy service account token cleaner controller")
 	defer logger.Info("Shutting down legacy service account token cleaner controller")
 
-	if !cache.WaitForNamedCacheSync("legacy-service-account-token-cleaner", ctx.Done(), tc.saInformerSynced, tc.secretInformerSynced, tc.podInformerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.saInformerSynced, tc.secretInformerSynced, tc.podInformerSynced) {
 		return
 	}
 

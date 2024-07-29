@@ -312,7 +312,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 
 	if kubeDeps.KubeClient != nil {
 		klog.InfoS("Adding apiserver pod source")
-		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
+		config.NewSourceApiserver(ctx, kubeDeps.KubeClient, nodeName, nodeHasSynced, cfg.Channel(ctx, kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
@@ -587,8 +587,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if klet.kubeClient != nil {
 		switch kubeCfg.ConfigMapAndSecretChangeDetectionStrategy {
 		case kubeletconfiginternal.WatchChangeDetectionStrategy:
-			secretManager = secret.NewWatchingSecretManager(klet.kubeClient, klet.resyncInterval)
-			configMapManager = configmap.NewWatchingConfigMapManager(klet.kubeClient, klet.resyncInterval)
+			secretManager = secret.NewWatchingSecretManager(ctx, klet.kubeClient, klet.resyncInterval)
+			configMapManager = configmap.NewWatchingConfigMapManager(ctx, klet.kubeClient, klet.resyncInterval)
 		case kubeletconfiginternal.TTLCacheChangeDetectionStrategy:
 			secretManager = secret.NewCachingSecretManager(
 				klet.kubeClient, manager.GetObjectTTLFromNodeFunc(klet.GetNode))

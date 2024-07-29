@@ -239,7 +239,7 @@ func (dsc *DaemonSetsController) updateDaemonset(logger klog.Logger, cur, old in
 	if curDS.UID != oldDS.UID {
 		key, err := controller.KeyFunc(oldDS)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", oldDS, err))
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", oldDS, err)) //nolint:logcheck // Not reached, all objects have a key.
 			return
 		}
 		dsc.deleteDaemonset(logger, cache.DeletedFinalStateUnknown{
@@ -257,12 +257,12 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		ds, ok = tombstone.Obj.(*apps.DaemonSet)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a DaemonSet %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -270,7 +270,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ds, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -282,7 +282,7 @@ func (dsc *DaemonSetsController) deleteDaemonset(logger klog.Logger, obj interfa
 
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	dsc.eventBroadcaster.StartStructuredLogging(3)
 	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
@@ -294,7 +294,7 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting daemon sets controller")
 	defer logger.Info("Shutting down daemon sets controller")
 
-	if !cache.WaitForNamedCacheSync("daemon sets", ctx.Done(), dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 
@@ -326,7 +326,7 @@ func (dsc *DaemonSetsController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", dsKey, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", dsKey)
 	dsc.queue.AddRateLimited(dsKey)
 
 	return true
@@ -335,7 +335,7 @@ func (dsc *DaemonSetsController) processNextWorkItem(ctx context.Context) bool {
 func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", ds, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -346,7 +346,7 @@ func (dsc *DaemonSetsController) enqueue(ds *apps.DaemonSet) {
 func (dsc *DaemonSetsController) enqueueDaemonSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -363,7 +363,7 @@ func (dsc *DaemonSetsController) getDaemonSetsForPod(pod *v1.Pod) []*apps.Daemon
 	if len(sets) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels))
+		utilruntime.HandleError(fmt.Errorf("user error! more than one daemon is selecting pods with labels: %+v", pod.Labels)) //nolint:logcheck // Could be reached (?), but not worth introducing a context for.
 	}
 	return sets
 }
@@ -477,12 +477,12 @@ func (dsc *DaemonSetsController) deleteHistory(logger klog.Logger, obj interface
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		history, ok = tombstone.Obj.(*apps.ControllerRevision)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ControllerRevision %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -614,12 +614,12 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -1032,7 +1032,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 					logger.V(2).Info("Failed creation, decrementing expectations for daemon set", "daemonset", klog.KObj(ds))
 					dsc.expectations.CreationObserved(logger, dsKey)
 					errCh <- err
-					utilruntime.HandleError(err)
+					utilruntime.HandleErrorWithContext(ctx, err, "Creating pod failed")
 				}
 			}(i)
 		}
@@ -1059,7 +1059,7 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 				if !apierrors.IsNotFound(err) {
 					logger.V(2).Info("Failed deletion, decremented expectations for daemon set", "daemonset", klog.KObj(ds))
 					errCh <- err
-					utilruntime.HandleError(err)
+					utilruntime.HandleErrorWithContext(ctx, err, "Deleting pod failed")
 				}
 			}
 		}(i)

@@ -94,9 +94,9 @@ func observeEventAfterAction(ctx context.Context, c clientset.Interface, ns stri
 	)
 
 	// Start the informer and block this goroutine waiting for the started signal.
-	informerStopChan := make(chan struct{})
-	defer func() { close(informerStopChan) }()
-	go controller.Run(informerStopChan)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go controller.RunWithContext(ctx)
 	<-informerStartedChan
 
 	// Invoke the action function.

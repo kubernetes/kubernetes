@@ -18,7 +18,6 @@ package pvprotection
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -74,14 +73,14 @@ func NewPVProtectionController(logger klog.Logger, pvInformer coreinformers.Pers
 
 // Run runs the controller goroutines.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting PV protection controller")
 	defer logger.Info("Shutting down PV protection controller")
 
-	if !cache.WaitForNamedCacheSync("PV protection", ctx.Done(), c.pvListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.pvListerSynced) {
 		return
 	}
 
@@ -113,7 +112,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("PV %v failed with : %v", pvKey, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing PV", "key", pvKey)
 	c.queue.AddRateLimited(pvKey)
 
 	return true
@@ -197,7 +196,7 @@ func (c *Controller) isBeingUsed(pv *v1.PersistentVolume) bool {
 func (c *Controller) pvAddedUpdated(logger klog.Logger, obj interface{}) {
 	pv, ok := obj.(*v1.PersistentVolume)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %#v", obj))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "PV informer returned non-PV object", "obj", klog.Format(obj))
 		return
 	}
 	logger.V(4).Info("Got event on PV", "PV", klog.KObj(pv))

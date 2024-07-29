@@ -84,7 +84,8 @@ func NewNamespaceController(
 	}
 
 	// configure the namespace informer event handlers
-	namespaceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	namespaceInformer.Informer().AddEventHandlerWithConfig(
+		ctx,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*v1.Namespace)
@@ -95,7 +96,9 @@ func NewNamespaceController(
 				namespaceController.enqueueNamespace(namespace)
 			},
 		},
-		resyncPeriod,
+		cache.HandlerConfig{
+			ResyncPeriod: resyncPeriod,
+		},
 	)
 	namespaceController.lister = namespaceInformer.Lister()
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
@@ -120,7 +123,7 @@ func nsControllerRateLimiter() workqueue.TypedRateLimiter[string] {
 func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -161,7 +164,7 @@ func (nm *NamespaceController) worker(ctx context.Context) {
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
 			nm.queue.AddRateLimited(key)
-			utilruntime.HandleError(fmt.Errorf("deletion of namespace %v failed: %v", key, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Deletion failed", "namespace", key)
 		}
 		return false
 	}
@@ -188,7 +191,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(ctx context.Context, key str
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to retrieve namespace from store", "namespace", key)
 		return err
 	}
 	return nm.namespacedResourcesDeleter.Delete(ctx, namespace.Name)
@@ -196,13 +199,13 @@ func (nm *NamespaceController) syncNamespaceFromKey(ctx context.Context, key str
 
 // Run starts observing the system with the specified number of workers.
 func (nm *NamespaceController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer nm.queue.ShutDown()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting namespace controller")
 	defer logger.Info("Shutting down namespace controller")
 
-	if !cache.WaitForNamedCacheSync("namespace", ctx.Done(), nm.listerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nm.listerSynced) {
 		return
 	}
 

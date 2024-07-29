@@ -444,7 +444,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	defer klog.Infof("Shutting down cluster_authentication_trust_controller controller")
 
 	// we have a personal informer that is narrowly scoped, start it.
-	go c.kubeSystemConfigMapInformer.Run(ctx.Done())
+	go c.kubeSystemConfigMapInformer.RunWithContext(ctx)
 
 	// wait for your secondary caches to fill before starting your work
 	if !cache.WaitForNamedCacheSync("cluster_authentication_trust_controller", ctx.Done(), c.preRunCaches...) {

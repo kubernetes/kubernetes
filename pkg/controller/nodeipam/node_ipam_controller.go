@@ -19,6 +19,8 @@ package nodeipam
 import (
 	"context"
 	"fmt"
+	"net"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,7 +32,6 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
-	"net"
 )
 
 // ipamController is an interface abstracting an interface for
@@ -132,7 +133,7 @@ func NewNodeIpamController(
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	nc.eventBroadcaster.StartStructuredLogging(3)
@@ -141,7 +142,7 @@ func (nc *Controller) Run(ctx context.Context) {
 	klog.FromContext(ctx).Info("Starting ipam controller")
 	defer klog.FromContext(ctx).Info("Shutting down ipam controller")
 
-	if !cache.WaitForNamedCacheSync("node", ctx.Done(), nc.nodeInformerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, nc.nodeInformerSynced) {
 		return
 	}
 

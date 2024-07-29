@@ -134,7 +134,7 @@ func NewNodes(f *framework.Framework, minNodes, maxNodes int) *Nodes {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			claimInformer.Run(cancelCtx.Done())
+			claimInformer.RunWithContext(cancelCtx)
 		}()
 	})
 	return nodes

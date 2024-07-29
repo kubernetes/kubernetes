@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 )
@@ -131,9 +132,10 @@ func Test_Controller(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			clientset := fake.NewSimpleClientset(test.lease)
 			controller := NewAPIServerLeaseGC(clientset, 100*time.Millisecond, metav1.NamespaceSystem, "apiserver.kubernetes.io/identity=kube-apiserver")
-			go controller.Run(nil)
+			go controller.Run(tCtx)
 
 			time.Sleep(time.Second)
 

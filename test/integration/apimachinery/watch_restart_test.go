@@ -35,6 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func noopNormalization(output []string) []string {
@@ -151,19 +152,19 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		name                string
 		succeed             bool
 		secret              *corev1.Secret
-		getWatcher          func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func())
+		getWatcher          func(ctx context.Context, c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, func(), error)
 		normalizeOutputFunc func(referenceOutput []string) []string
 	}{
 		{
 			name:    "regular watcher should fail",
 			succeed: false,
 			secret:  newTestSecret("secret-01"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(ctx context.Context, c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, func(), error) {
 				options := metav1.ListOptions{
 					ResourceVersion: secret.ResourceVersion,
 				}
 				w, err := getWatchFunc(c, secret)(options)
-				return w, err, noop
+				return w, noop, err
 			}, // regular watcher; unfortunately destined to fail
 			normalizeOutputFunc: noopNormalization,
 		},
@@ -171,14 +172,14 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			name:    "RetryWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-02"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(ctx context.Context, c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, func(), error) {
 				lw := &cache.ListWatch{
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return getWatchFunc(c, secret)(options)
 					},
 				}
 				w, err := watchtools.NewRetryWatcher(secret.ResourceVersion, lw)
-				return w, err, func() { <-w.Done() }
+				return w, func() { <-w.Done() }, err
 			},
 			normalizeOutputFunc: noopNormalization,
 		},
@@ -186,7 +187,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			name:    "InformerWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-03"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(ctx context.Context, c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, func(), error) {
 				lw := &cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 						return getListFunc(c, secret)(options), nil
@@ -199,9 +200,9 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				// since the watcher is driven by an informer it is crucial to start producing only after the informer has synced
 				// otherwise we might not get all expected events since the informer LIST (or watchelist) and only then WATCHES
 				// all events received during the initial LIST (or watchlist) will be seen as a single event (to most recent version of an obj)
-				_, informer, w, done := watchtools.NewIndexerInformerWatcher(lw, &corev1.Secret{})
-				cache.WaitForCacheSync(context.TODO().Done(), informer.HasSynced)
-				return w, nil, func() { <-done }
+				_, informer, w, done := watchtools.NewIndexerInformerWatcherWithContext(ctx, lw, &corev1.Secret{})
+				cache.WaitForCacheSync(ctx.Done(), informer.HasSynced)
+				return w, func() { <-done }, nil
 			},
 			normalizeOutputFunc: normalizeInformerOutputFunc(initialCount),
 		},
@@ -212,17 +213,18 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			tc := tmptc // we need to copy it for parallel runs
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
+				tCtx := ktesting.Init(t)
 				c, err := kubernetes.NewForConfig(server.ClientConfig)
 				if err != nil {
 					t.Fatalf("Failed to create clientset: %v", err)
 				}
 
-				secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
+				secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(tCtx, tc.secret, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Failed to create testing secret %s/%s: %v", tc.secret.Namespace, tc.secret.Name, err)
 				}
 
-				watcher, err, doneFn := tc.getWatcher(c, secret)
+				watcher, doneFn, err := tc.getWatcher(tCtx, c, secret)
 				if err != nil {
 					t.Fatalf("Failed to create watcher: %v", err)
 				}
@@ -236,7 +238,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 
 				// Record current time to be able to asses if the timeout has been reached
 				startTime := time.Now()
-				ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+				ctx, cancel := watchtools.ContextWithOptionalTimeout(tCtx, timeout)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
 					s, ok := event.Object.(*corev1.Secret)

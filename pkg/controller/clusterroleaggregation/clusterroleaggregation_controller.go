@@ -187,14 +187,14 @@ func ruleExists(haystack []rbacv1.PolicyRule, needle rbacv1.PolicyRule) bool {
 
 // Run starts the controller and blocks until stopCh is closed.
 func (c *ClusterRoleAggregationController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ClusterRoleAggregator controller")
 	defer logger.Info("Shutting down ClusterRoleAggregator controller")
 
-	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", ctx.Done(), c.clusterRolesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.clusterRolesSynced) {
 		return
 	}
 
@@ -223,7 +223,7 @@ func (c *ClusterRoleAggregationController) processNextWorkItem(ctx context.Conte
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", dsKey, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", dsKey)
 	c.queue.AddRateLimited(dsKey)
 
 	return true
@@ -235,7 +235,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 	// is a problem updating a single role
 	allClusterRoles, err := c.clusterRoleLister.List(labels.Everything())
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't list all objects %v", err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't list all objects %v", err)) //nolint:logcheck // Not reached, listing from cache should never fail.
 		return
 	}
 	for _, clusterRole := range allClusterRoles {
@@ -245,7 +245,7 @@ func (c *ClusterRoleAggregationController) enqueue() {
 		}
 		key, err := controller.KeyFunc(clusterRole)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", clusterRole, err))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", clusterRole, err)) //nolint:logcheck // Not reached, all objects have a key.
 			return
 		}
 		c.queue.Add(key)

@@ -636,7 +636,7 @@ func (config *RCConfig) start(ctx context.Context) error {
 
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
 
-	ps, err := NewPodStore(config.Client, config.Namespace, label, fields.Everything())
+	ps, err := NewPodStore(ctx, config.Client, config.Namespace, label, fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -722,7 +722,7 @@ func (config *RCConfig) start(ctx context.Context) error {
 // Simplified version of RunRC, that does not create RC, but creates plain Pods.
 // Optionally waits for pods to start running (if waitForRunning == true).
 // The number of replicas must be non-zero.
-func StartPods(c clientset.Interface, replicas int, namespace string, podNamePrefix string,
+func StartPods(ctx context.Context, c clientset.Interface, replicas int, namespace string, podNamePrefix string,
 	pod v1.Pod, waitForRunning bool, logFunc func(fmt string, args ...interface{})) error {
 	// no pod to start
 	if replicas < 1 {
@@ -742,7 +742,7 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 	logFunc("Waiting for running...")
 	if waitForRunning {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
-		err := WaitForPodsWithLabelRunning(c, namespace, label)
+		err := WaitForPodsWithLabelRunning(ctx, c, namespace, label)
 		if err != nil {
 			return fmt.Errorf("error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
 		}
@@ -752,15 +752,15 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 
 // Wait up to 10 minutes for all matching pods to become Running and at least one
 // matching pod exists.
-func WaitForPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector) error {
-	return WaitForEnoughPodsWithLabelRunning(c, ns, label, -1)
+func WaitForPodsWithLabelRunning(ctx context.Context, c clientset.Interface, ns string, label labels.Selector) error {
+	return WaitForEnoughPodsWithLabelRunning(ctx, c, ns, label, -1)
 }
 
 // Wait up to 10 minutes for at least 'replicas' many pods to be Running and at least
 // one matching pod exists. If 'replicas' is < 0, wait for all matching pods running.
-func WaitForEnoughPodsWithLabelRunning(c clientset.Interface, ns string, label labels.Selector, replicas int) error {
+func WaitForEnoughPodsWithLabelRunning(ctx context.Context, c clientset.Interface, ns string, label labels.Selector, replicas int) error {
 	running := false
-	ps, err := NewPodStore(c, ns, label, fields.Everything())
+	ps, err := NewPodStore(ctx, c, ns, label, fields.Everything())
 	if err != nil {
 		return err
 	}

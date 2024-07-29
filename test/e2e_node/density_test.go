@@ -336,16 +336,17 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, rc *Resour
 	var (
 		mutex      = &sync.Mutex{}
 		watchTimes = make(map[string]metav1.Time, 0)
-		stopCh     = make(chan struct{})
 	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// create test pod data structure
 	pods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageName(), podType)
 
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(ctx, f, mutex, watchTimes, podType)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	go controller.RunWithContext(ctx)
 
 	// TODO(coufon): in the test we found kubelet starts while it is busy on something, as a result 'syncLoop'
 	// does not response to pod creation immediately. Creating the first pod has a delay around 5s.
@@ -532,15 +533,17 @@ func createBatchPodSequential(ctx context.Context, f *framework.Framework, pods 
 	var (
 		mutex       = &sync.Mutex{}
 		watchTimes  = make(map[string]metav1.Time, 0)
-		stopCh      = make(chan struct{})
 		firstCreate metav1.Time
 		lastRunning metav1.Time
 		init        = true
 	)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(ctx, f, mutex, watchTimes, podType)
-	go controller.Run(stopCh)
-	defer close(stopCh)
+	go controller.RunWithContext(ctx)
 
 	batchStartTime := metav1.Now()
 	e2eLags := make([]e2emetrics.PodLatencyData, 0)

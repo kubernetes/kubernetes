@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,11 +34,11 @@ import (
 // Convenient wrapper around cache.Store that returns list of v1.Pod instead of interface{}.
 type PodStore struct {
 	cache.Store
-	stopCh    chan struct{}
+	cancel    func()
 	Reflector *cache.Reflector
 }
 
-func NewPodStore(c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) (*PodStore, error) {
+func NewPodStore(ctx context.Context, c clientset.Interface, namespace string, label labels.Selector, field fields.Selector) (*PodStore, error) {
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.LabelSelector = label.String()
@@ -53,19 +53,19 @@ func NewPodStore(c clientset.Interface, namespace string, label labels.Selector,
 		},
 	}
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	stopCh := make(chan struct{})
 	reflector := cache.NewReflector(lw, &v1.Pod{}, store, 0)
-	go reflector.Run(stopCh)
+	ctx, cancel := context.WithCancel(ctx)
+	go reflector.RunWithContext(ctx)
 	if err := wait.PollImmediate(50*time.Millisecond, 2*time.Minute, func() (bool, error) {
 		if len(reflector.LastSyncResourceVersion()) != 0 {
 			return true, nil
 		}
 		return false, nil
 	}); err != nil {
-		close(stopCh)
+		cancel()
 		return nil, err
 	}
-	return &PodStore{Store: store, stopCh: stopCh, Reflector: reflector}, nil
+	return &PodStore{Store: store, cancel: cancel, Reflector: reflector}, nil
 }
 
 func (s *PodStore) List() []*v1.Pod {
@@ -78,5 +78,5 @@ func (s *PodStore) List() []*v1.Pod {
 }
 
 func (s *PodStore) Stop() {
-	close(s.stopCh)
+	s.cancel()
 }

@@ -518,7 +518,7 @@ func (c *AssumeCache) emitEvents() {
 			return
 		}
 		func() {
-			defer utilruntime.HandleCrash()
+			defer utilruntime.HandleCrash() //nolint:logcheck // Should not be reached.
 			deliver()
 		}()
 	}

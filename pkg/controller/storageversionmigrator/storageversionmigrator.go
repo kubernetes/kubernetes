@@ -117,7 +117,7 @@ func (svmc *SVMController) updateSVM(logger klog.Logger, oldObj, newObj interfac
 func (svmc *SVMController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
 	key, err := controller.KeyFunc(svm)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %w", svm, err)) //nolint:logcheck // Should not be reached.
 		return
 	}
 
@@ -125,14 +125,14 @@ func (svmc *SVMController) enqueue(svm *svmv1alpha1.StorageVersionMigration) {
 }
 
 func (svmc *SVMController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer svmc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", svmc.controllerName)
 	defer logger.Info("Shutting down", "controller", svmc.controllerName)
 
-	if !cache.WaitForNamedCacheSync(svmc.controllerName, ctx.Done(), svmc.svmSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, svmc.svmSynced) {
 		return
 	}
 

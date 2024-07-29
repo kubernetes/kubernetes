@@ -61,7 +61,7 @@ func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions 
 }
 
 // NewServiceAccountsController returns a new *ServiceAccountsController.
-func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
+func NewServiceAccountsController(ctx context.Context, saInformer coreinformers.ServiceAccountInformer, nsInformer coreinformers.NamespaceInformer, cl clientset.Interface, options ServiceAccountsControllerOptions) (*ServiceAccountsController, error) {
 	e := &ServiceAccountsController{
 		client:                  cl,
 		serviceAccountsToEnsure: options.ServiceAccounts,
@@ -71,16 +71,16 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		),
 	}
 
-	saHandler, _ := saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	saHandler, _ := saInformer.Informer().AddEventHandlerWithConfig(ctx, cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
-	}, options.ServiceAccountResync)
+	}, cache.HandlerConfig{ResyncPeriod: options.ServiceAccountResync})
 	e.saLister = saInformer.Lister()
 	e.saListerSynced = saHandler.HasSynced
 
-	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithConfig(ctx, cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	}, options.NamespaceResync)
+	}, cache.HandlerConfig{ResyncPeriod: options.NamespaceResync})
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsHandler.HasSynced
 
@@ -108,13 +108,13 @@ type ServiceAccountsController struct {
 
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
 func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
 	klog.FromContext(ctx).Info("Starting service account controller")
 	defer klog.FromContext(ctx).Info("Shutting down service account controller")
 
-	if !cache.WaitForNamedCacheSync("service account", ctx.Done(), c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 
@@ -131,12 +131,12 @@ func (c *ServiceAccountsController) serviceAccountDeleted(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		sa, ok = tombstone.Obj.(*v1.ServiceAccount)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ServiceAccount %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a ServiceAccount %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -174,7 +174,7 @@ func (c *ServiceAccountsController) processNextWorkItem(ctx context.Context) boo
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	c.queue.AddRateLimited(key)
 
 	return true

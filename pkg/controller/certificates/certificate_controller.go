@@ -81,12 +81,12 @@ func NewCertificateController(
 		AddFunc: func(obj interface{}) {
 			csr := obj.(*certificates.CertificateSigningRequest)
 			logger.V(4).Info("Adding certificate request", "csr", csr.Name)
-			cc.enqueueCertificateRequest(obj)
+			cc.enqueueCertificateRequest(ctx, obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldCSR := old.(*certificates.CertificateSigningRequest)
 			logger.V(4).Info("Updating certificate request", "old", oldCSR.Name)
-			cc.enqueueCertificateRequest(new)
+			cc.enqueueCertificateRequest(ctx, new)
 		},
 		DeleteFunc: func(obj interface{}) {
 			csr, ok := obj.(*certificates.CertificateSigningRequest)
@@ -103,7 +103,7 @@ func NewCertificateController(
 				}
 			}
 			logger.V(4).Info("Deleting certificate request", "csr", csr.Name)
-			cc.enqueueCertificateRequest(obj)
+			cc.enqueueCertificateRequest(ctx, obj)
 		},
 	})
 	cc.csrLister = csrInformer.Lister()
@@ -113,14 +113,15 @@ func NewCertificateController(
 
 // Run the main goroutine responsible for watching and syncing jobs.
 func (cc *CertificateController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	ctx = klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), cc.name))
+	defer utilruntime.HandleCrashWithContext(ctx)
 	defer cc.queue.ShutDown()
 
 	logger := klog.FromContext(ctx)
-	logger.Info("Starting certificate controller", "name", cc.name)
-	defer logger.Info("Shutting down certificate controller", "name", cc.name)
+	logger.Info("Starting certificate controller")
+	defer logger.Info("Shutting down certificate controller")
 
-	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), ctx.Done(), cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, cc.csrsSynced) {
 		return
 	}
 
@@ -148,7 +149,7 @@ func (cc *CertificateController) processNextWorkItem(ctx context.Context) bool {
 	if err := cc.syncFunc(ctx, cKey); err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
-			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
+			utilruntime.HandleErrorWithContext(ctx, err, "Sync failed", "key", cKey)
 		} else {
 			klog.FromContext(ctx).V(4).Info("Sync certificate request failed", "csr", cKey, "err", err)
 		}
@@ -160,10 +161,10 @@ func (cc *CertificateController) processNextWorkItem(ctx context.Context) bool {
 
 }
 
-func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
+func (cc *CertificateController) enqueueCertificateRequest(ctx context.Context, obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Generating key failed")
 		return
 	}
 	cc.queue.Add(key)

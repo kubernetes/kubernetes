@@ -387,8 +387,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 	// during its previous scheduling cycle but before getting assumed.
 	isAssumed, err := sched.Cache.IsAssumedPod(pod)
 	if err != nil {
-		// TODO(91633): pass ctx into a revised HandleError
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to check whether pod is assumed", "pod", klog.KObj(pod))
 		return false
 	}
 	return isAssumed

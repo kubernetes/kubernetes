@@ -141,7 +141,7 @@ func NewDOTVertex(node *node) *dotVertex {
 	gv, err := schema.ParseGroupVersion(node.identity.APIVersion)
 	if err != nil {
 		// this indicates a bad data serialization that should be prevented during storage of the API
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Probably never reached?
 	}
 	return &dotVertex{
 		uid:                node.identity.UID,
@@ -159,7 +159,7 @@ func NewMissingdotVertex(ownerRef metav1.OwnerReference) *dotVertex {
 	gv, err := schema.ParseGroupVersion(ownerRef.APIVersion)
 	if err != nil {
 		// this indicates a bad data serialization that should be prevented during storage of the API
-		utilruntime.HandleError(err)
+		utilruntime.HandleError(err) //nolint:logcheck // Should not be reached.
 	}
 	return &dotVertex{
 		uid:              ownerRef.UID,

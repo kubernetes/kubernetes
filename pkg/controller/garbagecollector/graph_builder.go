@@ -122,15 +122,16 @@ type monitor struct {
 	controller cache.Controller
 	store      cache.Store
 
-	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
+	// ctx stops Controller. If ctx is nil, the monitor is considered to be
 	// not yet started.
-	stopCh chan struct{}
+	ctx    context.Context
+	cancel func()
 }
 
 // Run is intended to be called in a goroutine. Multiple calls of this is an
 // error.
 func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+	m.controller.RunWithContext(m.ctx)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -226,7 +227,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
 	// need to clone because it's from a shared cache
-	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	shared.Informer().AddEventHandlerWithConfig(klog.NewContext(context.Background(), logger), handlers, cache.HandlerConfig{ResyncPeriod: ResourceResyncTime})
 	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
 }
 
@@ -274,8 +275,8 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 	gb.monitors = current
 
 	for _, monitor := range toRemove {
-		if monitor.stopCh != nil {
-			close(monitor.stopCh)
+		if monitor.cancel != nil {
+			monitor.cancel()
 		}
 	}
 
@@ -303,9 +304,10 @@ func (gb *GraphBuilder) startMonitors(logger klog.Logger) {
 
 	monitors := gb.monitors
 	started := 0
+	ctx := klog.NewContext(context.Background(), logger)
 	for _, monitor := range monitors {
-		if monitor.stopCh == nil {
-			monitor.stopCh = make(chan struct{})
+		if monitor.ctx == nil {
+			monitor.ctx, monitor.cancel = context.WithCancel(ctx)
 			gb.sharedInformers.Start(gb.stopCh)
 			go monitor.Run()
 			started++
@@ -368,9 +370,9 @@ func (gb *GraphBuilder) Run(ctx context.Context) {
 	monitors := gb.monitors
 	stopped := 0
 	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
+		if monitor.cancel != nil {
 			stopped++
-			close(monitor.stopCh)
+			monitor.cancel()
 		}
 	}
 
@@ -573,7 +575,7 @@ func deletionStartsWithFinalizer(oldObj interface{}, newAccessor metav1.Object, 
 	}
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
+		utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return false
 	}
 	return !beingDeleted(oldAccessor) || !hasFinalizer(oldAccessor, matchingFinalizer)
@@ -685,7 +687,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 	obj := item.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Cannot access obj")
 		return true
 	}
 
@@ -1022,9 +1024,8 @@ func (gb *GraphBuilder) GetMonitor(ctx context.Context, resource schema.GroupVer
 		Controller: monitor.controller,
 	}
 
-	if !cache.WaitForNamedCacheSync(
-		gb.Name(),
-		ctx.Done(),
+	if !cache.WaitForNamedCacheSyncWithContext(
+		klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), gb.Name())),
 		func() bool {
 			return monitor.controller.HasSynced()
 		},

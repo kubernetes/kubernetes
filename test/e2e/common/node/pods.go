@@ -264,7 +264,7 @@ var _ = SIGDescribe("Pods", func() {
 				return podClient.Watch(ctx, options)
 			},
 		}
-		_, informer, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
+		_, informer, w, _ := watchtools.NewIndexerInformerWatcherWithContext(ctx, lw, &v1.Pod{})
 		defer w.Stop()
 
 		ctxUntil, cancelCtx := context.WithTimeout(ctx, wait.ForeverTestTimeout)

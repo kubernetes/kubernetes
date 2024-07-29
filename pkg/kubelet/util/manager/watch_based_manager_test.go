@@ -63,8 +63,9 @@ func isSecretImmutable(object runtime.Object) bool {
 	return false
 }
 
-func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
+func newSecretCache(ctx context.Context, fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
+		ctx:           ctx,
 		listObject:    listSecret(fakeClient),
 		watchObject:   watchSecret(fakeClient),
 		newObject:     func() runtime.Object { return &v1.Secret{} },
@@ -77,6 +78,9 @@ func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxId
 }
 
 func TestSecretCache(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fakeClient := &fake.Clientset{}
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
@@ -92,7 +96,7 @@ func TestSecretCache(t *testing.T) {
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name", "pod")
 	_, err := store.Get("ns", "name")
@@ -147,6 +151,8 @@ func TestSecretCache(t *testing.T) {
 }
 
 func TestSecretCacheMultipleRegistrations(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fakeClient := &fake.Clientset{}
 
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
@@ -162,7 +168,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name", "pod")
 	// This should trigger List and Watch actions eventually.
@@ -251,6 +257,8 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fakeClient := &fake.Clientset{}
 			listReactor := func(a core.Action) (bool, runtime.Object, error) {
 				result := &v1.SecretList{
@@ -268,7 +276,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			store := newSecretCache(fakeClient, fakeClock, time.Minute)
+			store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 			key := objectKey{namespace: "ns", name: "name"}
 			itemExists := func() (bool, error) {
@@ -284,7 +292,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 
 				item.lock.Lock()
 				defer item.lock.Unlock()
-				return !item.stopped
+				return !item.stopped()
 			}
 
 			// AddReference should start reflector.
@@ -331,6 +339,8 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 }
 
 func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -355,7 +365,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 	key := objectKey{namespace: "ns", name: "name"}
 	itemExists := func() (bool, error) {
@@ -372,7 +382,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 
 		item.lock.Lock()
 		defer item.lock.Unlock()
-		return !item.stopped
+		return !item.stopped()
 	}
 
 	// AddReference should start reflector.
@@ -410,6 +420,8 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 }
 
 func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",
@@ -437,7 +449,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
-	store := newSecretCache(fakeClient, fakeClock, time.Minute)
+	store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 	key := objectKey{namespace: "ns", name: "name"}
 	itemExists := func() (bool, error) {
@@ -454,7 +466,7 @@ func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 
 		item.lock.Lock()
 		defer item.lock.Unlock()
-		return !item.stopped
+		return !item.stopped()
 	}
 
 	reflectorInitialized := func() (bool, error) {
@@ -579,6 +591,8 @@ func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fakeClient := &fake.Clientset{}
 			listReactor := func(a core.Action) (bool, runtime.Object, error) {
 				result := &v1.SecretList{
@@ -593,7 +607,7 @@ func TestRefMapHandlesReferencesCorrectly(t *testing.T) {
 			fakeWatch := watch.NewFake()
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			store := newSecretCache(fakeClient, fakeClock, time.Minute)
+			store := newSecretCache(ctx, fakeClient, fakeClock, time.Minute)
 
 			for i, step := range tc.steps {
 				expect := tc.expects[i]

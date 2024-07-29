@@ -267,7 +267,7 @@ var _ = SIGDescribe("DaemonRestart", framework.WithDisruptive(), func() {
 				},
 			},
 		)
-		go controller.Run(backgroundCtx.Done())
+		go controller.RunWithContext(backgroundCtx)
 	})
 
 	ginkgo.It("Controller Manager should not create/delete replicas across restart", func(ctx context.Context) {

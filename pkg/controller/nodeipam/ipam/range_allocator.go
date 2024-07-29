@@ -148,7 +148,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 			// TODO: instead of executing the operation directly in the handler, build a small cache with key node.Name
 			// and value PodCIDRs use ReleaseCIDR on the reconcile loop so we can retry on `ReleaseCIDR` failures.
 			if err := ra.ReleaseCIDR(logger, obj.(*v1.Node)); err != nil {
-				utilruntime.HandleError(fmt.Errorf("error while processing CIDR Release: %w", err))
+				utilruntime.HandleErrorWithContext(ctx, err, "Error while processing CIDR Release")
 			}
 			// IndexerInformer uses a delta nodeQueue, therefore for deletes we have to use this
 			// key function.
@@ -163,7 +163,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client clientset.Interface, node
 }
 
 func (r *rangeAllocator) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	r.broadcaster.StartStructuredLogging(3)
@@ -177,7 +177,7 @@ func (r *rangeAllocator) Run(ctx context.Context) {
 	logger.Info("Starting range CIDR allocator")
 	defer logger.Info("Shutting down range CIDR allocator")
 
-	if !cache.WaitForNamedCacheSync("cidrallocator", ctx.Done(), r.nodesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, r.nodesSynced) {
 		return
 	}
 
@@ -203,9 +203,10 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 	if shutdown {
 		return false
 	}
+	logger := klog.FromContext(ctx)
 
 	// We wrap this block in a func so we can defer r.queue.Done.
-	err := func(logger klog.Logger, obj interface{}) error {
+	err := func() error {
 		// We call Done here so the workNodeQueue knows we have finished
 		// processing this item. We also must remember to call Forget if we
 		// do not want this work item being re-queued. For example, we do
@@ -225,7 +226,7 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 			// Forget here else we'd go into a loop of attempting to
 			// process a work item that is invalid.
 			r.queue.Forget(obj)
-			utilruntime.HandleError(fmt.Errorf("expected string in workNodeQueue but got %#v", obj))
+			utilruntime.HandleErrorWithContext(ctx, nil, "Expected string in workNodeQueue", "actualObjectType", fmt.Sprintf("%T", obj))
 			return nil
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
@@ -240,10 +241,10 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 		r.queue.Forget(obj)
 		logger.Info("Successfully synced", "key", key)
 		return nil
-	}(klog.FromContext(ctx), obj)
+	}()
 
 	if err != nil {
-		utilruntime.HandleError(err)
+		utilruntime.HandleErrorWithContext(ctx, err, "Error processing item", "key", obj)
 		return true
 	}
 

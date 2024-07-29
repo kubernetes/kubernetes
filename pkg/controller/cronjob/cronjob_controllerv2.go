@@ -132,7 +132,7 @@ func NewControllerV2(ctx context.Context, jobInformer batchv1informers.JobInform
 
 // Run starts the main goroutine responsible for watching and syncing jobs.
 func (jm *ControllerV2) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start event processing pipeline.
 	jm.broadcaster.StartStructuredLogging(3)
@@ -145,7 +145,7 @@ func (jm *ControllerV2) Run(ctx context.Context, workers int) {
 	logger.Info("Starting cronjob controller v2")
 	defer logger.Info("Shutting down cronjob controller v2")
 
-	if !cache.WaitForNamedCacheSync("cronjob", ctx.Done(), jm.jobListerSynced, jm.cronJobListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
 	}
 
@@ -171,7 +171,7 @@ func (jm *ControllerV2) processNextWorkItem(ctx context.Context) bool {
 	requeueAfter, err := jm.sync(ctx, key)
 	switch {
 	case err != nil:
-		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %w", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 		jm.queue.AddRateLimited(key)
 	case requeueAfter != nil:
 		jm.queue.Forget(key)
@@ -334,12 +334,12 @@ func (jm *ControllerV2) deleteJob(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 		job, ok = tombstone.Obj.(*batchv1.Job)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Job %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Job %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 			return
 		}
 	}
@@ -359,7 +359,7 @@ func (jm *ControllerV2) deleteJob(obj interface{}) {
 func (jm *ControllerV2) enqueueController(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -369,7 +369,7 @@ func (jm *ControllerV2) enqueueController(obj interface{}) {
 func (jm *ControllerV2) enqueueControllerAfter(obj interface{}, t time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 

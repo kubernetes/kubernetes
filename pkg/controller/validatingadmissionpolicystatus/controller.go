@@ -52,9 +52,9 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
-	if !cache.WaitForNamedCacheSync(ControllerName, ctx.Done(), c.policySynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.policySynced) {
 		return
 	}
 
@@ -96,7 +96,7 @@ func (c *Controller) enqueuePolicy(policy any) {
 		// policy objects are cluster-scoped, no point include its namespace.
 		key := policy.ObjectMeta.Name
 		if key == "" {
-			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy))
+			utilruntime.HandleError(fmt.Errorf("cannot get name of object %v", policy)) //nolint:logcheck // Should not be reached.
 		}
 		c.policyQueue.Add(key)
 	}
@@ -131,7 +131,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(ctx, err, "Syncing failed", "key", key)
 	c.policyQueue.AddRateLimited(key)
 
 	return true

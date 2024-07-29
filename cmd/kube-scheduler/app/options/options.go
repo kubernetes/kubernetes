@@ -236,7 +236,7 @@ func (o *Options) ApplyTo(logger klog.Logger, c *schedulerappconfig.Config) erro
 	// Build kubeconfig first to so that if it fails, it doesn't cause leaking
 	// goroutines (started from initializing secure serving - which underneath
 	// creates a queue which in its constructor starts a goroutine).
-	kubeConfig, err := createKubeConfig(c.ComponentConfig.ClientConnection, o.Master)
+	kubeConfig, err := createKubeConfig(logger, c.ComponentConfig.ClientConnection, o.Master)
 	if err != nil {
 		return err
 	}
@@ -370,8 +370,8 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 
 // createKubeConfig creates a kubeConfig from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
-	kubeConfig, err := clientcmd.BuildConfigFromFlags(masterOverride, config.Kubeconfig)
+func createKubeConfig(logger klog.Logger, config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
+	kubeConfig, err := clientcmd.BuildConfigFromFlagsWithContext(klog.NewContext(context.Background(), logger), masterOverride, config.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}

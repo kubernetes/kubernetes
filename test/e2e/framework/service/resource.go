@@ -125,7 +125,7 @@ func CreateServiceForSimpleAppWithPods(ctx context.Context, c clientset.Interfac
 	theService := CreateServiceForSimpleApp(ctx, c, contPort, svcPort, namespace, appName)
 	e2enode.CreatePodsPerNodeForSimpleApp(ctx, c, namespace, appName, podSpec, count)
 	if block {
-		err = testutils.WaitForPodsWithLabelRunning(c, namespace, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
+		err = testutils.WaitForPodsWithLabelRunning(ctx, c, namespace, labels.SelectorFromSet(labels.Set(theService.Spec.Selector)))
 	}
 	return theService, err
 }

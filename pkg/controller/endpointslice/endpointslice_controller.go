@@ -267,10 +267,10 @@ type Controller struct {
 
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
-	c.eventBroadcaster.StartLogging(klog.Infof)
+	c.eventBroadcaster.StartStructuredLogging(0)
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
 	defer c.eventBroadcaster.Shutdown()
 
@@ -281,7 +281,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	logger.Info("Starting endpoint slice controller")
 	defer logger.Info("Shutting down endpoint slice controller")
 
-	if !cache.WaitForNamedCacheSync("endpoint_slice", ctx.Done(), c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
 	}
 
@@ -348,7 +348,7 @@ func (c *Controller) handleErr(logger klog.Logger, err error, key string) {
 
 	logger.Info("Retry budget exceeded, dropping service out of the queue", "key", key, "err", err)
 	c.serviceQueue.Forget(key)
-	utilruntime.HandleError(err)
+	utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), err, "Syncing failed", "key", key)
 }
 
 func (c *Controller) syncService(logger klog.Logger, key string) error {
@@ -440,7 +440,7 @@ func (c *Controller) syncService(logger klog.Logger, key string) error {
 func (c *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -451,7 +451,7 @@ func (c *Controller) onServiceUpdate(obj interface{}) {
 func (c *Controller) onServiceDelete(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -464,7 +464,7 @@ func (c *Controller) onServiceDelete(obj interface{}) {
 func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()"))
+		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceAdd()")) //nolint:logcheck // Probably never reached.
 		return
 	}
 	if c.reconciler.ManagedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
@@ -480,7 +480,7 @@ func (c *Controller) onEndpointSliceUpdate(logger klog.Logger, prevObj, obj inte
 	prevEndpointSlice := prevObj.(*discovery.EndpointSlice)
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	if endpointSlice == nil || prevEndpointSlice == nil {
-		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()"))
+		utilruntime.HandleError(fmt.Errorf("Invalid EndpointSlice provided to onEndpointSliceUpdate()")) //nolint:logcheck // Probably never reached.
 		return
 	}
 	// EndpointSlice generation does not change when labels change. Although the
@@ -518,7 +518,7 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 func (c *Controller) queueServiceForEndpointSlice(endpointSlice *discovery.EndpointSlice) {
 	key, err := endpointslicerec.ServiceControllerKey(endpointSlice)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v: %v", endpointSlice, err))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for EndpointSlice %+v: %v", endpointSlice, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 
@@ -535,7 +535,7 @@ func (c *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 	services, err := endpointsliceutil.GetPodServiceMemberships(c.serviceLister, pod)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
+		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err)) //nolint:logcheck // Probably never reached?
 		return
 	}
 	for key := range services {
@@ -632,12 +632,12 @@ func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice 
 	// If we reached here it means the pod was deleted but its final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a EndpointSlice: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a EndpointSlice: %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	return endpointSlice

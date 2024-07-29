@@ -161,12 +161,12 @@ func getServiceFromDeleteAction(obj interface{}) *corev1.Service {
 	// is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	service, ok := tombstone.Obj.(*corev1.Service)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Service resource: %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	return service
@@ -182,12 +182,12 @@ func getEndpointsFromDeleteAction(obj interface{}) *corev1.Endpoints {
 	// final state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	endpoints, ok := tombstone.Obj.(*corev1.Endpoints)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an Endpoints resource: %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	return endpoints
@@ -202,12 +202,12 @@ func getEndpointSliceFromDeleteAction(obj interface{}) *discovery.EndpointSlice 
 	// state is unrecorded.
 	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	endpointSlice, ok := tombstone.Obj.(*discovery.EndpointSlice)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", obj))
+		utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not an EndpointSlice resource: %#v", obj)) //nolint:logcheck // Not reached, shouldn't have unknown objects.
 		return nil
 	}
 	return endpointSlice

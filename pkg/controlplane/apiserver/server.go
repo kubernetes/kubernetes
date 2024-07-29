@@ -262,7 +262,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				IdentityLeaseGCPeriod,
 				metav1.NamespaceSystem,
 				IdentityLeaseComponentLabelKey+"="+name,
-			).Run(hookContext.Done())
+			).Run(hookContext)
 			return nil
 		})
 	}

@@ -153,7 +153,7 @@ func NewStatefulSetController(
 
 // Run runs the statefulset controller.
 func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	// Start events processing pipeline.
 	ssc.eventBroadcaster.StartStructuredLogging(3)
@@ -166,7 +166,7 @@ func (ssc *StatefulSetController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting stateful set controller")
 	defer logger.Info("Shutting down statefulset controller")
 
-	if !cache.WaitForNamedCacheSync("stateful set", ctx.Done(), ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
 	}
 
@@ -280,12 +280,12 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Couldn't get object from tombstone", "obj", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*v1.Pod)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %+v", obj))
+			utilruntime.HandleErrorWithContext(klog.NewContext(context.Background(), logger), nil, "Tombstone contained object that is not a pod", "obj", obj)
 			return
 		}
 	}
@@ -377,6 +377,7 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 		for _, s := range sets {
 			setNames = append(setNames, s.Name)
 		}
+		//nolint:logcheck // Not worth fixing (called by informer callback).
 		utilruntime.HandleError(
 			fmt.Errorf(
 				"user error: more than one StatefulSet is selecting pods with labels: %+v. Sets: %v",
@@ -410,7 +411,7 @@ func (ssc *StatefulSetController) resolveControllerRef(namespace string, control
 func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	ssc.queue.Add(key)
@@ -420,7 +421,7 @@ func (ssc *StatefulSetController) enqueueStatefulSet(obj interface{}) {
 func (ssc *StatefulSetController) enqueueSSAfter(ss *apps.StatefulSet, duration time.Duration) {
 	key, err := controller.KeyFunc(ss)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ss, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", ss, err)) //nolint:logcheck // Not reached, all objects have a key.
 		return
 	}
 	ssc.queue.AddAfter(key, duration)
@@ -435,7 +436,7 @@ func (ssc *StatefulSetController) processNextWorkItem(ctx context.Context) bool 
 	}
 	defer ssc.queue.Done(key)
 	if err := ssc.sync(ctx, key); err != nil {
-		utilruntime.HandleError(fmt.Errorf("error syncing StatefulSet %v, requeuing: %w", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "error syncing StatefulSet, requeueing", "key", key)
 		ssc.queue.AddRateLimited(key)
 	} else {
 		ssc.queue.Forget(key)
@@ -467,13 +468,13 @@ func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to retrieve StatefulSet %v from store: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Unable to retrieve StatefulSet", "statefulset", klog.KRef(namespace, name))
 		return err
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("error converting StatefulSet %v selector: %v", key, err))
+		utilruntime.HandleErrorWithContext(ctx, err, "Error converting StatefulSet selector", "statefulset", klog.KObj(set))
 		// This is a non-transient error, so don't retry.
 		return nil
 	}

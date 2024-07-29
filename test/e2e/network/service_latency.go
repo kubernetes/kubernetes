@@ -151,9 +151,10 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 	// make; this is to minimize the timing error. It's how kube-proxy
 	// consumes the endpoints data, so it seems like the right thing to
 	// test.
-	endpointQueries := newQuerier()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	endpointQueries := newQuerier(ctx)
 	startEndpointWatcher(ctx, f, endpointQueries)
-	defer close(endpointQueries.stop)
 
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
@@ -209,20 +210,18 @@ type endpointQuery struct {
 type endpointQueries struct {
 	requests map[string]*endpointQuery
 
-	stop        chan struct{}
 	requestChan chan *endpointQuery
 	seenChan    chan *v1.Endpoints
 }
 
-func newQuerier() *endpointQueries {
+func newQuerier(ctx context.Context) *endpointQueries {
 	eq := &endpointQueries{
 		requests: map[string]*endpointQuery{},
 
-		stop:        make(chan struct{}, 100),
 		requestChan: make(chan *endpointQuery),
 		seenChan:    make(chan *v1.Endpoints, 100),
 	}
-	go eq.join()
+	go eq.join(ctx)
 	return eq
 }
 
@@ -230,7 +229,7 @@ func newQuerier() *endpointQueries {
 // nice properties like:
 //   - remembering an endpoint if it happens to arrive before it is requested.
 //   - closing all outstanding requests (returning nil) if it is stopped.
-func (eq *endpointQueries) join() {
+func (eq *endpointQueries) join(ctx context.Context) {
 	defer func() {
 		// Terminate all pending requests, so that no goroutine will
 		// block indefinitely.
@@ -243,7 +242,7 @@ func (eq *endpointQueries) join() {
 
 	for {
 		select {
-		case <-eq.stop:
+		case <-ctx.Done():
 			return
 		case req := <-eq.requestChan:
 			if cur, ok := eq.requests[req.endpointsName]; ok && cur.endpoints != nil {
@@ -327,7 +326,7 @@ func startEndpointWatcher(ctx context.Context, f *framework.Framework, q *endpoi
 		},
 	)
 
-	go controller.Run(q.stop)
+	go controller.RunWithContext(ctx)
 
 	// Wait for the controller to sync, so that we don't count any warm-up time.
 	for !controller.HasSynced() {

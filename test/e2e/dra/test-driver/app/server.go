@@ -121,7 +121,7 @@ func NewCommand() *cobra.Command {
 				return fmt.Errorf("create in-cluster client configuration: %w", err)
 			}
 		} else {
-			config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+			config, err = clientcmd.BuildConfigFromFlagsWithContext(cmd.Context(), "", *kubeconfig)
 			if err != nil {
 				return fmt.Errorf("create out-of-cluster client configuration: %w", err)
 			}

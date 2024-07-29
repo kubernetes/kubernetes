@@ -99,7 +99,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		scName  string
 		pvcs    []*v1.PersistentVolumeClaim
 		options *storageframework.PerformanceTestOptions
-		stopCh  chan struct{}
+		cancel  func()
 	}
 	var (
 		dInfo *storageframework.DriverInfo
@@ -130,9 +130,9 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 
 	ginkgo.AfterEach(func(ctx context.Context) {
 		if l != nil {
-			if l.stopCh != nil {
+			if l.cancel != nil {
 				ginkgo.By("Closing informer channel")
-				close(l.stopCh)
+				l.cancel()
 			}
 
 			ginkgo.By("Deleting all PVCs")
@@ -180,8 +180,9 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		// When all PVCs provisioned by this test are in the Bound state, the controller
 		// sends a signal to the channel
 		controller := newPVCWatch(ctx, f, l.options.ProvisioningOptions.Count, provisioningStats)
-		l.stopCh = make(chan struct{})
-		go controller.Run(l.stopCh)
+		cancelCtx, cancel := context.WithCancel(context.Background())
+		l.cancel = cancel
+		go controller.RunWithContext(cancelCtx)
 		waitForProvisionCh = make(chan []*v1.PersistentVolumeClaim)
 
 		ginkgo.By(fmt.Sprintf("Creating %d PVCs of size %s", l.options.ProvisioningOptions.Count, l.options.ProvisioningOptions.VolumeSize))
