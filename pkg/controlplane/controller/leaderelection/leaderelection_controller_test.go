@@ -19,6 +19,7 @@ package leaderelection
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -442,16 +442,16 @@ func TestController(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	cases := []struct {
-		name                       string
-		leaseNN                    types.NamespacedName
-		createAfterControllerStart []*v1alpha1.LeaseCandidate
-		deleteAfterControllerStart []types.NamespacedName
-		expectedLeaderLeases       []*v1.Lease
+		name                            string
+		leases                          []*v1.Lease
+		candidates                      []*v1alpha1.LeaseCandidate
+		createAfterControllerStart      []*v1alpha1.LeaseCandidate
+		deleteLeaseAfterControllerStart []types.NamespacedName
+		expectedLeaderLeases            []*v1.Lease
 	}{
 		{
-			name:    "single candidate leader election",
-			leaseNN: types.NamespacedName{Namespace: "kube-system", Name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
+			name: "single candidate leader election",
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -479,9 +479,8 @@ func TestController(t *testing.T) {
 			},
 		},
 		{
-			name:    "multiple candidate leader election",
-			leaseNN: types.NamespacedName{Namespace: "kube-system", Name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
+			name: "multiple candidate leader election",
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -535,17 +534,21 @@ func TestController(t *testing.T) {
 			},
 		},
 		{
-			name:    "deletion of lease triggers reelection",
-			leaseNN: types.NamespacedName{Namespace: "kube-system", Name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
+			name: "deletion of lease triggers reelection",
+			leases: []*v1.Lease{
 				{
-					// Leader lease
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
 					},
-					Spec: v1alpha1.LeaseCandidateSpec{},
+					Spec: v1.LeaseSpec{
+						HolderIdentity:       ptr.To("some-other-component"),
+						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(time.Second))),
+						LeaseDurationSeconds: ptr.To(int32(10)),
+					},
 				},
+			},
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -560,7 +563,7 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			deleteAfterControllerStart: []types.NamespacedName{
+			deleteLeaseAfterControllerStart: []types.NamespacedName{
 				{Namespace: "kube-system", Name: "component-A"},
 			},
 			expectedLeaderLeases: []*v1.Lease{
@@ -576,17 +579,65 @@ func TestController(t *testing.T) {
 			},
 		},
 		{
-			name:    "better candidate triggers reelection",
-			leaseNN: types.NamespacedName{Namespace: "kube-system", Name: "component-A"},
-			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
+			name: "expired lease is replaced",
+			leases: []*v1.Lease{
 				{
-					// Leader lease
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-A",
 					},
-					Spec: v1alpha1.LeaseCandidateSpec{},
+					Spec: v1.LeaseSpec{
+						HolderIdentity:       ptr.To("some-other-component"),
+						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(-11 * time.Second))),
+						LeaseDurationSeconds: ptr.To(int32(10)),
+						Strategy:             ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
+					},
 				},
+			},
+			candidates: []*v1alpha1.LeaseCandidate{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-identity-1",
+					},
+					Spec: v1alpha1.LeaseCandidateSpec{
+						LeaseName:           "component-A",
+						EmulationVersion:    "1.19.0",
+						BinaryVersion:       "1.19.0",
+						RenewTime:           ptr.To(metav1.NewMicroTime(fakeClock.Now())),
+						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
+					},
+				},
+			},
+			expectedLeaderLeases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity: ptr.To("component-identity-1"),
+					},
+				},
+			},
+		},
+		{
+			name: "better candidate triggers reelection",
+			leases: []*v1.Lease{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "kube-system",
+						Name:      "component-A",
+					},
+					Spec: v1.LeaseSpec{
+						HolderIdentity:       ptr.To("component-identity-1"),
+						Strategy:             ptr.To[v1.CoordinatedLeaseStrategy]("OldestEmulationVersion"),
+						RenewTime:            ptr.To(metav1.NewMicroTime(fakeClock.Now().Add(time.Second))),
+						LeaseDurationSeconds: ptr.To(int32(10)),
+					},
+				},
+			},
+			candidates: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -600,6 +651,8 @@ func TestController(t *testing.T) {
 						PreferredStrategies: []v1.CoordinatedLeaseStrategy{v1.OldestEmulationVersion},
 					},
 				},
+			},
+			createAfterControllerStart: []*v1alpha1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
@@ -645,8 +698,29 @@ func TestController(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			for _, obj := range tc.leases {
+				t.Logf("Pre-creating lease %s/%s", obj.Namespace, obj.Name)
+				_, err := client.CoordinationV1().Leases(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error pre-creating lease %s/%s: %v", obj.Namespace, obj.Name, err)
+				}
+			}
+			for _, obj := range tc.candidates {
+				t.Logf("Pre-creating lease candidate %s/%s", obj.Namespace, obj.Name)
+				_, err := client.CoordinationV1alpha1().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Error pre-creating lease candidate %s/%s: %v", obj.Namespace, obj.Name, err)
+				}
+			}
+
 			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 			go controller.Run(ctx, 1)
+
+			if rand.Intn(2) == 0 {
+				t.Logf("Giving controller a chance to run")
+				time.Sleep(time.Second)
+			}
 
 			go func() {
 				ticker := time.NewTicker(10 * time.Millisecond)
@@ -658,14 +732,24 @@ func TestController(t *testing.T) {
 						return
 					case <-ticker.C:
 						for _, expectedLease := range tc.expectedLeaderLeases {
-							lease, err := client.CoordinationV1().Leases(expectedLease.Namespace).Get(ctx, expectedLease.Name, metav1.GetOptions{})
-							if err == nil {
-								if preferredHolder := lease.Spec.PreferredHolder; preferredHolder != nil {
-									err = client.CoordinationV1().Leases(expectedLease.Namespace).Delete(ctx, expectedLease.Name, metav1.DeleteOptions{})
-									if err != nil {
-										runtime.HandleError(err)
-									}
-								}
+							l, err := client.CoordinationV1().Leases(expectedLease.Namespace).Get(ctx, expectedLease.Name, metav1.GetOptions{})
+							if err != nil {
+								continue
+							}
+							ph := l.Spec.PreferredHolder
+							if ph == nil || l.Spec.HolderIdentity == nil {
+								continue
+							}
+							if *ph == *l.Spec.HolderIdentity {
+								continue
+							}
+							if _, err := client.CoordinationV1alpha1().LeaseCandidates(expectedLease.Namespace).Get(ctx, *l.Spec.HolderIdentity, metav1.GetOptions{}); err != nil {
+								continue // only candidate-aware controllers will follow preferredHolder
+							}
+
+							t.Logf("Deleting lease %s/%s because of preferredHolder %q != %q", l.Namespace, l.Name, *ph, *l.Spec.HolderIdentity)
+							if err = client.CoordinationV1().Leases(expectedLease.Namespace).Delete(ctx, expectedLease.Name, metav1.DeleteOptions{}); err != nil {
+								t.Logf("Error deleting lease %s/%s: %v", l.Namespace, l.Name, err)
 							}
 						}
 					}
@@ -682,16 +766,15 @@ func TestController(t *testing.T) {
 						return
 					case <-ticker.C:
 						for _, lc := range tc.createAfterControllerStart {
-							lease, err := client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Get(ctx, lc.Name, metav1.GetOptions{})
+							c, err := client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Get(ctx, lc.Name, metav1.GetOptions{})
 							if err == nil {
-								if lease.Spec.PingTime != nil {
-									c := lease.DeepCopy()
+								if c.Spec.PingTime != nil {
+									t.Logf("Answering ping for %s/%s", c.Namespace, c.Name)
 									c.Spec.RenewTime = &metav1.MicroTime{Time: fakeClock.Now()}
 									_, err = client.CoordinationV1alpha1().LeaseCandidates(lc.Namespace).Update(ctx, c, metav1.UpdateOptions{})
 									if err != nil {
-										runtime.HandleError(err)
+										t.Logf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
 									}
-
 								}
 							}
 						}
@@ -700,22 +783,25 @@ func TestController(t *testing.T) {
 			}()
 
 			for _, obj := range tc.createAfterControllerStart {
+				t.Logf("Post-creating lease candidate %s/%s", obj.Namespace, obj.Name)
 				_, err := client.CoordinationV1alpha1().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
 				if err != nil {
-					t.Fatal(err)
+					t.Fatalf("Error post-creating lease candidate %s/%s: %v", obj.Namespace, obj.Name, err)
 				}
 			}
 
-			for _, obj := range tc.deleteAfterControllerStart {
-				err := client.CoordinationV1alpha1().LeaseCandidates(obj.Namespace).Delete(ctx, obj.Name, metav1.DeleteOptions{})
+			for _, obj := range tc.deleteLeaseAfterControllerStart {
+				t.Logf("Post-deleting lease %s/%s", obj.Namespace, obj.Name)
+				err := client.CoordinationV1().Leases(obj.Namespace).Delete(ctx, obj.Name, metav1.DeleteOptions{})
 				if err != nil {
-					t.Fatal(err)
+					t.Fatalf("Error post-deleting lease %s/%s: %v", obj.Namespace, obj.Name, err)
 				}
 			}
 
 			for _, expectedLease := range tc.expectedLeaderLeases {
 				var lease *v1.Lease
-				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 600*time.Second, true, func(ctx context.Context) (done bool, err error) {
+				t.Logf("Waiting for lease %s/%s with holder %q", expectedLease.Namespace, expectedLease.Name, strOrNil(expectedLease.Spec.HolderIdentity))
+				err = wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 					lease, err = client.CoordinationV1().Leases(expectedLease.Namespace).Get(ctx, expectedLease.Name, metav1.GetOptions{})
 					if err != nil {
 						if errors.IsNotFound(err) {
@@ -723,22 +809,22 @@ func TestController(t *testing.T) {
 						}
 						return true, err
 					}
-					if expectedLease.Spec.HolderIdentity == nil || lease.Spec.HolderIdentity == nil {
-						return expectedLease.Spec.HolderIdentity == nil && lease.Spec.HolderIdentity == nil, nil
+					if expectedLease.Spec.HolderIdentity == nil {
+						return lease.Spec.HolderIdentity == nil, nil
 					}
-					if expectedLease.Spec.HolderIdentity != nil && lease.Spec.HolderIdentity != nil && *expectedLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity {
+					if lease.Spec.HolderIdentity == nil {
+						return false, nil
+					}
+					if *expectedLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity {
 						return false, nil
 					}
 					return true, nil
 				})
 				if err != nil {
-					t.Fatal(err)
-				}
-				if lease.Spec.HolderIdentity == nil {
-					t.Fatalf("Expected HolderIdentity of %s but got nil", expectedLease.Name)
-				}
-				if *lease.Spec.HolderIdentity != *expectedLease.Spec.HolderIdentity {
-					t.Errorf("Expected HolderIdentity of %s but got %s", *expectedLease.Spec.HolderIdentity, *lease.Spec.HolderIdentity)
+					if lease == nil {
+						t.Fatalf("Error waiting for lease %s/%s to exist: %v", expectedLease.Namespace, expectedLease.Name, err)
+					}
+					t.Fatalf("Error waiting for lease %s/%s with holder %q, but got %q: %v", expectedLease.Namespace, expectedLease.Name, strOrNil(expectedLease.Spec.HolderIdentity), strOrNil(lease.Spec.HolderIdentity), err)
 				}
 			}
 		})

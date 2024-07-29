@@ -23,7 +23,6 @@ import (
 	"github.com/blang/semver/v4"
 	v1 "k8s.io/api/coordination/v1"
 	v1alpha1 "k8s.io/api/coordination/v1alpha1"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -36,11 +35,6 @@ func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha1.LeaseCandidate)
 		if electee == nil || compare(electee, c) > 0 {
 			electee = c
 		}
-	}
-	if electee == nil {
-		klog.Infof("pickBestLeader: none found")
-	} else {
-		klog.Infof("pickBestLeader: %s %s", electee.Namespace, electee.Name)
 	}
 	return electee
 }
