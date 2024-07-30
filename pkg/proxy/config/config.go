@@ -78,11 +78,10 @@ type EndpointSliceConfig struct {
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
 func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
 	result := &EndpointSliceConfig{
-		listerSynced: endpointSliceInformer.Informer().HasSynced,
-		logger:       klog.FromContext(ctx),
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddEndpointSlice,
 			UpdateFunc: result.handleUpdateEndpointSlice,
@@ -90,6 +89,8 @@ func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discovery
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
@@ -171,11 +172,10 @@ type ServiceConfig struct {
 // NewServiceConfig creates a new ServiceConfig.
 func NewServiceConfig(ctx context.Context, serviceInformer v1informers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
-		listerSynced: serviceInformer.Informer().HasSynced,
-		logger:       klog.FromContext(ctx),
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddService,
 			UpdateFunc: result.handleUpdateService,
@@ -183,6 +183,8 @@ func NewServiceConfig(ctx context.Context, serviceInformer v1informers.ServiceIn
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
