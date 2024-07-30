@@ -259,6 +259,7 @@ func TestPodAdmission(t *testing.T) {
 			stopCh := make(chan struct{})
 			defer close(stopCh)
 			informerFactory.Start(stopCh)
+			informerFactory.WaitForCacheSync(stopCh)
 
 			handler.pluginConfig = &pluginapi.Configuration{Default: test.defaultClusterTolerations, Whitelist: test.clusterWhitelist}
 			pod := test.pod
