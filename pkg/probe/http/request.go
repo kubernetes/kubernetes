@@ -38,6 +38,16 @@ func NewProbeRequest(url *url.URL, headers http.Header) (*http.Request, error) {
 // NewRequestForHTTPGetAction returns an http.Request derived from httpGet.
 // When httpGet.Host is empty, podIP will be used instead.
 func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Container, podIP string, userAgentFragment string) (*http.Request, error) {
+	url, err := GetProbeUrl(httpGet, container, podIP)
+	if err != nil {
+		return nil, err
+	}
+	headers := v1HeaderToHTTPHeader(httpGet.HTTPHeaders)
+
+	return newProbeRequest(url, headers, userAgentFragment)
+}
+
+func GetProbeUrl(httpGet *v1.HTTPGetAction, container *v1.Container, podIP string) (*url.URL, error) {
 	scheme := strings.ToLower(string(httpGet.Scheme))
 	if scheme == "" {
 		scheme = "http"
@@ -55,9 +65,8 @@ func NewRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Contain
 
 	path := httpGet.Path
 	url := formatURL(scheme, host, port, path)
-	headers := v1HeaderToHTTPHeader(httpGet.HTTPHeaders)
 
-	return newProbeRequest(url, headers, userAgentFragment)
+	return url, nil
 }
 
 func newProbeRequest(url *url.URL, headers http.Header, userAgentFragment string) (*http.Request, error) {

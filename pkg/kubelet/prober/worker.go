@@ -28,6 +28,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 )
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
@@ -162,9 +163,12 @@ func (w *worker) run() {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
+
 		if w.spec.HTTPGet != nil {
-			key := probeKey{podUID: w.pod.UID, containerName: w.container.Name, probeType: w.probeType}
-			w.probeManager.prober.httpProbeReqCache.Delete(key)
+			url, _ := httpprobe.GetProbeUrl(w.spec.HTTPGet, &w.container, w.pod.Status.PodIP)
+			if url != nil {
+				w.probeManager.prober.http.RemoveCache(url.String())
+			}
 		}
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)

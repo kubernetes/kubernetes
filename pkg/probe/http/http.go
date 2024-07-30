@@ -21,8 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/probe"
 
@@ -37,7 +39,7 @@ const (
 // New creates Prober that will skip TLS verification while probing.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
 // If disabled, redirects to other hosts will trigger a warning result.
-func New(followNonLocalRedirects bool) Prober {
+func New(followNonLocalRedirects bool) *HttpProber {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
 	return NewWithTLSConfig(tlsConfig, followNonLocalRedirects)
 }
@@ -45,7 +47,7 @@ func New(followNonLocalRedirects bool) Prober {
 // NewWithTLSConfig takes tls config as parameter.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
 // If disabled, redirects to other hosts will trigger a warning result.
-func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
+func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) *HttpProber {
 	// We do not want the probe use node's local proxy set.
 	transport := utilnet.SetTransportDefaults(
 		&http.Transport{
@@ -58,7 +60,7 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 			DialContext: probe.ProbeDialer().DialContext,
 		})
 
-	return httpProber{transport, followNonLocalRedirects}
+	return &HttpProber{transport, followNonLocalRedirects, &sync.Map{}}
 }
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
@@ -66,19 +68,43 @@ type Prober interface {
 	Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error)
 }
 
-type httpProber struct {
+type HttpProber struct {
 	transport               *http.Transport
 	followNonLocalRedirects bool
+	httpRequestCache        *sync.Map
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
-func (pr httpProber) Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error) {
+func (pr *HttpProber) Probe(req *http.Request, timeout time.Duration) (probe.Result, string, error) {
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
 		CheckRedirect: RedirectChecker(pr.followNonLocalRedirects),
 	}
 	return DoHTTPProbe(req, client)
+}
+
+// Probe returns a ProbeRunner capable of running an HTTP check.
+func (pr *HttpProber) GetRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, container *v1.Container, podIP string, userAgentFragment string) (*http.Request, error) {
+	var err error
+	url, err := GetProbeUrl(httpGet, container, podIP)
+	if err != nil {
+		return nil, err
+	}
+	reqAny, found := pr.httpRequestCache.Load(url.String())
+	req, _ := reqAny.(*http.Request)
+	if !found {
+		req, err = NewRequestForHTTPGetAction(httpGet, container, podIP, userAgentFragment)
+		if err != nil {
+			return nil, err
+		}
+		pr.httpRequestCache.Store(url.String(), req)
+	}
+	return req, nil
+}
+
+func (pr *HttpProber) RemoveCache(url string) {
+	pr.httpRequestCache.Delete(url)
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
