@@ -848,7 +848,8 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		preparedKey += "/"
 	}
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-	if resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported {
+	consistentRead := resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported
+	if consistentRead {
 		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
 		if err != nil {
 			return err
@@ -887,8 +888,23 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 
 	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	success := "true"
+	fallback := "false"
 	if err != nil {
+		if consistentRead {
+			if storage.IsTooLargeResourceVersion(err) {
+				fallback = "true"
+				err = c.storage.GetList(ctx, key, opts, listObj)
+			}
+			if err != nil {
+				success = "false"
+			}
+			metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
+		}
 		return err
+	}
+	if consistentRead {
+		metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
 	}
 	span.AddEvent("Listed items from cache", attribute.Int("count", len(objs)))
 	// store pointer of eligible objects,
