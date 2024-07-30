@@ -24,6 +24,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -267,6 +269,104 @@ func TestMakeMounts(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
+		})
+	}
+}
+
+func TestMakeMountsEtcHostsFile(t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "test-ns",
+			Name:        "test-pod-name",
+			Annotations: map[string]string{},
+		},
+		Spec: v1.PodSpec{
+			EnableServiceLinks: ptr.To(false), // to avoid errors with kl.makeEnvironmentVariables
+		},
+	}
+	testContainer := v1.Container{
+		Name:  "test-container",
+		Image: "img",
+	}
+	tests := []struct {
+		name        string
+		podFn       func(pod *v1.Pod)
+		containerFn func(container *v1.Container)
+		podVolumes  kubecontainer.VolumeMap
+		podIPs      []string
+		want        bool // check if mounts the /etc/host file
+		wantErr     bool
+	}{
+		{
+			name:   "pod with network",
+			podIPs: []string{"192.168.0.1"},
+			want:   true,
+		},
+		{
+			name: "pod with network but no IPs",
+			want: false,
+		},
+		{
+			name: "pod with host network",
+			podFn: func(pod *v1.Pod) {
+				pod.Spec.HostNetwork = true
+			},
+			podIPs: []string{"192.168.0.1"},
+			want:   true,
+		},
+		{
+			name: "pod with host network but no IPs",
+			podFn: func(pod *v1.Pod) {
+				pod.Spec.HostNetwork = true
+			},
+			want: true,
+		},
+		{
+			name: "pod with network already mounting the hosts file",
+			containerFn: func(container *v1.Container) {
+				container.VolumeMounts = []v1.VolumeMount{
+					{
+						Name:      "etchosts",
+						MountPath: etcHostsPath,
+					},
+				}
+			},
+			podVolumes: kubecontainer.VolumeMap{
+				"etchosts": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+			},
+			podIPs: []string{"192.168.0.1"},
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fhu := hostutil.NewFakeHostUtil(nil)
+			fsp := &subpath.FakeSubpath{}
+			pod := testPod.DeepCopy()
+			if tt.podFn != nil {
+				tt.podFn(pod)
+			}
+			container := testContainer.DeepCopy()
+			if tt.containerFn != nil {
+				tt.containerFn(container)
+			}
+
+			mounts, _, err := makeMounts(pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := false
+			for _, mount := range mounts {
+				if mount.Name == "k8s-managed-etc-hosts" {
+					got = true
+					break
+				}
+			}
+
+			if got != tt.want {
+				t.Errorf("/etc/hosts file mounted: got = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
